@@ -22,13 +22,13 @@ The app runs at `http://localhost:5173`.
 
 Run from the repo root with `pnpm --filter frontend <script>`, or from inside `apps/frontend` with `pnpm <script>`:
 
-| Script      | Description                    |
-| ----------- | ------------------------------ |
-| `dev`       | Starts the dev server          |
-| `build`     | Typecheck + production build   |
-| `preview`   | Previews the production build  |
-| `lint`      | Runs ESLint                    |
-| `typecheck` | Runs `tsc -b` (type check only)|
+| Script      | Description                     |
+| ----------- | ------------------------------- |
+| `dev`       | Starts the dev server           |
+| `build`     | Typecheck + production build    |
+| `preview`   | Previews the production build   |
+| `lint`      | Runs ESLint                     |
+| `typecheck` | Runs `tsc -b` (type check only) |
 
 ## Environment Variables
 
