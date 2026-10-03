@@ -21,7 +21,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "dev:backend": "pnpm --filter @steamx/backend start:dev"
   },
   "devDependencies": {
     "prettier": "^3.9.9",
