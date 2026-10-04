@@ -37,6 +37,24 @@ export class EnrollmentService {
 }
 ```
 
+## API conventions
+
+API routes use the `/api/v1` prefix. When enabled, Swagger UI is available at
+`/api/docs`.
+
+Errors use a consistent response shape:
+
+```json
+{
+  "statusCode": 404,
+  "code": "NOT_FOUND",
+  "message": "Cannot GET /api/v1/missing",
+  "requestId": "a84f4a1f-746d-4e64-9841-c99d5d6ced31"
+}
+```
+
+Validation errors use `VALIDATION_ERROR` and include field details.
+
 ## Compile and run the project
 
 ```bash
