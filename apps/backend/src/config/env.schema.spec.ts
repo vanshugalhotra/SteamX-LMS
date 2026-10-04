@@ -35,6 +35,15 @@ describe('validateEnv', () => {
     ).toBe(false);
   });
 
+  it('accepts silent logging', () => {
+    expect(
+      validateEnv({
+        DATABASE_URL: '******localhost:5432/steamx_lms',
+        LOG_LEVEL: 'silent',
+      }).LOG_LEVEL,
+    ).toBe('silent');
+  });
+
   it('reports every invalid or missing variable without exposing values', () => {
     const sensitiveValue = 'private-environment-value';
     let message = '';

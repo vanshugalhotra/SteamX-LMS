@@ -15,9 +15,9 @@ variables that need attention.
 
 The API uses structured Pino logging. Production and test environments write
 JSON to stdout; development uses readable `pino-pretty` output. Set `LOG_LEVEL`
-to control the minimum logged level. Request logs include the method, URL, status,
-response time, and request ID; `/health` is excluded. Request and response
-bodies are not logged.
+to control the minimum logged level; `silent` disables logging. Request logs
+include the method, URL, status, response time, and request ID; `/health` is
+excluded. Request and response bodies are not logged.
 
 Inject `PinoLogger` in a service and set its context to identify the source:
 
