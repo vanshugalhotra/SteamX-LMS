@@ -25,4 +25,14 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+      - run: pnpm --filter @steamx/backend test:e2e
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/steamx_lms
+          NODE_ENV: development
+          PORT: 3000
+          CORS_ORIGINS: http://localhost:5173
+          SWAGGER_ENABLED: true
+          LOG_LEVEL: info
+
       - run: pnpm build
