@@ -1,8 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import request from 'supertest';
 import { App } from 'supertest/types.js';
+import request from 'supertest';
 import { AppModule } from './../src/app.module.js';
+import { configureApp } from './../src/configure-app.js';
 
 describe('Request logging (e2e)', () => {
   let app: INestApplication<App>;
@@ -13,6 +14,7 @@ describe('Request logging (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    configureApp(app);
     await app.init();
   });
 
@@ -20,7 +22,7 @@ describe('Request logging (e2e)', () => {
     const requestId = 'a84f4a1f-746d-4e64-9841-c99d5d6ced31';
 
     return request(app.getHttpServer())
-      .get('/')
+      .get('/api/v1')
       .set('X-Request-Id', requestId)
       .expect(200)
       .expect('X-Request-Id', requestId);
@@ -28,7 +30,7 @@ describe('Request logging (e2e)', () => {
 
   it('generates a UUID when the incoming request ID is invalid', async () => {
     const response = await request(app.getHttpServer())
-      .get('/')
+      .get('/api/v1')
       .set('X-Request-Id', 'untrusted-value')
       .expect(200);
 
