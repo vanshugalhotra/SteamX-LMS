@@ -16,8 +16,8 @@ variables that need attention.
 The API uses structured Pino logging. Production and test environments write
 JSON to stdout; development uses readable `pino-pretty` output. Set `LOG_LEVEL`
 to control the minimum logged level; `silent` disables logging. Request logs
-include the method, URL, status, response time, and request ID; `/health` is
-excluded. Request and response bodies are not logged.
+include the method, URL, status, response time, and request ID; paths beginning
+with `/health` are excluded. Request and response bodies are not logged.
 
 Inject `PinoLogger` in a service and set its context to identify the source:
 
@@ -41,6 +41,10 @@ export class EnrollmentService {
 
 API routes use the `/api/v1` prefix. When enabled, Swagger UI is available at
 `/api/docs`.
+
+`GET /health/live` is available at the root without the `/api/v1` prefix. It
+returns `{ "status": "ok" }` while the process is running and does not check
+external dependencies.
 
 Errors use a consistent response shape:
 

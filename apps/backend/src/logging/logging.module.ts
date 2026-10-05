@@ -56,7 +56,10 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
               return 'info';
             },
             autoLogging: {
-              ignore: (req: IncomingMessage) => req.url?.split('?')[0] === '/health',
+              ignore: (req: IncomingMessage) => {
+                const path = req.url?.split('?')[0];
+                return path === '/health' || path?.startsWith('/health/') === true;
+              },
             },
             ...(nodeEnv === 'development' && {
               transport: {
