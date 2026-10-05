@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   INestApplication,
+  RequestMethod,
   ValidationPipe,
   VersioningType,
 } from '@nestjs/common';
@@ -53,7 +54,9 @@ export function configureApp(app: INestApplication): void {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
     exposedHeaders: ['X-Request-Id'],
   });
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'health/*path', method: RequestMethod.GET }],
+  });
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',
