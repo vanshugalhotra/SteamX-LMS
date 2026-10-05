@@ -6,8 +6,6 @@ import { Pool } from 'pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 import type { Env } from '../config/env.schema.js';
 
-const DATABASE_CONNECTION_TIMEOUT_MS = 5_000;
-
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly pool: Pool;
@@ -19,7 +17,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const connectionString = config.get('DATABASE_URL', { infer: true });
     const pool = new Pool({
       connectionString,
-      connectionTimeoutMillis: DATABASE_CONNECTION_TIMEOUT_MS,
+      connectionTimeoutMillis: config.get('MAX_DB_TIMEOUT', { infer: true }),
+      max: config.get('MAX_DB_CONNECTIONS', { infer: true }),
     });
 
     super({ adapter: new PrismaPg(pool) });

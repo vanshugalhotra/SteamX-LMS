@@ -33,6 +33,8 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://steamx_local:local_dev_password@localhost:5432/steamx_lms_test
+      MAX_DB_TIMEOUT: 5000
+      MAX_DB_CONNECTIONS: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

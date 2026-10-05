@@ -38,6 +38,13 @@ Existing environment variables take precedence over `.env.test`, so CI only
 overrides `DATABASE_URL`. Environment variables are validated at startup; see
 `.env.example` for development settings.
 
+`MAX_DB_TIMEOUT` configures the connection-establishment timeout in
+milliseconds (default `5000`). `MAX_DB_CONNECTIONS` sets the maximum number of
+connections in each API process's PostgreSQL pool (default `20`). Keep the pool
+limit aligned with the database's total connection budget and the number of API
+instances. The `pg` idle timeout default is sufficient for now; avoid `maxUses`
+connection rotation unless the hosting environment demonstrates a need for it.
+
 ## Commands
 
 ```bash

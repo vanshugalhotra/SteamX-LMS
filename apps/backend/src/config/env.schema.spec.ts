@@ -13,6 +13,8 @@ describe('validateEnv', () => {
       PORT: 4300,
       LOG_LEVEL: 'info',
       DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
+      MAX_DB_TIMEOUT: 5_000,
+      MAX_DB_CONNECTIONS: 20,
       CORS_ORIGINS: ['http://localhost:5173', 'https://steamx.example'],
       SWAGGER_ENABLED: true,
     });
@@ -55,6 +57,8 @@ describe('validateEnv', () => {
         LOG_LEVEL: 'verbose',
         CORS_ORIGINS: sensitiveValue,
         SWAGGER_ENABLED: 'yes',
+        MAX_DB_TIMEOUT: '0',
+        MAX_DB_CONNECTIONS: 'not-a-number',
       });
     } catch (error) {
       message = error instanceof Error ? error.message : '';
@@ -67,6 +71,8 @@ describe('validateEnv', () => {
     expect(message).toContain('DATABASE_URL');
     expect(message).toContain('CORS_ORIGINS');
     expect(message).toContain('SWAGGER_ENABLED');
+    expect(message).toContain('MAX_DB_TIMEOUT');
+    expect(message).toContain('MAX_DB_CONNECTIONS');
     expect(message).not.toContain(sensitiveValue);
   });
 });
