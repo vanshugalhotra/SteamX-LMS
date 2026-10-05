@@ -1,0 +1,13 @@
+// Data conventions: PascalCase models map to snake_case plural tables with @@map;
+// columns use snake_case @map names, UUID primary keys, and created_at/updated_at
+// timestamps on every table.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}

@@ -1,86 +1,57 @@
-## Project setup
+# STEAMX LMS: Backend
+
+## Setup
+
+Requires Node (see `.nvmrc`), pnpm, and PostgreSQL 18.
+
+First create the dedicated local role and databases once, while connected to
+PostgreSQL as an administrator (for example, with `psql -U postgres`):
+
+```sql
+CREATE ROLE steamx_local LOGIN PASSWORD 'local_dev_password';
+CREATE DATABASE steamx_lms OWNER steamx_local;
+CREATE DATABASE steamx_lms_test OWNER steamx_local;
+```
+
+Then, from the repository root, install dependencies, configure the development
+URL, and generate the Prisma client:
 
 ```bash
-$ pnpm install
+pnpm install
+cp apps/backend/.env.example apps/backend/.env
+pnpm --filter @steamx/backend prisma:generate
 ```
 
-## Configuration
+The development URL belongs in `apps/backend/.env`:
 
-Copy `.env.example` to `.env` and set the values for your environment, including
-the required `DATABASE_URL`. Environment variables are validated when the API
-starts; any missing required or invalid value stops startup with a list of the
-variables that need attention.
-
-## Logging
-
-The API uses structured Pino logging. Production and test environments write
-JSON to stdout; development uses readable `pino-pretty` output. Set `LOG_LEVEL`
-to control the minimum logged level; `silent` disables logging. Request logs
-include the method, URL, status, response time, and request ID; paths beginning
-with `/health` are excluded. Request and response bodies are not logged.
-
-Inject `PinoLogger` in a service and set its context to identify the source:
-
-```ts
-import { Injectable } from '@nestjs/common';
-import { PinoLogger } from 'nestjs-pino';
-
-@Injectable()
-export class EnrollmentService {
-  constructor(private readonly logger: PinoLogger) {
-    this.logger.setContext(EnrollmentService.name);
-  }
-
-  enroll(courseId: string): void {
-    this.logger.info({ courseId }, 'Enrollment created');
-  }
-}
+```text
+DATABASE_URL=postgresql://steamx_local:local_dev_password@localhost:5432/steamx_lms
 ```
 
-## API conventions
+E2E tests automatically load `apps/backend/.env.test`, which points to:
 
-API routes use the `/api/v1` prefix. When enabled, Swagger UI is available at
-`/api/docs`.
-
-`GET /health/live` is available at the root without the `/api/v1` prefix. It
-returns `{ "status": "ok" }` while the process is running and does not check
-external dependencies.
-
-Errors use a consistent response shape:
-
-```json
-{
-  "statusCode": 404,
-  "code": "NOT_FOUND",
-  "message": "Cannot GET /api/v1/missing",
-  "requestId": "a84f4a1f-746d-4e64-9841-c99d5d6ced31"
-}
+```text
+DATABASE_URL=postgresql://steamx_local:local_dev_password@localhost:5432/steamx_lms_test
 ```
 
-Validation errors use `VALIDATION_ERROR` and include field details.
+Existing environment variables take precedence over `.env.test`, so CI only
+overrides `DATABASE_URL`. Environment variables are validated at startup; see
+`.env.example` for development settings.
 
-## Compile and run the project
+## Commands
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm --filter @steamx/backend start:dev                       # run with watch
+pnpm --filter @steamx/backend test                            # unit tests
+pnpm --filter @steamx/backend test:e2e                        # e2e (uses .env.test)
+pnpm --filter @steamx/backend migrate:dev --name <name>       # create/apply migration after adding schema changes
+pnpm --filter @steamx/backend migrate:deploy                  # apply migrations (CI/production)
 ```
 
-## Run tests
+## Conventions
 
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
+- Routes live under `/api/v1`. Swagger is at `/api/docs` when `SWAGGER_ENABLED=true`.
+  `GET /health/live` is at the root.
+- Errors always look like `{ statusCode, code, message, details?, requestId }`.
+- Prisma is used only in the data-access layer, never in controllers.
+- Logging: inject `PinoLogger`, log IDs and facts, never tokens or personal data.
