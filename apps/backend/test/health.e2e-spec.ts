@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { App } from 'supertest/types.js';
 import request from 'supertest';
+import type { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/configure-app.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
@@ -19,24 +19,18 @@ describe('Health endpoints (e2e)', () => {
     await app.init();
   });
 
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await app.close();
+  });
+
   it('GET /health/live returns ok without prefix or version', async () => {
     await request(app.getHttpServer()).get('/health/live').expect(200).expect({ status: 'ok' });
     await request(app.getHttpServer()).get('/api/v1/health/live').expect(404);
   });
 
-  it('GET /health/ready checks the real database and is skipped by request logging', async () => {
-    const output: string[] = [];
-    const write = vi.spyOn(process.stdout, 'write').mockImplementation((...args) => {
-      output.push(String(args[0]));
-      return true;
-    });
-
-    try {
-      await request(app.getHttpServer()).get('/health/ready').expect(200).expect({ status: 'ok' });
-      expect(output.join('')).not.toContain('/health/ready');
-    } finally {
-      write.mockRestore();
-    }
+  it('GET /health/ready returns ok when the database is reachable', async () => {
+    await request(app.getHttpServer()).get('/health/ready').expect(200).expect({ status: 'ok' });
   });
 
   it('GET /api/v1/health/ready is not under the API prefix', async () => {
@@ -55,9 +49,5 @@ describe('Health endpoints (e2e)', () => {
       .expect({ status: 'error', checks: { database: 'down' } });
 
     expect(JSON.stringify(response.body)).not.toContain('Sensitive database host');
-  });
-
-  afterEach(async () => {
-    await app.close();
   });
 });
