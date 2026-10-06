@@ -1,11 +1,9 @@
 # STEAMX LMS: Backend
 
-## Setup
+## Project setup
 
-Requires Node (see `.nvmrc`), pnpm, and PostgreSQL 18.
-
-First create the dedicated local role and databases once, while connected to
-PostgreSQL as an administrator (for example, with `psql -U postgres`):
+Requires Node from `.nvmrc`, pnpm, and PostgreSQL 18. Create separate development
+and test databases:
 
 ```sql
 CREATE ROLE steamx_local LOGIN PASSWORD 'local_dev_password';
@@ -13,8 +11,8 @@ CREATE DATABASE steamx_lms OWNER steamx_local;
 CREATE DATABASE steamx_lms_test OWNER steamx_local;
 ```
 
-Then, from the repository root, install dependencies, configure the development
-URL, and generate the Prisma client:
+From the repository root, install dependencies, configure the backend, and
+generate the Prisma client:
 
 ```bash
 pnpm install
@@ -22,44 +20,34 @@ cp apps/backend/.env.example apps/backend/.env
 pnpm --filter @steamx/backend prisma:generate
 ```
 
-The development URL belongs in `apps/backend/.env`:
-
-```text
-DATABASE_URL=postgresql://steamx_local:local_dev_password@localhost:5432/steamx_lms
-```
-
-E2E tests automatically load `apps/backend/.env.test`, which points to:
-
-```text
-DATABASE_URL=postgresql://steamx_local:local_dev_password@localhost:5432/steamx_lms_test
-```
-
-Existing environment variables take precedence over `.env.test`, so CI only
-overrides `DATABASE_URL`. Environment variables are validated at startup; see
-`.env.example` for development settings.
-
-`DB_CONNECTION_TIMEOUT_MS` configures the connection-establishment timeout in
-milliseconds (minimum `1000`, default `5000`). `DB_POOL_MAX` sets the maximum
-number of connections in each API process's PostgreSQL pool (range `1`–`50`,
-default `10`). Keep the pool limit aligned with the database's total connection
-budget and the number of API instances. Other pool tuning remains at the `pg`
-defaults.
+Set `DATABASE_URL` in `apps/backend/.env` to the development database. E2E tests
+use `apps/backend/.env.test` and the test database.
 
 ## Commands
 
+Run from the repository root:
+
 ```bash
-pnpm --filter @steamx/backend start:dev                       # run with watch
-pnpm --filter @steamx/backend test                            # unit tests
-pnpm --filter @steamx/backend test:e2e                        # e2e (uses .env.test)
-pnpm --filter @steamx/backend migrate:dev --name <name>       # create/apply migration after adding schema changes
-pnpm --filter @steamx/backend migrate:deploy                  # apply migrations (CI/production)
+pnpm --filter @steamx/backend start:dev
+pnpm --filter @steamx/backend lint
+pnpm --filter @steamx/backend typecheck
+pnpm --filter @steamx/backend test
+pnpm --filter @steamx/backend test:e2e
+pnpm --filter @steamx/backend build
+pnpm --filter @steamx/backend migrate:dev --name <name>
+pnpm --filter @steamx/backend migrate:deploy
 ```
 
-## Conventions
+## Decisions and beware
 
-- Routes live under `/api/v1`. Swagger is at `/api/docs` when `SWAGGER_ENABLED=true`.
-  `GET /health/live` is at the root. `GET /health/ready` is also at the root and returns
-  `503` if the database is unreachable.
-- Errors always look like `{ statusCode, code, message, details?, requestId }`.
-- Prisma is used only in the data-access layer, never in controllers.
-- Logging: inject `PinoLogger`, log IDs and facts, never tokens or personal data.
+- API routes use `/api/v1`. `/health/live` and `/health/ready` are root,
+  unversioned routes; readiness returns `503` when PostgreSQL is unavailable.
+- E2E tests use the real test database. Environment variables override values
+  loaded from `.env.test`.
+- Each API process has a PostgreSQL pool capped by `DB_POOL_MAX` (default `10`,
+  range `1`–`50`). `DB_CONNECTION_TIMEOUT_MS` controls connection establishment
+  (default `5000`, minimum `1000`). Align the pool limit with the database
+  connection budget and number of API instances.
+- Use `migrate:dev` to create and apply development migrations; use
+  `migrate:deploy` to apply existing migrations in CI or production.
+- Responses use `{ statusCode, code, message, details?, requestId }`.
