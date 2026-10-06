@@ -6,6 +6,7 @@ import { AppService } from './app.service.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { validateEnv } from './config/env.schema.js';
 import { HealthController } from './health/health.controller.js';
+import { HealthService } from './health/health.service.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -20,6 +21,6 @@ import { PrismaModule } from './prisma/prisma.module.js';
     PrismaModule,
   ],
   controllers: [AppController, HealthController],
-  providers: [AppService, { provide: APP_FILTER, useClass: HttpExceptionFilter }],
+  providers: [AppService, HealthService, { provide: APP_FILTER, useClass: HttpExceptionFilter }],
 })
 export class AppModule {}

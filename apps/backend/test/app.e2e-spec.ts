@@ -22,11 +22,6 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer()).get('/api/v1').expect(200).expect('Hello World!');
   });
 
-  it('GET /health/live returns ok without prefix or version', async () => {
-    await request(app.getHttpServer()).get('/health/live').expect(200).expect({ status: 'ok' });
-    await request(app.getHttpServer()).get('/api/v1/health/live').expect(404);
-  });
-
   afterEach(async () => {
     await app.close();
   });

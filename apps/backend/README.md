@@ -58,7 +58,8 @@ pnpm --filter @steamx/backend migrate:deploy                  # apply migrations
 ## Conventions
 
 - Routes live under `/api/v1`. Swagger is at `/api/docs` when `SWAGGER_ENABLED=true`.
-  `GET /health/live` is at the root.
+  `GET /health/live` is at the root. `GET /health/ready` is also at the root and returns
+  `503` if the database is unreachable.
 - Errors always look like `{ statusCode, code, message, details?, requestId }`.
 - Prisma is used only in the data-access layer, never in controllers.
 - Logging: inject `PinoLogger`, log IDs and facts, never tokens or personal data.
