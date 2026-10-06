@@ -1,5 +1,4 @@
-const BASE_URL =
-  import.meta.env.VITE_API_URL as string;
+const BASE_URL = import.meta.env.VITE_API_URL as string;
 
 interface ApiErrorBody {
   code?: string;
@@ -15,7 +14,7 @@ export class ApiError extends Error {
 
   constructor(status: number, message: string, body?: ApiErrorBody) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
     this.status = status;
     this.code = body?.code;
     this.details = body?.details;
@@ -35,46 +34,37 @@ export function setApiHandlers(next: Handlers) {
 }
 
 const FALLBACK_MESSAGES: Partial<Record<number, string>> = {
-  401: "Your session has expired. Please log in again.",
+  401: 'Your session has expired. Please log in again.',
   403: "You don't have access to this.",
   404: "We couldn't find what you were looking for.",
 };
 
-export async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   const isFormData = options.body instanceof FormData;
-  if (options.body && !isFormData && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
+  if (options.body && !isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
   }
 
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       ...options,
-      credentials: "include", // httpOnly cookies
+      credentials: 'include', // httpOnly cookies
       headers,
     });
   } catch {
-    throw new ApiError(0, "Network error. Please check your connection.");
+    throw new ApiError(0, 'Network error. Please check your connection.');
   }
 
-  const data: unknown =
-    res.status === 204 ? null : await res.json().catch(() => null);
+  const data: unknown = res.status === 204 ? null : await res.json().catch(() => null);
 
   if (!res.ok) {
     if (res.status === 401) handlers.onUnauthorized?.();
     if (res.status === 403) handlers.onForbidden?.();
 
-    const message =
-      FALLBACK_MESSAGES[res.status] ??
-      "Something went wrong. Please try again.";
-    const body =
-      typeof data === "object" && data !== null
-        ? (data as ApiErrorBody)
-        : undefined;
+    const message = FALLBACK_MESSAGES[res.status] ?? 'Something went wrong. Please try again.';
+    const body = typeof data === 'object' && data !== null ? (data as ApiErrorBody) : undefined;
     throw new ApiError(res.status, message, body);
   }
 
