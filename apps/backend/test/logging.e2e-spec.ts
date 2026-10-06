@@ -22,17 +22,17 @@ describe('Request logging (e2e)', () => {
     const requestId = 'a84f4a1f-746d-4e64-9841-c99d5d6ced31';
 
     return request(app.getHttpServer())
-      .get('/api/v1')
+      .get('/api/v1/not-found')
       .set('X-Request-Id', requestId)
-      .expect(200)
+      .expect(404)
       .expect('X-Request-Id', requestId);
   });
 
   it('generates a UUID when the incoming request ID is invalid', async () => {
     const response = await request(app.getHttpServer())
-      .get('/api/v1')
+      .get('/api/v1/not-found')
       .set('X-Request-Id', 'untrusted-value')
-      .expect(200);
+      .expect(404);
 
     expect(response.headers['x-request-id']).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,

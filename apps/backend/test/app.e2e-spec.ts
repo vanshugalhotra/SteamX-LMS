@@ -5,7 +5,7 @@ import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
 import { configureApp } from './../src/configure-app.js';
 
-describe('AppController (e2e)', () => {
+describe('API routes (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
@@ -13,13 +13,12 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     }).compile();
     app = moduleFixture.createNestApplication();
-    app = moduleFixture.createNestApplication();
     configureApp(app);
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/api/v1').expect(200).expect('Hello World!');
+  it('returns 404 when no API route matches', () => {
+    return request(app.getHttpServer()).get('/api/v1').expect(404);
   });
 
   afterEach(async () => {
