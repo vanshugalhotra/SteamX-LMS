@@ -1,4 +1,6 @@
-const BASE_URL = import.meta.env.VITE_API_URL as string;
+import { env } from './env';
+
+const BASE_URL = env.VITE_API_URL;
 
 interface ApiErrorBody {
   code?: string;
