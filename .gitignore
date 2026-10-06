@@ -5,7 +5,9 @@ coverage/
 .env
 .env.*
 !.env.example
+!apps/backend/.env.test
 *.log
+apps/backend/src/generated/prisma/
 .DS_Store
 .idea/
 .vscode/*
