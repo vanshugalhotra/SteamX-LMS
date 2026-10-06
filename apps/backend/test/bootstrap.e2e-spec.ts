@@ -91,7 +91,7 @@ describe('API bootstrap (e2e)', () => {
     });
 
     const disallowedOrigin = await request(app.getHttpServer())
-      .get('/api/v1')
+      .get('/health/live')
       .set('Origin', 'https://not-configured.example')
       .expect(200);
 

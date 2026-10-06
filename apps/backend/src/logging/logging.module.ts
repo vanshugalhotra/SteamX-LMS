@@ -5,6 +5,7 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
 import { REDACTED_LOG_PATHS } from './logging.constants.js';
 import type { Env } from '../config/env.schema.js';
+import { serializeError } from './serialize-error.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,6 +21,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
           pinoHttp: {
             level: config.get('LOG_LEVEL', { infer: true }),
             serializers: {
+              err: serializeError,
               req: (req: IncomingMessage) => ({
                 id: req.id,
                 method: req.method,

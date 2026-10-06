@@ -8,6 +8,8 @@ const envSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
     DATABASE_URL: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
+    DB_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+    DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(1000).default(5000),
     CORS_ORIGINS: z
       .string()
       .default('')

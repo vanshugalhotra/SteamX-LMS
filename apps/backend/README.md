@@ -1,86 +1,53 @@
+# STEAMX LMS: Backend
+
 ## Project setup
 
-```bash
-$ pnpm install
+Requires Node from `.nvmrc`, pnpm, and PostgreSQL 18. Create separate development
+and test databases:
+
+```sql
+CREATE ROLE steamx_local LOGIN PASSWORD 'local_dev_password';
+CREATE DATABASE steamx_lms OWNER steamx_local;
+CREATE DATABASE steamx_lms_test OWNER steamx_local;
 ```
 
-## Configuration
-
-Copy `.env.example` to `.env` and set the values for your environment, including
-the required `DATABASE_URL`. Environment variables are validated when the API
-starts; any missing required or invalid value stops startup with a list of the
-variables that need attention.
-
-## Logging
-
-The API uses structured Pino logging. Production and test environments write
-JSON to stdout; development uses readable `pino-pretty` output. Set `LOG_LEVEL`
-to control the minimum logged level; `silent` disables logging. Request logs
-include the method, URL, status, response time, and request ID; paths beginning
-with `/health` are excluded. Request and response bodies are not logged.
-
-Inject `PinoLogger` in a service and set its context to identify the source:
-
-```ts
-import { Injectable } from '@nestjs/common';
-import { PinoLogger } from 'nestjs-pino';
-
-@Injectable()
-export class EnrollmentService {
-  constructor(private readonly logger: PinoLogger) {
-    this.logger.setContext(EnrollmentService.name);
-  }
-
-  enroll(courseId: string): void {
-    this.logger.info({ courseId }, 'Enrollment created');
-  }
-}
-```
-
-## API conventions
-
-API routes use the `/api/v1` prefix. When enabled, Swagger UI is available at
-`/api/docs`.
-
-`GET /health/live` is available at the root without the `/api/v1` prefix. It
-returns `{ "status": "ok" }` while the process is running and does not check
-external dependencies.
-
-Errors use a consistent response shape:
-
-```json
-{
-  "statusCode": 404,
-  "code": "NOT_FOUND",
-  "message": "Cannot GET /api/v1/missing",
-  "requestId": "a84f4a1f-746d-4e64-9841-c99d5d6ced31"
-}
-```
-
-Validation errors use `VALIDATION_ERROR` and include field details.
-
-## Compile and run the project
+From the repository root, install dependencies, configure the backend, and
+generate the Prisma client:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm install
+cp apps/backend/.env.example apps/backend/.env
+pnpm --filter @steamx/backend prisma:generate
 ```
 
-## Run tests
+Set `DATABASE_URL` in `apps/backend/.env` to the development database. E2E tests
+use `apps/backend/.env.test` and the test database.
+
+## Commands
+
+Run from the repository root:
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm --filter @steamx/backend start:dev
+pnpm --filter @steamx/backend lint
+pnpm --filter @steamx/backend typecheck
+pnpm --filter @steamx/backend test
+pnpm --filter @steamx/backend test:e2e
+pnpm --filter @steamx/backend build
+pnpm --filter @steamx/backend migrate:dev --name <name>
+pnpm --filter @steamx/backend migrate:deploy
 ```
+
+## Decisions and beware
+
+- API routes use `/api/v1`. `/health/live` and `/health/ready` are root,
+  unversioned routes; readiness returns `503` when PostgreSQL is unavailable.
+- E2E tests use the real test database. Environment variables override values
+  loaded from `.env.test`.
+- Each API process has a PostgreSQL pool capped by `DB_POOL_MAX` (default `10`,
+  range `1`–`50`). `DB_CONNECTION_TIMEOUT_MS` controls connection establishment
+  (default `5000`, minimum `1000`). Align the pool limit with the database
+  connection budget and number of API instances.
+- Use `migrate:dev` to create and apply development migrations; use
+  `migrate:deploy` to apply existing migrations in CI or production.
+- Responses use `{ statusCode, code, message, details?, requestId }`.
