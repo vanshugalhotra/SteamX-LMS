@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Logger } from 'nestjs-pino';
+import { mapPrismaError } from '../errors/prisma-error.js';
 
 const HTTP_ERROR_CODES: Partial<Record<number, string>> = {
   400: 'BAD_REQUEST',
@@ -99,14 +100,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    const statusCode = getStatusCode(exception);
-    const exceptionResponse = getExceptionResponse(exception);
+    const error = mapPrismaError(exception) ?? exception;
+    const statusCode = getStatusCode(error);
+    const exceptionResponse = getExceptionResponse(error);
     const isServerError = statusCode >= 500;
 
     if (isServerError) {
-      const error = exception instanceof Error ? exception : new Error(String(exception));
+      const originalError = exception instanceof Error ? exception : new Error(String(exception));
       this.logger.error({
-        err: error,
+        err: originalError,
         requestId: request.id,
         msg: 'Unhandled request error',
       });
@@ -115,7 +117,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(statusCode).json({
       statusCode,
       code: getCode(exceptionResponse, statusCode),
-      message: getMessage(exception, exceptionResponse, statusCode),
+      message: getMessage(error, exceptionResponse, statusCode),
       ...(statusCode < 500 &&
         exceptionResponse?.details !== undefined && { details: exceptionResponse.details }),
       requestId: request.id,
