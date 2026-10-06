@@ -6,6 +6,11 @@ import { Pool } from 'pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 import type { Env } from '../config/env.schema.js';
 
+const IDLE_TIMEOUT_MS = 30_000;
+const MAX_LIFETIME_SECONDS = 1_800;
+const STATEMENT_TIMEOUT_MS = 30_000;
+const IDLE_IN_TRANSACTION_TIMEOUT_MS = 30_000;
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly pool: Pool;
@@ -14,16 +19,26 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
   ) {
-    const connectionString = config.get('DATABASE_URL', { infer: true });
     const pool = new Pool({
-      connectionString,
-      connectionTimeoutMillis: config.get('MAX_DB_TIMEOUT', { infer: true }),
-      max: config.get('MAX_DB_CONNECTIONS', { infer: true }),
+      connectionString: config.get('DATABASE_URL', { infer: true }),
+      max: config.get('DB_POOL_MAX', { infer: true }),
+      connectionTimeoutMillis: config.get('DB_CONNECTION_TIMEOUT_MS', { infer: true }),
+      idleTimeoutMillis: IDLE_TIMEOUT_MS,
+      maxLifetimeSeconds: MAX_LIFETIME_SECONDS,
+      statement_timeout: STATEMENT_TIMEOUT_MS,
+      idle_in_transaction_session_timeout: IDLE_IN_TRANSACTION_TIMEOUT_MS,
+      keepAlive: true,
+      application_name: 'steamx-api',
     });
 
     super({ adapter: new PrismaPg(pool) });
     this.pool = pool;
     this.logger.setContext(PrismaService.name);
+
+    // Without this listener, a dropped idle connection crashes the process.
+    this.pool.on('error', (err) => {
+      this.logger.error({ err }, 'Idle PostgreSQL client error');
+    });
   }
 
   async onModuleInit(): Promise<void> {
@@ -33,34 +48,26 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.logger.info('Connected to PostgreSQL');
     } catch (error) {
       this.logger.error({ err: error }, 'Failed to connect to PostgreSQL');
-
-      try {
-        await this.$disconnect();
-      } catch (disconnectError) {
-        this.logger.error(
-          { err: disconnectError },
-          'Failed to disconnect Prisma after startup failure',
-        );
-      } finally {
-        try {
-          await this.pool.end();
-        } catch (poolError) {
-          this.logger.error(
-            { err: poolError },
-            'Failed to close PostgreSQL pool after startup failure',
-          );
-        }
-      }
+      await this.close();
       throw error;
     }
   }
 
   async onModuleDestroy(): Promise<void> {
+    await this.close();
+    this.logger.info('Disconnected from PostgreSQL');
+  }
+
+  private async close(): Promise<void> {
     try {
       await this.$disconnect();
-    } finally {
-      await this.pool.end();
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to disconnect Prisma');
     }
-    this.logger.info('Disconnected from PostgreSQL');
+    try {
+      await this.pool.end();
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to close PostgreSQL pool');
+    }
   }
 }

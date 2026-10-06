@@ -13,11 +13,22 @@ describe('validateEnv', () => {
       PORT: 4300,
       LOG_LEVEL: 'info',
       DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
-      MAX_DB_TIMEOUT: 5_000,
-      MAX_DB_CONNECTIONS: 20,
+      DB_POOL_MAX: 10,
+      DB_CONNECTION_TIMEOUT_MS: 5_000,
       CORS_ORIGINS: ['http://localhost:5173', 'https://steamx.example'],
       SWAGGER_ENABLED: true,
     });
+  });
+
+  it('parses configured database pool values', () => {
+    const env = validateEnv({
+      DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
+      DB_POOL_MAX: '25',
+      DB_CONNECTION_TIMEOUT_MS: '8000',
+    });
+
+    expect(env.DB_POOL_MAX).toBe(25);
+    expect(env.DB_CONNECTION_TIMEOUT_MS).toBe(8_000);
   });
 
   it('parses false as false and disables Swagger outside development', () => {
@@ -57,8 +68,8 @@ describe('validateEnv', () => {
         LOG_LEVEL: 'verbose',
         CORS_ORIGINS: sensitiveValue,
         SWAGGER_ENABLED: 'yes',
-        MAX_DB_TIMEOUT: '0',
-        MAX_DB_CONNECTIONS: 'not-a-number',
+        DB_POOL_MAX: '51',
+        DB_CONNECTION_TIMEOUT_MS: '999',
       });
     } catch (error) {
       message = error instanceof Error ? error.message : '';
@@ -71,8 +82,8 @@ describe('validateEnv', () => {
     expect(message).toContain('DATABASE_URL');
     expect(message).toContain('CORS_ORIGINS');
     expect(message).toContain('SWAGGER_ENABLED');
-    expect(message).toContain('MAX_DB_TIMEOUT');
-    expect(message).toContain('MAX_DB_CONNECTIONS');
+    expect(message).toContain('DB_POOL_MAX');
+    expect(message).toContain('DB_CONNECTION_TIMEOUT_MS');
     expect(message).not.toContain(sensitiveValue);
   });
 });
