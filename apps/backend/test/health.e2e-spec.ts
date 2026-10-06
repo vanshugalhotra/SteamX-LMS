@@ -39,7 +39,7 @@ describe('Health endpoints (e2e)', () => {
 
   it('returns only the database-down response when the readiness query fails', async () => {
     const prisma = app.get(PrismaService);
-    vi.spyOn(prisma, '$queryRaw').mockRejectedValueOnce(
+    vi.spyOn(prisma, '$transaction').mockRejectedValueOnce(
       new Error('Sensitive database host and connection details'),
     );
 
