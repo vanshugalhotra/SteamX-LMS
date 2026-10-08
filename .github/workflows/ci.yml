@@ -44,6 +44,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @steamx/backend prisma:generate
+      - name: Apply database migrations
+        run: pnpm --filter @steamx/backend migrate:deploy
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
