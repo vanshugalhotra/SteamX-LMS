@@ -5,6 +5,7 @@ import { Type } from 'class-transformer';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
+import { Public } from './../src/auth/decorators/public.decorator.js';
 import { configureApp } from './../src/configure-app.js';
 
 class LessonBlockRequest {
@@ -19,6 +20,7 @@ class ValidationRequest {
 }
 
 @Controller('test-validation')
+@Public()
 class ValidationTestController {
   @Post()
   create(@Body() body: ValidationRequest): ValidationRequest {

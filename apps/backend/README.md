@@ -51,6 +51,11 @@ pnpm --filter @steamx/backend migrate:dev --name <name>
 pnpm --filter @steamx/backend migrate:deploy
 ```
 
+## Conventions
+
+- All routes are protected by default.
+- Use `@Public()` on a controller or route to opt out of authentication.
+
 ## Decisions and beware
 
 - API routes use `/api/v1`. `/health/live` and `/health/ready` are root,

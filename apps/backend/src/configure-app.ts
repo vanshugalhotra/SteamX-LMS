@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { ValidationError } from 'class-validator';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import type { Env } from './config/env.schema.js';
@@ -30,6 +31,7 @@ export function configureApp(app: INestApplication): void {
 
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
+  app.use(cookieParser());
   app.use(helmet());
   if (config.get('SWAGGER_ENABLED', { infer: true })) {
     app.use(
