@@ -28,6 +28,11 @@ use `apps/backend/.env.test` and the test database.
 E2E tests automatically apply pending migrations to the `.env.test` database before they start.
 Never edit an applied migration; create a new one.
 
+## Configuration
+
+- Set `AUTH_JWT_SECRET` to a generated secret of at least 32 characters; changing it signs everyone out.
+- Set `AUTH_TOKEN_TTL_SECONDS` to the fixed token lifetime in seconds (default: `86400`).
+
 ## Commands
 
 Run from the repository root:
