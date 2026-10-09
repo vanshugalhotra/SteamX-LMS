@@ -102,6 +102,44 @@ describe('TokenService', () => {
     await expect(service.verify(token)).rejects.toThrow(UnauthorizedException);
   });
 
+  it('rejects a signed token with an extra school claim', async () => {
+    const service = createTokenService();
+    const issuedAt = Math.floor(Date.now() / 1_000);
+    const token = await new SignJWT({ schoolId: 'school-123' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('user-123')
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + TOKEN_TTL_SECONDS)
+      .sign(new TextEncoder().encode(JWT_SECRET));
+
+    await expect(service.verify(token)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects a signed token without an expiration claim', async () => {
+    const service = createTokenService();
+    const issuedAt = Math.floor(Date.now() / 1_000);
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('user-123')
+      .setIssuedAt(issuedAt)
+      .sign(new TextEncoder().encode(JWT_SECRET));
+
+    await expect(service.verify(token)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects a signed token with an empty subject', async () => {
+    const service = createTokenService();
+    const issuedAt = Math.floor(Date.now() / 1_000);
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('')
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + TOKEN_TTL_SECONDS)
+      .sign(new TextEncoder().encode(JWT_SECRET));
+
+    await expect(service.verify(token)).rejects.toThrow(UnauthorizedException);
+  });
+
   it('rejects an expired token', async () => {
     vi.useFakeTimers();
     const service = createTokenService();
