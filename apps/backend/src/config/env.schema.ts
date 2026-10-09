@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+const AUTH_TOKEN_TTL_MIN_SECONDS = 60;
+const AUTH_TOKEN_TTL_DEFAULT_SECONDS = 86_400;
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -10,6 +13,16 @@ const envSchema = z
     DATABASE_URL: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
     DB_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
     DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(1000).default(5000),
+    AUTH_JWT_SECRET: z
+      .string({ error: 'is required' })
+      .min(32, { error: 'must be at least 32 characters' }),
+    AUTH_TOKEN_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(AUTH_TOKEN_TTL_MIN_SECONDS, {
+        error: `must be at least ${AUTH_TOKEN_TTL_MIN_SECONDS}`,
+      })
+      .default(AUTH_TOKEN_TTL_DEFAULT_SECONDS),
     CORS_ORIGINS: z
       .string()
       .default('')
