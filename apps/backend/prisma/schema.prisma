@@ -309,11 +309,10 @@ model ClassSection {
   students   StudentProfile[]
   deliveries Delivery[]
   // [CHECK] both names non-empty and = btrim(...)
-  // [IDX]   Replace the unique above with UNIQUE (school_id, lower(class_name), lower(section_name)) so "Class 5" and "class 5" cant coexist.
+  // [IDX]   Case-insensitive unique index lives in the identity_constraints migration.
   // [RULE]  "Every class has >=1 section" holds by construction (a class exists only as rows here). Default section 'All' created by the app.
 
   @@unique([id, schoolId])
-  @@unique([schoolId, className, sectionName])
   @@map("class_sections")
 }
 

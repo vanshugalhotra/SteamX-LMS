@@ -27,6 +27,8 @@ use `apps/backend/.env.test` and the test database.
 
 E2E tests automatically apply pending migrations to the `.env.test` database before they start.
 Never edit an applied migration; create a new one.
+CHECK constraints and expression indexes live in migrations (Prisma does not model them). Never edit applied migrations.
+Frontend validation guidance for applied database checks is in [database_checks.md](../docs/database_checks.md).
 
 ## Configuration
 
