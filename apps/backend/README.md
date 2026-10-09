@@ -23,6 +23,11 @@ pnpm --filter @steamx/backend prisma:generate
 Set `DATABASE_URL` in `apps/backend/.env` to the development database. E2E tests
 use `apps/backend/.env.test` and the test database.
 
+## Database
+
+E2E tests automatically apply pending migrations to the `.env.test` database before they start.
+Never edit an applied migration; create a new one.
+
 ## Commands
 
 Run from the repository root:
