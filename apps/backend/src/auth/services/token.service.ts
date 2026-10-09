@@ -2,10 +2,9 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify } from 'jose';
 import type { Env } from '../../config/env.schema.js';
-import { AUTHENTICATION_ERROR_MESSAGE } from '../auth.constants.js';
+import { AUTHENTICATION_ERROR_MESSAGE, AUTH_COOKIE_NAME } from '../auth.constants.js';
 import type { AuthCookieOptions, VerifiedToken } from '../types/token.js';
 
-const AUTH_COOKIE_NAME = 'steamx_session';
 const JWT_ALGORITHM = 'HS256';
 const JWT_ALGORITHMS = [JWT_ALGORITHM];
 const MILLISECONDS_PER_SECOND = 1_000;
