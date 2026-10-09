@@ -2,14 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify } from 'jose';
 import type { Env } from '../../config/env.schema.js';
+import { AUTHENTICATION_ERROR_MESSAGE, AUTH_COOKIE_NAME } from '../auth.constants.js';
 import type { AuthCookieOptions, VerifiedToken } from '../types/token.js';
 
-const AUTH_COOKIE_NAME = 'steamx_session';
 const JWT_ALGORITHM = 'HS256';
 const JWT_ALGORITHMS = [JWT_ALGORITHM];
 const MILLISECONDS_PER_SECOND = 1_000;
-const INVALID_TOKEN_MESSAGE = 'Invalid or expired authentication token';
-
 @Injectable()
 export class TokenService {
   private readonly secret: Uint8Array;
@@ -53,7 +51,7 @@ export class TokenService {
         typeof payload.exp !== 'number' ||
         !Number.isInteger(payload.exp)
       ) {
-        throw new Error(INVALID_TOKEN_MESSAGE);
+        throw new Error(AUTHENTICATION_ERROR_MESSAGE);
       }
 
       return {
@@ -62,7 +60,7 @@ export class TokenService {
         expiresAt: payload.exp,
       };
     } catch {
-      throw new UnauthorizedException(INVALID_TOKEN_MESSAGE);
+      throw new UnauthorizedException(AUTHENTICATION_ERROR_MESSAGE);
     }
   }
 

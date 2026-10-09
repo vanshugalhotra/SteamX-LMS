@@ -1,3 +1,5 @@
+import type { AUTH_COOKIE_NAME } from '../auth.constants.js';
+
 export type VerifiedToken = {
   userId: string;
   issuedAt: number;
@@ -5,7 +7,7 @@ export type VerifiedToken = {
 };
 
 export type AuthCookieOptions = {
-  name: 'steamx_session';
+  name: typeof AUTH_COOKIE_NAME;
   httpOnly: true;
   secure: boolean;
   sameSite: 'lax';

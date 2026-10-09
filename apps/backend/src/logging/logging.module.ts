@@ -18,6 +18,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
         const nodeEnv = config.get('NODE_ENV', { infer: true });
 
         return {
+          assignResponse: true,
           pinoHttp: {
             level: config.get('LOG_LEVEL', { infer: true }),
             serializers: {

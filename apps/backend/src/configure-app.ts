@@ -8,8 +8,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { ValidationError } from 'class-validator';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { AUTH_COOKIE_NAME } from './auth/auth.constants.js';
 import type { Env } from './config/env.schema.js';
 
 type FieldErrors = { field: string; errors: string[] };
@@ -30,6 +32,7 @@ export function configureApp(app: INestApplication): void {
 
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
+  app.use(cookieParser());
   app.use(helmet());
   if (config.get('SWAGGER_ENABLED', { infer: true })) {
     app.use(
@@ -80,7 +83,7 @@ export function configureApp(app: INestApplication): void {
       .setTitle('STEAMX LMS API')
       .setDescription('API documentation for STEAMX LMS.')
       .setVersion('1')
-      .addCookieAuth('session', { type: 'apiKey', in: 'cookie' }, 'cookieAuth')
+      .addCookieAuth(AUTH_COOKIE_NAME, { type: 'apiKey', in: 'cookie' }, 'cookieAuth')
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('docs', app, document, { useGlobalPrefix: true });
