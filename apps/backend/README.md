@@ -46,6 +46,7 @@ pnpm --filter @steamx/backend typecheck
 pnpm --filter @steamx/backend test
 pnpm --filter @steamx/backend test:e2e
 pnpm --filter @steamx/backend build
+pnpm --filter @steamx/backend admin:create # one time run only (idempotent though)
 pnpm --filter @steamx/backend migrate:dev --name <name>
 pnpm --filter @steamx/backend migrate:deploy
 ```
