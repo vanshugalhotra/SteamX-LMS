@@ -508,9 +508,6 @@ CREATE UNIQUE INDEX "teacher_profiles_user_id_school_id_user_type_key" ON "teach
 CREATE UNIQUE INDEX "class_sections_id_school_id_key" ON "class_sections"("id", "school_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "class_sections_school_id_class_name_section_name_key" ON "class_sections"("school_id", "class_name", "section_name");
-
--- CreateIndex
 CREATE UNIQUE INDEX "modules_id_course_id_key" ON "modules"("id", "course_id");
 
 -- CreateIndex

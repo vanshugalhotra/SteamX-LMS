@@ -1,6 +1,3 @@
--- DropIndex
-DROP INDEX "class_sections_school_id_class_name_section_name_key";
-
 -- schools
 ALTER TABLE schools
   ADD CONSTRAINT schools_code_fmt CHECK (code = upper(code) AND code ~ '^[A-Z0-9][A-Z0-9_-]{1,31}$'),
