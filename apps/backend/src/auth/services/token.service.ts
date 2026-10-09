@@ -1,28 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify } from 'jose';
-import type { Env } from '../config/env.schema.js';
+import type { Env } from '../../config/env.schema.js';
+import type { AuthCookieOptions, VerifiedToken } from '../types/token.js';
 
 const AUTH_COOKIE_NAME = 'steamx_session';
 const JWT_ALGORITHM = 'HS256';
 const JWT_ALGORITHMS = [JWT_ALGORITHM];
 const MILLISECONDS_PER_SECOND = 1_000;
 const INVALID_TOKEN_MESSAGE = 'Invalid or expired authentication token';
-
-export type VerifiedToken = {
-  userId: string;
-  issuedAt: number;
-  expiresAt: number;
-};
-
-export type AuthCookieOptions = {
-  name: typeof AUTH_COOKIE_NAME;
-  httpOnly: true;
-  secure: boolean;
-  sameSite: 'lax';
-  path: '/';
-  maxAge: number;
-};
 
 @Injectable()
 export class TokenService {

@@ -3,8 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma, UserType } from '../src/generated/prisma/client.js';
 import { AppModule } from '../src/app.module.js';
-import { FirstAdminService } from '../src/auth/first-admin.service.js';
-import { PasswordService } from '../src/auth/password.service.js';
+import { FirstAdminService } from '../src/auth/services/first-admin.service.js';
+import { PasswordService } from '../src/auth/services/password.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 const ROLLBACK_SENTINEL = new Error('ROLLBACK_AUTH_FOUNDATION_TEST');
@@ -194,5 +194,56 @@ describe('Authentication foundation reference data (e2e)', () => {
         password: 'admin123',
       }),
     ).rejects.toThrow('Password is too common.');
+  });
+
+  it('reports when the requested SteamX ID is already used by a non-admin', async () => {
+    await withRollback(async (tx) => {
+      const school = await tx.school.create({
+        data: {
+          code: 'TST7',
+          name: 'Test School',
+          city: 'Test City',
+          state: 'Test State',
+          postalCode: '00000',
+          country: 'Test Country',
+        },
+      });
+      const teacherRole = await tx.role.findUniqueOrThrow({
+        where: { key: 'teacher' },
+        select: { id: true },
+      });
+
+      await tx.user.create({
+        data: {
+          steamxId: 'ADM123',
+          name: 'Existing Teacher',
+          passwordHash: 'test-only-password-hash',
+          roleId: teacherRole.id,
+          userType: UserType.SCHOOL_STAFF,
+          schoolId: school.id,
+        },
+      });
+
+      await expect(firstAdmin.create(ADMIN_INPUT, tx)).rejects.toThrow(
+        'ADMIN_STEAMX_ID is already in use by another account.',
+      );
+    });
+  });
+
+  it('reports a serialization conflict as another process creating the Admin', async () => {
+    const transaction = vi.spyOn(prisma, '$transaction').mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Serialization conflict', {
+        code: 'P2034',
+        clientVersion: '7.10.0',
+      }),
+    );
+
+    try {
+      await expect(firstAdmin.create(ADMIN_INPUT)).rejects.toThrow(
+        'Another process may be creating the admin. Re-run the command to check.',
+      );
+    } finally {
+      transaction.mockRestore();
+    }
   });
 });

@@ -1,26 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, UserType } from '../generated/prisma/client.js';
-import { PrismaService } from '../prisma/prisma.service.js';
-import { isPrismaKnownError } from '../common/errors/prisma-error.js';
+import { Prisma, UserType } from '../../generated/prisma/client.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { isPrismaKnownError } from '../../common/errors/prisma-error.js';
 import { PasswordService } from './password.service.js';
-import { validatePasswordPolicy } from './password-policy.js';
+import { validatePasswordPolicy } from '../validators/password-policy.js';
+import { isValidSteamxId, normalizeSteamxId } from '../validators/steamx-id.js';
+import {
+  FirstAdminError,
+  type FirstAdminInput,
+  type FirstAdminResult,
+} from '../types/first-admin.js';
 
 const ADMIN_ROLE_KEY = 'admin';
 const DEFAULT_ADMIN_NAME = 'Platform Admin';
-const STEAMX_ID_PATTERN = /^[A-Z0-9][A-Z0-9._-]{2,31}$/;
-
-export type FirstAdminInput = {
-  steamxId: string;
-  password: string;
-  name?: string;
-};
-
-export type FirstAdminResult = {
-  created: boolean;
-  steamxId: string;
-};
-
-export class FirstAdminError extends Error {}
 
 type NormalizedFirstAdminInput = {
   steamxId: string;
@@ -40,20 +32,39 @@ export class FirstAdminService {
     transaction?: Prisma.TransactionClient,
   ): Promise<FirstAdminResult> {
     const normalized = this.validateInput(input);
+    const passwordHash = await this.passwords.hash(normalized.password);
 
-    if (transaction) {
-      return this.createInTransaction(transaction, normalized);
+    try {
+      if (transaction) {
+        return await this.createInTransaction(transaction, normalized, passwordHash);
+      }
+
+      return await this.prisma.$transaction(
+        (tx) => this.createInTransaction(tx, normalized, passwordHash),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isPrismaKnownError(error) && error.code === 'P2021') {
+        throw new FirstAdminError('Database migrations have not been applied. Run migrate:deploy.');
+      }
+      if (isPrismaKnownError(error) && error.code === 'P2034') {
+        throw new FirstAdminError(
+          'Another process may be creating the admin. Re-run the command to check.',
+        );
+      }
+      if (isPrismaKnownError(error) && error.code === 'P2002') {
+        throw new FirstAdminError('ADMIN_STEAMX_ID is already in use by another account.');
+      }
+      throw error;
     }
-
-    return this.prisma.$transaction((tx) => this.createInTransaction(tx, normalized), {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-    });
   }
 
   private validateInput(input: FirstAdminInput): NormalizedFirstAdminInput {
-    const steamxId = input.steamxId.trim().toUpperCase();
-    if (!STEAMX_ID_PATTERN.test(steamxId)) {
-      throw new FirstAdminError('ADMIN_STEAMX_ID must be 3–32 valid SteamX ID characters.');
+    const steamxId = normalizeSteamxId(input.steamxId);
+    if (!isValidSteamxId(steamxId)) {
+      throw new FirstAdminError(
+        'ADMIN_STEAMX_ID must be 3–32 characters: letters, numbers, dot, underscore, or hyphen.',
+      );
     }
 
     const passwordErrors = validatePasswordPolicy(input.password, steamxId);
@@ -72,19 +83,12 @@ export class FirstAdminService {
   private async createInTransaction(
     tx: Prisma.TransactionClient,
     input: NormalizedFirstAdminInput,
+    passwordHash: string,
   ): Promise<FirstAdminResult> {
-    let adminRole: { id: number; userType: UserType } | null;
-    try {
-      adminRole = await tx.role.findUnique({
-        where: { key: ADMIN_ROLE_KEY },
-        select: { id: true, userType: true },
-      });
-    } catch (error) {
-      if (isPrismaKnownError(error) && error.code === 'P2021') {
-        throw new FirstAdminError('Database migrations have not been applied. Run migrate:deploy.');
-      }
-      throw error;
-    }
+    const adminRole = await tx.role.findUnique({
+      where: { key: ADMIN_ROLE_KEY },
+      select: { id: true, userType: true },
+    });
 
     if (!adminRole || adminRole.userType !== UserType.PLATFORM_STAFF) {
       throw new FirstAdminError(
@@ -105,7 +109,7 @@ export class FirstAdminService {
       data: {
         steamxId: input.steamxId,
         name: input.name,
-        passwordHash: await this.passwords.hash(input.password),
+        passwordHash,
         roleId: adminRole.id,
         userType: UserType.PLATFORM_STAFF,
         schoolId: null,

@@ -1,6 +1,6 @@
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import type { Algorithm, Version } from '@node-rs/argon2';
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 const ARGON2ID_ALGORITHM: Algorithm = 2;
 const ARGON2_VERSION_19: Version = 1;
@@ -22,7 +22,11 @@ function getDummyHash(): Promise<string> {
 }
 
 @Injectable()
-export class PasswordService {
+export class PasswordService implements OnModuleInit {
+  async onModuleInit(): Promise<void> {
+    await getDummyHash();
+  }
+
   hash(password: string): Promise<string> {
     return argonHash(password, ARGON2_OPTIONS);
   }

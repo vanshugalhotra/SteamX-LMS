@@ -26,7 +26,6 @@ use `apps/backend/.env.test` and the test database.
 ## Database
 
 E2E tests automatically apply pending migrations to the `.env.test` database before they start.
-Never edit an applied migration; create a new one.
 CHECK constraints and expression indexes live in migrations (Prisma does not model them). Never edit applied migrations.
 Frontend validation guidance for applied database checks is in [database_checks.md](../docs/database_checks.md).
 
@@ -34,6 +33,7 @@ Frontend validation guidance for applied database checks is in [database_checks.
 
 - Set `AUTH_JWT_SECRET` to a generated secret of at least 32 characters; changing it signs everyone out.
 - Set `AUTH_TOKEN_TTL_SECONDS` to the fixed token lifetime in seconds (default: `86400`).
+- Set `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD` securely for the one-time `admin:create` command; do not put the password in shell history, process arguments, or logs, and rotate it immediately after first login.
 
 ## Commands
 

@@ -1,4 +1,4 @@
-import { FirstAdminError, type FirstAdminInput } from './first-admin.service.js';
+import { FirstAdminError, type FirstAdminInput } from '../types/first-admin.js';
 
 export function readFirstAdminInput(environment: NodeJS.ProcessEnv): FirstAdminInput {
   const steamxId = environment.ADMIN_STEAMX_ID;

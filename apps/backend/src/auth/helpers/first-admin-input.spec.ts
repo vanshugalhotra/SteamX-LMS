@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FirstAdminError } from './first-admin.service.js';
+import { FirstAdminError } from '../types/first-admin.js';
 import { readFirstAdminInput } from './first-admin-input.js';
 
 describe('readFirstAdminInput', () => {

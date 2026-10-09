@@ -4,7 +4,7 @@ import { PasswordService } from './password.service.js';
 describe('PasswordService', () => {
   const passwords = new PasswordService();
 
-  it('hashes passwords with Argon2id and verifies the correct password', async () => {
+  it('hashes with Argon2id and verifies the correct password', async () => {
     const encodedHash = await passwords.hash('correct horse battery staple');
 
     expect(encodedHash).toMatch(/^\$argon2id\$/);

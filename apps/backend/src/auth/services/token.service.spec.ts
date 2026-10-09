@@ -2,8 +2,8 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT } from 'jose';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../config/env.schema.js';
-import { validateEnv } from '../config/env.schema.js';
+import type { Env } from '../../config/env.schema.js';
+import { validateEnv } from '../../config/env.schema.js';
 import { TokenService } from './token.service.js';
 
 const DATABASE_URL = 'postgresql://localhost/steamx_test';
