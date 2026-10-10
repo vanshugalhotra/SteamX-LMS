@@ -1,4 +1,5 @@
 import { Body, Controller, INestApplication, Module, Post } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -7,6 +8,7 @@ import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
 import { Public } from './../src/auth/decorators/public.decorator.js';
 import { configureApp } from './../src/configure-app.js';
+import type { Env } from './../src/config/env.schema.js';
 
 class LessonBlockRequest {
   @IsString()
@@ -44,6 +46,7 @@ class BootstrapTestModule {}
 
 describe('API bootstrap (e2e)', () => {
   let app: INestApplication<App>;
+  let origin: string;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -52,6 +55,13 @@ describe('API bootstrap (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configureApp(app);
+    const configuredOrigin = app
+      .get<ConfigService<Env, true>>(ConfigService)
+      .get('CORS_ORIGINS', { infer: true })[0];
+    if (!configuredOrigin) {
+      throw new Error('Bootstrap E2E tests require at least one CORS_ORIGINS entry.');
+    }
+    origin = configuredOrigin;
     await app.init();
   });
 
@@ -67,6 +77,7 @@ describe('API bootstrap (e2e)', () => {
 
     const validationFailure = await request(app.getHttpServer())
       .post('/api/v1/test-validation')
+      .set('Origin', origin)
       .send({ block: { name: 42, extra: 'not allowed' } })
       .expect(400);
 
@@ -84,6 +95,7 @@ describe('API bootstrap (e2e)', () => {
 
     const payloadTooLarge = await request(app.getHttpServer())
       .post('/api/v1/test-validation/payload-too-large')
+      .set('Origin', origin)
       .expect(413);
 
     expect(payloadTooLarge.body).toMatchObject({

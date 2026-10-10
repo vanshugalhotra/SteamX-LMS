@@ -22,4 +22,22 @@ export class AuthContextRepository {
       },
     });
   }
+
+  findLoginUser(steamxId: string) {
+    return this.prisma.user.findUnique({
+      where: { steamxId },
+      select: {
+        id: true,
+        steamxId: true,
+        name: true,
+        passwordHash: true,
+        status: true,
+        userType: true,
+        schoolId: true,
+        mustChangePassword: true,
+        role: { select: { key: true } },
+        school: { select: { status: true } },
+      },
+    });
+  }
 }
