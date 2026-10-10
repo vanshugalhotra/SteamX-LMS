@@ -55,6 +55,7 @@ pnpm --filter @steamx/backend migrate:deploy
 
 - All routes are protected by default.
 - Use `@Public()` on a controller or route to opt out of authentication.
+- API endpoint details and Origin requirements are documented in Swagger.
 
 ## Decisions and beware
 
