@@ -81,7 +81,9 @@ export function configureApp(app: INestApplication): void {
   if (config.get('SWAGGER_ENABLED', { infer: true })) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('STEAMX LMS API')
-      .setDescription('API documentation for STEAMX LMS.')
+      .setDescription(
+        'API documentation for STEAMX LMS. State-changing requests require an Origin header matching an entry in CORS_ORIGINS. Browsers send Origin automatically; tools such as Postman must set it explicitly.',
+      )
       .setVersion('1')
       .addCookieAuth(AUTH_COOKIE_NAME, { type: 'apiKey', in: 'cookie' }, 'cookieAuth')
       .build();

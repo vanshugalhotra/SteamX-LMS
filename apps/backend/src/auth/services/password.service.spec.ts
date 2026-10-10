@@ -8,13 +8,13 @@ describe('PasswordService', () => {
     const encodedHash = await passwords.hash('correct horse battery staple');
 
     expect(encodedHash).toMatch(/^\$argon2id\$/);
-    expect(await passwords.verify('correct horse battery staple', encodedHash)).toBe(true);
+    expect(await passwords.verify(encodedHash, 'correct horse battery staple')).toBe(true);
   });
 
   it('returns false for an incorrect password', async () => {
     const encodedHash = await passwords.hash('correct horse battery staple');
 
-    await expect(passwords.verify('incorrect horse battery staple', encodedHash)).resolves.toBe(
+    await expect(passwords.verify(encodedHash, 'incorrect horse battery staple')).resolves.toBe(
       false,
     );
   });
@@ -22,7 +22,7 @@ describe('PasswordService', () => {
   it.each([null, undefined, '', 'not-a-hash', '$argon2id$invalid'])(
     'returns false for a missing or malformed hash',
     async (encodedHash) => {
-      await expect(passwords.verify('some password', encodedHash)).resolves.toBe(false);
+      await expect(passwords.verify(encodedHash, 'some password')).resolves.toBe(false);
     },
   );
 });

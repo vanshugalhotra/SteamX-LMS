@@ -31,7 +31,7 @@ export class PasswordService implements OnModuleInit {
     return argonHash(password, ARGON2_OPTIONS);
   }
 
-  async verify(password: string, encodedHash: string | null | undefined): Promise<boolean> {
+  async verify(encodedHash: string | null | undefined, password: string): Promise<boolean> {
     if (typeof encodedHash !== 'string' || !encodedHash.startsWith('$argon2id$')) {
       await this.verifyDummy(password);
       return false;

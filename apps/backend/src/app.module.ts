@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
+import { AuthGuard } from './auth/auth.guard.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
+import { OriginGuard } from './common/guards/origin.guard.js';
 import { validateEnv } from './config/env.schema.js';
 import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
@@ -18,6 +20,10 @@ import { LoggingModule } from './logging/logging.module.js';
     LoggingModule,
     HealthModule,
   ],
-  providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
+  providers: [
+    { provide: APP_GUARD, useClass: OriginGuard },
+    { provide: APP_GUARD, useExisting: AuthGuard },
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
+  ],
 })
 export class AppModule {}

@@ -180,7 +180,7 @@ describe('Authentication foundation reference data (e2e)', () => {
         mustChangePassword: true,
         role: { key: 'admin' },
       });
-      expect(await passwords.verify(ADMIN_INPUT.password, user.passwordHash)).toBe(true);
+      expect(await passwords.verify(user.passwordHash, ADMIN_INPUT.password)).toBe(true);
     });
 
     expect(await snapshotReferenceData(prisma)).toEqual(before);

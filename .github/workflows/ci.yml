@@ -35,6 +35,7 @@ jobs:
       DATABASE_URL: postgresql://steamx_local:local_dev_password@localhost:5432/steamx_lms_test
       DB_POOL_MAX: 10
       DB_CONNECTION_TIMEOUT_MS: 5000
+      CORS_ORIGINS: http://localhost:5173
       AUTH_JWT_SECRET: steamx-ci-only-test-signing-key-not-for-production-00000000
     steps:
       - uses: actions/checkout@v4
