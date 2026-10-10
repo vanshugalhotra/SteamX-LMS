@@ -16,6 +16,7 @@ function createTokenService(nodeEnv: Env['NODE_ENV'] = 'test', secret = JWT_SECR
     NODE_ENV: nodeEnv,
     AUTH_JWT_SECRET: secret,
     AUTH_TOKEN_TTL_SECONDS: TOKEN_TTL_SECONDS,
+    CORS_ORIGINS: nodeEnv === 'production' ? 'https://steamx.example' : '',
   });
 
   return new TokenService(new ConfigService<Env, true>(env));
