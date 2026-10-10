@@ -14,6 +14,7 @@ import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-passwor
 import { CurrentAuth } from './decorators/current-auth.decorator.js';
 import { Public } from './decorators/public.decorator.js';
 import { AuthService } from './auth.service.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import type { AuthContext } from './types/auth-context.js';
 import { AuthProfile, toAuthProfile } from './types/auth-profile.js';
@@ -32,20 +33,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log in with a SteamX ID and password' })
   @ApiOkResponse({
-    description: 'Authenticated profile; session token is set as an HTTP-only cookie.',
+    description: 'Returns the profile and sets the session cookie.',
     type: AuthProfile,
-    headers: {
-      'Set-Cookie': {
-        description: 'Sets the steamx_session cookie.',
-        schema: { type: 'string' },
-      },
-      'Cache-Control': {
-        description: 'Prevents caching of authentication data.',
-        schema: { type: 'string', example: 'no-store' },
-      },
-    },
   })
-  @ApiUnauthorizedResponse({ description: 'Invalid credentials or inactive account.' })
+  @ApiUnauthorizedResponse({ description: 'Invalid credentials.' })
   @ApiBadRequestResponse({ description: 'Invalid request body.' })
   async login(
     @Body() body: LoginDto,
@@ -63,16 +54,8 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth('cookieAuth')
   @ApiOperation({ summary: 'Log out and clear the session cookie' })
-  @ApiNoContentResponse({
-    description: 'Session cookie cleared; no response body.',
-    headers: {
-      'Set-Cookie': {
-        description: 'Expires the steamx_session cookie.',
-        schema: { type: 'string' },
-      },
-    },
-  })
-  @ApiUnauthorizedResponse({ description: 'Session is missing or invalid.' })
+  @ApiNoContentResponse({ description: 'Session cookie cleared.' })
+  @ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
   logout(@Res({ passthrough: true }) response: Response): void {
     const { name, httpOnly, secure, sameSite, path } = this.tokens.cookieOptions();
     response.clearCookie(name, { httpOnly, secure, sameSite, path });
@@ -82,17 +65,8 @@ export class AuthController {
   @Get('me')
   @ApiCookieAuth('cookieAuth')
   @ApiOperation({ summary: 'Get the current authenticated profile' })
-  @ApiOkResponse({
-    description: 'Current authenticated profile.',
-    type: AuthProfile,
-    headers: {
-      'Cache-Control': {
-        description: 'Prevents caching of authentication data.',
-        schema: { type: 'string', example: 'no-store' },
-      },
-    },
-  })
-  @ApiUnauthorizedResponse({ description: 'Session is missing or invalid.' })
+  @ApiOkResponse({ description: 'Returns the current profile.', type: AuthProfile })
+  @ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
   @ApiForbiddenResponse({ description: 'Password change is required.' })
   getMe(
     @CurrentAuth() authContext: AuthContext,
@@ -100,5 +74,35 @@ export class AuthController {
   ): AuthProfile {
     response.setHeader('Cache-Control', 'no-store');
     return toAuthProfile(authContext);
+  }
+
+  @AllowWhenPasswordChangeRequired()
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiCookieAuth('cookieAuth')
+  @ApiOperation({ summary: 'Change the current user password' })
+  @ApiOkResponse({
+    description: 'Returns the updated profile and refreshes the session.',
+    type: AuthProfile,
+  })
+  @ApiBadRequestResponse({
+    description: 'Current password is incorrect or new password is invalid.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
+  @ApiForbiddenResponse({ description: 'Password change is required.' })
+  async changePassword(
+    @CurrentAuth() authContext: AuthContext,
+    @Body() body: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthProfile> {
+    response.setHeader('Cache-Control', 'no-store');
+    const { token, profile } = await this.auth.changePassword(
+      authContext,
+      body.currentPassword,
+      body.newPassword,
+    );
+    const { name, ...cookieOptions } = this.tokens.cookieOptions();
+    response.cookie(name, token, cookieOptions);
+    return profile;
   }
 }

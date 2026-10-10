@@ -38,6 +38,15 @@ const envSchema = z
       .transform((value) => value === 'true')
       .optional(),
   })
+  .superRefine((env, context) => {
+    if (env.NODE_ENV === 'production' && env.CORS_ORIGINS.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['CORS_ORIGINS'],
+        message: 'must contain at least one allowed origin in production',
+      });
+    }
+  })
   .transform((env) => ({
     ...env,
     SWAGGER_ENABLED: env.SWAGGER_ENABLED ?? env.NODE_ENV === 'development',
