@@ -14,6 +14,7 @@ import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-passwor
 import { CurrentAuth } from './decorators/current-auth.decorator.js';
 import { Public } from './decorators/public.decorator.js';
 import { AuthService } from './auth.service.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import type { AuthContext } from './types/auth-context.js';
 import { AuthProfile, toAuthProfile } from './types/auth-profile.js';
@@ -100,5 +101,45 @@ export class AuthController {
   ): AuthProfile {
     response.setHeader('Cache-Control', 'no-store');
     return toAuthProfile(authContext);
+  }
+
+  @AllowWhenPasswordChangeRequired()
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiCookieAuth('cookieAuth')
+  @ApiOperation({ summary: 'Change the current user password' })
+  @ApiOkResponse({
+    description: 'Password updated and session cookie refreshed.',
+    type: AuthProfile,
+    headers: {
+      'Set-Cookie': {
+        description: 'Sets a fresh steamx_session cookie.',
+        schema: { type: 'string' },
+      },
+      'Cache-Control': {
+        description: 'Prevents caching of authentication data.',
+        schema: { type: 'string', example: 'no-store' },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Current password is incorrect, password is reused, or policy is not met.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Session is missing or invalid.' })
+  @ApiForbiddenResponse({ description: 'Password change is required.' })
+  async changePassword(
+    @CurrentAuth() authContext: AuthContext,
+    @Body() body: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthProfile> {
+    response.setHeader('Cache-Control', 'no-store');
+    const { token, profile } = await this.auth.changePassword(
+      authContext,
+      body.currentPassword,
+      body.newPassword,
+    );
+    const { name, ...cookieOptions } = this.tokens.cookieOptions();
+    response.cookie(name, token, cookieOptions);
+    return profile;
   }
 }

@@ -6,6 +6,7 @@ import { AuthContextRepository } from './auth-context.repository.js';
 import { AuthService } from './auth.service.js';
 import { PasswordService } from './services/password.service.js';
 import { TokenService } from './services/token.service.js';
+import type { AuthContext } from './types/auth-context.js';
 
 const LOGIN_PASSWORD = 'sensitive-test-password';
 const SESSION_TOKEN = 'sensitive-test-token';
@@ -92,6 +93,66 @@ describe('AuthService', () => {
     const loggedArgs = JSON.stringify([...logger.info.mock.calls, ...logger.warn.mock.calls]);
     expect(loggedArgs).not.toContain(LOGIN_PASSWORD);
     expect(loggedArgs).not.toContain(SESSION_TOKEN);
+    await moduleRef.close();
+  });
+
+  it('does not log passwords or tokens during password changes and resets', async () => {
+    const currentPassword = 'Current password for test 2026!';
+    const newPassword = 'New password for test 2026!';
+    const resetPassword = 'Admin selected password 2026!';
+    const findCredentials = vi.fn().mockResolvedValue({
+      steamxId: 'AUTH123',
+      passwordHash: 'stored-hash',
+    });
+    const findPasswordResetTarget = vi.fn().mockResolvedValue({
+      id: 'target-user',
+      steamxId: 'STU123',
+    });
+    const updatePassword = vi.fn();
+    const logger = { info: vi.fn(), warn: vi.fn() };
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        {
+          provide: AuthContextRepository,
+          useValue: { findCredentials, findPasswordResetTarget, updatePassword },
+        },
+        {
+          provide: PasswordService,
+          useValue: {
+            verify: vi.fn().mockResolvedValue(true),
+            hash: vi.fn().mockResolvedValue('new-stored-hash'),
+          },
+        },
+        { provide: TokenService, useValue: { sign: vi.fn().mockResolvedValue(SESSION_TOKEN) } },
+        { provide: PinoLogger, useValue: logger },
+      ],
+    }).compile();
+    const service = moduleRef.get(AuthService);
+    const actor: AuthContext = {
+      userId: 'actor-user',
+      steamxId: 'ADM123',
+      name: 'Admin',
+      roleKey: 'admin',
+      userType: UserType.PLATFORM_STAFF,
+      schoolId: null,
+      mustChangePassword: true,
+    };
+
+    await service.changePassword(actor, currentPassword, newPassword);
+    await service.resetPassword(actor, 'target-user', resetPassword);
+
+    expect(updatePassword).toHaveBeenNthCalledWith(1, actor.userId, 'new-stored-hash', false);
+    expect(updatePassword).toHaveBeenNthCalledWith(2, 'target-user', 'new-stored-hash', true);
+    const loggedArgs = JSON.stringify([...logger.info.mock.calls, ...logger.warn.mock.calls]);
+    expect(loggedArgs).not.toContain(currentPassword);
+    expect(loggedArgs).not.toContain(newPassword);
+    expect(loggedArgs).not.toContain(resetPassword);
+    expect(loggedArgs).not.toContain(SESSION_TOKEN);
+    expect(logger.info).toHaveBeenCalledWith(
+      { actorId: actor.userId, targetId: 'target-user' },
+      'Password reset',
+    );
     await moduleRef.close();
   });
 });
