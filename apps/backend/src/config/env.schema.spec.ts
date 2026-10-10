@@ -43,6 +43,7 @@ describe('validateEnv', () => {
         AUTH_JWT_SECRET: VALID_SECRET,
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
+        CORS_ORIGINS: 'https://steamx.example',
         SWAGGER_ENABLED: 'false',
       }).SWAGGER_ENABLED,
     ).toBe(false);
@@ -54,6 +55,23 @@ describe('validateEnv', () => {
         DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
       }).SWAGGER_ENABLED,
     ).toBe(false);
+  });
+
+  it('requires at least one CORS origin in production', () => {
+    expect(() =>
+      validateEnv({
+        AUTH_JWT_SECRET: VALID_SECRET,
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://localhost/steamx_lms',
+      }),
+    ).toThrow('- CORS_ORIGINS: must contain at least one allowed origin in production');
+
+    expect(
+      validateEnv({
+        AUTH_JWT_SECRET: VALID_SECRET,
+        DATABASE_URL: 'postgresql://localhost/steamx_lms',
+      }).CORS_ORIGINS,
+    ).toEqual([]);
   });
 
   it('accepts silent logging', () => {
