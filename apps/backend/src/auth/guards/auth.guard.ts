@@ -8,12 +8,12 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PinoLogger } from 'nestjs-pino';
 import type { Request } from 'express';
-import { SchoolStatus, UserStatus } from '../generated/prisma/client.js';
-import { AuthContextRepository } from './auth-context.repository.js';
-import { AUTHENTICATION_ERROR_MESSAGE } from './auth.constants.js';
-import { ALLOW_PASSWORD_CHANGE_ROUTE, PUBLIC_ROUTE } from './decorators/metadata.constants.js';
-import type { AuthContext } from './types/auth-context.js';
-import { TokenService } from './services/token.service.js';
+import { SchoolStatus, UserStatus } from '../../generated/prisma/client.js';
+import { AuthContextRepository } from '../auth-context.repository.js';
+import { AUTHENTICATION_ERROR_MESSAGE } from '../auth.constants.js';
+import { ALLOW_PASSWORD_CHANGE_ROUTE, PUBLIC_ROUTE } from '../decorators/metadata.constants.js';
+import type { AuthContext } from '../types/auth-context.js';
+import { TokenService } from '../services/token.service.js';
 
 const AUTH_FAILURE_REASON = {
   MISSING_COOKIE: 'missing_cookie',

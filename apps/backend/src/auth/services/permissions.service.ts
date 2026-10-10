@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { AuthContextRepository } from './auth-context.repository.js';
-import { PERMISSION, type PermissionKey } from './permissions.js';
+import { AuthContextRepository } from '../auth-context.repository.js';
+import { PERMISSION, type PermissionKey } from '../permissions.js';
 
 function isPermissionKey(key: string): key is PermissionKey {
   return Object.values(PERMISSION).some((permission) => permission === key);
