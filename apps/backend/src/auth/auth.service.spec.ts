@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { PinoLogger } from 'nestjs-pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { UnauthorizedException } from '@nestjs/common';
 import { UserStatus, UserType } from '../generated/prisma/client.js';
 import { AuthContextRepository } from './auth-context.repository.js';
 import { AuthService } from './auth.service.js';
@@ -153,6 +154,41 @@ describe('AuthService', () => {
       { actorId: actor.userId, targetId: 'target-user' },
       'Password reset',
     );
+    await moduleRef.close();
+  });
+
+  it('rejects a password change if the authenticated user no longer exists', async () => {
+    const findCredentials = vi.fn().mockResolvedValue(null);
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        {
+          provide: AuthContextRepository,
+          useValue: {
+            findCredentials,
+            updatePassword: vi.fn(),
+          },
+        },
+        { provide: PasswordService, useValue: { verify: vi.fn(), hash: vi.fn() } },
+        { provide: TokenService, useValue: { sign: vi.fn() } },
+        { provide: PinoLogger, useValue: { info: vi.fn(), warn: vi.fn() } },
+      ],
+    }).compile();
+    const service = moduleRef.get(AuthService);
+    const auth: AuthContext = {
+      userId: 'deleted-user',
+      steamxId: 'AUTH123',
+      name: 'Deleted User',
+      roleKey: 'student',
+      userType: UserType.STUDENT,
+      schoolId: 'school-123',
+      mustChangePassword: true,
+    };
+
+    await expect(service.changePassword(auth, 'current password', 'new password')).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(findCredentials).toHaveBeenCalledWith(auth.userId);
     await moduleRef.close();
   });
 });

@@ -27,4 +27,5 @@
 - `POST /api/v1/auth/login`
 
 Roles and permissions are migration-managed. Update this document in the same PR as any
-permission change.
+permission change. Permission mappings are loaded at application startup; restart the backend
+after changing role-permission data in the database.

@@ -80,4 +80,33 @@ describe('FirstAdminService', () => {
     );
     await moduleRef.close();
   });
+
+  it.each([
+    [
+      { steamxId: 'a!', password: 'Recovered admin password 2026!' },
+      'ADMIN_STEAMX_ID must be 3–32 characters',
+    ],
+    [
+      { steamxId: 'ADM123', password: 'Recovered admin password 2026!', name: '   ' },
+      'ADMIN_NAME must not be blank.',
+    ],
+  ])('rejects invalid first-admin input %#', async (input, message) => {
+    const transaction = vi.fn();
+    const hash = vi.fn();
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        FirstAdminService,
+        { provide: PrismaService, useValue: { $transaction: transaction } },
+        { provide: PasswordService, useValue: { hash } },
+        { provide: AuthContextRepository, useValue: {} },
+      ],
+    }).compile();
+    const service = moduleRef.get(FirstAdminService);
+
+    await expect(service.create(input)).rejects.toThrow(message);
+
+    expect(hash).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+    await moduleRef.close();
+  });
 });
