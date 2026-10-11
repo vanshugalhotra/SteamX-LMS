@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, UserType } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { isPrismaKnownError } from '../../common/errors/prisma-error.js';
+import { AuthContextRepository } from '../auth-context.repository.js';
 import { PasswordService } from './password.service.js';
 import { validatePasswordPolicy } from '../validators/password-policy.js';
 import { isValidSteamxId, normalizeSteamxId } from '../validators/steamx-id.js';
@@ -25,7 +26,29 @@ export class FirstAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
+    private readonly users: AuthContextRepository,
   ) {}
+
+  async resetAdminPassword(input: Pick<FirstAdminInput, 'steamxId' | 'password'>): Promise<string> {
+    const steamxId = normalizeSteamxId(input.steamxId);
+    const user = await this.users.findAdminPasswordResetTarget(steamxId);
+
+    if (!user) {
+      throw new FirstAdminError(`No account found for SteamX ID ${steamxId}.`);
+    }
+    if (user.role.key !== ADMIN_ROLE_KEY) {
+      throw new FirstAdminError(`SteamX ID ${steamxId} does not belong to an admin.`);
+    }
+
+    const passwordErrors = validatePasswordPolicy(input.password, steamxId);
+    if (passwordErrors.length > 0) {
+      throw new FirstAdminError(passwordErrors.join(' '));
+    }
+
+    const passwordHash = await this.passwords.hash(input.password);
+    await this.users.updatePassword(user.id, passwordHash, true, user.updatedAt);
+    return steamxId;
+  }
 
   async create(
     input: FirstAdminInput,
