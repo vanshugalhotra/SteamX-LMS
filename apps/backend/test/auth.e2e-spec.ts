@@ -313,6 +313,8 @@ describe('Authentication endpoints (e2e)', () => {
     expect(logout.headers['set-cookie']?.[0]).toMatch(/; Path=\//i);
     expect(logout.headers['set-cookie']?.[0]).toMatch(/Expires=Thu, 01 Jan 1970/i);
     await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
+    await withCookie('/api/v1/auth/me', cookie).expect(200);
+    await withCookie('/api/v1/auth-test/protected', cookie).expect(403);
   });
 
   it('loads role permissions once and only allows the seeded Admin permission', async () => {
