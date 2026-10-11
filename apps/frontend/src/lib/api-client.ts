@@ -41,7 +41,18 @@ const FALLBACK_MESSAGES: Partial<Record<number, string>> = {
   404: "We couldn't find what you were looking for.",
 };
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export interface ApiRequestOptions extends RequestInit {
+  /**
+   * Skip the global onUnauthorized / onForbidden handlers.
+   * Use for calls where 401 is an expected answer (session probe, login attempt).
+   */
+  skipAuthHandlers?: boolean;
+}
+
+export async function apiFetch<T>(
+  path: string,
+  { skipAuthHandlers = false, ...options }: ApiRequestOptions = {},
+): Promise<T> {
   const headers = new Headers(options.headers);
   const isFormData = options.body instanceof FormData;
   if (options.body && !isFormData && !headers.has('Content-Type')) {
@@ -62,8 +73,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const data: unknown = res.status === 204 ? null : await res.json().catch(() => null);
 
   if (!res.ok) {
-    if (res.status === 401) handlers.onUnauthorized?.();
-    if (res.status === 403) handlers.onForbidden?.();
+    if (!skipAuthHandlers) {
+      if (res.status === 401) handlers.onUnauthorized?.();
+      if (res.status === 403) handlers.onForbidden?.();
+    }
 
     const message = FALLBACK_MESSAGES[res.status] ?? 'Something went wrong. Please try again.';
     const body = typeof data === 'object' && data !== null ? (data as ApiErrorBody) : undefined;
