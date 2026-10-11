@@ -68,6 +68,13 @@ export class AuthContextRepository {
     });
   }
 
+  findAdminPasswordResetTarget(steamxId: string) {
+    return this.prisma.user.findUnique({
+      where: { steamxId },
+      select: { id: true, role: { select: { key: true } } },
+    });
+  }
+
   async updatePassword(
     userId: string,
     passwordHash: string,
