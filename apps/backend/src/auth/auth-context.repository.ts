@@ -71,11 +71,7 @@ export class AuthContextRepository {
   findAdminPasswordResetTarget(steamxId: string) {
     return this.prisma.user.findUnique({
       where: { steamxId },
-      select: {
-        id: true,
-        updatedAt: true,
-        role: { select: { key: true } },
-      },
+      select: { id: true, role: { select: { key: true } } },
     });
   }
 
@@ -83,7 +79,6 @@ export class AuthContextRepository {
     userId: string,
     passwordHash: string,
     mustChangePassword: boolean,
-    updatedAt?: Date,
   ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
@@ -91,7 +86,6 @@ export class AuthContextRepository {
         passwordHash,
         mustChangePassword,
         passwordChangedAt: new Date(),
-        ...(updatedAt === undefined ? {} : { updatedAt }),
       },
       select: { id: true },
     });

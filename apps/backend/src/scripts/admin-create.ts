@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { AppModule } from '../app.module.js';
+import { fileURLToPath } from 'node:url';
 import { readFirstAdminInput } from '../auth/helpers/first-admin-input.js';
 import { FirstAdminService } from '../auth/services/first-admin.service.js';
 import { FirstAdminError } from '../auth/types/first-admin.js';
@@ -19,6 +19,7 @@ export async function runAdminCreate(
   }
 
   const input = readFirstAdminInput(environment);
+  const { AppModule } = await import('../app.module.js');
 
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
 
@@ -49,7 +50,7 @@ async function main(): Promise<void> {
       process.stderr.write(`${error.message}\n`);
     } else {
       process.stderr.write(
-        'Admin creation failed. Check the database connection and run `pnpm --filter @steamx/backend migrate:deploy` if migrations are pending.\n',
+        'Admin command failed. Check the database connection and run `pnpm --filter @steamx/backend migrate:deploy` if migrations are pending.\n',
       );
     }
     process.exitCode = 1;
@@ -57,6 +58,9 @@ async function main(): Promise<void> {
 }
 
 const entryPoint = process.argv[1];
-if (entryPoint && import.meta.url === pathToFileURL(resolve(entryPoint)).href) {
+if (
+  entryPoint &&
+  realpathSync(resolve(entryPoint)) === realpathSync(fileURLToPath(import.meta.url))
+) {
   await main();
 }

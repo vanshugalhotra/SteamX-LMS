@@ -31,23 +31,36 @@ export class FirstAdminService {
 
   async resetAdminPassword(input: Pick<FirstAdminInput, 'steamxId' | 'password'>): Promise<string> {
     const steamxId = normalizeSteamxId(input.steamxId);
-    const user = await this.users.findAdminPasswordResetTarget(steamxId);
+    try {
+      const user = await this.users.findAdminPasswordResetTarget(steamxId);
 
-    if (!user) {
-      throw new FirstAdminError(`No account found for SteamX ID ${steamxId}.`);
-    }
-    if (user.role.key !== ADMIN_ROLE_KEY) {
-      throw new FirstAdminError(`SteamX ID ${steamxId} does not belong to an admin.`);
-    }
+      if (!user) {
+        throw new FirstAdminError(`No account found for SteamX ID ${steamxId}.`);
+      }
+      if (user.role.key !== ADMIN_ROLE_KEY) {
+        throw new FirstAdminError(`SteamX ID ${steamxId} does not belong to an admin.`);
+      }
 
-    const passwordErrors = validatePasswordPolicy(input.password, steamxId);
-    if (passwordErrors.length > 0) {
-      throw new FirstAdminError(passwordErrors.join(' '));
-    }
+      const passwordErrors = validatePasswordPolicy(input.password, steamxId);
+      if (passwordErrors.length > 0) {
+        throw new FirstAdminError(passwordErrors.join(' '));
+      }
 
-    const passwordHash = await this.passwords.hash(input.password);
-    await this.users.updatePassword(user.id, passwordHash, true, user.updatedAt);
-    return steamxId;
+      const passwordHash = await this.passwords.hash(input.password);
+      await this.users.updatePassword(user.id, passwordHash, true);
+      return steamxId;
+    } catch (error) {
+      if (error instanceof FirstAdminError) {
+        throw error;
+      }
+      if (isPrismaKnownError(error) && error.code === 'P2021') {
+        throw new FirstAdminError('Database migrations have not been applied. Run migrate:deploy.');
+      }
+      if (isPrismaKnownError(error) && error.code === 'P2025') {
+        throw new FirstAdminError(`Admin account ${steamxId} no longer exists.`);
+      }
+      throw error;
+    }
   }
 
   async create(

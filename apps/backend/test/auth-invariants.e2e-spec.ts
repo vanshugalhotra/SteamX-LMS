@@ -526,7 +526,6 @@ describe('Authentication invariants (e2e)', () => {
           userType: true,
           schoolId: true,
           createdAt: true,
-          updatedAt: true,
           passwordHash: true,
           mustChangePassword: true,
           passwordChangedAt: true,
@@ -556,7 +555,6 @@ describe('Authentication invariants (e2e)', () => {
           userType: true,
           schoolId: true,
           createdAt: true,
-          updatedAt: true,
           passwordHash: true,
           mustChangePassword: true,
           passwordChangedAt: true,
@@ -572,7 +570,6 @@ describe('Authentication invariants (e2e)', () => {
         userType: before.userType,
         schoolId: before.schoolId,
         createdAt: before.createdAt,
-        updatedAt: before.updatedAt,
         mustChangePassword: true,
       });
       expect(after.passwordHash).not.toBe(before.passwordHash);
