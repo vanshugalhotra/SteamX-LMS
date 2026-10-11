@@ -10,9 +10,9 @@
 
 ## Permissions
 
-| Key                   | Description           | Admin | Teacher | Student | Added in                        |
-| --------------------- | --------------------- | :---: | :-----: | :-----: | ------------------------------- |
-| `user.password.reset` | Reset a user password |  Yes  |   No    |   No    | `20261009183400_reference_data` |
+| Key                   | Description           | Admin | Teacher | Student |
+| --------------------- | --------------------- | :---: | :-----: | :-----: |
+| `user.password.reset` | Reset a user password |  Yes  |   No    |   No    |
 
 ## Routes that require a session but no specific permission
 
