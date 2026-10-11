@@ -3,7 +3,12 @@ import { cn } from '@/lib/utils';
 
 function Logo({ onBrand = false, className }: { onBrand?: boolean; className?: string }) {
   return (
-    <div className={cn('flex items-center gap-2.5 text-[22px] font-semibold tracking-tight', className)}>
+    <div
+      className={cn(
+        'flex items-center gap-2.5 text-[22px] font-semibold tracking-tight',
+        className,
+      )}
+    >
       <span className="relative h-7.5 w-8.5 flex-none" aria-hidden="true">
         <i className="absolute bottom-0 left-0 size-5.5 rounded-full bg-coral-500" />
         <i
@@ -20,7 +25,12 @@ function Logo({ onBrand = false, className }: { onBrand?: boolean; className?: s
 
 function BrandArt() {
   return (
-    <svg className="mt-8 block h-auto w-full max-w-75" viewBox="0 0 576 576" fill="none" aria-hidden="true">
+    <svg
+      className="mt-8 block h-auto w-full max-w-75"
+      viewBox="0 0 576 576"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle cx="88" cy="88" r="88" className="fill-coral-500" />
       <path d="M200 176A176 176 0 0 1 376 0V176Z" className="fill-yellow-500" />
       <rect x="400" y="0" width="176" height="176" rx="44" className="fill-white" />
@@ -43,9 +53,18 @@ function BrandPanel() {
       aria-label="SteamX"
       className="relative hidden min-h-160 flex-col justify-between overflow-hidden rounded-4xl bg-teal-500 p-8 text-gray-900 min-[900px]:flex min-[1025px]:p-10"
     >
-      <span aria-hidden="true" className="pointer-events-none absolute -top-27.5 -right-35 size-100 rounded-full bg-white/25" />
-      <span aria-hidden="true" className="pointer-events-none absolute top-46.75 right-20 size-17.5 rounded-full bg-yellow-500" />
-      <span aria-hidden="true" className="pointer-events-none absolute -right-18.75 bottom-28 size-62.5 rounded-full bg-magenta-500" />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-27.5 -right-35 size-100 rounded-full bg-white/25"
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute top-46.75 right-20 size-17.5 rounded-full bg-yellow-500"
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-18.75 bottom-28 size-62.5 rounded-full bg-magenta-500"
+      />
 
       <Logo onBrand />
       <div className="relative">

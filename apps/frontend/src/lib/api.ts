@@ -7,7 +7,13 @@ export class ApiError extends Error {
   readonly details: unknown;
   readonly requestId: string | undefined;
 
-  constructor(status: number, code?: string, message?: string, details?: unknown, requestId?: string) {
+  constructor(
+    status: number,
+    code?: string,
+    message?: string,
+    details?: unknown,
+    requestId?: string,
+  ) {
     super(message ?? 'Request failed');
     this.name = 'ApiError';
     this.status = status;
@@ -43,7 +49,13 @@ export async function api<T = unknown>(path: string, { json, ...rest }: Options 
 
   if (!res.ok) {
     const body = (data ?? {}) as ErrorBody;
-    throw new ApiError(res.status, asString(body.code), asString(body.message), body.details, asString(body.requestId));
+    throw new ApiError(
+      res.status,
+      asString(body.code),
+      asString(body.message),
+      body.details,
+      asString(body.requestId),
+    );
   }
   return data as T;
 }

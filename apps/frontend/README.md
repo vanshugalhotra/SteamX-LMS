@@ -20,8 +20,8 @@ cp apps/frontend/.env.example apps/frontend/.env
 
 `apps/frontend/.env`:
 
-| Variable | Example | Notes |
-| --- | --- | --- |
+| Variable       | Example                        | Notes                                                                               |
+| -------------- | ------------------------------ | ----------------------------------------------------------------------------------- |
 | `VITE_API_URL` | `http://localhost:3000/api/v1` | Backend base URL **including `/api/v1`**. Restart the dev server after changing it. |
 
 ## Run
@@ -36,13 +36,13 @@ The app runs at <http://localhost:5173>.
 
 Run from the repository root with `pnpm --filter frontend <script>`:
 
-| Script | What it does |
-| --- | --- |
-| `dev` | Start the Vite dev server |
-| `lint` | ESLint (type-aware) |
-| `typecheck` | `tsc -b` |
-| `build` | Type-check and production build |
-| `preview` | Serve the production build locally |
+| Script      | What it does                       |
+| ----------- | ---------------------------------- |
+| `dev`       | Start the Vite dev server          |
+| `lint`      | ESLint (type-aware)                |
+| `typecheck` | `tsc -b`                           |
+| `build`     | Type-check and production build    |
+| `preview`   | Serve the production build locally |
 
 ## Trying the login page
 

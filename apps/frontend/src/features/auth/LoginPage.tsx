@@ -47,7 +47,9 @@ export function LoginPage() {
 
   return (
     <AuthLayout>
-      <h1 className="text-2xl leading-tight font-semibold tracking-tight min-[600px]:text-[28px]">Welcome back</h1>
+      <h1 className="text-2xl leading-tight font-semibold tracking-tight min-[600px]:text-[28px]">
+        Welcome back
+      </h1>
       <p className="mt-2 mb-7 max-w-[36ch] text-gray-600">
         Sign in with the SteamX ID and password your teacher gave you.
       </p>
@@ -87,10 +89,18 @@ export function LoginPage() {
           )}
         </FormField>
 
-        <Button type="submit" size="lg" className="mt-1.5 w-full shadow-lg shadow-coral-700/25" disabled={busy}>
+        <Button
+          type="submit"
+          size="lg"
+          className="mt-1.5 w-full shadow-lg shadow-coral-700/25"
+          disabled={busy}
+        >
           {busy ? (
             <>
-              <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+              <span
+                className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                aria-hidden="true"
+              />
               Signing in…
             </>
           ) : (

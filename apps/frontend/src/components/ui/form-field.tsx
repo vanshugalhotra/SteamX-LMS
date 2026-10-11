@@ -22,7 +22,11 @@ export function FormField({ label, error, children }: FormFieldProps) {
       <label htmlFor={id} className="mb-1.5 block text-xs font-medium">
         {label}
       </label>
-      {children({ id, 'aria-invalid': Boolean(error), 'aria-describedby': error ? errorId : undefined })}
+      {children({
+        id,
+        'aria-invalid': Boolean(error),
+        'aria-describedby': error ? errorId : undefined,
+      })}
       {error && (
         <p id={errorId} className="mt-1.5 text-xs text-danger">
           {error}
