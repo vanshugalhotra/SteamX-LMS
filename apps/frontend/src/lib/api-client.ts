@@ -1,6 +1,7 @@
 import { env } from './env';
 
-const BASE_URL = env.VITE_API_URL;
+const API_PREFIX = '/api/v1';
+const BASE_URL = `${env.VITE_API_URL}${API_PREFIX}`;
 
 interface ApiErrorBody {
   code?: string;

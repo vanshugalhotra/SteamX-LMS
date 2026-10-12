@@ -20,9 +20,9 @@ cp apps/frontend/.env.example apps/frontend/.env
 
 `apps/frontend/.env`:
 
-| Variable       | Example                        | Notes                                                                               |
-| -------------- | ------------------------------ | ----------------------------------------------------------------------------------- |
-| `VITE_API_URL` | `http://localhost:3000/api/v1` | Backend base URL **including `/api/v1`**. Restart the dev server after changing it. |
+| Variable       | Example                 | Notes                                                                                                                  |
+| -------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_URL` | `http://localhost:3000` | Backend origin only, **without** `/api/v1` (the prefix is added in `lib/api-client.ts`). Restart the dev server after changing it. |
 
 ## Run
 
