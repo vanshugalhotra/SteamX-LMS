@@ -51,6 +51,13 @@
   --color-magenta-700: #c94a6b;
   --color-magenta-800: #a83255;
   --color-magenta-900: #7a1f3d;
+
+  --color-danger: #a83a4a;
+  --color-danger-line: #d64550;
+  --color-danger-soft: #fdeeee;
+  --color-success: #1f5a2e;
+  --color-success-line: #a7e0b2;
+  --color-success-soft: #f1f8f3;
 }
 
 @theme inline {
