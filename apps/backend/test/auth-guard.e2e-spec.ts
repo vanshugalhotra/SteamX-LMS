@@ -14,6 +14,7 @@ import type { AuthContext } from '../src/auth/types/auth-context.js';
 import { TokenService } from '../src/auth/services/token.service.js';
 import { configureApp } from '../src/configure-app.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { createTestUser } from './helpers/fixtures.js';
 
 const TEST_PASSWORD_HASH = 'test-only-password-hash';
 const ALTERNATE_TEST_SECRET = 'different-test-secret-that-is-at-least-32-characters';
@@ -64,15 +65,19 @@ describe('Global authentication guard (e2e)', () => {
   });
 
   afterEach(async () => {
-    if (createdUserIds.length > 0) {
-      await prisma.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
-      createdUserIds.length = 0;
-    }
-    if (createdSchoolIds.length > 0) {
-      await prisma.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
-      createdSchoolIds.length = 0;
-    }
+    await prisma.$transaction(async (tx) => {
+      if (createdUserIds.length > 0) {
+        await tx.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
+        await tx.studentProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
+        await tx.user.deleteMany({ where: { id: { in: createdUserIds } } });
+      }
+      if (createdSchoolIds.length > 0) {
+        await tx.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
+      }
+    });
+
+    createdUserIds.length = 0;
+    createdSchoolIds.length = 0;
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -86,56 +91,22 @@ describe('Global authentication guard (e2e)', () => {
     schoolStatus: SchoolStatus = SchoolStatus.ACTIVE,
     mustChangePassword = false,
   ): Promise<{ id: string; schoolId: string | null }> {
-    const schoolCode = `AT${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-    const roleKey = userType === UserType.PLATFORM_STAFF ? 'admin' : 'teacher';
-    const role = await prisma.role.findUniqueOrThrow({
-      where: { key: roleKey },
-      select: { id: true },
-    });
+    const fixture = await prisma.$transaction((tx) =>
+      createTestUser(tx, {
+        userType,
+        name: 'Auth Guard Test User',
+        passwordHash: TEST_PASSWORD_HASH,
+        steamxId: `AUTH${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
+        schoolStatus,
+        mustChangePassword,
+      }),
+    );
 
-    const fixture = await prisma.$transaction(async (tx) => {
-      const school =
-        userType === UserType.PLATFORM_STAFF
-          ? null
-          : await tx.school.create({
-              data: {
-                code: schoolCode,
-                name: 'Auth Guard Test School',
-                city: 'Test City',
-                state: 'Test State',
-                postalCode: '00000',
-                country: 'Test Country',
-                status: schoolStatus,
-              },
-              select: { id: true },
-            });
-      const user = await tx.user.create({
-        data: {
-          steamxId: `AUTH${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
-          name: 'Auth Guard Test User',
-          passwordHash: TEST_PASSWORD_HASH,
-          roleId: role.id,
-          userType,
-          schoolId: school?.id ?? null,
-          mustChangePassword,
-        },
-        select: { id: true },
-      });
-
-      if (school) {
-        await tx.teacherProfile.create({
-          data: { userId: user.id, schoolId: school.id },
-        });
-      }
-
-      return { userId: user.id, schoolId: school?.id ?? null };
-    });
-
-    createdUserIds.push(fixture.userId);
+    createdUserIds.push(fixture.id);
     if (fixture.schoolId !== null) {
       createdSchoolIds.push(fixture.schoolId);
     }
-    return { id: fixture.userId, schoolId: fixture.schoolId };
+    return { id: fixture.id, schoolId: fixture.schoolId };
   }
 
   function withCookie(token: string) {
