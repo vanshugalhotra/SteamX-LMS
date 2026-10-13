@@ -29,6 +29,7 @@ import { runAdminCreate } from '../src/scripts/admin-create.js';
 import { configureApp } from '../src/configure-app.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestUser } from './helpers/fixtures.js';
+import { loginAs } from './helpers/login.js';
 
 const INITIAL_PASSWORD = 'Starting invariant password 2026!';
 const RECOVERY_PASSWORD = 'Recovered admin password 2026!';
@@ -59,6 +60,7 @@ type FixtureUser = {
   id: string;
   steamxId: string;
   schoolId: string | null;
+  password: string;
 };
 
 function strings(value: unknown): string[] {
@@ -162,20 +164,12 @@ describe('Authentication invariants (e2e)', () => {
       id: fixture.id,
       schoolId: fixture.schoolId,
       steamxId: fixture.steamxId,
+      password: INITIAL_PASSWORD,
     };
   }
 
   async function login(user: FixtureUser, password = INITIAL_PASSWORD): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .set('Origin', origin)
-      .send({ steamxId: user.steamxId, password })
-      .expect(200);
-    const setCookie = response.headers['set-cookie']?.[0];
-    if (!setCookie) {
-      throw new Error('Login response did not set a session cookie.');
-    }
-    return setCookie.split(';', 1)[0]!;
+    return loginAs(app, user, password);
   }
 
   function get(path: string, cookie?: string) {
