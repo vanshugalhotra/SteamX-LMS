@@ -79,20 +79,24 @@ Login needs the backend, a database and an admin user. One-time setup:
 - Empty submit shows field errors; wrong credentials show an error alert.
 - A successful login sets an httpOnly session cookie and redirects to `/`.
 - While signed in, opening `/login` redirects you away from it.
-- The admin account created by `admin:create` must change its password on first login. The forced password-change screen is **not built yet**, so such a user is redirected to `/change-password`, which currently shows "Page not found".
+- The admin account created by `admin:create` must change its password on first login. Such a user is redirected to `/change-password` and cannot continue until the password is changed. After a successful change you land on `/`.
 
-### Changing the admin password until that screen exists
+### Trying the forced password change
 
-Swagger's "Try it out" is blocked by the backend's origin check, so call the endpoint from the app's own origin. While signed in, open <http://localhost:5173>, then in the browser DevTools console run:
+The admin you created has `mustChangePassword: true`, so the first login lands on `/change-password`. To test it again later, reset the admin (this also revokes existing sessions):
 
-```js
-fetch('http://localhost:3000/api/v1/auth/change-password', {
-  method: 'POST',
-  credentials: 'include',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ currentPassword: 'OLD_PASSWORD', newPassword: 'NEW_PASSWORD' }),
-}).then(async (r) => console.log(r.status, JSON.stringify(await r.json(), null, 2)));
+```bash
+ADMIN_STEAMX_ID=admin ADMIN_PASSWORD='<a strong password>' pnpm --filter @steamx/backend admin:create --reset
 ```
+
+(PowerShell: set `$env:ADMIN_STEAMX_ID` and `$env:ADMIN_PASSWORD` first.) The password must not contain the SteamX ID.
+
+On `/change-password`:
+
+- Empty fields and mismatched confirmation show field errors.
+- A wrong current password or a password that breaks the policy shows an error alert (policy errors are listed).
+- Success refetches the session and redirects to `/`.
+- Signed-out users are redirected to `/login`; users who don't need to change their password are redirected to `/`.
 
 ## Project structure
 

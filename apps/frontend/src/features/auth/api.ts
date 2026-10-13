@@ -17,6 +17,11 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
 /** POST /auth/login: sets the httpOnly session cookie and returns the profile. */
 export function login(payload: LoginPayload) {
   return apiFetch<AuthProfile>(AUTH_ENDPOINTS.login, {
@@ -34,4 +39,12 @@ export async function fetchSession(): Promise<AuthProfile | null> {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;
   }
+}
+
+/** POST /auth/change-password */
+export function changePassword(payload: ChangePasswordPayload) {
+  return apiFetch<null>(AUTH_ENDPOINTS.changePassword, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
