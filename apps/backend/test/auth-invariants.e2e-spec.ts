@@ -117,20 +117,23 @@ describe('Authentication invariants (e2e)', () => {
   });
 
   afterEach(async () => {
-    if (createdUserIds.length > 0) {
-      await prisma.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-      await prisma.studentProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
-      createdUserIds.length = 0;
-    }
-    if (createdClassSectionIds.length > 0) {
-      await prisma.classSection.deleteMany({ where: { id: { in: createdClassSectionIds } } });
-      createdClassSectionIds.length = 0;
-    }
-    if (createdSchoolIds.length > 0) {
-      await prisma.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
-      createdSchoolIds.length = 0;
-    }
+    await prisma.$transaction(async (tx) => {
+      if (createdUserIds.length > 0) {
+        await tx.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
+        await tx.studentProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
+        await tx.user.deleteMany({ where: { id: { in: createdUserIds } } });
+      }
+      if (createdClassSectionIds.length > 0) {
+        await tx.classSection.deleteMany({ where: { id: { in: createdClassSectionIds } } });
+      }
+      if (createdSchoolIds.length > 0) {
+        await tx.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
+      }
+    });
+
+    createdUserIds.length = 0;
+    createdClassSectionIds.length = 0;
+    createdSchoolIds.length = 0;
   });
 
   afterAll(async () => {

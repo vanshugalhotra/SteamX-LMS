@@ -65,15 +65,19 @@ describe('Global authentication guard (e2e)', () => {
   });
 
   afterEach(async () => {
-    if (createdUserIds.length > 0) {
-      await prisma.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
-      createdUserIds.length = 0;
-    }
-    if (createdSchoolIds.length > 0) {
-      await prisma.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
-      createdSchoolIds.length = 0;
-    }
+    await prisma.$transaction(async (tx) => {
+      if (createdUserIds.length > 0) {
+        await tx.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
+        await tx.studentProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
+        await tx.user.deleteMany({ where: { id: { in: createdUserIds } } });
+      }
+      if (createdSchoolIds.length > 0) {
+        await tx.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
+      }
+    });
+
+    createdUserIds.length = 0;
+    createdSchoolIds.length = 0;
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
