@@ -5,10 +5,10 @@ import { IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
-import { AppModule } from './../src/app.module.js';
-import { Public } from './../src/auth/decorators/public.decorator.js';
-import { configureApp } from './../src/configure-app.js';
-import type { Env } from './../src/config/env.schema.js';
+import { AppModule } from '../../src/app.module.js';
+import { Public } from '../../src/auth/decorators/public.decorator.js';
+import { configureApp } from '../../src/configure-app.js';
+import type { Env } from '../../src/config/env.schema.js';
 
 class LessonBlockRequest {
   @IsString()

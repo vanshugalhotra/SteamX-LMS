@@ -1,14 +1,14 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Prisma, UserType } from '../src/generated/prisma/client.js';
-import { AppModule } from '../src/app.module.js';
-import { FirstAdminService } from '../src/auth/services/first-admin.service.js';
-import { PasswordService } from '../src/auth/services/password.service.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
-import { createTestUser } from './helpers/fixtures.js';
+import { Prisma, UserType } from '../../src/generated/prisma/client.js';
+import { AppModule } from '../../src/app.module.js';
+import { FirstAdminService } from '../../src/auth/services/first-admin.service.js';
+import { PasswordService } from '../../src/auth/services/password.service.js';
+import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { createTestUser } from '../factories/fixtures.js';
+import { withRollback } from '../setup/with-rollback.js';
 
-const ROLLBACK_SENTINEL = new Error('ROLLBACK_AUTH_FOUNDATION_TEST');
 const ADMIN_INPUT = {
   steamxId: '  adm123 ',
   password: 'very strong phrase 24',
@@ -16,7 +16,6 @@ const ADMIN_INPUT = {
 };
 const REFERENCE_MIGRATION_SUFFIX = '_reference_data';
 
-type TransactionTest = (tx: Prisma.TransactionClient) => Promise<void>;
 type ReferenceDataSnapshot = {
   roles: Array<{ key: string; userType: UserType }>;
   permissions: string[];
@@ -24,7 +23,7 @@ type ReferenceDataSnapshot = {
   migrations: string[];
 };
 
-describe('Authentication foundation reference data (e2e)', () => {
+describe('Authentication foundation reference data', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let firstAdmin: FirstAdminService;
@@ -45,32 +44,6 @@ describe('Authentication foundation reference data (e2e)', () => {
   afterAll(async () => {
     await app.close();
   });
-
-  async function withRollback(test: TransactionTest): Promise<void> {
-    let testFailed = false;
-    let testError: unknown;
-
-    try {
-      await prisma.$transaction(async (tx) => {
-        try {
-          await test(tx);
-        } catch (error) {
-          testFailed = true;
-          testError = error;
-        }
-
-        throw ROLLBACK_SENTINEL;
-      });
-    } catch (error) {
-      if (error !== ROLLBACK_SENTINEL) {
-        throw error;
-      }
-    }
-
-    if (testFailed) {
-      throw testError;
-    }
-  }
 
   async function snapshotReferenceData(
     database: Prisma.TransactionClient | PrismaService,
@@ -123,9 +96,12 @@ describe('Authentication foundation reference data (e2e)', () => {
 
   it('replays the reference migration idempotently without changing migration history', async () => {
     const before = await snapshotReferenceData(prisma);
-    const migrationDirectories = await readdir(new URL('../prisma/migrations/', import.meta.url), {
-      withFileTypes: true,
-    });
+    const migrationDirectories = await readdir(
+      new URL('../../prisma/migrations/', import.meta.url),
+      {
+        withFileTypes: true,
+      },
+    );
     const migrationDirectory = migrationDirectories.find(
       (entry) => entry.isDirectory() && entry.name.endsWith(REFERENCE_MIGRATION_SUFFIX),
     );
@@ -135,7 +111,7 @@ describe('Authentication foundation reference data (e2e)', () => {
     }
 
     const migrationSql = await readFile(
-      new URL(`../prisma/migrations/${migrationDirectory.name}/migration.sql`, import.meta.url),
+      new URL(`../../prisma/migrations/${migrationDirectory.name}/migration.sql`, import.meta.url),
       'utf8',
     );
     const statements = migrationSql
@@ -143,7 +119,7 @@ describe('Authentication foundation reference data (e2e)', () => {
       .map((statement) => statement.trim())
       .filter((statement) => statement.length > 0);
 
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       for (const statement of statements) {
         await tx.$executeRawUnsafe(statement);
       }
@@ -157,7 +133,7 @@ describe('Authentication foundation reference data (e2e)', () => {
   it('creates one normalized first Admin, returns existing on repeat, and rolls cleanup back', async () => {
     const before = await snapshotReferenceData(prisma);
 
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const created = await firstAdmin.create(ADMIN_INPUT, tx);
       const repeated = await firstAdmin.create(
         {
@@ -198,7 +174,7 @@ describe('Authentication foundation reference data (e2e)', () => {
   });
 
   it('reports when the requested SteamX ID is already used by a non-admin', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       await createTestUser(tx, {
         steamxId: 'ADM123',
         name: 'Existing Teacher',
