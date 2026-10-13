@@ -28,6 +28,7 @@ import { FirstAdminError } from '../src/auth/types/first-admin.js';
 import { runAdminCreate } from '../src/scripts/admin-create.js';
 import { configureApp } from '../src/configure-app.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { createTestUser } from './helpers/fixtures.js';
 
 const INITIAL_PASSWORD = 'Starting invariant password 2026!';
 const RECOVERY_PASSWORD = 'Recovered admin password 2026!';
@@ -137,69 +138,15 @@ describe('Authentication invariants (e2e)', () => {
   });
 
   async function createUser(userType: UserType = UserType.PLATFORM_STAFF): Promise<FixtureUser> {
-    const roleKey =
-      userType === UserType.PLATFORM_STAFF
-        ? 'admin'
-        : userType === UserType.SCHOOL_STAFF
-          ? 'teacher'
-          : 'student';
-    const role = await prisma.role.findUniqueOrThrow({
-      where: { key: roleKey },
-      select: { id: true },
-    });
-    const steamxId = `INV${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-    const schoolCode = `IV${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-    const fixture = await prisma.$transaction(async (tx) => {
-      const school =
-        userType === UserType.PLATFORM_STAFF
-          ? null
-          : await tx.school.create({
-              data: {
-                code: schoolCode,
-                name: 'Auth Invariant School',
-                city: 'Test City',
-                state: 'Test State',
-                postalCode: '00000',
-                country: 'Test Country',
-              },
-              select: { id: true },
-            });
-      const classSection =
-        userType === UserType.STUDENT && school
-          ? await tx.classSection.create({
-              data: { schoolId: school.id, className: `Class ${randomUUID().slice(0, 8)}` },
-              select: { id: true },
-            })
-          : null;
-      const user = await tx.user.create({
-        data: {
-          steamxId,
-          name: 'Auth Invariant User',
-          passwordHash,
-          roleId: role.id,
-          userType,
-          schoolId: school?.id ?? null,
-          mustChangePassword: false,
-        },
-        select: { id: true },
-      });
-
-      if (school && userType === UserType.STUDENT && classSection) {
-        await tx.studentProfile.create({
-          data: { userId: user.id, schoolId: school.id, classSectionId: classSection.id },
-        });
-      } else if (school) {
-        await tx.teacherProfile.create({
-          data: { userId: user.id, schoolId: school.id },
-        });
-      }
-
-      return {
-        id: user.id,
-        schoolId: school?.id ?? null,
-        classSectionId: classSection?.id ?? null,
-      };
-    });
+    const fixture = await prisma.$transaction((tx) =>
+      createTestUser(tx, {
+        userType,
+        name: 'Auth Invariant User',
+        passwordHash,
+        steamxId: `INV${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
+        mustChangePassword: false,
+      }),
+    );
 
     createdUserIds.push(fixture.id);
     if (fixture.schoolId) {
@@ -208,7 +155,11 @@ describe('Authentication invariants (e2e)', () => {
     if (fixture.classSectionId) {
       createdClassSectionIds.push(fixture.classSectionId);
     }
-    return { id: fixture.id, schoolId: fixture.schoolId, steamxId };
+    return {
+      id: fixture.id,
+      schoolId: fixture.schoolId,
+      steamxId: fixture.steamxId,
+    };
   }
 
   async function login(user: FixtureUser, password = INITIAL_PASSWORD): Promise<string> {

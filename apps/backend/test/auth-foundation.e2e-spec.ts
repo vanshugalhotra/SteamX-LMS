@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module.js';
 import { FirstAdminService } from '../src/auth/services/first-admin.service.js';
 import { PasswordService } from '../src/auth/services/password.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { createTestUser } from './helpers/fixtures.js';
 
 const ROLLBACK_SENTINEL = new Error('ROLLBACK_AUTH_FOUNDATION_TEST');
 const ADMIN_INPUT = {
@@ -198,30 +199,11 @@ describe('Authentication foundation reference data (e2e)', () => {
 
   it('reports when the requested SteamX ID is already used by a non-admin', async () => {
     await withRollback(async (tx) => {
-      const school = await tx.school.create({
-        data: {
-          code: 'TST7',
-          name: 'Test School',
-          city: 'Test City',
-          state: 'Test State',
-          postalCode: '00000',
-          country: 'Test Country',
-        },
-      });
-      const teacherRole = await tx.role.findUniqueOrThrow({
-        where: { key: 'teacher' },
-        select: { id: true },
-      });
-
-      await tx.user.create({
-        data: {
-          steamxId: 'ADM123',
-          name: 'Existing Teacher',
-          passwordHash: 'test-only-password-hash',
-          roleId: teacherRole.id,
-          userType: UserType.SCHOOL_STAFF,
-          schoolId: school.id,
-        },
+      await createTestUser(tx, {
+        steamxId: 'ADM123',
+        name: 'Existing Teacher',
+        passwordHash: 'test-only-password-hash',
+        userType: UserType.SCHOOL_STAFF,
       });
 
       await expect(firstAdmin.create(ADMIN_INPUT, tx)).rejects.toThrow(

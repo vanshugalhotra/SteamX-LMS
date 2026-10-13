@@ -17,6 +17,7 @@ import { TokenService } from '../src/auth/services/token.service.js';
 import { configureApp } from '../src/configure-app.js';
 import type { Env } from '../src/config/env.schema.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { createTestUser } from './helpers/fixtures.js';
 
 const TEST_PASSWORD = 'Test login password 2026!';
 
@@ -108,81 +109,19 @@ describe('Authentication endpoints (e2e)', () => {
     } = {},
   ): Promise<{ id: string; steamxId: string; schoolId: string | null }> {
     const userType = options.userType ?? UserType.PLATFORM_STAFF;
-    const roleKey =
-      userType === UserType.PLATFORM_STAFF
-        ? 'admin'
-        : userType === UserType.STUDENT
-          ? 'student'
-          : 'teacher';
-    const role = await prisma.role.findUniqueOrThrow({
-      where: { key: roleKey },
-      select: { id: true },
-    });
-    const schoolCode = `AT${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
     const steamxId =
       options.steamxId ?? `AUTH${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-    const fixture = await prisma.$transaction(async (tx) => {
-      const school =
-        userType === UserType.PLATFORM_STAFF
-          ? null
-          : await tx.school.create({
-              data: {
-                code: schoolCode,
-                name: 'Auth E2E School',
-                city: 'Test City',
-                state: 'Test State',
-                postalCode: '00000',
-                country: 'Test Country',
-                status: options.schoolStatus ?? SchoolStatus.ACTIVE,
-              },
-              select: { id: true },
-            });
-      const classSection =
-        userType === UserType.STUDENT && school
-          ? await tx.classSection.create({
-              data: {
-                schoolId: school.id,
-                className: `Class ${randomUUID().slice(0, 8)}`,
-              },
-              select: { id: true },
-            })
-          : null;
-      const user = await tx.user.create({
-        data: {
-          steamxId,
-          name: 'Auth E2E User',
-          passwordHash,
-          roleId: role.id,
-          userType,
-          schoolId: school?.id ?? null,
-          status: options.status ?? UserStatus.ACTIVE,
-          mustChangePassword: options.mustChangePassword ?? false,
-        },
-        select: { id: true },
-      });
-
-      if (school) {
-        if (userType === UserType.STUDENT && classSection) {
-          await tx.studentProfile.create({
-            data: {
-              userId: user.id,
-              schoolId: school.id,
-              classSectionId: classSection.id,
-            },
-          });
-        } else {
-          await tx.teacherProfile.create({
-            data: { userId: user.id, schoolId: school.id },
-          });
-        }
-      }
-
-      return {
-        id: user.id,
-        schoolId: school?.id ?? null,
-        classSectionId: classSection?.id ?? null,
-      };
-    });
+    const fixture = await prisma.$transaction((tx) =>
+      createTestUser(tx, {
+        userType,
+        name: 'Auth E2E User',
+        passwordHash,
+        steamxId,
+        status: options.status,
+        schoolStatus: options.schoolStatus,
+        mustChangePassword: options.mustChangePassword,
+      }),
+    );
     createdUserIds.push(fixture.id);
     if (fixture.schoolId !== null) {
       createdSchoolIds.push(fixture.schoolId);
