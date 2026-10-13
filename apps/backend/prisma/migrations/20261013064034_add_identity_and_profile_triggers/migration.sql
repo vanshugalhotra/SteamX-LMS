@@ -4,10 +4,15 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   column_name text;
+  new_row jsonb;
+  old_row jsonb;
 BEGIN
+  new_row := to_jsonb(NEW);
+  old_row := to_jsonb(OLD);
+
   FOREACH column_name IN ARRAY TG_ARGV
   LOOP
-    IF (to_jsonb(NEW) -> column_name) IS DISTINCT FROM (to_jsonb(OLD) -> column_name) THEN
+    IF (new_row -> column_name) IS DISTINCT FROM (old_row -> column_name) THEN
       RAISE EXCEPTION '% is immutable', TG_TABLE_NAME || '.' || column_name
         USING ERRCODE = 'integrity_constraint_violation';
     END IF;

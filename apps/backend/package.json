@@ -24,7 +24,8 @@
     "prisma:generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "migrate:status": "prisma migrate status"
+    "migrate:status": "prisma migrate status",
+    "migrate:reset": "prisma migrate reset"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
