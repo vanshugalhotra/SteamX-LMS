@@ -32,6 +32,10 @@ export class ClassSectionsService {
     private readonly logger: PinoLogger,
   ) {}
 
+  // ─────────────────────────────────────────
+  // POST /class-sections — Create a class section
+  // ─────────────────────────────────────────
+
   async create(actor: AuthContext, body: CreateClassSectionDto): Promise<ClassSectionResponseDto> {
     const schoolId = resolveSchoolScope(actor, body.schoolId);
     if (!schoolId) {
@@ -66,6 +70,10 @@ export class ClassSectionsService {
     }
   }
 
+  // ─────────────────────────────────────────
+  // GET /class-sections — List class sections
+  // ─────────────────────────────────────────
+
   async findMany(
     actor: AuthContext,
     query: ClassSectionListQueryDto,
@@ -80,6 +88,10 @@ export class ClassSectionsService {
     );
   }
 
+  // ─────────────────────────────────────────
+  // GET /class-sections/:id — Get a class section
+  // ─────────────────────────────────────────
+
   async findById(actor: AuthContext, id: string): Promise<ClassSectionResponseDto> {
     const scope = resolveSchoolScope(actor);
     const section = await this.sections.findById(id, scope);
@@ -88,6 +100,10 @@ export class ClassSectionsService {
     }
     return toClassSectionResponse(section);
   }
+
+  // ─────────────────────────────────────────
+  // PATCH /class-sections/:id — Update a class section
+  // ─────────────────────────────────────────
 
   async update(
     actor: AuthContext,
@@ -117,6 +133,10 @@ export class ClassSectionsService {
       throw error;
     }
   }
+
+  // ─────────────────────────────────────────
+  // DELETE /class-sections/:id — Delete a class section
+  // ─────────────────────────────────────────
 
   async delete(actor: AuthContext, id: string): Promise<void> {
     const scope = resolveSchoolScope(actor);

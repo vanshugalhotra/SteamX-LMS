@@ -43,6 +43,10 @@ import { ClassSectionsService } from './class-sections.service.js';
 export class ClassSectionsController {
   constructor(private readonly sections: ClassSectionsService) {}
 
+  // ─────────────────────────────────────────
+  // POST /class-sections — Create a class section
+  // ─────────────────────────────────────────
+
   @RequirePermission(PERMISSION.CLASSSECTION_MANAGE)
   @Post()
   @ApiOperation({ summary: 'Create a class section' })
@@ -57,6 +61,10 @@ export class ClassSectionsController {
     return this.sections.create(actor, body);
   }
 
+  // ─────────────────────────────────────────
+  // GET /class-sections — List class sections
+  // ─────────────────────────────────────────
+
   @RequirePermission(PERMISSION.CLASSSECTION_READ)
   @Get()
   @ApiOperation({ summary: 'List class sections' })
@@ -70,6 +78,10 @@ export class ClassSectionsController {
     return this.sections.findMany(actor, query);
   }
 
+  // ─────────────────────────────────────────
+  // GET /class-sections/:id — Get a class section
+  // ─────────────────────────────────────────
+
   @RequirePermission(PERMISSION.CLASSSECTION_READ)
   @Get(':id')
   @ApiOperation({ summary: 'Get a class section' })
@@ -81,6 +93,10 @@ export class ClassSectionsController {
   ): Promise<ClassSectionResponseDto> {
     return this.sections.findById(actor, id);
   }
+
+  // ─────────────────────────────────────────
+  // PATCH /class-sections/:id — Update a class section
+  // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.CLASSSECTION_MANAGE)
   @Patch(':id')
@@ -96,6 +112,10 @@ export class ClassSectionsController {
   ): Promise<ClassSectionResponseDto> {
     return this.sections.update(actor, id, body);
   }
+
+  // ─────────────────────────────────────────
+  // DELETE /class-sections/:id — Delete a class section
+  // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.CLASSSECTION_MANAGE)
   @Delete(':id')
