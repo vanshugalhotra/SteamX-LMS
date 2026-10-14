@@ -58,6 +58,15 @@ export function getPrismaReason(error: PrismaKnownError): string {
   );
 }
 
+export function throwConflictOnDuplicate(
+  error: unknown,
+  response: { code: string; message: string },
+): void {
+  if (isPrismaKnownError(error) && error.code === 'P2002') {
+    throw new ConflictException(response);
+  }
+}
+
 export function mapPrismaError(error: unknown): HttpException | undefined {
   if (!isPrismaKnownError(error)) {
     return undefined;

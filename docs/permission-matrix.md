@@ -15,8 +15,11 @@
 | `user.password.reset` | Reset a user password     |  Yes  |   No    |   No    |
 | `school.read`         | View schools              |  Yes  |   No*   |   No    |
 | `school.manage`       | Create and manage schools |  Yes  |   No    |   No    |
+| `classsection.read`   | View class sections       |  Yes  |   No    |   No    |
+| `classsection.manage` | Manage class sections     |  Yes  |   No    |   No    |
 
 `school.read` is granted to teachers selectively when explicitly authorized.
+`classsection.read` and `classsection.manage` were added in TEN-3.
 
 ## Routes that require a session but no specific permission
 
