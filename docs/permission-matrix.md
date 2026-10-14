@@ -10,9 +10,13 @@
 
 ## Permissions
 
-| Key                   | Description           | Admin | Teacher | Student |
-| --------------------- | --------------------- | :---: | :-----: | :-----: |
-| `user.password.reset` | Reset a user password |  Yes  |   No    |   No    |
+| Key                   | Description               | Admin | Teacher | Student |
+| --------------------- | ------------------------- | :---: | :-----: | :-----: |
+| `user.password.reset` | Reset a user password     |  Yes  |   No    |   No    |
+| `school.read`         | View schools              |  Yes  |   No*   |   No    |
+| `school.manage`       | Create and manage schools |  Yes  |   No    |   No    |
+
+`school.read` is granted to teachers selectively when explicitly authorized.
 
 ## Routes that require a session but no specific permission
 

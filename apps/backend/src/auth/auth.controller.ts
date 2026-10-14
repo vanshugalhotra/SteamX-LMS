@@ -28,6 +28,10 @@ export class AuthController {
     private readonly tokens: TokenService,
   ) {}
 
+  // ─────────────────────────────────────────
+  // POST /auth/login — Log in
+  // ─────────────────────────────────────────
+
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -49,6 +53,10 @@ export class AuthController {
     return profile;
   }
 
+  // ─────────────────────────────────────────
+  // POST /auth/logout — Log out
+  // ─────────────────────────────────────────
+
   @AllowWhenPasswordChangeRequired()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -60,6 +68,10 @@ export class AuthController {
     const { name, httpOnly, secure, sameSite, path } = this.tokens.cookieOptions();
     response.clearCookie(name, { httpOnly, secure, sameSite, path });
   }
+
+  // ─────────────────────────────────────────
+  // GET /auth/me — Current profile
+  // ─────────────────────────────────────────
 
   @AllowWhenPasswordChangeRequired()
   @Get('me')
@@ -75,6 +87,10 @@ export class AuthController {
     response.setHeader('Cache-Control', 'no-store');
     return toAuthProfile(authContext);
   }
+
+  // ─────────────────────────────────────────
+  // POST /auth/change-password — Change password
+  // ─────────────────────────────────────────
 
   @AllowWhenPasswordChangeRequired()
   @Post('change-password')

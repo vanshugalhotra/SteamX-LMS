@@ -80,7 +80,7 @@ describe('Authentication foundation reference data', () => {
     };
   }
 
-  it('seeds exactly three roles and gives the reset permission only to Admin', async () => {
+  it('seeds exactly three roles and gives school and reset permissions only to Admin', async () => {
     const snapshot = await snapshotReferenceData(prisma);
 
     expect(snapshot.roles).toEqual([
@@ -88,9 +88,11 @@ describe('Authentication foundation reference data', () => {
       { key: 'student', userType: UserType.STUDENT },
       { key: 'teacher', userType: UserType.SCHOOL_STAFF },
     ]);
-    expect(snapshot.permissions).toEqual(['user.password.reset']);
+    expect(snapshot.permissions).toEqual(['school.manage', 'school.read', 'user.password.reset']);
     expect(snapshot.rolePermissions).toEqual([
       { role: 'admin', permission: 'user.password.reset' },
+      { role: 'admin', permission: 'school.read' },
+      { role: 'admin', permission: 'school.manage' },
     ]);
   });
 
