@@ -2,8 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { App } from 'supertest/types.js';
 import request from 'supertest';
-import { AppModule } from './../src/app.module.js';
-import { configureApp } from './../src/configure-app.js';
+import { AppModule } from '../../src/app.module.js';
+import { configureApp } from '../../src/configure-app.js';
 
 describe('Request logging (e2e)', () => {
   let app: INestApplication<App>;

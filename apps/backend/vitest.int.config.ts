@@ -4,9 +4,9 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['**/*.e2e-spec.ts'],
-    setupFiles: ['./test/setup-env.ts'],
-    globalSetup: ['./test/global-setup.ts'],
+    include: ['test/db/**/*.int-spec.ts'],
+    setupFiles: ['./test/setup/setup-env.ts'],
+    globalSetup: ['./test/setup/global-setup.ts'],
     fileParallelism: false,
   },
   resolve: {
