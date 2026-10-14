@@ -114,7 +114,7 @@ describe('Schools endpoints (e2e)', () => {
       .send(body);
   }
 
-  function changeStatus(cookie: string, id: string, status: SchoolStatus) {
+  function changeStatus(cookie: string, id: string, status: string) {
     return request(app.getHttpServer())
       .patch(`/api/v1/schools/${id}/status`)
       .set('Origin', origin)
@@ -136,13 +136,21 @@ describe('Schools endpoints (e2e)', () => {
     const adminCookie = await loginAs(app, fixture.admin);
     const created = await createSchool(
       adminCookie,
-      createBody(' ab-12 ', { contactEmail: '  CONTACT@EXAMPLE.COM ' }),
+      createBody(' ab-12 ', {
+        contactEmail: '  CONTACT@EXAMPLE.COM ',
+        streetAddress: null,
+        contactName: null,
+        contactPhone: null,
+      }),
     ).expect(201);
     createdSchoolIds.push(created.body.id as string);
     expect(created.body).toMatchObject({
       code: 'AB-12',
       name: REQUIRED_SCHOOL_FIELDS.name,
       contactEmail: 'contact@example.com',
+      streetAddress: null,
+      contactName: null,
+      contactPhone: null,
       status: SchoolStatus.ACTIVE,
     });
     expect(created.body).not.toHaveProperty('schoolId');
@@ -183,12 +191,20 @@ describe('Schools endpoints (e2e)', () => {
     const adminCookie = await loginAs(app, fixture.admin);
     const updated = await patchSchool(adminCookie, fixture.schoolA.school.id, {
       name: 'Updated Academy',
+      state: 'Haryana',
+      streetAddress: null,
+      contactName: null,
       contactPhone: null,
+      contactEmail: null,
     }).expect(200);
     expect(updated.body).toMatchObject({
       id: fixture.schoolA.school.id,
       name: 'Updated Academy',
+      state: 'Haryana',
+      streetAddress: null,
+      contactName: null,
       contactPhone: null,
+      contactEmail: null,
     });
 
     await patchSchool(adminCookie, fixture.schoolA.school.id, { code: 'CHANGED1' }).expect(400);
@@ -341,7 +357,7 @@ describe('Schools endpoints (e2e)', () => {
     const teacherACookie = await loginAs(app, fixture.schoolA.teacher);
     const teacherBCookie = await loginAs(app, fixture.schoolB.teacher);
 
-    await changeStatus(adminCookie, fixture.schoolA.school.id, SchoolStatus.INACTIVE).expect(200);
+    await changeStatus(adminCookie, fixture.schoolA.school.id, 'INACTIVE       ').expect(200);
     await changeStatus(adminCookie, fixture.schoolA.school.id, SchoolStatus.INACTIVE).expect(200);
     await request(app.getHttpServer())
       .get('/api/v1/schools')

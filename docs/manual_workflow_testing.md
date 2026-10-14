@@ -81,8 +81,6 @@
 | Weak password (policy violation)     | `400`                              |
 | Admin resets their own ID            | Rejected (use change-password)     |
 
-**Note:** same one-second caveat as section 5.
-
 ## 7. Revocation (session dies on the next request)
 
 | Action                    | Expected on the user's next request |
@@ -103,7 +101,70 @@ Test once, using login or logout.
 | Allowed origin         | Request proceeds           |
 | `GET` without `Origin` | Works                      |
 
-## 9. Health
+## 9. Schools
+
+School routes require a session and permission:
+
+| Route                        | Permission      |
+| ---------------------------- | --------------- |
+| `POST /schools`              | `school.manage` |
+| `GET /schools`               | `school.read`   |
+| `GET /schools/{id}`          | `school.read`   |
+| `PATCH /schools/{id}`        | `school.manage` |
+| `PATCH /schools/{id}/status` | `school.manage` |
+
+Only Admin has these permissions by default. A Teacher needs an explicit `school.read`
+grant to test school reads.
+
+### Create: `POST /schools`
+
+| Case                                                | Expected                   |
+| --------------------------------------------------- | -------------------------- |
+| Valid school                                        | `201`, code is normalized  |
+| Existing code, including different letter case      | `409` `SCHOOL_CODE_EXISTS` |
+| Invalid code or blank required text                 | `400` `VALIDATION_ERROR`   |
+| Invalid contact email                               | `400` `VALIDATION_ERROR`   |
+| Unknown body field                                  | `400` `VALIDATION_ERROR`   |
+| Teacher or Student, even if granted `school.manage` | `403`                      |
+
+### List: `GET /schools`
+
+Query parameters: `page` (default `1`, maximum `100000`), `limit` (default `20`, maximum
+`100`), optional `status` (`ACTIVE` or `INACTIVE`), and optional `q`.
+
+Example: `GET /api/v1/schools?page=1&limit=10&status=ACTIVE&q=ab`
+
+`q` searches school name or code, case-insensitively.
+Admin sees all matching schools. A Teacher with `school.read` sees only their own school.
+Limits outside the allowed range return `400` `VALIDATION_ERROR`.
+
+### View and edit
+
+| Route / case                               | Expected                                          |
+| ------------------------------------------ | ------------------------------------------------- |
+| Admin gets any school by UUID              | `200`, school response                            |
+| Teacher with `school.read` gets own school | `200`                                             |
+| Teacher gets another school's ID           | `404` `NOT_FOUND`                                 |
+| Teacher requests a random UUID             | Same `404` body as foreign ID, except `requestId` |
+| `PATCH /schools/{id}` with editable fields | `200`, updated school                             |
+| PATCH body includes `code` or `status`     | `400` `VALIDATION_ERROR`                          |
+| PATCH body is empty                        | `400` `VALIDATION_ERROR`                          |
+| PATCH optional field to `null`             | `200`, field is cleared                           |
+| Teacher or Student tries to edit           | `403`                                             |
+
+### Change status: `PATCH /schools/{id}/status`
+
+Body: `{ "status": "INACTIVE" }` or `{ "status": "ACTIVE" }`.
+
+| Case                         | Expected                                       |
+| ---------------------------- | ---------------------------------------------- |
+| Admin changes status         | `200`; repeating the same status is also `200` |
+| Invalid status               | `400` `VALIDATION_ERROR`                       |
+| School is inactive           | Its users' next request and login return `401` |
+| Another school's teacher     | Remains able to use their own-school routes    |
+| Admin reactivates the school | Its users can log in again                     |
+
+## 10. Health
 
 | Endpoint            | Case                 | Expected |
 | ------------------- | -------------------- | -------- |
