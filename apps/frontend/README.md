@@ -83,19 +83,13 @@ Login needs the backend, a database and an admin user. One-time setup:
 
 ### Trying the forced password change
 
-The admin you created has `mustChangePassword: true`, so the first login lands on `/change-password`. To test it again later, reset the admin (this also revokes existing sessions):
-
-```bash
-ADMIN_STEAMX_ID=admin ADMIN_PASSWORD='<a strong password>' pnpm --filter @steamx/backend admin:create --reset
-```
-
-(PowerShell: set `$env:ADMIN_STEAMX_ID` and `$env:ADMIN_PASSWORD` first.) The password must not contain the SteamX ID.
+The admin you created has `mustChangePassword: true`, so the first login lands on `/change-password`. To reset the admin and try it again, follow the runbook in [docs/runbooks/admin-recovery.md](../../docs/runbooks/admin-recovery.md).
 
 On `/change-password`:
 
 - Empty fields and mismatched confirmation show field errors.
 - A wrong current password or a password that breaks the policy shows an error alert (policy errors are listed).
-- Success refetches the session and redirects to `/`.
+- Success updates the session and redirects to `/`.
 - Signed-out users are redirected to `/login`; users who don't need to change their password are redirected to `/`.
 
 ## Project structure

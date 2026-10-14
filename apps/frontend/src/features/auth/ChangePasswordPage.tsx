@@ -11,7 +11,12 @@ import { ApiError } from '@/lib/api-client';
 import { queryClient } from '@/lib/query-client';
 import { changePassword } from './api';
 import { AuthLayout } from './components/AuthLayout';
-import { detailStrings } from './errors';
+import {
+  INVALID_CURRENT_PASSWORD,
+  PASSWORD_POLICY,
+  PASSWORD_REUSED,
+  policyMessages,
+} from './errors';
 import { AUTH_PATHS } from './paths';
 import { sessionQueryOptions } from './queries';
 
@@ -30,13 +35,16 @@ type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
 function getErrorMessages(error: unknown): string[] {
   if (!(error instanceof ApiError)) return ['Something went wrong. Please try again.'];
-  if (error.code === 'PASSWORD_POLICY') {
-    return detailStrings(error.details) ?? ['Password does not meet the policy.'];
+  switch (error.code) {
+    case PASSWORD_POLICY:
+      return policyMessages(error.details);
+    case INVALID_CURRENT_PASSWORD:
+      return ['Your current password is incorrect.'];
+    case PASSWORD_REUSED:
+      return ['Your new password must be different from your current password.'];
+    default:
+      return [error.message];
   }
-  if (error.status === 400) {
-    return ['Current password is incorrect or the new password is invalid.'];
-  }
-  return [error.message];
 }
 
 export function ChangePasswordPage() {
@@ -55,8 +63,8 @@ export function ChangePasswordPage() {
   const onSubmit = handleSubmit(async ({ currentPassword, newPassword }) => {
     setErrorMessages([]);
     try {
-      await changePassword({ currentPassword, newPassword });
-      await queryClient.query({ ...sessionQueryOptions, staleTime: 0 });
+      const profile = await changePassword({ currentPassword, newPassword });
+      queryClient.setQueryData(sessionQueryOptions.queryKey, profile);
       await navigate(AUTH_PATHS.afterLogin, { replace: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) return;

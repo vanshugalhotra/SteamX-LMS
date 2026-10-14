@@ -41,9 +41,9 @@ export async function fetchSession(): Promise<AuthProfile | null> {
   }
 }
 
-/** POST /auth/change-password */
+/** POST /auth/change-password: sets a fresh session cookie and returns the updated profile. */
 export function changePassword(payload: ChangePasswordPayload) {
-  return apiFetch<null>(AUTH_ENDPOINTS.changePassword, {
+  return apiFetch<AuthProfile>(AUTH_ENDPOINTS.changePassword, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
