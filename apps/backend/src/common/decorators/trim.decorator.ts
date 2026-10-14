@@ -1,3 +1,6 @@
+/**
+ * Trims DTO strings; lowercase can be enabled for normalized fields like email.
+ */
 import { Transform } from 'class-transformer';
 
 type TrimOptions = {

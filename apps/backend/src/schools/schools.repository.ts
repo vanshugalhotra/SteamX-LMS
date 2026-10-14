@@ -1,3 +1,6 @@
+/**
+ * Runs school queries with the resolved school scope included in the database filter.
+ */
 import { Injectable } from '@nestjs/common';
 import { Prisma, SchoolStatus } from '../generated/prisma/client.js';
 import type { School } from '../generated/prisma/client.js';

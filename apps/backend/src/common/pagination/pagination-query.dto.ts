@@ -1,3 +1,6 @@
+/**
+ * Validates paging inputs and caps page offsets to values Prisma can handle.
+ */
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, Max, Min } from 'class-validator';
