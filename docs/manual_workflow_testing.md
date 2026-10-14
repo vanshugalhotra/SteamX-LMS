@@ -164,7 +164,37 @@ Body: `{ "status": "INACTIVE" }` or `{ "status": "ACTIVE" }`.
 | Another school's teacher     | Remains able to use their own-school routes    |
 | Admin reactivates the school | Its users can log in again                     |
 
-## 10. Health
+## 10. Class sections
+
+Class-section routes require a session and permission:
+
+| Route                         | Permission            |
+| ----------------------------- | --------------------- |
+| `POST /class-sections`        | `classsection.manage` |
+| `GET /class-sections`         | `classsection.read`   |
+| `GET /class-sections/{id}`    | `classsection.read`   |
+| `PATCH /class-sections/{id}`  | `classsection.manage` |
+| `DELETE /class-sections/{id}` | `classsection.manage` |
+
+Only Admin has these permissions by default. A Teacher needs an explicit `classsection.read`
+grant to test school-scoped reads.
+
+| Case                                                 | Expected                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| Admin creates with `schoolId` and `className`        | `201`, `sectionName` is `All`                             |
+| Admin creates with a `sectionName`                   | `201`, one section returned                               |
+| Duplicate class and section names (case-insensitive) | `409` `CLASS_SECTION_EXISTS`                              |
+| Unknown or inactive school                           | `404`, or `409` `SCHOOL_INACTIVE`, respectively           |
+| Admin creates without `schoolId`                     | `400` `VALIDATION_ERROR`                                  |
+| Blank/invalid name or unknown body field             | `400` `VALIDATION_ERROR`                                  |
+| List with `page`, `limit`, `q`, or `schoolId`        | Paginated, filtered results                               |
+| Teacher with `classsection.read` lists sections      | Only their own school's sections                          |
+| Teacher requests another school's section            | `404` `NOT_FOUND`                                         |
+| Admin updates or deletes an empty section            | `200` on update; `204` on delete                          |
+| Update with an empty body or duplicate names         | `400` `VALIDATION_ERROR`, or `409` `CLASS_SECTION_EXISTS` |
+| Delete a section assigned to a student               | `409` `CLASS_SECTION_IN_USE`                              |
+
+## 11. Health
 
 | Endpoint            | Case                 | Expected |
 | ------------------- | -------------------- | -------- |

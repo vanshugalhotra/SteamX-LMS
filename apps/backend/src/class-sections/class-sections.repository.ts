@@ -23,7 +23,7 @@ export class ClassSectionsRepository {
       data: {
         schoolId,
         className: data.className,
-        sectionName: data.sectionName ?? 'All',
+        ...(data.sectionName === undefined ? {} : { sectionName: data.sectionName }),
       },
     });
   }

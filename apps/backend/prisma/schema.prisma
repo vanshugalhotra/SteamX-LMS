@@ -312,7 +312,7 @@ model ClassSection {
   // [CHECK] both names non-empty and = btrim(...)
   // [IDX]   Case-insensitive unique index lives in the identity_constraints migration.
   // [TRG] school_id immutable.
-  // [RULE]  "Every class has >=1 section" holds by construction (a class exists only as rows here). Default section 'All' created by the app.
+  // [RULE]  "Every class has >=1 section" holds by construction (a class exists only as rows here). Database default section is 'All'.
 
   @@unique([id, schoolId])
   @@map("class_sections")
