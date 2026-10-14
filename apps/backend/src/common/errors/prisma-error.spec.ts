@@ -4,6 +4,7 @@ import {
   getPrismaReason,
   isPrismaKnownError,
   mapPrismaError,
+  throwConflictOnDuplicate,
 } from './prisma-error.js';
 
 function createPrismaError(
@@ -19,6 +20,32 @@ function createPrismaError(
 }
 
 describe('Prisma error helpers', () => {
+  it('throws the configured conflict response for duplicate errors', () => {
+    expect(() =>
+      throwConflictOnDuplicate(createPrismaError('P2002'), {
+        code: 'SCHOOL_CODE_EXISTS',
+        message: 'School code already exists',
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        response: {
+          code: 'SCHOOL_CODE_EXISTS',
+          message: 'School code already exists',
+        },
+        status: 409,
+      }),
+    );
+  });
+
+  it('does not throw for Prisma errors that are not duplicates', () => {
+    expect(() =>
+      throwConflictOnDuplicate(createPrismaError('P2025'), {
+        code: 'SCHOOL_CODE_EXISTS',
+        message: 'School code already exists',
+      }),
+    ).not.toThrow();
+  });
+
   it.each([
     ['P2002', 409, { code: 'CONFLICT', message: 'Resource already exists' }],
     ['P2003', 409, { code: 'CONFLICT', message: 'Operation conflicts with related data' }],

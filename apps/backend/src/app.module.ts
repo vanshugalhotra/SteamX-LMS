@@ -10,6 +10,7 @@ import { validateEnv } from './config/env.schema.js';
 import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { SchoolsModule } from './schools/schools.module.js';
+import { ClassSectionsModule } from './class-sections/class-sections.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SchoolsModule } from './schools/schools.module.js';
     LoggingModule,
     HealthModule,
     SchoolsModule,
+    ClassSectionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OriginGuard },

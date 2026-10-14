@@ -1,13 +1,12 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { SchoolStatus, UserType } from '../generated/prisma/client.js';
-import { isPrismaKnownError } from '../common/errors/prisma-error.js';
+import { throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { resolveSchoolScope } from '../common/tenancy/school-scope.js';
@@ -48,12 +47,10 @@ export class SchoolsService {
       this.logger.info({ actorId: actor.userId, schoolId: school.id }, 'School created');
       return toSchoolResponse(school);
     } catch (error) {
-      if (isPrismaKnownError(error) && error.code === 'P2002') {
-        throw new ConflictException({
-          code: 'SCHOOL_CODE_EXISTS',
-          message: 'School code already exists',
-        });
-      }
+      throwConflictOnDuplicate(error, {
+        code: 'SCHOOL_CODE_EXISTS',
+        message: 'School code already exists',
+      });
       throw error;
     }
   }
