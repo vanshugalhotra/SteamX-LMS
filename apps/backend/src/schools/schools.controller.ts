@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from 
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -24,6 +25,8 @@ import { SchoolsService } from './schools.service.js';
 
 @ApiTags('Schools')
 @ApiCookieAuth('cookieAuth')
+@ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
+@ApiForbiddenResponse({ description: 'The caller lacks the required permission.' })
 @Controller({ path: 'schools', version: '1' })
 export class SchoolsController {
   constructor(private readonly schools: SchoolsService) {}
@@ -33,8 +36,7 @@ export class SchoolsController {
   @ApiOperation({ summary: 'Create a school' })
   @ApiCreatedResponse({ description: 'School created.', type: SchoolResponseDto })
   @ApiBadRequestResponse({ description: 'School details are invalid.' })
-  @ApiForbiddenResponse({ description: 'The caller cannot create a school.' })
-  @ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
+  @ApiConflictResponse({ description: 'A school with this code already exists.' })
   create(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateSchoolDto,

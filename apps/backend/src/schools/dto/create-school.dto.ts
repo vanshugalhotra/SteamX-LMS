@@ -52,6 +52,7 @@ export class CreateSchoolDto {
   @Trim()
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(255)
   streetAddress?: string | null;
 
@@ -59,6 +60,7 @@ export class CreateSchoolDto {
   @Trim()
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(120)
   contactName?: string | null;
 
@@ -66,6 +68,7 @@ export class CreateSchoolDto {
   @Trim()
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(32)
   contactPhone?: string | null;
 

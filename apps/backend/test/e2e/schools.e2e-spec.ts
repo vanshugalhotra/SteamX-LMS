@@ -164,6 +164,13 @@ describe('Schools endpoints (e2e)', () => {
     await createSchool(adminCookie, createBody('EMAIL1', { contactEmail: 'not-an-email' }))
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    for (const field of ['streetAddress', 'contactName', 'contactPhone']) {
+      await createSchool(adminCookie, createBody(`SPACE${field.slice(0, 1).toUpperCase()}`, {
+        [field]: '   ',
+      }))
+        .expect(400)
+        .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    }
     await createSchool(adminCookie, { ...createBody('UNKNOWN1'), extra: true })
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
@@ -242,6 +249,11 @@ describe('Schools endpoints (e2e)', () => {
       .get('/api/v1/schools')
       .set('Cookie', adminCookie)
       .query({ limit: 101 })
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/v1/schools')
+      .set('Cookie', adminCookie)
+      .query({ page: Number.MAX_SAFE_INTEGER })
       .expect(400);
   });
 
