@@ -165,9 +165,12 @@ describe('Schools endpoints (e2e)', () => {
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
     for (const field of ['streetAddress', 'contactName', 'contactPhone']) {
-      await createSchool(adminCookie, createBody(`SPACE${field.slice(0, 1).toUpperCase()}`, {
-        [field]: '   ',
-      }))
+      await createSchool(
+        adminCookie,
+        createBody(`SPACE${field.slice(0, 1).toUpperCase()}`, {
+          [field]: '   ',
+        }),
+      )
         .expect(400)
         .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
     }
