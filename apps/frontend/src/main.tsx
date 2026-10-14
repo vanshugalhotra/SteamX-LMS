@@ -8,9 +8,15 @@ import './index.css';
 
 setApiHandlers({
   onUnauthorized: () => {
+    // INTENTIONAL: window.location.assign does a full page reload (not a SPA navigation),
+    // which clears React Router state and the React Query cache so no stale user data
+    // survives an expired session. Do not replace with navigate().
     if (window.location.pathname !== '/login') {
       window.location.assign('/login');
     }
+  },
+  onForbidden: () => {
+    // TODO: Revisit when role-based routing is in place.
   },
 });
 
