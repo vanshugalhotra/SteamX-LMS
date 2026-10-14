@@ -9,7 +9,10 @@ import type { CreateSchoolDto } from './dto/create-school.dto.js';
 import type { SchoolListQueryDto } from './dto/school-list-query.dto.js';
 import type { UpdateSchoolDto } from './dto/update-school.dto.js';
 
-function schoolIdFilter(scope: string | undefined): Prisma.SchoolWhereInput {
+// Schools scope by their own id, not by a schoolId FK.
+// In findById/update this filter is combined via AND because the lookup id
+// and the scope both target the `id` field — a spread would overwrite one.
+function selfScopeFilter(scope: string | undefined): Prisma.SchoolWhereInput {
   return scope === undefined ? {} : { id: scope };
 }
 
@@ -26,7 +29,7 @@ export class SchoolsRepository {
     query: SchoolListQueryDto,
   ): Promise<{ items: School[]; total: number }> {
     const where: Prisma.SchoolWhereInput = {
-      ...schoolIdFilter(scope),
+      ...selfScopeFilter(scope),
       ...(query.status === undefined ? {} : { status: query.status }),
       ...(query.q === undefined
         ? {}
@@ -51,39 +54,18 @@ export class SchoolsRepository {
 
   findById(id: string, scope: string | undefined) {
     return this.prisma.school.findFirst({
-      where: {
-        id,
-        ...(scope === undefined ? {} : { AND: [{ id: scope }] }),
-      },
+      where: { AND: [{ id }, selfScopeFilter(scope)] },
     });
   }
 
   async update(
     id: string,
     scope: string | undefined,
-    data: UpdateSchoolDto,
+    data: UpdateSchoolDto | { status: SchoolStatus },
   ): Promise<School | null> {
     const result = await this.prisma.school.updateMany({
-      where: {
-        id,
-        ...(scope === undefined ? {} : { AND: [{ id: scope }] }),
-      },
+      where: { AND: [{ id }, selfScopeFilter(scope)] },
       data,
-    });
-    return result.count === 0 ? null : this.findById(id, scope);
-  }
-
-  async updateStatus(
-    id: string,
-    scope: string | undefined,
-    status: SchoolStatus,
-  ): Promise<School | null> {
-    const result = await this.prisma.school.updateMany({
-      where: {
-        id,
-        ...(scope === undefined ? {} : { AND: [{ id: scope }] }),
-      },
-      data: { status },
     });
     return result.count === 0 ? null : this.findById(id, scope);
   }

@@ -6,7 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { Prisma, SchoolStatus, UserType } from '../generated/prisma/client.js';
+import { SchoolStatus, UserType } from '../generated/prisma/client.js';
+import { isPrismaKnownError } from '../common/errors/prisma-error.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { resolveSchoolScope } from '../common/tenancy/school-scope.js';
@@ -15,6 +16,7 @@ import type { CreateSchoolDto } from './dto/create-school.dto.js';
 import type { SchoolListQueryDto } from './dto/school-list-query.dto.js';
 import type { SchoolResponseDto } from './dto/school-response.dto.js';
 import type { UpdateSchoolDto } from './dto/update-school.dto.js';
+import { toSchoolResponse } from './schools.mapper.js';
 import { SchoolsRepository } from './schools.repository.js';
 
 const NOT_FOUND = { code: 'NOT_FOUND', message: 'Resource not found' };
@@ -31,6 +33,10 @@ export class SchoolsService {
     private readonly logger: PinoLogger,
   ) {}
 
+  // ─────────────────────────────────────────
+  // POST /schools — Create a school
+  // ─────────────────────────────────────────
+
   async create(actor: AuthContext, body: CreateSchoolDto): Promise<SchoolResponseDto> {
     if (actor.userType !== UserType.PLATFORM_STAFF) {
       // even if a user has SCHOOL_MANAGE permission, they cannot create a school if they are not PLATFORM_STAFF
@@ -40,9 +46,9 @@ export class SchoolsService {
     try {
       const school = await this.schools.create(body);
       this.logger.info({ actorId: actor.userId, schoolId: school.id }, 'School created');
-      return this.toResponse(school);
+      return toSchoolResponse(school);
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isPrismaKnownError(error) && error.code === 'P2002') {
         throw new ConflictException({
           code: 'SCHOOL_CODE_EXISTS',
           message: 'School code already exists',
@@ -52,6 +58,10 @@ export class SchoolsService {
     }
   }
 
+  // ─────────────────────────────────────────
+  // GET /schools — List schools
+  // ─────────────────────────────────────────
+
   async findMany(
     actor: AuthContext,
     query: SchoolListQueryDto,
@@ -59,12 +69,16 @@ export class SchoolsService {
     const scope = resolveSchoolScope(actor);
     const { items, total } = await this.schools.findMany(scope, query);
     return paginate(
-      items.map((school) => this.toResponse(school)),
+      items.map((school) => toSchoolResponse(school)),
       query.page,
       query.limit,
       total,
     );
   }
+
+  // ─────────────────────────────────────────
+  // GET /schools/:id — Get a school
+  // ─────────────────────────────────────────
 
   async findById(actor: AuthContext, id: string): Promise<SchoolResponseDto> {
     const scope = resolveSchoolScope(actor);
@@ -72,8 +86,12 @@ export class SchoolsService {
     if (!school) {
       throw new NotFoundException(NOT_FOUND);
     }
-    return this.toResponse(school);
+    return toSchoolResponse(school);
   }
+
+  // ─────────────────────────────────────────
+  // PATCH /schools/:id — Update a school
+  // ─────────────────────────────────────────
 
   async update(actor: AuthContext, id: string, body: UpdateSchoolDto): Promise<SchoolResponseDto> {
     if (Object.values(body).every((value) => value === undefined)) {
@@ -87,8 +105,12 @@ export class SchoolsService {
     }
 
     this.logger.info({ actorId: actor.userId, schoolId: school.id }, 'School updated');
-    return this.toResponse(school);
+    return toSchoolResponse(school);
   }
+
+  // ─────────────────────────────────────────
+  // PATCH /schools/:id/status — Update status
+  // ─────────────────────────────────────────
 
   async updateStatus(
     actor: AuthContext,
@@ -101,49 +123,15 @@ export class SchoolsService {
       throw new NotFoundException(NOT_FOUND);
     }
     if (current.status === status) {
-      return this.toResponse(current);
+      return toSchoolResponse(current);
     }
 
-    const school = await this.schools.updateStatus(id, scope, status);
+    const school = await this.schools.update(id, scope, { status });
     if (!school) {
       throw new NotFoundException(NOT_FOUND);
     }
 
     this.logger.info({ actorId: actor.userId, schoolId: school.id }, 'School status changed');
-    return this.toResponse(school);
-  }
-
-  private toResponse(school: {
-    id: string;
-    code: string;
-    name: string;
-    streetAddress: string | null;
-    city: string;
-    state: string;
-    postalCode: string;
-    country: string;
-    contactName: string | null;
-    contactEmail: string | null;
-    contactPhone: string | null;
-    status: SchoolStatus;
-    createdAt: Date;
-    updatedAt: Date;
-  }): SchoolResponseDto {
-    return {
-      id: school.id,
-      code: school.code,
-      name: school.name,
-      streetAddress: school.streetAddress,
-      city: school.city,
-      state: school.state,
-      postalCode: school.postalCode,
-      country: school.country,
-      contactName: school.contactName,
-      contactEmail: school.contactEmail,
-      contactPhone: school.contactPhone,
-      status: school.status,
-      createdAt: school.createdAt,
-      updatedAt: school.updatedAt,
-    };
+    return toSchoolResponse(school);
   }
 }

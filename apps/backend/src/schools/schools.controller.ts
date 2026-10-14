@@ -31,6 +31,10 @@ import { SchoolsService } from './schools.service.js';
 export class SchoolsController {
   constructor(private readonly schools: SchoolsService) {}
 
+  // ─────────────────────────────────────────
+  // POST /schools — Create a school
+  // ─────────────────────────────────────────
+
   @RequirePermission(PERMISSION.SCHOOL_MANAGE)
   @Post()
   @ApiOperation({ summary: 'Create a school' })
@@ -44,6 +48,10 @@ export class SchoolsController {
     return this.schools.create(actor, body);
   }
 
+  // ─────────────────────────────────────────
+  // GET /schools — List schools
+  // ─────────────────────────────────────────
+
   @RequirePermission(PERMISSION.SCHOOL_READ)
   @Get()
   @ApiOperation({ summary: 'List schools' })
@@ -52,9 +60,13 @@ export class SchoolsController {
   findMany(
     @CurrentAuth() actor: AuthContext,
     @Query() query: SchoolListQueryDto,
-  ): ReturnType<SchoolsService['findMany']> {
+  ): Promise<SchoolListResponseDto> {
     return this.schools.findMany(actor, query);
   }
+
+  // ─────────────────────────────────────────
+  // GET /schools/:id — Get a school
+  // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.SCHOOL_READ)
   @Get(':id')
@@ -67,6 +79,10 @@ export class SchoolsController {
   ): Promise<SchoolResponseDto> {
     return this.schools.findById(actor, id);
   }
+
+  // ─────────────────────────────────────────
+  // PATCH /schools/:id — Update a school
+  // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.SCHOOL_MANAGE)
   @Patch(':id')
@@ -81,6 +97,10 @@ export class SchoolsController {
   ): Promise<SchoolResponseDto> {
     return this.schools.update(actor, id, body);
   }
+
+  // ─────────────────────────────────────────
+  // PATCH /schools/:id/status — Update status
+  // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.SCHOOL_MANAGE)
   @Patch(':id/status')
