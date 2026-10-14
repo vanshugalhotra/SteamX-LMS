@@ -22,7 +22,11 @@ import { ResetPasswordDto } from './dto/reset-password.dto.js';
 export class UserPasswordController {
   constructor(private readonly auth: AuthService) {}
 
-  // TODO: Keep this controller here until the Users module is introduced.
+  // ─────────────────────────────────────────
+  // POST /users/:userId/reset-password
+  // ─────────────────────────────────────────
+
+  // Lives in auth until a Users module is introduced.
   @RequirePermission(PERMISSION.USER_PASSWORD_RESET)
   @Post(':userId/reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
