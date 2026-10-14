@@ -70,3 +70,5 @@ pnpm --filter @steamx/backend migrate:deploy
 - Use `migrate:dev` to create and apply development migrations; use
   `migrate:deploy` to apply existing migrations in CI or production.
 - Responses use `{ statusCode, code, message, details?, requestId }`.
+- List endpoints accept `page` (default 1) and `limit` (default 20, maximum 100).
+- Paginated responses use `{ items, page, limit, total }`.

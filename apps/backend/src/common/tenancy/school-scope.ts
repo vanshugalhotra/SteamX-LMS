@@ -1,3 +1,6 @@
+/**
+ * Keeps school staff in their own school and hides foreign IDs as not found.
+ */
 import { NotFoundException } from '@nestjs/common';
 import { UserType } from '../../generated/prisma/client.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
