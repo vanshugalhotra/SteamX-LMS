@@ -6,7 +6,7 @@ import './setup-env.js';
 
 const prismaCliPath = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  '../node_modules/prisma/build/index.js',
+  '../../node_modules/prisma/build/index.js',
 );
 
 const resetTestData = `

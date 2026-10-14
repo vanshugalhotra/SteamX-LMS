@@ -5,16 +5,17 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { Response as SupertestResponse } from 'supertest';
 import type { App } from 'supertest/types.js';
-import { SchoolStatus, UserStatus, UserType } from '../src/generated/prisma/client.js';
-import { AppModule } from '../src/app.module.js';
-import { AllowWhenPasswordChangeRequired } from '../src/auth/decorators/allow-when-password-change-required.decorator.js';
-import { CurrentAuth } from '../src/auth/decorators/current-auth.decorator.js';
-import { Public } from '../src/auth/decorators/public.decorator.js';
-import type { AuthContext } from '../src/auth/types/auth-context.js';
-import { TokenService } from '../src/auth/services/token.service.js';
-import { configureApp } from '../src/configure-app.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
-import { createTestUser } from './helpers/fixtures.js';
+import { SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
+import { AppModule } from '../../src/app.module.js';
+import { AllowWhenPasswordChangeRequired } from '../../src/auth/decorators/allow-when-password-change-required.decorator.js';
+import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js';
+import { Public } from '../../src/auth/decorators/public.decorator.js';
+import type { AuthContext } from '../../src/auth/types/auth-context.js';
+import { TokenService } from '../../src/auth/services/token.service.js';
+import { configureApp } from '../../src/configure-app.js';
+import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { createTestUser } from '../factories/fixtures.js';
+import { cleanupFixtures } from '../setup/cleanup.js';
 
 const TEST_PASSWORD_HASH = 'test-only-password-hash';
 const ALTERNATE_TEST_SECRET = 'different-test-secret-that-is-at-least-32-characters';
@@ -65,19 +66,7 @@ describe('Global authentication guard (e2e)', () => {
   });
 
   afterEach(async () => {
-    await prisma.$transaction(async (tx) => {
-      if (createdUserIds.length > 0) {
-        await tx.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-        await tx.studentProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-        await tx.user.deleteMany({ where: { id: { in: createdUserIds } } });
-      }
-      if (createdSchoolIds.length > 0) {
-        await tx.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
-      }
-    });
-
-    createdUserIds.length = 0;
-    createdSchoolIds.length = 0;
+    await cleanupFixtures(prisma, createdUserIds, createdSchoolIds);
     vi.restoreAllMocks();
     vi.useRealTimers();
   });

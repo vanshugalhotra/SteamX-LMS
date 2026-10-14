@@ -9,6 +9,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { validateEnv } from './config/env.schema.js';
 import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
+import { SchoolsModule } from './schools/schools.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { LoggingModule } from './logging/logging.module.js';
     AuthModule,
     LoggingModule,
     HealthModule,
+    SchoolsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OriginGuard },

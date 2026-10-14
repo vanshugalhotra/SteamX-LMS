@@ -14,21 +14,23 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { Response as SupertestResponse } from 'supertest';
 import type { App } from 'supertest/types.js';
-import type { Env } from '../src/config/env.schema.js';
-import { SchoolStatus, UserStatus, UserType } from '../src/generated/prisma/client.js';
-import { AppModule } from '../src/app.module.js';
-import { AUTH_COOKIE_NAME } from '../src/auth/auth.constants.js';
-import { PasswordService } from '../src/auth/services/password.service.js';
-import { RequirePermission } from '../src/auth/decorators/require-permission.decorator.js';
-import { CurrentAuth } from '../src/auth/decorators/current-auth.decorator.js';
-import { PUBLIC_ROUTE } from '../src/auth/decorators/metadata.constants.js';
-import { PERMISSION } from '../src/auth/permissions.js';
-import type { AuthContext } from '../src/auth/types/auth-context.js';
-import { FirstAdminError } from '../src/auth/types/first-admin.js';
-import { runAdminCreate } from '../src/scripts/admin-create.js';
-import { configureApp } from '../src/configure-app.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
-import { createTestUser } from './helpers/fixtures.js';
+import type { Env } from '../../src/config/env.schema.js';
+import { SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
+import { AppModule } from '../../src/app.module.js';
+import { AUTH_COOKIE_NAME } from '../../src/auth/auth.constants.js';
+import { PasswordService } from '../../src/auth/services/password.service.js';
+import { RequirePermission } from '../../src/auth/decorators/require-permission.decorator.js';
+import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js';
+import { PUBLIC_ROUTE } from '../../src/auth/decorators/metadata.constants.js';
+import { PERMISSION } from '../../src/auth/permissions.js';
+import type { AuthContext } from '../../src/auth/types/auth-context.js';
+import { FirstAdminError } from '../../src/auth/types/first-admin.js';
+import { runAdminCreate } from '../../src/scripts/admin-create.js';
+import { configureApp } from '../../src/configure-app.js';
+import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { createTestUser } from '../factories/fixtures.js';
+import { loginAs } from '../setup/login.js';
+import { cleanupFixtures } from '../setup/cleanup.js';
 
 const INITIAL_PASSWORD = 'Starting invariant password 2026!';
 const RECOVERY_PASSWORD = 'Recovered admin password 2026!';
@@ -59,6 +61,7 @@ type FixtureUser = {
   id: string;
   steamxId: string;
   schoolId: string | null;
+  password: string;
 };
 
 function strings(value: unknown): string[] {
@@ -117,23 +120,7 @@ describe('Authentication invariants (e2e)', () => {
   });
 
   afterEach(async () => {
-    await prisma.$transaction(async (tx) => {
-      if (createdUserIds.length > 0) {
-        await tx.teacherProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-        await tx.studentProfile.deleteMany({ where: { userId: { in: createdUserIds } } });
-        await tx.user.deleteMany({ where: { id: { in: createdUserIds } } });
-      }
-      if (createdClassSectionIds.length > 0) {
-        await tx.classSection.deleteMany({ where: { id: { in: createdClassSectionIds } } });
-      }
-      if (createdSchoolIds.length > 0) {
-        await tx.school.deleteMany({ where: { id: { in: createdSchoolIds } } });
-      }
-    });
-
-    createdUserIds.length = 0;
-    createdClassSectionIds.length = 0;
-    createdSchoolIds.length = 0;
+    await cleanupFixtures(prisma, createdUserIds, createdSchoolIds, createdClassSectionIds);
   });
 
   afterAll(async () => {
@@ -162,20 +149,12 @@ describe('Authentication invariants (e2e)', () => {
       id: fixture.id,
       schoolId: fixture.schoolId,
       steamxId: fixture.steamxId,
+      password: INITIAL_PASSWORD,
     };
   }
 
   async function login(user: FixtureUser, password = INITIAL_PASSWORD): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .set('Origin', origin)
-      .send({ steamxId: user.steamxId, password })
-      .expect(200);
-    const setCookie = response.headers['set-cookie']?.[0];
-    if (!setCookie) {
-      throw new Error('Login response did not set a session cookie.');
-    }
-    return setCookie.split(';', 1)[0]!;
+    return loginAs(app, user, password);
   }
 
   function get(path: string, cookie?: string) {

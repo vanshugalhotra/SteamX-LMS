@@ -1,14 +1,13 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Prisma, UserType } from '../src/generated/prisma/client.js';
-import { getPostgresCode, isPrismaKnownError } from '../src/common/errors/prisma-error.js';
-import { AppModule } from '../src/app.module.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
+import { Prisma, UserType } from '../../src/generated/prisma/client.js';
+import { AppModule } from '../../src/app.module.js';
+import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { withRollback } from '../setup/with-rollback.js';
+import { expectConstraint } from '../setup/expect-constraint.js';
 
-const ROLLBACK_SENTINEL = new Error('ROLLBACK_IDENTITY_CONSTRAINT_TEST');
 const PASSWORD_HASH = 'test-only-password-hash';
 
-type TransactionTest = (tx: Prisma.TransactionClient) => Promise<void>;
 type SchoolOverrides = {
   code?: string;
   name?: string;
@@ -16,7 +15,7 @@ type SchoolOverrides = {
   contactEmail?: string | null;
 };
 
-describe('Identity database constraints (e2e)', () => {
+describe('Identity database constraints', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
@@ -33,32 +32,6 @@ describe('Identity database constraints (e2e)', () => {
   afterAll(async () => {
     await app.close();
   });
-
-  async function withRollback(test: TransactionTest): Promise<void> {
-    let testFailed = false;
-    let testError: unknown;
-
-    try {
-      await prisma.$transaction(async (tx) => {
-        try {
-          await test(tx);
-        } catch (error) {
-          testFailed = true;
-          testError = error;
-        }
-
-        throw ROLLBACK_SENTINEL;
-      });
-    } catch (error) {
-      if (error !== ROLLBACK_SENTINEL) {
-        throw error;
-      }
-    }
-
-    if (testFailed) {
-      throw testError;
-    }
-  }
 
   async function createSchool(
     tx: Prisma.TransactionClient,
@@ -106,34 +79,10 @@ describe('Identity database constraints (e2e)', () => {
     });
   }
 
-  async function expectConstraint(
-    operation: () => Promise<unknown>,
-    postgresCode: '23514' | '23505',
-    constraintName: string,
-  ): Promise<void> {
-    let databaseError: unknown;
-
-    try {
-      await operation();
-    } catch (error) {
-      databaseError = error;
-    }
-
-    expect(databaseError).toBeDefined();
-    if (!isPrismaKnownError(databaseError)) {
-      throw new Error('Expected a Prisma database error');
-    }
-
-    expect(getPostgresCode(databaseError)).toBe(postgresCode);
-    expect(
-      JSON.stringify({
-        message: databaseError.message,
-        meta: databaseError.meta,
-      }),
-    ).toContain(constraintName);
-  }
-
-  const allowedCases: Array<{ name: string; run: TransactionTest }> = [
+  const allowedCases: Array<{
+    name: string;
+    run: (tx: Prisma.TransactionClient) => Promise<void>;
+  }> = [
     {
       name: 'valid school',
       run: async (tx) => {
@@ -198,7 +147,7 @@ describe('Identity database constraints (e2e)', () => {
   ];
 
   it.each(allowedCases)('allows $name', async ({ run }) => {
-    await withRollback(run);
+    await withRollback(prisma, run);
   });
 
   const invalidSteamxIds = [
@@ -209,7 +158,7 @@ describe('Identity database constraints (e2e)', () => {
   ];
 
   it.each(invalidSteamxIds)('rejects a $name steamx_id', async ({ value }) => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
       await expectConstraint(
         () =>
@@ -273,7 +222,7 @@ describe('Identity database constraints (e2e)', () => {
   ];
 
   it.each(invalidUserCases)('rejects $name', async (testCase) => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = testCase.schoolId === 'present' ? await createSchool(tx) : undefined;
       await expectConstraint(
         () =>
@@ -303,7 +252,7 @@ describe('Identity database constraints (e2e)', () => {
   ];
 
   it.each(invalidSchoolCases)('rejects a school with $name', async (testCase) => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       await expectConstraint(
         () => createSchool(tx, testCase.overrides),
         '23514',
@@ -333,7 +282,7 @@ describe('Identity database constraints (e2e)', () => {
   ];
 
   it.each(invalidProfiles)('rejects a $name', async (testCase) => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
       const user = await createUser(tx, testCase.userType, school.id);
       const section = await tx.classSection.create({
@@ -380,7 +329,7 @@ describe('Identity database constraints (e2e)', () => {
   ];
 
   it.each(invalidSectionNames)('rejects a section with $name', async (testCase) => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
       await expectConstraint(
         () =>
@@ -398,7 +347,7 @@ describe('Identity database constraints (e2e)', () => {
   });
 
   it('rejects class and section names that differ only by case within a school', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
       await tx.classSection.create({
         data: { schoolId: school.id, className: 'Class 5', sectionName: 'A' },

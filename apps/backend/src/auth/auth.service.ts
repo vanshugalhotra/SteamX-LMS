@@ -12,7 +12,7 @@ import { PasswordService } from './services/password.service.js';
 import { TokenService } from './services/token.service.js';
 import { getPasswordPolicyViolations } from './validators/password-policy.js';
 import type { AuthContext } from './types/auth-context.js';
-import type { AuthProfile } from './types/auth-profile.js';
+import { type AuthProfile, toAuthProfile } from './types/auth-profile.js';
 
 export type LoginResult = {
   token: string;
@@ -27,6 +27,10 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly logger: PinoLogger,
   ) {}
+
+  // ─────────────────────────────────────────
+  // Login
+  // ─────────────────────────────────────────
 
   async login(rawSteamxId: string, password: string): Promise<LoginResult> {
     const steamxId = rawSteamxId.trim().toUpperCase();
@@ -57,6 +61,10 @@ export class AuthService {
     this.logger.info({ userId: user.id, schoolId: user.schoolId }, 'Login successful');
     return { token, profile };
   }
+
+  // ─────────────────────────────────────────
+  // Change password
+  // ─────────────────────────────────────────
 
   async changePassword(
     auth: AuthContext,
@@ -90,18 +98,13 @@ export class AuthService {
     const passwordHash = await this.passwords.hash(newPassword);
     await this.users.updatePassword(auth.userId, passwordHash, false);
 
-    const profile: AuthProfile = {
-      id: auth.userId,
-      steamxId: auth.steamxId,
-      name: auth.name,
-      roleKey: auth.roleKey,
-      userType: auth.userType,
-      schoolId: auth.schoolId,
-      mustChangePassword: false,
-    };
-
+    const profile = toAuthProfile({ ...auth, mustChangePassword: false });
     return { token: await this.tokens.sign(auth.userId), profile };
   }
+
+  // ─────────────────────────────────────────
+  // Reset password (admin action)
+  // ─────────────────────────────────────────
 
   async resetPassword(
     actor: AuthContext,
@@ -126,6 +129,10 @@ export class AuthService {
     await this.users.updatePassword(target.id, passwordHash, true);
     this.logger.info({ actorId: actor.userId, targetId: target.id }, 'Password reset');
   }
+
+  // ─────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────
 
   private validateNewPassword(password: string, steamxId: string): void {
     const violations = getPasswordPolicyViolations(password, steamxId);

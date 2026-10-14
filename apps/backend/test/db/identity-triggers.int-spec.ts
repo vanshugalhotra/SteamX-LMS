@@ -1,17 +1,16 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
-import { Prisma, UserType } from '../src/generated/prisma/client.js';
-import { AppModule } from '../src/app.module.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
-import { createTestUser } from './helpers/fixtures.js';
+import { Prisma, UserType } from '../../src/generated/prisma/client.js';
+import { AppModule } from '../../src/app.module.js';
+import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { createTestUser } from '../factories/fixtures.js';
+import { withRollback } from '../setup/with-rollback.js';
+import { expectTriggerMessage } from '../setup/expect-trigger.js';
 
-const ROLLBACK_SENTINEL = new Error('ROLLBACK_MODULE1_TRIGGER_TEST');
 const PASSWORD_HASH = 'test-only-password-hash';
 
-type TransactionTest = (tx: Prisma.TransactionClient) => Promise<void>;
-
-describe('Module 1 database triggers (e2e)', () => {
+describe('Identity and profile triggers', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
@@ -29,54 +28,6 @@ describe('Module 1 database triggers (e2e)', () => {
     await app.close();
   });
 
-  async function withRollback(test: TransactionTest): Promise<void> {
-    let testFailed = false;
-    let testError: unknown;
-
-    try {
-      await prisma.$transaction(async (tx) => {
-        try {
-          await test(tx);
-        } catch (error) {
-          testFailed = true;
-          testError = error;
-        }
-
-        throw ROLLBACK_SENTINEL;
-      });
-    } catch (error) {
-      if (error !== ROLLBACK_SENTINEL) {
-        throw error;
-      }
-    }
-
-    if (testFailed) {
-      throw testError;
-    }
-  }
-
-  async function expectTriggerMessage(
-    operation: () => Promise<unknown>,
-    message: string,
-  ): Promise<void> {
-    let databaseError: unknown;
-
-    try {
-      await operation();
-    } catch (error) {
-      databaseError = error;
-    }
-
-    expect(databaseError).toBeDefined();
-    const metadata =
-      typeof databaseError === 'object' && databaseError !== null && 'meta' in databaseError
-        ? databaseError.meta
-        : undefined;
-    const errorText =
-      databaseError instanceof Error ? databaseError.message : String(databaseError);
-    expect(`${errorText} ${JSON.stringify(metadata)}`).toContain(message);
-  }
-
   async function createSchool(tx: Prisma.TransactionClient): Promise<{ id: string }> {
     return tx.school.create({
       data: {
@@ -92,7 +43,7 @@ describe('Module 1 database triggers (e2e)', () => {
   }
 
   it('rejects changes to roles.key', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const role = await tx.role.create({
         data: {
           key: 'trigger-test-role',
@@ -111,7 +62,7 @@ describe('Module 1 database triggers (e2e)', () => {
   });
 
   it('rejects changes to schools.code', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
 
       await expectTriggerMessage(
@@ -122,7 +73,7 @@ describe('Module 1 database triggers (e2e)', () => {
   });
 
   it('rejects changes to class_sections.school_id', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
       const anotherSchool = await createSchool(tx);
       const classSection = await tx.classSection.create({
@@ -143,7 +94,7 @@ describe('Module 1 database triggers (e2e)', () => {
     { column: 'school_id', value: null, expected: 'users.school_id is immutable' },
     { column: 'steamx_id', value: 'CHANGED123', expected: 'users.steamx_id is immutable' },
   ])('rejects changes to users.$column', async ({ column, value, expected }) => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const user = await createTestUser(tx, {
         userType: UserType.SCHOOL_STAFF,
         name: 'Immutable User',
@@ -163,7 +114,7 @@ describe('Module 1 database triggers (e2e)', () => {
   });
 
   it('allows mutable updates to school and user names', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const user = await createTestUser(tx, {
         userType: UserType.SCHOOL_STAFF,
         name: 'Before Update',
@@ -196,7 +147,7 @@ describe('Module 1 database triggers (e2e)', () => {
   ])(
     'rejects a $roleKey user without a profile when constraints are immediate',
     async ({ userType, roleKey, message }) => {
-      await withRollback(async (tx) => {
+      await withRollback(prisma, async (tx) => {
         const school = await createSchool(tx);
         const role = await tx.role.findUniqueOrThrow({
           where: { key: roleKey },
@@ -223,7 +174,7 @@ describe('Module 1 database triggers (e2e)', () => {
   );
 
   it('allows valid profiles and a platform admin when constraints are immediate', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const student = await createTestUser(tx, {
         userType: UserType.STUDENT,
         name: 'Valid Student',
@@ -248,7 +199,7 @@ describe('Module 1 database triggers (e2e)', () => {
   });
 
   it('allows an unprofiled user to be inserted and deleted in the same transaction', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
       const role = await tx.role.findUniqueOrThrow({
         where: { key: 'student' },
@@ -271,7 +222,7 @@ describe('Module 1 database triggers (e2e)', () => {
   });
 
   it('checks the current role when the role changes before commit', async () => {
-    await withRollback(async (tx) => {
+    await withRollback(prisma, async (tx) => {
       const school = await createSchool(tx);
       const teacherRole = await tx.role.findUniqueOrThrow({
         where: { key: 'teacher' },
