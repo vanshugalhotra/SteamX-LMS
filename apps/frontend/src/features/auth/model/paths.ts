@@ -1,10 +1,12 @@
-import type { AuthProfile } from './api';
+import type { AuthProfile } from '../api/api';
 
 export const AUTH_PATHS = {
   login: '/login',
   changePassword: '/change-password',
   afterLogin: '/',
 } as const;
+
+export const SESSION_EXPIRED = 'session-expired';
 
 /** Where a signed-in user belongs right now. */
 export function getPostLoginPath(profile: AuthProfile) {

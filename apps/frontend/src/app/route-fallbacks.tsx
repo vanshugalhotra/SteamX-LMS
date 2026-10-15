@@ -1,6 +1,6 @@
 import { isRouteErrorResponse, useRouteError } from 'react-router';
 import { Button } from '@/components/ui/button';
-import { AUTH_PATHS } from '@/features/auth/paths';
+import { AUTH_PATHS } from '@/features/auth/model/paths';
 import { buttonVariants } from '@/components/ui/button-variants';
 
 export function RootFallback() {

@@ -80,6 +80,7 @@ Login needs the backend, a database and an admin user. One-time setup:
 - A successful login sets an httpOnly session cookie and redirects to `/`.
 - While signed in, opening `/login` redirects you away from it.
 - The admin account created by `admin:create` must change its password on first login. Such a user is redirected to `/change-password` and cannot continue until the password is changed. After a successful change you land on `/`.
+- When a protected API call returns 401, you are sent to `/login` with a "session expired" message (verified once a feature calls a protected endpoint).
 
 ### Trying the forced password change
 
@@ -91,6 +92,17 @@ On `/change-password`:
 - A wrong current password or a password that breaks the policy shows an error alert (policy errors are listed).
 - Success updates the session and redirects to `/`.
 - Signed-out users are redirected to `/login`; users who don't need to change their password are redirected to `/`.
+
+### Trying session management
+
+There is a temporary protected route at `/home` with a **Log out** button (to be replaced by real pages).
+
+- Sign in, refresh the page: you stay signed in (the session is restored from `/auth/me`).
+- Open `/home` while signed out: you are redirected to `/login`.
+- Click **Log out**: the session cookie is cleared, the cache is dropped and you land on `/login`.
+- A user who must change their password is redirected to `/change-password` from `/home`.
+
+The global 401/403 handlers (`app/session-handlers.ts`) only run for API calls made without `skipAuthHandlers`. No page makes such a call yet, so the "session expired" message and the "no access" toast cannot be triggered from the UI until a feature calls a protected endpoint.
 
 ## Project structure
 
