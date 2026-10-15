@@ -1,8 +1,9 @@
 import { createBrowserRouter } from 'react-router';
 import { LandingPage } from '@/features/landing/LandingPage';
-import { guestOnlyLoader, changePasswordLoader } from '@/features/auth/loaders';
+import { guestOnlyLoader, changePasswordLoader, protectedLoader } from '@/features/auth/loaders';
 import { AUTH_PATHS } from '@/features/auth/paths';
 import { RootFallback, RootError } from './route-fallbacks';
+import { LogoutButton } from '@/features/auth/components/LogoutButton';
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,17 @@ export const router = createBrowserRouter([
           const { ChangePasswordPage } = await import('@/features/auth/ChangePasswordPage');
           return { Component: ChangePasswordPage };
         },
+      },
+      {
+        loader: protectedLoader,
+        children: [
+          // protected routes go here
+          // for testing
+          {
+            path: '/home',
+            element: <div className="p-6"><LogoutButton /></div>,
+          },
+        ],
       },
       { path: '*', element: <div className="p-6">Page not found</div> },
     ],

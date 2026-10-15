@@ -6,6 +6,8 @@ export const AUTH_PATHS = {
   afterLogin: '/',
 } as const;
 
+export const SESSION_EXPIRED = 'session-expired';
+
 /** Where a signed-in user belongs right now. */
 export function getPostLoginPath(profile: AuthProfile) {
   return profile.mustChangePassword ? AUTH_PATHS.changePassword : AUTH_PATHS.afterLogin;

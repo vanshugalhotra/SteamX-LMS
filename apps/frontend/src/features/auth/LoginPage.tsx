@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { ApiError } from '@/lib/api-client';
 import { AuthLayout } from './components/AuthLayout';
-import { getPostLoginPath } from './paths';
+import { getPostLoginPath, SESSION_EXPIRED } from './paths';
 import { useLogin } from './queries';
 import { loginSchema, type LoginValues } from './schemas';
 
@@ -23,6 +23,15 @@ function getLoginErrorMessage(error: Error) {
   return 'Something went wrong on our side. Please try again.';
 }
 
+function isSessionExpired(state: unknown) {
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    'reason' in state &&
+    state.reason === SESSION_EXPIRED
+  );
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const login = useLogin();
@@ -34,6 +43,9 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: { steamxId: '', password: '' },
   });
+
+  const location = useLocation();
+  const sessionExpired = isSessionExpired(location.state);
 
   const onSubmit = handleSubmit((values) => {
     login.mutate(values, {
@@ -53,6 +65,10 @@ export function LoginPage() {
       <p className="mt-2 mb-7 max-w-[36ch] text-gray-600">
         Sign in with the SteamX ID and password your teacher gave you.
       </p>
+
+      {sessionExpired && !login.isError && (
+        <Alert className="mb-5">Your session has expired. Please sign in again.</Alert>
+      )}
 
       {login.isError && <Alert className="mb-5">{getLoginErrorMessage(login.error)}</Alert>}
 

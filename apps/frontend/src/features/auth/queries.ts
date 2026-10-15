@@ -1,5 +1,7 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchSession, login } from './api';
+import { useNavigate } from 'react-router';
+import { fetchSession, login, logout } from './api';
+import { AUTH_PATHS } from './paths';
 
 export const sessionQueryOptions = queryOptions({
   queryKey: ['auth', 'session'],
@@ -15,6 +17,20 @@ export function useLogin() {
     mutationFn: login,
     onSuccess: (profile) => {
       queryClient.setQueryData(sessionQueryOptions.queryKey, profile);
+    },
+  });
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  return useMutation({
+    mutationFn: logout,
+    onSettled: () => {
+      queryClient.clear();
+      queryClient.setQueryData(sessionQueryOptions.queryKey, null);
+      void navigate(AUTH_PATHS.login, { replace: true });
     },
   });
 }

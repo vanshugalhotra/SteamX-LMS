@@ -26,8 +26,8 @@ export class ApiError extends Error {
 }
 
 interface Handlers {
-  onUnauthorized?: () => void;
-  onForbidden?: () => void;
+  onUnauthorized?: (error: ApiError) => void;
+  onForbidden?: (error: ApiError) => void;
 }
 
 let handlers: Handlers = {};
@@ -74,14 +74,15 @@ export async function apiFetch<T>(
   const data: unknown = res.status === 204 ? null : await res.json().catch(() => null);
 
   if (!res.ok) {
-    if (!skipAuthHandlers) {
-      if (res.status === 401) handlers.onUnauthorized?.();
-      if (res.status === 403) handlers.onForbidden?.();
-    }
-
     const message = FALLBACK_MESSAGES[res.status] ?? 'Something went wrong. Please try again.';
     const body = typeof data === 'object' && data !== null ? (data as ApiErrorBody) : undefined;
-    throw new ApiError(res.status, message, body);
+    const error = new ApiError(res.status, message, body);
+
+    if (!skipAuthHandlers) {
+      if (res.status === 401) handlers.onUnauthorized?.(error);
+      if (res.status === 403) handlers.onForbidden?.(error);
+    }
+    throw error;
   }
 
   return data as T;

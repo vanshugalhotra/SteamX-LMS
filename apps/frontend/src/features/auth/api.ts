@@ -48,3 +48,11 @@ export function changePassword(payload: ChangePasswordPayload) {
     body: JSON.stringify(payload),
   });
 }
+
+/** POST /auth/logout: the server clears the session cookie. */
+export function logout() {
+  return apiFetch<null>(AUTH_ENDPOINTS.logout, {
+    method: 'POST',
+    skipAuthHandlers: true,
+  });
+}

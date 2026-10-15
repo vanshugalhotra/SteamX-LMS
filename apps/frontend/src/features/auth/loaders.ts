@@ -14,3 +14,10 @@ export async function changePasswordLoader() {
   if (!session.mustChangePassword) return redirect(AUTH_PATHS.afterLogin);
   return session;
 }
+
+export async function protectedLoader() {
+  const session = await queryClient.query(sessionQueryOptions);
+  if (!session) return redirect(AUTH_PATHS.login);
+  if (session.mustChangePassword) return redirect(AUTH_PATHS.changePassword);
+  return session;
+}
