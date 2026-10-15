@@ -34,7 +34,11 @@ export const router = createBrowserRouter([
           // for testing
           {
             path: '/home',
-            element: <div className="p-6"><LogoutButton /></div>,
+            element: (
+              <div className="p-6">
+                <LogoutButton />
+              </div>
+            ),
           },
         ],
       },
