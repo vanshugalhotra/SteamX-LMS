@@ -1,7 +1,7 @@
 import { isPasswordChangeRequired } from '@/features/auth/model/errors';
 import type { AuthProfile } from '@/features/auth/api/api';
 import { AUTH_PATHS, SESSION_EXPIRED } from '@/features/auth/model/paths';
-import { sessionQueryOptions } from '@/features/auth/queries';
+import { clearSession, sessionQueryOptions } from '@/features/auth/queries';
 import { setApiHandlers } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { queryClient } from '@/lib/query-client';
@@ -12,10 +12,7 @@ export function registerSessionHandlers() {
     onUnauthorized: () => {
       // SPA navigation instead of a full page reload: lets us pass the "session expired"
       // reason through router state, avoids a page flash, and keeps the router and Toaster mounted.
-      // User data lives only in the TanStack Query cache, and queryClient.clear() removes all of it.
-      // If other in-memory user state is added later (e.g. a store), reset it here too.
-      queryClient.clear();
-      queryClient.setQueryData(sessionQueryOptions.queryKey, null);
+      clearSession(queryClient);
       if (router.state.location.pathname !== AUTH_PATHS.login) {
         void router.navigate(AUTH_PATHS.login, {
           replace: true,
