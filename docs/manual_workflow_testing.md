@@ -194,7 +194,29 @@ grant to test school-scoped reads.
 | Update with an empty body or duplicate names         | `400` `VALIDATION_ERROR`, or `409` `CLASS_SECTION_EXISTS` |
 | Delete a section assigned to a student               | `409` `CLASS_SECTION_IN_USE`                              |
 
-## 11. Health
+## 11. Users
+
+| Route                  | Permission            |
+| ---------------------- | --------------------- |
+| `POST /users/teachers` | `user.create.teacher` |
+| `POST /users/students` | `user.create.student` |
+| `GET /users`           | `user.read`           |
+| `GET /users/{id}`      | `user.read`           |
+
+Only Admin has these permissions by default. School staff visibility is fail-closed to their
+own user; they need an explicit permission grant to test the routes.
+
+| Case                                                  | Expected                                  |
+| ----------------------------------------------------- | ----------------------------------------- |
+| Platform staff creates teacher/student with school ID | `201`, user ID and profile returned       |
+| Platform staff creates without school ID              | `400` `SCHOOL_REQUIRED`                   |
+| Inactive school or unknown school                     | `409` `SCHOOL_INACTIVE`, or `404`         |
+| Student class section belongs to another school       | `404`                                     |
+| List with role, status, school, search and pagination | Matching paginated users                  |
+| School staff lists users or opens a foreign user      | Own user only; foreign user returns `404` |
+| Create/list/view responses                            | Never include `passwordHash`              |
+
+## 12. Health
 
 | Endpoint            | Case                 | Expected |
 | ------------------- | -------------------- | -------- |
