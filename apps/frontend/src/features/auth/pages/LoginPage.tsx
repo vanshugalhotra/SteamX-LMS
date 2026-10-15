@@ -7,10 +7,10 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { ApiError } from '@/lib/api-client';
-import { AuthLayout } from './components/AuthLayout';
-import { getPostLoginPath, SESSION_EXPIRED } from './paths';
-import { useLogin } from './queries';
-import { loginSchema, type LoginValues } from './schemas';
+import { AuthLayout } from '../components/AuthLayout';
+import { getPostLoginPath, SESSION_EXPIRED } from '../model/paths';
+import { useLogin } from '../queries';
+import { loginSchema, type LoginValues } from '../model/schemas';
 
 function getLoginErrorMessage(error: Error) {
   if (error instanceof ApiError) {

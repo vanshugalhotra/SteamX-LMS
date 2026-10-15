@@ -11,7 +11,17 @@ export function LogoutButton() {
         logout.mutate();
       }}
     >
-      Log out
+      {logout.isPending ? (
+        <>
+          <span
+            className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+            aria-hidden="true"
+          />
+          Logging out…
+        </>
+      ) : (
+        'Log out'
+      )}
     </Button>
   );
 }

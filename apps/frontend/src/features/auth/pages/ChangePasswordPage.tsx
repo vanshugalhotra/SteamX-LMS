@@ -9,16 +9,16 @@ import { FormField } from '@/components/ui/form-field';
 import { PasswordInput } from '@/components/ui/password-input';
 import { ApiError } from '@/lib/api-client';
 import { queryClient } from '@/lib/query-client';
-import { changePassword } from './api';
-import { AuthLayout } from './components/AuthLayout';
+import { changePassword } from '../api/api';
+import { AuthLayout } from '../components/AuthLayout';
 import {
   INVALID_CURRENT_PASSWORD,
   PASSWORD_POLICY,
   PASSWORD_REUSED,
   policyMessages,
-} from './errors';
-import { AUTH_PATHS } from './paths';
-import { sessionQueryOptions } from './queries';
+} from '../model/errors';
+import { AUTH_PATHS } from '../model/paths';
+import { sessionQueryOptions } from '../queries';
 
 const changePasswordSchema = z
   .object({

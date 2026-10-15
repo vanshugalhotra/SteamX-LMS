@@ -1,6 +1,6 @@
 import { redirect } from 'react-router';
 import { queryClient } from '@/lib/query-client';
-import { AUTH_PATHS, getPostLoginPath } from './paths';
+import { AUTH_PATHS, getPostLoginPath } from './model/paths';
 import { sessionQueryOptions } from './queries';
 
 export async function guestOnlyLoader() {

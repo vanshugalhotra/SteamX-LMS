@@ -1,4 +1,4 @@
-import type { AuthProfile } from './api';
+import type { AuthProfile } from '../api/api';
 
 export const AUTH_PATHS = {
   login: '/login',
