@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { ApiError } from '@/lib/api-client';
 import { AuthLayout } from '../components/AuthLayout';
-import { getPostLoginPath, SESSION_EXPIRED } from '../model/paths';
+import { getPostLoginPath, SESSION_EXPIRED } from '../model/redirects';
 import { useLogin } from '../queries';
 import { loginSchema, type LoginValues } from '../model/schemas';
 

@@ -1,6 +1,6 @@
 import { isRouteErrorResponse, useRouteError } from 'react-router';
 import { Button } from '@/components/ui/button';
-import { AUTH_PATHS } from '@/features/auth/model/paths';
+import { PATHS } from '@/lib/paths';
 import { buttonVariants } from '@/components/ui/button-variants';
 
 export function RootFallback() {
@@ -32,7 +32,7 @@ export function RootError() {
           >
             Try again
           </Button>
-          <a href={AUTH_PATHS.login} className={buttonVariants({ variant: 'secondary' })}>
+          <a href={PATHS.login} className={buttonVariants({ variant: 'secondary' })}>
             Back to login
           </a>
         </div>

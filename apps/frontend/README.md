@@ -2,7 +2,7 @@
 
 React 19 + TypeScript + Vite single-page app.
 
-**Stack:** Tailwind CSS v4, Base UI + class-variance-authority (shadcn-style components), React Router, TanStack Query, React Hook Form + Zod.
+**Stack:** Tailwind CSS v4, Base UI + class-variance-authority (shadcn-style components), React Router, TanStack Query, React Hook Form + Zod, Sonner (toasts), Lucide (icons).
 
 ## Prerequisites
 
@@ -77,9 +77,9 @@ Login needs the backend, a database and an admin user. One-time setup:
 ### What to expect
 
 - Empty submit shows field errors; wrong credentials show an error alert.
-- A successful login sets an httpOnly session cookie and redirects to `/`.
+- A successful login sets an httpOnly session cookie and redirects to `/steamx/admin/dashboard`.
 - While signed in, opening `/login` redirects you away from it.
-- The admin account created by `admin:create` must change its password on first login. Such a user is redirected to `/change-password` and cannot continue until the password is changed. After a successful change you land on `/`.
+- The admin account created by `admin:create` must change its password on first login. Such a user is redirected to `/change-password` and cannot continue until the password is changed. After a successful change you land on `/steamx/admin/dashboard`.
 - When a protected API call returns 401, you are sent to `/login` with a "session expired" message (verified once a feature calls a protected endpoint).
 
 ### Trying the forced password change
@@ -90,17 +90,19 @@ On `/change-password`:
 
 - Empty fields and mismatched confirmation show field errors.
 - A wrong current password or a password that breaks the policy shows an error alert (policy errors are listed).
-- Success updates the session and redirects to `/`.
-- Signed-out users are redirected to `/login`; users who don't need to change their password are redirected to `/`.
+- Success updates the session and redirects to `/steamx/admin/dashboard`.
+- Signed-out users are redirected to `/login`; users who don't need to change their password are redirected to `/steamx/admin/dashboard`.
 
-### Trying session management
+### Trying the admin shell and session management
 
-There is a temporary protected route at `/home` with a **Log out** button (to be replaced by real pages).
+Signing in lands on the admin shell at `/steamx/admin/dashboard` (sidebar, header and the page content).
 
 - Sign in, refresh the page: you stay signed in (the session is restored from `/auth/me`).
-- Open `/home` while signed out: you are redirected to `/login`.
-- Click **Log out**: the session cookie is cleared, the cache is dropped and you land on `/login`.
-- A user who must change their password is redirected to `/change-password` from `/home`.
+- Open `/steamx/admin/dashboard` while signed out: you are redirected to `/login`.
+- Click **Sign out** (in the sidebar; top right on mobile): the session cookie is cleared, the cache is dropped and you land on `/login`.
+- A user who must change their password is redirected to `/change-password` from every admin route.
+- Desktop: the sidebar groups (People, Content, Billing) can be collapsed; the group containing the current page stays open. Mobile: the navigation is one horizontally scrollable row.
+- Navigation items whose page does not exist yet are shown disabled.
 
 The global 401/403 handlers (`app/session-handlers.ts`) only run for API calls made without `skipAuthHandlers`. No page makes such a call yet, so the "session expired" message and the "no access" toast cannot be triggered from the UI until a feature calls a protected endpoint.
 
@@ -108,10 +110,12 @@ The global 401/403 handlers (`app/session-handlers.ts`) only run for API calls m
 
 ```
 src/
-  app/          App wiring: providers, router
-  components/   Shared UI (components/ui: Button, Input, PasswordInput, FormField, Alert)
-  features/     One folder per feature (landing, auth, ...): pages, API calls, queries, schemas
-  lib/          Shared helpers: api-client, env, query-client, utils
+  app/          App wiring: providers, router, session handlers
+  components/   Shared UI (components/ui: Button, Input, PasswordInput, FormField, Alert), Logo
+  features/     One folder per feature (landing, auth, admin, ...)
+    auth/       api/, pages/, model/, components/, queries.ts, loaders.ts
+    admin/      components/ (layout, sidebar, header), pages/, nav.ts
+  lib/          Shared helpers: api-client, env, query-client, paths, utils
 ```
 
 Conventions:
@@ -119,3 +123,5 @@ Conventions:
 - Import with the `@/` alias (`@/lib/api-client`), not long relative paths.
 - Call the backend through `apiFetch` in `lib/api-client.ts` (cookies are sent automatically). Pass `skipAuthHandlers: true` for calls where a 401 is an expected answer, so the global "session expired" redirect doesn't fire.
 - Server state goes through TanStack Query; forms use React Hook Form with a Zod schema.
+- All route paths live in `lib/paths.ts` (`PATHS`). Admin routes are prefixed with `/steamx/admin`. Don't hardcode paths in components.
+- Global 401/403 handling lives in `app/session-handlers.ts`, registered once in `main.tsx`.

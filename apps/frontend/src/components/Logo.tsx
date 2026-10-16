@@ -1,6 +1,11 @@
 import { cn } from '@/lib/utils';
 
-export function Logo({ className }: { className?: string }) {
+interface LogoProps {
+  className?: string;
+  accent?: 'white' | 'teal';
+}
+
+export function Logo({ className, accent = 'white' }: LogoProps) {
   return (
     <span
       className={cn(
@@ -10,7 +15,12 @@ export function Logo({ className }: { className?: string }) {
     >
       <span aria-hidden className="relative h-7.5 w-8.5 flex-none">
         <i className="absolute bottom-0 left-0 size-5.5 rounded-full bg-coral-500" />
-        <i className="absolute top-0 right-0 size-4 rounded-full bg-white" />
+        <i
+          className={cn(
+            'absolute top-0 right-0 size-4 rounded-full',
+            accent === 'teal' ? 'bg-teal-500 outline-2 outline-white' : 'bg-white',
+          )}
+        />
       </span>
       SteamX
     </span>
