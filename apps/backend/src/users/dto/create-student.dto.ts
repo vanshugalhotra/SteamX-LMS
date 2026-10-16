@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { Trim } from '../../common/decorators/trim.decorator.js';
+import { PasswordInput } from '../../common/decorators/password-input.decorator.js';
+import {
+  MAX_PASSWORD_CHARACTERS,
+  MIN_PASSWORD_CHARACTERS,
+} from '../../auth/validators/password-policy.js';
 
 export class CreateStudentDto {
   @ApiProperty({ maxLength: 120 })
@@ -10,10 +15,10 @@ export class CreateStudentDto {
   @MaxLength(120)
   name!: string;
 
-  @ApiProperty({ minLength: 8, maxLength: 100 })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
+  @PasswordInput({
+    minLength: MIN_PASSWORD_CHARACTERS,
+    maxLength: MAX_PASSWORD_CHARACTERS,
+  })
   password!: string;
 
   @ApiProperty({ format: 'uuid' })

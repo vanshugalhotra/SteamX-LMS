@@ -5,6 +5,7 @@ import { PUBLIC_ROUTE } from '../decorators/metadata.constants.js';
 import { REQUIRED_PERMISSION } from '../decorators/require-permission.decorator.js';
 import type { PermissionKey } from '../permissions.js';
 import { PermissionsService } from '../services/permissions.service.js';
+import { API_ERROR, permissionRequiredError } from '../../common/errors/api-errors.js';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -32,11 +33,11 @@ export class PermissionGuard implements CanActivate {
     }
 
     const authContext = context.switchToHttp().getRequest<Request>().authContext;
-    if (!authContext || !this.permissions.has(authContext.roleKey, requiredPermission)) {
-      throw new ForbiddenException({
-        code: 'FORBIDDEN',
-        message: 'Forbidden',
-      });
+    if (!authContext) {
+      throw new ForbiddenException(API_ERROR.FORBIDDEN);
+    }
+    if (!this.permissions.has(authContext.roleKey, requiredPermission)) {
+      throw new ForbiddenException(permissionRequiredError(requiredPermission));
     }
 
     return true;

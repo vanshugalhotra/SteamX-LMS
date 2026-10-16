@@ -7,6 +7,7 @@ import {
 import { PinoLogger } from 'nestjs-pino';
 import { SchoolStatus, UserType } from '../generated/prisma/client.js';
 import { throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { resolveSchoolScope } from '../common/tenancy/school-scope.js';
@@ -17,13 +18,6 @@ import type { SchoolResponseDto } from './dto/school-response.dto.js';
 import type { UpdateSchoolDto } from './dto/update-school.dto.js';
 import { toSchoolResponse } from './schools.mapper.js';
 import { SchoolsRepository } from './schools.repository.js';
-
-const NOT_FOUND = { code: 'NOT_FOUND', message: 'Resource not found' };
-const EMPTY_UPDATE = {
-  code: 'VALIDATION_ERROR',
-  message: 'Validation failed',
-  details: [{ field: 'body', errors: ['At least one field must be provided'] }],
-};
 
 @Injectable()
 export class SchoolsService {
@@ -39,7 +33,7 @@ export class SchoolsService {
   async create(actor: AuthContext, body: CreateSchoolDto): Promise<SchoolResponseDto> {
     if (actor.userType !== UserType.PLATFORM_STAFF) {
       // even if a user has SCHOOL_MANAGE permission, they cannot create a school if they are not PLATFORM_STAFF
-      throw new ForbiddenException({ code: 'FORBIDDEN', message: 'Forbidden' });
+      throw new ForbiddenException(API_ERROR.SCHOOL_FORBIDDEN);
     }
 
     try {
@@ -47,10 +41,7 @@ export class SchoolsService {
       this.logger.info({ actorId: actor.userId, schoolId: school.id }, 'School created');
       return toSchoolResponse(school);
     } catch (error) {
-      throwConflictOnDuplicate(error, {
-        code: 'SCHOOL_CODE_EXISTS',
-        message: 'School code already exists',
-      });
+      throwConflictOnDuplicate(error, API_ERROR.SCHOOL_CODE_EXISTS);
       throw error;
     }
   }
@@ -81,7 +72,7 @@ export class SchoolsService {
     const scope = resolveSchoolScope(actor);
     const school = await this.schools.findById(id, scope);
     if (!school) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toSchoolResponse(school);
   }
@@ -92,13 +83,13 @@ export class SchoolsService {
 
   async update(actor: AuthContext, id: string, body: UpdateSchoolDto): Promise<SchoolResponseDto> {
     if (Object.values(body).every((value) => value === undefined)) {
-      throw new BadRequestException(EMPTY_UPDATE);
+      throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
 
     const scope = resolveSchoolScope(actor);
     const school = await this.schools.update(id, scope, body);
     if (!school) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
 
     this.logger.info({ actorId: actor.userId, schoolId: school.id }, 'School updated');
@@ -117,7 +108,7 @@ export class SchoolsService {
     const scope = resolveSchoolScope(actor);
     const current = await this.schools.findById(id, scope);
     if (!current) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     if (current.status === status) {
       return toSchoolResponse(current);
@@ -125,7 +116,7 @@ export class SchoolsService {
 
     const school = await this.schools.update(id, scope, { status });
     if (!school) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
 
     this.logger.info({ actorId: actor.userId, schoolId: school.id }, 'School status changed');

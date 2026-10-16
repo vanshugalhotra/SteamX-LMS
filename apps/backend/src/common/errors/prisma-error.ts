@@ -1,4 +1,5 @@
 import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
+import { API_ERROR } from './api-errors.js';
 
 type PrismaKnownError = {
   name: 'PrismaClientKnownRequestError';
@@ -74,20 +75,11 @@ export function mapPrismaError(error: unknown): HttpException | undefined {
 
   switch (error.code) {
     case 'P2002':
-      return new ConflictException({
-        code: 'CONFLICT',
-        message: 'Resource already exists',
-      });
+      return new ConflictException(API_ERROR.CONFLICT);
     case 'P2003':
-      return new ConflictException({
-        code: 'CONFLICT',
-        message: 'Operation conflicts with related data',
-      });
+      return new ConflictException(API_ERROR.RELATED_DATA_CONFLICT);
     case 'P2025':
-      return new NotFoundException({
-        code: 'NOT_FOUND',
-        message: 'Resource not found',
-      });
+      return new NotFoundException(API_ERROR.NOT_FOUND);
     default:
       return undefined;
   }

@@ -4,7 +4,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type UserType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { UserListQueryDto } from './dto/user-list-query.dto.js';
+import { paginatedSearch } from '../common/repositories/paginated-search.js';
 
 const USER_LIST_SELECT = {
   id: true,
@@ -31,13 +31,6 @@ export type UserDetailRecord = Prisma.UserGetPayload<{ select: typeof USER_DETAI
 @Injectable()
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  findSchoolStatus(schoolId: string) {
-    return this.prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { status: true },
-    });
-  }
 
   findRole(key: string) {
     return this.prisma.role.findUnique({
@@ -124,19 +117,24 @@ export class UsersRepository {
 
   async findMany(
     where: Prisma.UserWhereInput,
-    query: UserListQueryDto,
+    pagination: { page: number; limit: number },
   ): Promise<{ items: UserListRecord[]; total: number }> {
-    const [items, total] = await Promise.all([
-      this.prisma.user.findMany({
-        where,
-        select: USER_LIST_SELECT,
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
-    return { items, total };
+    const orderBy = [
+      { createdAt: 'desc' },
+      { id: 'asc' },
+    ] satisfies Prisma.UserOrderByWithRelationInput[];
+    return paginatedSearch({
+      where,
+      orderBy,
+      page: pagination.page,
+      limit: pagination.limit,
+      findMany: (args) =>
+        this.prisma.user.findMany({
+          ...args,
+          select: USER_LIST_SELECT,
+        }),
+      count: (filter) => this.prisma.user.count({ where: filter }),
+    });
   }
 
   findById(where: Prisma.UserWhereInput): Promise<UserDetailRecord | null> {

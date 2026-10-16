@@ -318,6 +318,17 @@ describe('Users endpoints (e2e)', () => {
     await listUsers(teacherCookie, { schoolId: fixture.schoolB.school.id }).expect(404);
   });
 
+  it('explains which permission is missing when the caller role is not granted access', async () => {
+    const studentCookie = await loginAs(app, fixture.schoolA.student);
+    const response = await listUsers(studentCookie).expect(403);
+
+    expect(response.body).toMatchObject({
+      code: 'FORBIDDEN',
+      message: expect.stringContaining(PERMISSION.USER_READ),
+    });
+    expect(response.body.message).toContain('Ask an administrator to grant it to your role.');
+  });
+
   it('rolls back a user when its teacher profile insert fails', async () => {
     const adminCookie = await loginAs(app, fixture.admin);
     const suffix = randomUUID().replaceAll('-', '');

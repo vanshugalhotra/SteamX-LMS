@@ -1,20 +1,22 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { SchoolStatus, UserType, type Prisma } from '../generated/prisma/client.js';
+import { UserType, type Prisma } from '../generated/prisma/client.js';
 import { PasswordService } from '../auth/services/password.service.js';
 import { USER_ROLE_KEY, type UserRoleKey } from '../auth/permissions.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
+import { ActiveSchoolService } from '../common/tenancy/active-school.service.js';
 import { resolveSchoolScope, schoolFilter } from '../common/tenancy/school-scope.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { ClassSectionsService } from '../class-sections/class-sections.service.js';
 import { getPasswordPolicyViolations } from '../auth/validators/password-policy.js';
+import { AuthService } from '../auth/auth.service.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
 import type { CreateTeacherDto } from './dto/create-teacher.dto.js';
 import type { UserListQueryDto } from './dto/user-list-query.dto.js';
@@ -25,8 +27,6 @@ import { toUserListItem, toUserResponse } from './users.mapper.js';
 import { UsersRepository } from './users.repository.js';
 import { SteamxIdService } from './steamx-id.service.js';
 
-const NOT_FOUND = { code: 'NOT_FOUND', message: 'Resource not found' };
-
 @Injectable()
 export class UsersService {
   constructor(
@@ -34,6 +34,8 @@ export class UsersService {
     private readonly passwords: PasswordService,
     private readonly steamxIds: SteamxIdService,
     private readonly sections: ClassSectionsService,
+    private readonly authService: AuthService,
+    private readonly activeSchool: ActiveSchoolService,
     private readonly logger: PinoLogger,
   ) {}
 
@@ -42,7 +44,7 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   async createTeacher(actor: AuthContext, body: CreateTeacherDto): Promise<UserResponseDto> {
-    const schoolId = await this.resolveActiveSchool(actor, body.schoolId);
+    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
     const role = await this.resolveRole(USER_ROLE_KEY.TEACHER, UserType.SCHOOL_STAFF);
 
     return this.steamxIds.withUniqueSteamxId(async (steamxId) => {
@@ -71,7 +73,7 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   async createStudent(actor: AuthContext, body: CreateStudentDto): Promise<UserResponseDto> {
-    const schoolId = await this.resolveActiveSchool(actor, body.schoolId);
+    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
     await this.sections.assertInSchool(body.classSectionId, schoolId);
     const role = await this.resolveRole(USER_ROLE_KEY.STUDENT, UserType.STUDENT);
 
@@ -135,39 +137,20 @@ export class UsersService {
       AND: [{ id }, userVisibility(actor)],
     });
     if (!user) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toUserResponse(user);
   }
 
-  private async resolveActiveSchool(
-    actor: AuthContext,
-    requestedSchoolId?: string,
-  ): Promise<string> {
-    const schoolId = resolveSchoolScope(actor, requestedSchoolId);
-    if (!schoolId) {
-      throw new BadRequestException({
-        code: 'SCHOOL_REQUIRED',
-        message: 'A school is required',
-      });
-    }
-
-    const school = await this.users.findSchoolStatus(schoolId);
-    if (!school) {
-      throw new NotFoundException(NOT_FOUND);
-    }
-    if (school.status !== SchoolStatus.ACTIVE) {
-      throw new ConflictException({ code: 'SCHOOL_INACTIVE', message: 'School is inactive' });
-    }
-    return schoolId;
+  async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {
+    await this.authService.resetPassword(actor, userId, newPassword);
   }
 
   private async resolveRole(roleKey: UserRoleKey, userType: UserType): Promise<{ id: number }> {
     const role = await this.users.findRole(roleKey);
     if (!role || role.userType !== userType) {
       throw new InternalServerErrorException({
-        code: 'ROLE_CONFIGURATION_ERROR',
-        message: 'User role is not configured correctly',
+        ...API_ERROR.ROLE_CONFIGURATION_ERROR,
       });
     }
     return { id: role.id };
@@ -176,11 +159,7 @@ export class UsersService {
   private validatePassword(password: string, steamxId: string): void {
     const violations = getPasswordPolicyViolations(password, steamxId);
     if (violations.length > 0) {
-      throw new BadRequestException({
-        code: 'PASSWORD_POLICY',
-        message: 'Password does not meet policy requirements',
-        details: violations,
-      });
+      throw new BadRequestException({ ...API_ERROR.PASSWORD_POLICY, details: violations });
     }
   }
 }
