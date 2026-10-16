@@ -1,15 +1,15 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { SchoolStatus, UserType, type Prisma } from '../generated/prisma/client.js';
+import { UserType, type Prisma } from '../generated/prisma/client.js';
 import { PasswordService } from '../auth/services/password.service.js';
 import { USER_ROLE_KEY, type UserRoleKey } from '../auth/permissions.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
+import { ActiveSchoolService } from '../common/tenancy/active-school.service.js';
 import { resolveSchoolScope, schoolFilter } from '../common/tenancy/school-scope.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
@@ -35,6 +35,7 @@ export class UsersService {
     private readonly steamxIds: SteamxIdService,
     private readonly sections: ClassSectionsService,
     private readonly authService: AuthService,
+    private readonly activeSchool: ActiveSchoolService,
     private readonly logger: PinoLogger,
   ) {}
 
@@ -43,7 +44,7 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   async createTeacher(actor: AuthContext, body: CreateTeacherDto): Promise<UserResponseDto> {
-    const schoolId = await this.resolveActiveSchool(actor, body.schoolId);
+    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
     const role = await this.resolveRole(USER_ROLE_KEY.TEACHER, UserType.SCHOOL_STAFF);
 
     return this.steamxIds.withUniqueSteamxId(async (steamxId) => {
@@ -72,7 +73,7 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   async createStudent(actor: AuthContext, body: CreateStudentDto): Promise<UserResponseDto> {
-    const schoolId = await this.resolveActiveSchool(actor, body.schoolId);
+    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
     await this.sections.assertInSchool(body.classSectionId, schoolId);
     const role = await this.resolveRole(USER_ROLE_KEY.STUDENT, UserType.STUDENT);
 
@@ -143,25 +144,6 @@ export class UsersService {
 
   async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {
     await this.authService.resetPassword(actor, userId, newPassword);
-  }
-
-  private async resolveActiveSchool(
-    actor: AuthContext,
-    requestedSchoolId?: string,
-  ): Promise<string> {
-    const schoolId = resolveSchoolScope(actor, requestedSchoolId);
-    if (!schoolId) {
-      throw new BadRequestException(API_ERROR.SCHOOL_REQUIRED);
-    }
-
-    const school = await this.users.findSchoolStatus(schoolId);
-    if (!school) {
-      throw new NotFoundException(API_ERROR.NOT_FOUND);
-    }
-    if (school.status !== SchoolStatus.ACTIVE) {
-      throw new ConflictException(API_ERROR.SCHOOL_INACTIVE);
-    }
-    return schoolId;
   }
 
   private async resolveRole(roleKey: UserRoleKey, userType: UserType): Promise<{ id: number }> {

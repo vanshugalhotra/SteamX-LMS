@@ -1,28 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, SchoolStatus } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import type { ClassSection } from '../generated/prisma/client.js';
 import { schoolFilter } from '../common/tenancy/school-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateClassSectionDto } from './dto/create-class-section.dto.js';
 import type { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
-import { BaseRepository } from '../common/repositories/base.repository.js';
-import type {
-  PaginationParams,
-  TextSearchParams,
-} from '../common/repositories/repository-search.types.js';
+import { paginatedSearch } from '../common/repositories/paginated-search.js';
 
 @Injectable()
-export class ClassSectionsRepository extends BaseRepository {
-  constructor(private readonly prisma: PrismaService) {
-    super();
-  }
-
-  findSchoolStatus(schoolId: string): Promise<{ status: SchoolStatus } | null> {
-    return this.prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { status: true },
-    });
-  }
+export class ClassSectionsRepository {
+  constructor(private readonly prisma: PrismaService) {}
 
   create(schoolId: string, data: CreateClassSectionDto) {
     return this.prisma.classSection.create({
@@ -36,7 +23,7 @@ export class ClassSectionsRepository extends BaseRepository {
 
   findMany(
     scope: string | undefined,
-    query: PaginationParams & TextSearchParams,
+    query: { page: number; limit: number; q?: string },
   ): Promise<{ items: ClassSection[]; total: number }> {
     const where: Prisma.ClassSectionWhereInput = {
       ...schoolFilter(scope),
@@ -54,7 +41,7 @@ export class ClassSectionsRepository extends BaseRepository {
       { sectionName: 'asc' },
       { id: 'asc' },
     ] satisfies Prisma.ClassSectionOrderByWithRelationInput[];
-    return this.search({
+    return paginatedSearch({
       where,
       orderBy,
       page: query.page,

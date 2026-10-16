@@ -203,7 +203,7 @@ describe('Class sections endpoints (e2e)', () => {
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
     await post(adminCookie, { className: `${prefix} No School` })
       .expect(400)
-      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+      .then(({ body }) => expect(body.code).toBe('SCHOOL_REQUIRED'));
     await post(adminCookie, { schoolId: randomUUID(), className: `${prefix} Unknown` }).expect(404);
 
     await prisma.school.update({

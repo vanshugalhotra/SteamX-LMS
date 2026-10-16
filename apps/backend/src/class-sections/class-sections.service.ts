@@ -5,11 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { SchoolStatus } from '../generated/prisma/client.js';
 import { isPrismaKnownError, throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
+import { ActiveSchoolService } from '../common/tenancy/active-school.service.js';
 import { resolveSchoolScope } from '../common/tenancy/school-scope.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import type { ClassSectionListQueryDto } from './dto/class-section-list-query.dto.js';
@@ -23,6 +23,7 @@ import { ClassSectionsRepository } from './class-sections.repository.js';
 export class ClassSectionsService {
   constructor(
     private readonly sections: ClassSectionsRepository,
+    private readonly activeSchool: ActiveSchoolService,
     private readonly logger: PinoLogger,
   ) {}
 
@@ -31,21 +32,7 @@ export class ClassSectionsService {
   // ─────────────────────────────────────────
 
   async create(actor: AuthContext, body: CreateClassSectionDto): Promise<ClassSectionResponseDto> {
-    const schoolId = resolveSchoolScope(actor, body.schoolId);
-    if (!schoolId) {
-      throw new BadRequestException({
-        ...API_ERROR.VALIDATION_ERROR,
-        details: [{ field: 'schoolId', errors: ['schoolId is required'] }],
-      });
-    }
-
-    const school = await this.sections.findSchoolStatus(schoolId);
-    if (!school) {
-      throw new NotFoundException(API_ERROR.NOT_FOUND);
-    }
-    if (school.status !== SchoolStatus.ACTIVE) {
-      throw new ConflictException(API_ERROR.SCHOOL_INACTIVE);
-    }
+    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
 
     try {
       const section = await this.sections.create(schoolId, body);

@@ -5,11 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, SchoolStatus } from '../generated/prisma/client.js';
 import type { School } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { BaseRepository } from '../common/repositories/base.repository.js';
-import type {
-  PaginationParams,
-  TextSearchParams,
-} from '../common/repositories/repository-search.types.js';
+import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import type { CreateSchoolDto } from './dto/create-school.dto.js';
 import type { UpdateSchoolDto } from './dto/update-school.dto.js';
 
@@ -21,10 +17,8 @@ function selfScopeFilter(scope: string | undefined): Prisma.SchoolWhereInput {
 }
 
 @Injectable()
-export class SchoolsRepository extends BaseRepository {
-  constructor(private readonly prisma: PrismaService) {
-    super();
-  }
+export class SchoolsRepository {
+  constructor(private readonly prisma: PrismaService) {}
 
   create(data: CreateSchoolDto) {
     return this.prisma.school.create({ data });
@@ -32,7 +26,7 @@ export class SchoolsRepository extends BaseRepository {
 
   findMany(
     scope: string | undefined,
-    query: PaginationParams & TextSearchParams & { status?: SchoolStatus },
+    query: { page: number; limit: number; q?: string; status?: SchoolStatus },
   ): Promise<{ items: School[]; total: number }> {
     const where: Prisma.SchoolWhereInput = {
       ...selfScopeFilter(scope),
@@ -50,7 +44,7 @@ export class SchoolsRepository extends BaseRepository {
       { name: 'asc' },
       { id: 'asc' },
     ] satisfies Prisma.SchoolOrderByWithRelationInput[];
-    return this.search({
+    return paginatedSearch({
       where,
       orderBy,
       page: query.page,

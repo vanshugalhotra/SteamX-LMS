@@ -4,8 +4,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type UserType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { BaseRepository } from '../common/repositories/base.repository.js';
-import type { PaginationParams } from '../common/repositories/repository-search.types.js';
+import { paginatedSearch } from '../common/repositories/paginated-search.js';
 
 const USER_LIST_SELECT = {
   id: true,
@@ -30,17 +29,8 @@ export type UserListRecord = Prisma.UserGetPayload<{ select: typeof USER_LIST_SE
 export type UserDetailRecord = Prisma.UserGetPayload<{ select: typeof USER_DETAIL_SELECT }>;
 
 @Injectable()
-export class UsersRepository extends BaseRepository {
-  constructor(private readonly prisma: PrismaService) {
-    super();
-  }
-
-  findSchoolStatus(schoolId: string) {
-    return this.prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { status: true },
-    });
-  }
+export class UsersRepository {
+  constructor(private readonly prisma: PrismaService) {}
 
   findRole(key: string) {
     return this.prisma.role.findUnique({
@@ -127,13 +117,13 @@ export class UsersRepository extends BaseRepository {
 
   async findMany(
     where: Prisma.UserWhereInput,
-    pagination: PaginationParams,
+    pagination: { page: number; limit: number },
   ): Promise<{ items: UserListRecord[]; total: number }> {
     const orderBy = [
       { createdAt: 'desc' },
       { id: 'asc' },
     ] satisfies Prisma.UserOrderByWithRelationInput[];
-    return this.search({
+    return paginatedSearch({
       where,
       orderBy,
       page: pagination.page,
