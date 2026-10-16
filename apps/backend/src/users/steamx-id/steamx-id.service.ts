@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { ConflictException, Injectable } from '@nestjs/common';
-import { isPrismaKnownError } from '../common/errors/prisma-error.js';
-import { API_ERROR } from '../common/errors/api-errors.js';
+import { isPrismaKnownError } from '../../common/errors/prisma-error.js';
+import { API_ERROR } from '../../common/errors/api-errors.js';
 import { buildSteamxId } from './steamx-id.js';
 
 const MAX_STEAMX_ID_ATTEMPTS = 3;
@@ -36,7 +36,7 @@ function isSteamxIdUniqueViolation(error: unknown): boolean {
   }
 
   const meta = error.meta;
-  if (typeof meta !== 'object' || meta === null) {
+  if (!isRecord(meta)) {
     return false;
   }
 

@@ -5,7 +5,7 @@ import { PasswordInput } from '../../common/decorators/password-input.decorator.
 import {
   MAX_PASSWORD_CHARACTERS,
   MIN_PASSWORD_CHARACTERS,
-} from '../../auth/validators/password-policy.js';
+} from '../../common/validators/password-policy.js';
 
 export class CreateTeacherDto {
   @ApiProperty({ maxLength: 120 })

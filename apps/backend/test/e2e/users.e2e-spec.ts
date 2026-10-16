@@ -16,7 +16,7 @@ import type { Env } from '../../src/config/env.schema.js';
 import { configureApp } from '../../src/configure-app.js';
 import { PrismaClient, SchoolStatus, UserType } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { SteamxIdService } from '../../src/users/steamx-id.service.js';
+import { SteamxIdService } from '../../src/users/steamx-id/steamx-id.service.js';
 import {
   createTwoSchoolFixture,
   TENANCY_TEST_PASSWORD,

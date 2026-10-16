@@ -14,7 +14,7 @@ import { resolveSchoolScope, schoolFilter } from '../common/tenancy/school-scope
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { ClassSectionsService } from '../class-sections/class-sections.service.js';
-import { getPasswordPolicyViolations } from '../auth/validators/password-policy.js';
+import { getPasswordPolicyViolations } from '../common/validators/password-policy.js';
 import { AuthService } from '../auth/auth.service.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
@@ -25,7 +25,7 @@ import type { UserResponseDto } from './dto/user-response.dto.js';
 import { userVisibility } from './user-visibility.js';
 import { toUserListItem, toUserResponse } from './users.mapper.js';
 import { UsersRepository } from './users.repository.js';
-import { SteamxIdService } from './steamx-id.service.js';
+import { SteamxIdService } from './steamx-id/steamx-id.service.js';
 
 @Injectable()
 export class UsersService {
