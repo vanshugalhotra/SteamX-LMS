@@ -10,7 +10,7 @@ import {
   User,
   type LucideIcon,
 } from 'lucide-react';
-import { ADMIN_PATHS } from './paths';
+import { PATHS } from '@/lib/paths';
 
 export interface NavItem {
   label: string;
@@ -25,7 +25,7 @@ export interface NavGroup {
 }
 
 export const ADMIN_NAV: NavGroup[] = [
-  { id: 'main', items: [{ label: 'Dashboard', icon: LayoutGrid, to: ADMIN_PATHS.dashboard }] },
+  { id: 'main', items: [{ label: 'Dashboard', icon: LayoutGrid, to: PATHS.admin.dashboard }] },
   {
     id: 'people',
     label: 'People',

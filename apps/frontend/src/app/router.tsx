@@ -1,18 +1,17 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, redirect } from 'react-router';
 import { LandingPage } from '@/features/landing/LandingPage';
 import { guestOnlyLoader, changePasswordLoader, protectedLoader } from '@/features/auth/loaders';
-import { AUTH_PATHS } from '@/features/auth/model/paths';
+import { PATHS } from '@/lib/paths';
 import { RootFallback, RootError } from './route-fallbacks';
-import { ADMIN_PATHS } from '@/features/admin/paths';
 
 export const router = createBrowserRouter([
   {
     HydrateFallback: RootFallback,
     errorElement: <RootError />,
     children: [
-      { path: '/', element: <LandingPage /> },
+      { path: PATHS.home, element: <LandingPage /> },
       {
-        path: AUTH_PATHS.login,
+        path: PATHS.login,
         loader: guestOnlyLoader,
         lazy: async () => {
           const { LoginPage } = await import('@/features/auth/pages/LoginPage');
@@ -20,7 +19,7 @@ export const router = createBrowserRouter([
         },
       },
       {
-        path: AUTH_PATHS.changePassword,
+        path: PATHS.changePassword,
         loader: changePasswordLoader,
         lazy: async () => {
           const { ChangePasswordPage } = await import('@/features/auth/pages/ChangePasswordPage');
@@ -35,12 +34,13 @@ export const router = createBrowserRouter([
         },
         children: [
           {
-            path: ADMIN_PATHS.dashboard,
+            path: PATHS.admin.dashboard,
             lazy: async () => {
               const { DashboardPage } = await import('@/features/admin/pages/DashboardPage');
               return { Component: DashboardPage };
             },
           },
+          { path: PATHS.admin.base, loader: () => redirect(PATHS.admin.dashboard) },
         ],
       },
       { path: '*', element: <div className="p-6">Page not found</div> },

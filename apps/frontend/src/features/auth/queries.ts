@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { fetchSession, login, logout } from './api/api';
-import { AUTH_PATHS } from './model/paths';
+import { PATHS } from '@/lib/paths';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api-client';
 
@@ -47,7 +47,7 @@ export function useLogout() {
 
   const finishLogout = () => {
     clearSession(queryClient);
-    void navigate(AUTH_PATHS.login, { replace: true });
+    void navigate(PATHS.login, { replace: true });
   };
 
   return useMutation({

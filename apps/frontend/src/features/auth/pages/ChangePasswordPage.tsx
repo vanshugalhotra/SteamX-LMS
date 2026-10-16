@@ -17,7 +17,7 @@ import {
   PASSWORD_REUSED,
   policyMessages,
 } from '../model/errors';
-import { getHomePath } from '../model/paths';
+import { getHomePath } from '../model/redirects';
 import { sessionQueryOptions } from '../queries';
 
 const changePasswordSchema = z

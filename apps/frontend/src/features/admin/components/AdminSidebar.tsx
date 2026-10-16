@@ -56,7 +56,7 @@ export function AdminSidebar() {
 
   return (
     <aside className="bg-gray-50 lg:w-64 lg:shrink-0">
-      <div className="flex flex-col gap-3 p-5 lg:sticky lg:top-6 lg:max-h-[calc(100svh-3rem)] lg:min-h-[calc(100svh-3rem)] lg:overflow-y-auto lg:p-6">
+      <div className="flex flex-col gap-3 p-4 lg:sticky lg:top-0 lg:h-svh lg:overflow-y-auto lg:p-6">
         <div className="flex items-center justify-between gap-3">
           <Logo accent="teal" />
           {/* Mobile only: compact sign out in the top row */}
