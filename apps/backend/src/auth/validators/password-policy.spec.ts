@@ -50,12 +50,9 @@ describe('getPasswordPolicyViolations', () => {
     expect(violations).toContain(PASSWORD_POLICY_VIOLATION.CONTAINS_STEAMX_ID);
   });
 
-  it.each(['R4nd0m words are fine', 'long-enough!'])(
-    'accepts valid password: %s',
-    (password) => {
-      expect(getPasswordPolicyViolations(password, 'STEAMX-123')).toHaveLength(0);
-    },
-  );
+  it.each(['R4nd0m words are fine', 'long-enough!'])('accepts valid password: %s', (password) => {
+    expect(getPasswordPolicyViolations(password, 'STEAMX-123')).toHaveLength(0);
+  });
 
   it('does not require a character composition mix', () => {
     expect(getPasswordPolicyViolations('abcdefgh', 'USER123')).toHaveLength(0);
