@@ -17,15 +17,18 @@ import { ClassSectionsService } from '../class-sections/class-sections.service.j
 import { getPasswordPolicyViolations } from '../common/validators/password-policy.js';
 import { AuthService } from '../auth/auth.service.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
+import { throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
 import type { CreateTeacherDto } from './dto/create-teacher.dto.js';
 import type { UserListQueryDto } from './dto/user-list-query.dto.js';
 import type { UserListItemResponseDto } from './dto/user-list-item-response.dto.js';
 import type { UserResponseDto } from './dto/user-response.dto.js';
+import type { RenameSteamxIdDto } from './dto/rename-steamx-id.dto.js';
 import { userVisibility } from './user-visibility.js';
 import { toUserListItem, toUserResponse } from './users.mapper.js';
 import { UsersRepository } from './users.repository.js';
 import { SteamxIdService } from './steamx-id/steamx-id.service.js';
+import { isValidSteamxId } from './steamx-id/steamx-id.js';
 
 @Injectable()
 export class UsersService {
@@ -146,6 +149,52 @@ export class UsersService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toUserResponse(user);
+  }
+
+  async renameSteamxId(
+    actor: AuthContext,
+    id: string,
+    body: RenameSteamxIdDto,
+  ): Promise<UserResponseDto> {
+    const scope = resolveSchoolScope(actor);
+    const where: Prisma.UserWhereInput = {
+      AND: [{ id }, schoolFilter(scope), userVisibility(actor)],
+    };
+    const user = await this.users.findById(where);
+    if (!user) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    if (user.schoolId === null) {
+      throw new BadRequestException(API_ERROR.STEAMX_ID_NOT_RENAMABLE);
+    }
+
+    const school = await this.users.findSchoolCode(user.schoolId);
+    if (!school || !isValidSteamxId(body.steamxId, school.code)) {
+      throw new BadRequestException(API_ERROR.INVALID_STEAMX_ID);
+    }
+    if (body.steamxId === user.steamxId) {
+      return toUserResponse(user);
+    }
+
+    try {
+      const renamed = await this.users.renameSteamxId(where, body.steamxId);
+      if (!renamed) {
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
+      }
+      this.logger.info(
+        {
+          actorId: actor.userId,
+          userId: renamed.id,
+          oldSteamxId: user.steamxId,
+          newSteamxId: renamed.steamxId,
+        },
+        'User SteamX ID renamed',
+      );
+      return toUserResponse(renamed);
+    } catch (error) {
+      throwConflictOnDuplicate(error, API_ERROR.STEAMX_ID_TAKEN);
+      throw error;
+    }
   }
 
   async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {

@@ -97,6 +97,7 @@ describe('Authentication foundation reference data', () => {
       'user.create.teacher',
       'user.password.reset',
       'user.read',
+      'user.steamx-id.update',
     ]);
     expect(snapshot.rolePermissions).toEqual([
       { role: 'admin', permission: 'classsection.manage' },
@@ -107,6 +108,7 @@ describe('Authentication foundation reference data', () => {
       { role: 'admin', permission: 'user.create.teacher' },
       { role: 'admin', permission: 'user.password.reset' },
       { role: 'admin', permission: 'user.read' },
+      { role: 'admin', permission: 'user.steamx-id.update' },
     ]);
   });
 

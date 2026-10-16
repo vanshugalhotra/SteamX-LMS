@@ -244,7 +244,7 @@ model User {
   // [CHECK] steamx_id = upper(btrim(steamx_id)) AND steamx_id ~ '^[A-Z0-9][A-Z0-9._-]{2,31}$'
   // [CHECK] email IS NULL OR email = lower(btrim(email));  user_type <> 'STUDENT' OR email IS NULL
   // [CHECK] length(btrim(name)) > 0
-  // [TRG]   user_type and school_id immutable after insert. steamx_id immutable (rename = explicit admin proc).
+  // [TRG]   user_type and school_id immutable after insert. steamx_id changes only through the controlled admin rename API.
   // [TRG]   DEFERRED constraint trigger: STUDENT must have student_profiles row; role.key='teacher' must have teacher_profiles row.
   // [RULE]  Accounts are never deleted (steamx_id never reused). Purge of a student = purge_student(), G1.
   // [RULE]  password_hash is selected only by the auth module (never by generic user queries).

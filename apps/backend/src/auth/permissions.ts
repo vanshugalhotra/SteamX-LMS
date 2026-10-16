@@ -3,6 +3,7 @@ export const PERMISSION = {
   USER_READ: 'user.read',
   USER_CREATE_TEACHER: 'user.create.teacher',
   USER_CREATE_STUDENT: 'user.create.student',
+  USER_STEAMX_ID_UPDATE: 'user.steamx-id.update',
   SCHOOL_READ: 'school.read',
   SCHOOL_MANAGE: 'school.manage',
   CLASSSECTION_READ: 'classsection.read',

@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   ParseUUIDPipe,
   Post,
   Query,
@@ -34,6 +35,7 @@ import { UserListResponseDto } from './dto/user-list-response.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { UsersService } from './users.service.js';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto.js';
+import { RenameSteamxIdDto } from './dto/rename-steamx-id.dto.js';
 
 @ApiTags('Users')
 @ApiCookieAuth('cookieAuth')
@@ -130,6 +132,25 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserResponseDto> {
     return this.users.findById(actor, id);
+  }
+
+  // ─────────────────────────────────────────
+  // PATCH /users/:id/steamx-id — Rename a user's SteamX ID
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.USER_STEAMX_ID_UPDATE)
+  @Patch(':id/steamx-id')
+  @ApiOperation({ summary: "Rename a user's SteamX ID" })
+  @ApiOkResponse({ description: "User's SteamX ID updated.", type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'The user ID or SteamX ID is invalid.' })
+  @ApiConflictResponse({ description: 'The SteamX ID is already in use.' })
+  @ApiNotFoundResponse({ description: 'User not found or not visible.' })
+  renameSteamxId(
+    @CurrentAuth() actor: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RenameSteamxIdDto,
+  ): Promise<UserResponseDto> {
+    return this.users.renameSteamxId(actor, id, body);
   }
 
   // ─────────────────────────────────────────

@@ -40,6 +40,18 @@ export const API_ERROR = {
     message: 'Only platform staff can create schools.',
   },
   USER_NOT_FOUND: { code: 'NOT_FOUND', message: 'User not found' },
+  STEAMX_ID_NOT_RENAMABLE: {
+    code: 'STEAMX_ID_NOT_RENAMABLE',
+    message: 'Platform staff SteamX IDs cannot be renamed.',
+  },
+  INVALID_STEAMX_ID: {
+    code: 'INVALID_STEAMX_ID',
+    message: 'SteamX ID does not match the target school format.',
+  },
+  STEAMX_ID_TAKEN: {
+    code: 'STEAMX_ID_TAKEN',
+    message: 'SteamX ID is already in use.',
+  },
   CLASS_SECTION_EXISTS: {
     code: 'CLASS_SECTION_EXISTS',
     message: 'Class section already exists',

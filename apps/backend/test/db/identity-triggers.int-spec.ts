@@ -107,7 +107,10 @@ describe('Identity and profile triggers', () => {
           : column === 'school_id'
             ? () => tx.$executeRaw`UPDATE users SET school_id = NULL WHERE id = ${user.id}::uuid`
             : () =>
-                tx.$executeRaw`UPDATE users SET steamx_id = ${value} WHERE id = ${user.id}::uuid`;
+                tx.user.update({
+                  where: { id: user.id },
+                  data: { steamxId: value ?? '' },
+                });
 
       await expectTriggerMessage(operation, expected);
     });

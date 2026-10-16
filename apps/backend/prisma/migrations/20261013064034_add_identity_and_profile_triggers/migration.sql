@@ -43,9 +43,29 @@ FOR EACH ROW
 EXECUTE FUNCTION reject_column_change('school_id');
 
 CREATE TRIGGER trg_users_immutable_identity
-BEFORE UPDATE OF user_type, school_id, steamx_id ON users
+BEFORE UPDATE OF user_type, school_id ON users
 FOR EACH ROW
-EXECUTE FUNCTION reject_column_change('user_type', 'school_id', 'steamx_id');
+EXECUTE FUNCTION reject_column_change('user_type', 'school_id');
+
+CREATE OR REPLACE FUNCTION guard_steamx_id_change()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.steamx_id IS DISTINCT FROM OLD.steamx_id
+     AND current_setting('steamx.allow_steamx_id_change', true) IS DISTINCT FROM 'on' THEN
+    RAISE EXCEPTION 'users.steamx_id is immutable'
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_users_immutable_steamx_id
+BEFORE UPDATE OF steamx_id ON users
+FOR EACH ROW
+EXECUTE FUNCTION guard_steamx_id_change();
 
 CREATE OR REPLACE FUNCTION check_user_has_profile()
 RETURNS trigger

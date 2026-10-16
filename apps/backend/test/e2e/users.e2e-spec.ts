@@ -49,6 +49,7 @@ describe('Users endpoints (e2e)', () => {
     const grant = await grantPermissions(setupClient, 'teacher', [
       PERMISSION.USER_READ,
       PERMISSION.USER_CREATE_TEACHER,
+      PERMISSION.USER_STEAMX_ID_UPDATE,
     ]);
     revokeTeacherPermissions = grant.revoke;
 
@@ -110,6 +111,14 @@ describe('Users endpoints (e2e)', () => {
 
   function getUser(cookie: string, id: string) {
     return request(app.getHttpServer()).get(`/api/v1/users/${id}`).set('Cookie', cookie);
+  }
+
+  function renameSteamxId(cookie: string, id: string, steamxId: string) {
+    return request(app.getHttpServer())
+      .patch(`/api/v1/users/${id}/steamx-id`)
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send({ steamxId });
   }
 
   async function createAndTrackTeacher(
@@ -244,6 +253,73 @@ describe('Users endpoints (e2e)', () => {
       expect(candidateSpy).toHaveBeenCalledTimes(3);
     } finally {
       candidateSpy.mockRestore();
+    }
+  });
+
+  it('renames school-user SteamX IDs with validation, scope, permission and login checks', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+    const studentCookie = await loginAs(app, fixture.schoolA.student);
+    const targetUser = await createAndTrackTeacher(
+      adminCookie,
+      'SteamX ID Rename Target',
+      fixture.schoolA.school.id,
+    );
+    const newSteamxId = `${fixture.schoolA.school.code}-RENAMED001`;
+
+    const renamed = await renameSteamxId(
+      adminCookie,
+      targetUser.id,
+      `  ${newSteamxId.toLowerCase()}  `,
+    ).expect(200);
+    expect(renamed.body.steamxId).toBe(newSteamxId);
+
+    try {
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .set('Origin', origin)
+        .send({
+          steamxId: targetUser.steamxId,
+          password: TENANCY_TEST_PASSWORD,
+        })
+        .expect(401);
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .set('Origin', origin)
+        .send({ steamxId: newSteamxId, password: TENANCY_TEST_PASSWORD })
+        .expect(200);
+
+      await renameSteamxId(adminCookie, fixture.schoolA.student.id, 'OTHER-RENAMED001')
+        .expect(400)
+        .expect(({ body }) => expect(body.code).toBe('INVALID_STEAMX_ID'));
+      await renameSteamxId(
+        adminCookie,
+        fixture.schoolA.student.id,
+        `${fixture.schoolA.school.code}-BAD1`,
+      )
+        .expect(400)
+        .expect(({ body }) => expect(body.code).toBe('INVALID_STEAMX_ID'));
+      await renameSteamxId(adminCookie, fixture.admin.id, newSteamxId)
+        .expect(400)
+        .expect(({ body }) => expect(body.code).toBe('STEAMX_ID_NOT_RENAMABLE'));
+
+      const takenUser = await createAndTrackTeacher(
+        adminCookie,
+        'Existing SteamX ID',
+        fixture.schoolA.school.id,
+      );
+      await renameSteamxId(adminCookie, fixture.schoolA.student.id, takenUser.steamxId)
+        .expect(409)
+        .expect(({ body }) => expect(body.code).toBe('STEAMX_ID_TAKEN'));
+
+      await renameSteamxId(teacherCookie, fixture.schoolB.teacher.id, newSteamxId).expect(404);
+      await renameSteamxId(studentCookie, fixture.schoolA.student.id, newSteamxId).expect(403);
+    } finally {
+      await renameSteamxId(
+        adminCookie,
+        targetUser.id,
+        targetUser.steamxId,
+      ).expect(200);
     }
   });
 
