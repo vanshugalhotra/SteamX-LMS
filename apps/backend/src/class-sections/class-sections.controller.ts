@@ -35,21 +35,17 @@ import { ClassSectionResponseDto } from './dto/class-section-response.dto.js';
 import { CreateClassSectionDto } from './dto/create-class-section.dto.js';
 import { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
 import { ClassSectionsService } from './class-sections.service.js';
-import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto.js';
 
 @ApiTags('Class sections')
 @ApiCookieAuth('cookieAuth')
 @ApiUnauthorizedResponse({
   description: 'Session is invalid or missing.',
-  type: ApiErrorResponseDto,
 })
 @ApiForbiddenResponse({
   description: 'Permission is missing or this action is blocked by Origin protection.',
-  type: ApiErrorResponseDto,
 })
 @ApiInternalServerErrorResponse({
   description: 'An unexpected server error occurred.',
-  type: ApiErrorResponseDto,
 })
 @Controller({ path: 'class-sections', version: '1' })
 export class ClassSectionsController {
@@ -65,13 +61,11 @@ export class ClassSectionsController {
   @ApiCreatedResponse({ description: 'Class section created.', type: ClassSectionResponseDto })
   @ApiBadRequestResponse({
     description: 'Class section details are invalid.',
-    type: ApiErrorResponseDto,
   })
   @ApiConflictResponse({
     description: 'School is inactive or class section already exists.',
-    type: ApiErrorResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'School not found.' })
   create(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateClassSectionDto,
@@ -89,9 +83,8 @@ export class ClassSectionsController {
   @ApiOkResponse({ description: 'Paginated class sections.', type: ClassSectionListResponseDto })
   @ApiBadRequestResponse({
     description: 'Query parameters are invalid.',
-    type: ApiErrorResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'School not found.' })
   findMany(
     @CurrentAuth() actor: AuthContext,
     @Query() query: ClassSectionListQueryDto,
@@ -109,9 +102,8 @@ export class ClassSectionsController {
   @ApiOkResponse({ description: 'Class section details.', type: ClassSectionResponseDto })
   @ApiBadRequestResponse({
     description: 'The class-section ID is not a UUID.',
-    type: ApiErrorResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'Class section not found.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'Class section not found.' })
   findById(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -129,10 +121,9 @@ export class ClassSectionsController {
   @ApiOkResponse({ description: 'Class section updated.', type: ClassSectionResponseDto })
   @ApiBadRequestResponse({
     description: 'The class-section ID or update body is invalid.',
-    type: ApiErrorResponseDto,
   })
-  @ApiConflictResponse({ description: 'Class section already exists.', type: ApiErrorResponseDto })
-  @ApiNotFoundResponse({ description: 'Class section not found.', type: ApiErrorResponseDto })
+  @ApiConflictResponse({ description: 'Class section already exists.' })
+  @ApiNotFoundResponse({ description: 'Class section not found.' })
   update(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -152,10 +143,9 @@ export class ClassSectionsController {
   @ApiNoContentResponse({ description: 'Class section deleted.' })
   @ApiBadRequestResponse({
     description: 'The class-section ID is not a UUID.',
-    type: ApiErrorResponseDto,
   })
-  @ApiConflictResponse({ description: 'Class section is in use.', type: ApiErrorResponseDto })
-  @ApiNotFoundResponse({ description: 'Class section not found.', type: ApiErrorResponseDto })
+  @ApiConflictResponse({ description: 'Class section is in use.' })
+  @ApiNotFoundResponse({ description: 'Class section not found.' })
   delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.sections.delete(actor, id);
   }

@@ -23,22 +23,18 @@ import { SchoolResponseDto } from './dto/school-response.dto.js';
 import { UpdateSchoolDto } from './dto/update-school.dto.js';
 import { UpdateSchoolStatusDto } from './dto/update-school-status.dto.js';
 import { SchoolsService } from './schools.service.js';
-import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto.js';
 
 @ApiTags('Schools')
 @ApiCookieAuth('cookieAuth')
 @ApiUnauthorizedResponse({
   description: 'Session is invalid or missing.',
-  type: ApiErrorResponseDto,
 })
 @ApiForbiddenResponse({
   description:
     'Permission is missing, this action is restricted to platform staff, or Origin is invalid.',
-  type: ApiErrorResponseDto,
 })
 @ApiInternalServerErrorResponse({
   description: 'An unexpected server error occurred.',
-  type: ApiErrorResponseDto,
 })
 @Controller({ path: 'schools', version: '1' })
 export class SchoolsController {
@@ -52,10 +48,9 @@ export class SchoolsController {
   @Post()
   @ApiOperation({ summary: 'Create a school' })
   @ApiCreatedResponse({ description: 'School created.', type: SchoolResponseDto })
-  @ApiBadRequestResponse({ description: 'School details are invalid.', type: ApiErrorResponseDto })
+  @ApiBadRequestResponse({ description: 'School details are invalid.' })
   @ApiConflictResponse({
     description: 'A school with this code already exists.',
-    type: ApiErrorResponseDto,
   })
   create(
     @CurrentAuth() actor: AuthContext,
@@ -74,7 +69,6 @@ export class SchoolsController {
   @ApiOkResponse({ description: 'Paginated schools.', type: SchoolListResponseDto })
   @ApiBadRequestResponse({
     description: 'Query parameters are invalid.',
-    type: ApiErrorResponseDto,
   })
   findMany(
     @CurrentAuth() actor: AuthContext,
@@ -91,8 +85,8 @@ export class SchoolsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a school' })
   @ApiOkResponse({ description: 'School details.', type: SchoolResponseDto })
-  @ApiBadRequestResponse({ description: 'The school ID is not a UUID.', type: ApiErrorResponseDto })
-  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
+  @ApiBadRequestResponse({ description: 'The school ID is not a UUID.' })
+  @ApiNotFoundResponse({ description: 'School not found.' })
   findById(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -110,9 +104,8 @@ export class SchoolsController {
   @ApiOkResponse({ description: 'School updated.', type: SchoolResponseDto })
   @ApiBadRequestResponse({
     description: 'The school ID or update body is invalid.',
-    type: ApiErrorResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'School not found.' })
   update(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -131,9 +124,8 @@ export class SchoolsController {
   @ApiOkResponse({ description: 'School status updated.', type: SchoolResponseDto })
   @ApiBadRequestResponse({
     description: 'The school ID or status is invalid.',
-    type: ApiErrorResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'School not found.' })
   updateStatus(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
