@@ -47,11 +47,11 @@ export function buildSteamxId(
     paddedNamePart += STEAMX_ID_FILLER_ALPHABET.charAt(randomInt(STEAMX_ID_FILLER_ALPHABET.length));
   }
 
-  const digits = randomInt(100).toString().padStart(2, '0');
+  const digits = randomInt(1000).toString().padStart(3, '0');
   return `${schoolCode}-${paddedNamePart}${digits}`;
 }
 
 export function isValidSteamxId(id: string, schoolCode: string): boolean {
   const escapedSchoolCode = schoolCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`^${escapedSchoolCode}-[A-Z]{4,8}[0-9]{2}$`).test(id);
+  return new RegExp(`^${escapedSchoolCode}-[A-Z]{4,8}[0-9]{3}$`).test(id);
 }

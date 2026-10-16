@@ -5,17 +5,17 @@ describe('SteamX ID generation', () => {
   const randomFromZero = (_maxExclusive: number): number => 0;
 
   it.each([
-    ['Puneet Kaur', 'PUNEETK00'],
-    ['Vansh Gupta', 'VANSHG00'],
-    ['Priya Sharma', 'PRIYAS00'],
-    ['Puneet', 'PUNEET00'],
-    ['Dr. Anita Rao', 'ANITAR00'],
-    ['Om Shah', 'OMSA00'],
-    ['K. Rajan', 'KRAA00'],
-    ['राहुल', 'AAAA00'],
-    ['José Pérez', 'JOSEP00'],
-    ['ABCDEFGHIJKL Qrstuvwxyz', 'ABCDEFGQ00'],
-    ['ABCDEFGHIJKLM', 'ABCDEFGH00'],
+    ['Puneet Kaur', 'PUNEETK000'],
+    ['Vansh Gupta', 'VANSHG000'],
+    ['Priya Sharma', 'PRIYAS000'],
+    ['Puneet', 'PUNEET000'],
+    ['Dr. Anita Rao', 'ANITAR000'],
+    ['Om Shah', 'OMSA000'],
+    ['K. Rajan', 'KRAA000'],
+    ['राहुल', 'AAAA000'],
+    ['José Pérez', 'JOSEP000'],
+    ['ABCDEFGHIJKL Qrstuvwxyz', 'ABCDEFGQ000'],
+    ['ABCDEFGHIJKLM', 'ABCDEFGH000'],
   ])('builds the expected ID for %s', (name, expected) => {
     expect(buildSteamxId('GVS', name, randomFromZero)).toBe(`GVS-${expected}`);
   });
@@ -25,32 +25,33 @@ describe('SteamX ID generation', () => {
     const candidateTwo = buildSteamxId('GVS', 'Puneet Kaur', () => 99);
 
     expect(candidateOne.slice(0, -2)).toBe(candidateTwo.slice(0, -2));
-    expect(candidateOne.slice(-2)).toBe('00');
-    expect(candidateTwo.slice(-2)).toBe('99');
+    expect(candidateOne.slice(-3)).toBe('000');
+    expect(candidateTwo.slice(-3)).toBe('099');
   });
 
   it('keeps a 12-character school code within the database SteamX ID limit', () => {
     const candidate = buildSteamxId('ABCDEFGHIJKL', 'abcdefghijk Qrst', randomFromZero);
 
-    expect(candidate.length).toBe(23);
+    expect(candidate.length).toBe(24);
     expect(candidate).toMatch(/^[A-Z0-9][A-Z0-9._-]{2,31}$/);
     expect(isValidSteamxId(candidate, 'ABCDEFGHIJKL')).toBe(true);
   });
 
   it.each([
-    ['GVS-PUNEETK47', 'GVS'],
-    ['AB-CD-ANITAR00', 'AB-CD'],
+    ['GVS-PUNEETK047', 'GVS'],
+    ['AB-CD-ANITAR000', 'AB-CD'],
   ])('accepts valid SteamX ID %s', (id, schoolCode) => {
     expect(isValidSteamxId(id, schoolCode)).toBe(true);
   });
 
   it.each([
-    ['OTHER-PUNEETK47', 'GVS'],
-    ['GVS-ABC00', 'GVS'],
-    ['GVS-ABCDEFGHI00', 'GVS'],
-    ['GVS-puneetk47', 'GVS'],
-    ['GVS-PUNEETK4', 'GVS'],
-    ['GVS-PUNEETK470', 'GVS'],
+    ['OTHER-PUNEETK047', 'GVS'],
+    ['GVS-ABC000', 'GVS'],
+    ['GVS-ABCDEFGHI000', 'GVS'],
+    ['GVS-puneetk047', 'GVS'],
+    ['GVS-PUNEETK04', 'GVS'],
+    ['GVS-PUNEETK0470', 'GVS'],
+    ['GVS-PUNEETK47', 'GVS'],
   ])('rejects invalid SteamX ID %s', (id, schoolCode) => {
     expect(isValidSteamxId(id, schoolCode)).toBe(false);
   });

@@ -31,6 +31,10 @@ export const API_ERROR = {
   SCHOOL_REQUIRED: { code: 'SCHOOL_REQUIRED', message: 'A school is required' },
   SCHOOL_INACTIVE: { code: 'SCHOOL_INACTIVE', message: 'School is inactive' },
   SCHOOL_CODE_EXISTS: { code: 'SCHOOL_CODE_EXISTS', message: 'School code already exists' },
+  STEAMX_ID_UNAVAILABLE: {
+    code: 'STEAMX_ID_UNAVAILABLE',
+    message: "Couldn't allocate a SteamX ID. Please try again.",
+  },
   SCHOOL_FORBIDDEN: {
     code: 'FORBIDDEN',
     message: 'Only platform staff can create schools.',

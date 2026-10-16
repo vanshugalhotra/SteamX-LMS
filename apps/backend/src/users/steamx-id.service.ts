@@ -1,9 +1,10 @@
 import { randomInt } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { isPrismaKnownError } from '../common/errors/prisma-error.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import { buildSteamxId } from './steamx-id.js';
 
-const MAX_STEAMX_ID_ATTEMPTS = 10;
+const MAX_STEAMX_ID_ATTEMPTS = 3;
 
 @Injectable()
 export class SteamxIdService {
@@ -16,12 +17,12 @@ export class SteamxIdService {
       try {
         return await run(candidate);
       } catch (error) {
-        if (!isSteamxIdUniqueViolation(error) || attempt === MAX_STEAMX_ID_ATTEMPTS - 1) {
+        if (!isSteamxIdUniqueViolation(error)) {
           throw error;
         }
       }
     }
-    throw new Error('SteamX ID generation exhausted its retry limit.');
+    throw new ConflictException(API_ERROR.STEAMX_ID_UNAVAILABLE);
   }
 
   private generateCandidate(schoolCode: string, name: string): string {

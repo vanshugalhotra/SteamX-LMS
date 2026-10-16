@@ -60,7 +60,8 @@ export class UsersController {
   @ApiCreatedResponse({ description: 'Teacher created.', type: UserResponseDto })
   @ApiBadRequestResponse({ description: 'Teacher details are invalid.' })
   @ApiConflictResponse({
-    description: 'School is inactive or a unique user value conflicts.',
+    description:
+      'School is inactive, a unique user value conflicts, or a SteamX ID could not be allocated.',
   })
   @ApiNotFoundResponse({ description: 'School not found.' })
   createTeacher(
@@ -80,7 +81,8 @@ export class UsersController {
   @ApiCreatedResponse({ description: 'Student created.', type: UserResponseDto })
   @ApiBadRequestResponse({ description: 'Student details are invalid.' })
   @ApiConflictResponse({
-    description: 'School is inactive or a unique user value conflicts.',
+    description:
+      'School is inactive, a unique user value conflicts, or a SteamX ID could not be allocated.',
   })
   @ApiNotFoundResponse({
     description: 'School or class section not found.',
