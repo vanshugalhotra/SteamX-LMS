@@ -2,7 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify } from 'jose';
 import type { Env } from '../../config/env.schema.js';
-import { AUTHENTICATION_ERROR_MESSAGE, AUTH_COOKIE_NAME } from '../auth.constants.js';
+import { AUTH_COOKIE_NAME } from '../auth.constants.js';
+import { API_ERROR } from '../../common/errors/api-errors.js';
 import type { AuthCookieOptions, VerifiedToken } from '../types/token.js';
 
 const JWT_ALGORITHM = 'HS256';
@@ -51,7 +52,7 @@ export class TokenService {
         typeof payload.exp !== 'number' ||
         !Number.isInteger(payload.exp)
       ) {
-        throw new Error(AUTHENTICATION_ERROR_MESSAGE);
+        throw new Error(API_ERROR.AUTHENTICATION_FAILED.message);
       }
 
       return {
@@ -60,7 +61,7 @@ export class TokenService {
         expiresAt: payload.exp,
       };
     } catch {
-      throw new UnauthorizedException(AUTHENTICATION_ERROR_MESSAGE);
+      throw new UnauthorizedException(API_ERROR.AUTHENTICATION_FAILED);
     }
   }
 

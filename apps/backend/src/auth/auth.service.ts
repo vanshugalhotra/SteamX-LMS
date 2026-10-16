@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { SchoolStatus, UserStatus } from '../generated/prisma/client.js';
-import { AUTHENTICATION_ERROR_MESSAGE } from './auth.constants.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import { AuthContextRepository } from './auth-context.repository.js';
 import { PasswordService } from './services/password.service.js';
 import { TokenService } from './services/token.service.js';
@@ -44,7 +44,7 @@ export class AuthService {
       (user.schoolId !== null && user.school?.status !== SchoolStatus.ACTIVE)
     ) {
       this.logger.warn({ steamxId: steamxId.slice(0, 64) }, 'Login failed');
-      throw new UnauthorizedException(AUTHENTICATION_ERROR_MESSAGE);
+      throw new UnauthorizedException(API_ERROR.AUTHENTICATION_FAILED);
     }
 
     const token = await this.tokens.sign(user.id);
@@ -73,7 +73,7 @@ export class AuthService {
   ): Promise<LoginResult> {
     const credentials = await this.users.findCredentials(auth.userId);
     if (!credentials) {
-      throw new UnauthorizedException(AUTHENTICATION_ERROR_MESSAGE);
+      throw new UnauthorizedException(API_ERROR.AUTHENTICATION_FAILED);
     }
 
     const currentPasswordMatches = await this.passwords.verify(
@@ -82,15 +82,13 @@ export class AuthService {
     );
     if (!currentPasswordMatches) {
       throw new BadRequestException({
-        code: 'INVALID_CURRENT_PASSWORD',
-        message: 'Current password is incorrect',
+        ...API_ERROR.INVALID_CURRENT_PASSWORD,
       });
     }
 
     if (newPassword === currentPassword) {
       throw new BadRequestException({
-        code: 'PASSWORD_REUSED',
-        message: 'New password must be different from the current password',
+        ...API_ERROR.PASSWORD_REUSED,
       });
     }
 
@@ -113,12 +111,11 @@ export class AuthService {
   ): Promise<void> {
     const target = await this.users.findPasswordResetTarget(targetUserId);
     if (!target) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'User not found' });
+      throw new NotFoundException(API_ERROR.USER_NOT_FOUND);
     }
     if (target.id === actor.userId) {
       throw new BadRequestException({
-        code: 'CANNOT_RESET_OWN_PASSWORD',
-        message: 'Use change-password to update your own password',
+        ...API_ERROR.CANNOT_RESET_OWN_PASSWORD,
       });
     }
 
@@ -137,11 +134,7 @@ export class AuthService {
   private validateNewPassword(password: string, steamxId: string): void {
     const violations = getPasswordPolicyViolations(password, steamxId);
     if (violations.length > 0) {
-      throw new BadRequestException({
-        code: 'PASSWORD_POLICY',
-        message: 'Password does not meet policy requirements',
-        details: violations,
-      });
+      throw new BadRequestException({ ...API_ERROR.PASSWORD_POLICY, details: violations });
     }
   }
 }

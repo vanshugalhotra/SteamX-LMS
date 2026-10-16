@@ -17,6 +17,7 @@ import {
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -34,11 +35,22 @@ import { ClassSectionResponseDto } from './dto/class-section-response.dto.js';
 import { CreateClassSectionDto } from './dto/create-class-section.dto.js';
 import { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
 import { ClassSectionsService } from './class-sections.service.js';
+import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto.js';
 
 @ApiTags('Class sections')
 @ApiCookieAuth('cookieAuth')
-@ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
-@ApiForbiddenResponse({ description: 'The caller lacks the required permission.' })
+@ApiUnauthorizedResponse({
+  description: 'Session is invalid or missing.',
+  type: ApiErrorResponseDto,
+})
+@ApiForbiddenResponse({
+  description: 'Permission is missing or this action is blocked by Origin protection.',
+  type: ApiErrorResponseDto,
+})
+@ApiInternalServerErrorResponse({
+  description: 'An unexpected server error occurred.',
+  type: ApiErrorResponseDto,
+})
 @Controller({ path: 'class-sections', version: '1' })
 export class ClassSectionsController {
   constructor(private readonly sections: ClassSectionsService) {}
@@ -51,9 +63,15 @@ export class ClassSectionsController {
   @Post()
   @ApiOperation({ summary: 'Create a class section' })
   @ApiCreatedResponse({ description: 'Class section created.', type: ClassSectionResponseDto })
-  @ApiBadRequestResponse({ description: 'Class section details are invalid.' })
-  @ApiConflictResponse({ description: 'School is inactive or class section already exists.' })
-  @ApiNotFoundResponse({ description: 'School not found.' })
+  @ApiBadRequestResponse({
+    description: 'Class section details are invalid.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiConflictResponse({
+    description: 'School is inactive or class section already exists.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
   create(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateClassSectionDto,
@@ -69,8 +87,11 @@ export class ClassSectionsController {
   @Get()
   @ApiOperation({ summary: 'List class sections' })
   @ApiOkResponse({ description: 'Paginated class sections.', type: ClassSectionListResponseDto })
-  @ApiBadRequestResponse({ description: 'Query parameters are invalid.' })
-  @ApiNotFoundResponse({ description: 'School not found.' })
+  @ApiBadRequestResponse({
+    description: 'Query parameters are invalid.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
   findMany(
     @CurrentAuth() actor: AuthContext,
     @Query() query: ClassSectionListQueryDto,
@@ -86,7 +107,11 @@ export class ClassSectionsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a class section' })
   @ApiOkResponse({ description: 'Class section details.', type: ClassSectionResponseDto })
-  @ApiNotFoundResponse({ description: 'Class section not found.' })
+  @ApiBadRequestResponse({
+    description: 'The class-section ID is not a UUID.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Class section not found.', type: ApiErrorResponseDto })
   findById(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -102,9 +127,12 @@ export class ClassSectionsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a class section' })
   @ApiOkResponse({ description: 'Class section updated.', type: ClassSectionResponseDto })
-  @ApiBadRequestResponse({ description: 'Class section details are invalid.' })
-  @ApiConflictResponse({ description: 'Class section already exists.' })
-  @ApiNotFoundResponse({ description: 'Class section not found.' })
+  @ApiBadRequestResponse({
+    description: 'The class-section ID or update body is invalid.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiConflictResponse({ description: 'Class section already exists.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'Class section not found.', type: ApiErrorResponseDto })
   update(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -122,8 +150,12 @@ export class ClassSectionsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a class section' })
   @ApiNoContentResponse({ description: 'Class section deleted.' })
-  @ApiConflictResponse({ description: 'Class section is in use.' })
-  @ApiNotFoundResponse({ description: 'Class section not found.' })
+  @ApiBadRequestResponse({
+    description: 'The class-section ID is not a UUID.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiConflictResponse({ description: 'Class section is in use.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'Class section not found.', type: ApiErrorResponseDto })
   delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.sections.delete(actor, id);
   }

@@ -2,17 +2,7 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Injectable } from
 import type { Request, Response } from 'express';
 import { Logger } from 'nestjs-pino';
 import { mapPrismaError } from '../errors/prisma-error.js';
-
-const HTTP_ERROR_CODES: Partial<Record<number, string>> = {
-  400: 'BAD_REQUEST',
-  401: 'UNAUTHORIZED',
-  403: 'FORBIDDEN',
-  404: 'NOT_FOUND',
-  409: 'CONFLICT',
-  413: 'PAYLOAD_TOO_LARGE',
-  429: 'TOO_MANY_REQUESTS',
-  500: 'INTERNAL_ERROR',
-};
+import { API_ERROR, HTTP_ERROR_CODES } from '../errors/api-errors.js';
 
 type ExceptionResponse = {
   code?: unknown;
@@ -61,7 +51,7 @@ function getMessage(
   statusCode: number,
 ): string {
   if (statusCode >= 500) {
-    return 'Internal server error';
+    return API_ERROR.INTERNAL_ERROR.message;
   }
   if (typeof exceptionResponse?.message === 'string') {
     return exceptionResponse.message;
@@ -78,13 +68,13 @@ function getMessage(
 
 function getCode(exceptionResponse: ExceptionResponse | undefined, statusCode: number): string {
   if (statusCode >= 500) {
-    return 'INTERNAL_ERROR';
+    return API_ERROR.INTERNAL_ERROR.code;
   }
   if (typeof exceptionResponse?.code === 'string') {
     return exceptionResponse.code;
   }
 
-  return HTTP_ERROR_CODES[statusCode] ?? 'HTTP_ERROR';
+  return HTTP_ERROR_CODES[statusCode] ?? API_ERROR.HTTP_ERROR.code;
 }
 
 @Injectable()

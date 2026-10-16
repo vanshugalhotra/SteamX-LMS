@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { PasswordInput } from '../../common/decorators/password-input.decorator.js';
 
 export class LoginDto {
   @ApiProperty({ maxLength: 64 })
@@ -8,9 +9,6 @@ export class LoginDto {
   @MaxLength(64)
   steamxId!: string;
 
-  @ApiProperty({ maxLength: 128, writeOnly: true })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(128)
+  @PasswordInput()
   password!: string;
 }

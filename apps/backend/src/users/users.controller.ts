@@ -1,11 +1,23 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -21,11 +33,23 @@ import { UserListQueryDto } from './dto/user-list-query.dto.js';
 import { UserListResponseDto } from './dto/user-list-response.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { UsersService } from './users.service.js';
+import { ResetPasswordDto } from '../auth/dto/reset-password.dto.js';
+import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto.js';
 
 @ApiTags('Users')
 @ApiCookieAuth('cookieAuth')
-@ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
-@ApiForbiddenResponse({ description: 'The caller lacks the required permission.' })
+@ApiUnauthorizedResponse({
+  description: 'Session is invalid or missing.',
+  type: ApiErrorResponseDto,
+})
+@ApiForbiddenResponse({
+  description: 'Permission is missing or this action is blocked by Origin protection.',
+  type: ApiErrorResponseDto,
+})
+@ApiInternalServerErrorResponse({
+  description: 'An unexpected server error occurred.',
+  type: ApiErrorResponseDto,
+})
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
   constructor(private readonly users: UsersService) {}
@@ -38,9 +62,12 @@ export class UsersController {
   @Post('teachers')
   @ApiOperation({ summary: 'Create a teacher' })
   @ApiCreatedResponse({ description: 'Teacher created.', type: UserResponseDto })
-  @ApiBadRequestResponse({ description: 'Teacher details are invalid.' })
-  @ApiConflictResponse({ description: 'School is inactive or a user key conflicts.' })
-  @ApiNotFoundResponse({ description: 'School not found.' })
+  @ApiBadRequestResponse({ description: 'Teacher details are invalid.', type: ApiErrorResponseDto })
+  @ApiConflictResponse({
+    description: 'School is inactive or a unique user value conflicts.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'School not found.', type: ApiErrorResponseDto })
   createTeacher(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateTeacherDto,
@@ -56,9 +83,15 @@ export class UsersController {
   @Post('students')
   @ApiOperation({ summary: 'Create a student' })
   @ApiCreatedResponse({ description: 'Student created.', type: UserResponseDto })
-  @ApiBadRequestResponse({ description: 'Student details are invalid.' })
-  @ApiConflictResponse({ description: 'School is inactive or a user key conflicts.' })
-  @ApiNotFoundResponse({ description: 'School or class section not found.' })
+  @ApiBadRequestResponse({ description: 'Student details are invalid.', type: ApiErrorResponseDto })
+  @ApiConflictResponse({
+    description: 'School is inactive or a unique user value conflicts.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'School or class section not found.',
+    type: ApiErrorResponseDto,
+  })
   createStudent(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateStudentDto,
@@ -74,8 +107,14 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'List users' })
   @ApiOkResponse({ description: 'Paginated users.', type: UserListResponseDto })
-  @ApiBadRequestResponse({ description: 'Query parameters are invalid.' })
-  @ApiNotFoundResponse({ description: 'School not found.' })
+  @ApiBadRequestResponse({
+    description: 'Query parameters are invalid.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'Requested school is not visible to the caller.',
+    type: ApiErrorResponseDto,
+  })
   findMany(
     @CurrentAuth() actor: AuthContext,
     @Query() query: UserListQueryDto,
@@ -91,11 +130,34 @@ export class UsersController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a user' })
   @ApiOkResponse({ description: 'User details.', type: UserResponseDto })
-  @ApiNotFoundResponse({ description: 'User not found.' })
+  @ApiBadRequestResponse({ description: 'The user ID is not a UUID.', type: ApiErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'User not found or not visible.', type: ApiErrorResponseDto })
   findById(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserResponseDto> {
     return this.users.findById(actor, id);
+  }
+
+  // ─────────────────────────────────────────
+  // POST /users/:id/reset-password — Reset a user password
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.USER_PASSWORD_RESET)
+  @Post(':id/reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Reset a user password' })
+  @ApiNoContentResponse({ description: 'Password reset; the user must change it after login.' })
+  @ApiBadRequestResponse({
+    description: 'The user ID or password is invalid, or this is a self-reset.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'User not found.', type: ApiErrorResponseDto })
+  resetPassword(
+    @CurrentAuth() actor: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ResetPasswordDto,
+  ): Promise<void> {
+    return this.users.resetPassword(actor, id, body.newPassword);
   }
 }

@@ -4,7 +4,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type UserType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { UserListQueryDto } from './dto/user-list-query.dto.js';
+import { BaseRepository } from '../common/repositories/base.repository.js';
+import type { PaginationParams } from '../common/repositories/repository-search.types.js';
 
 const USER_LIST_SELECT = {
   id: true,
@@ -29,8 +30,10 @@ export type UserListRecord = Prisma.UserGetPayload<{ select: typeof USER_LIST_SE
 export type UserDetailRecord = Prisma.UserGetPayload<{ select: typeof USER_DETAIL_SELECT }>;
 
 @Injectable()
-export class UsersRepository {
-  constructor(private readonly prisma: PrismaService) {}
+export class UsersRepository extends BaseRepository {
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
 
   findSchoolStatus(schoolId: string) {
     return this.prisma.school.findUnique({
@@ -124,19 +127,24 @@ export class UsersRepository {
 
   async findMany(
     where: Prisma.UserWhereInput,
-    query: UserListQueryDto,
+    pagination: PaginationParams,
   ): Promise<{ items: UserListRecord[]; total: number }> {
-    const [items, total] = await Promise.all([
-      this.prisma.user.findMany({
-        where,
-        select: USER_LIST_SELECT,
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
-    return { items, total };
+    const orderBy = [
+      { createdAt: 'desc' },
+      { id: 'asc' },
+    ] satisfies Prisma.UserOrderByWithRelationInput[];
+    return this.search({
+      where,
+      orderBy,
+      page: pagination.page,
+      limit: pagination.limit,
+      findMany: (args) =>
+        this.prisma.user.findMany({
+          ...args,
+          select: USER_LIST_SELECT,
+        }),
+      count: (filter) => this.prisma.user.count({ where: filter }),
+    });
   }
 
   findById(where: Prisma.UserWhereInput): Promise<UserDetailRecord | null> {

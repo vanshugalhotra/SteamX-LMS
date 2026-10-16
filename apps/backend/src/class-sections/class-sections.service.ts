@@ -7,6 +7,7 @@ import {
 import { PinoLogger } from 'nestjs-pino';
 import { SchoolStatus } from '../generated/prisma/client.js';
 import { isPrismaKnownError, throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { resolveSchoolScope } from '../common/tenancy/school-scope.js';
@@ -17,13 +18,6 @@ import type { CreateClassSectionDto } from './dto/create-class-section.dto.js';
 import type { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
 import { toClassSectionResponse } from './class-sections.mapper.js';
 import { ClassSectionsRepository } from './class-sections.repository.js';
-
-const NOT_FOUND = { code: 'NOT_FOUND', message: 'Resource not found' };
-const EMPTY_UPDATE = {
-  code: 'VALIDATION_ERROR',
-  message: 'Validation failed',
-  details: [{ field: 'body', errors: ['At least one field must be provided'] }],
-};
 
 @Injectable()
 export class ClassSectionsService {
@@ -40,18 +34,17 @@ export class ClassSectionsService {
     const schoolId = resolveSchoolScope(actor, body.schoolId);
     if (!schoolId) {
       throw new BadRequestException({
-        code: 'VALIDATION_ERROR',
-        message: 'Validation failed',
+        ...API_ERROR.VALIDATION_ERROR,
         details: [{ field: 'schoolId', errors: ['schoolId is required'] }],
       });
     }
 
     const school = await this.sections.findSchoolStatus(schoolId);
     if (!school) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     if (school.status !== SchoolStatus.ACTIVE) {
-      throw new ConflictException({ code: 'SCHOOL_INACTIVE', message: 'School is inactive' });
+      throw new ConflictException(API_ERROR.SCHOOL_INACTIVE);
     }
 
     try {
@@ -63,8 +56,7 @@ export class ClassSectionsService {
       return toClassSectionResponse(section);
     } catch (error) {
       throwConflictOnDuplicate(error, {
-        code: 'CLASS_SECTION_EXISTS',
-        message: 'Class section already exists',
+        ...API_ERROR.CLASS_SECTION_EXISTS,
       });
       throw error;
     }
@@ -96,7 +88,7 @@ export class ClassSectionsService {
     const scope = resolveSchoolScope(actor);
     const section = await this.sections.findById(id, scope);
     if (!section) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toClassSectionResponse(section);
   }
@@ -104,7 +96,7 @@ export class ClassSectionsService {
   async assertInSchool(id: string, schoolId: string): Promise<void> {
     const section = await this.sections.findById(id, schoolId);
     if (!section) {
-      throw new NotFoundException(NOT_FOUND);
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
   }
 
@@ -118,14 +110,14 @@ export class ClassSectionsService {
     body: UpdateClassSectionDto,
   ): Promise<ClassSectionResponseDto> {
     if (Object.values(body).every((value) => value === undefined)) {
-      throw new BadRequestException(EMPTY_UPDATE);
+      throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
 
     const scope = resolveSchoolScope(actor);
     try {
       const section = await this.sections.update(id, scope, body);
       if (!section) {
-        throw new NotFoundException(NOT_FOUND);
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
       this.logger.info(
         { actorId: actor.userId, schoolId: section.schoolId, sectionId: section.id },
@@ -134,8 +126,7 @@ export class ClassSectionsService {
       return toClassSectionResponse(section);
     } catch (error) {
       throwConflictOnDuplicate(error, {
-        code: 'CLASS_SECTION_EXISTS',
-        message: 'Class section already exists',
+        ...API_ERROR.CLASS_SECTION_EXISTS,
       });
       throw error;
     }
@@ -155,13 +146,10 @@ export class ClassSectionsService {
       );
     } catch (error) {
       if (isPrismaKnownError(error) && error.code === 'P2003') {
-        throw new ConflictException({
-          code: 'CLASS_SECTION_IN_USE',
-          message: 'Class section is in use',
-        });
+        throw new ConflictException(API_ERROR.CLASS_SECTION_IN_USE);
       }
       if (isPrismaKnownError(error) && error.code === 'P2025') {
-        throw new NotFoundException(NOT_FOUND);
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
       throw error;
     }

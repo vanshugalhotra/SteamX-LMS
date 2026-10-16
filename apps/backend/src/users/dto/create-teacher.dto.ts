@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { Trim } from '../../common/decorators/trim.decorator.js';
+import { PasswordInput } from '../../common/decorators/password-input.decorator.js';
+import {
+  MAX_PASSWORD_CHARACTERS,
+  MIN_PASSWORD_CHARACTERS,
+} from '../../auth/validators/password-policy.js';
 
 export class CreateTeacherDto {
   @ApiProperty({ maxLength: 120 })
@@ -17,10 +22,10 @@ export class CreateTeacherDto {
   @MaxLength(254)
   email?: string | null;
 
-  @ApiProperty({ minLength: 8, maxLength: 100 })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
+  @PasswordInput({
+    minLength: MIN_PASSWORD_CHARACTERS,
+    maxLength: MAX_PASSWORD_CHARACTERS,
+  })
   password!: string;
 
   @ApiPropertyOptional({ maxLength: 120, nullable: true })

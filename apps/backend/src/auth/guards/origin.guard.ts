@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, CanActivate, ExecutionContext } from '@
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { Env } from '../../config/env.schema.js';
+import { API_ERROR } from '../../common/errors/api-errors.js';
 
 const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -43,9 +44,6 @@ export class OriginGuard implements CanActivate {
   }
 
   private rejectOrigin(): never {
-    throw new ForbiddenException({
-      code: 'ORIGIN_NOT_ALLOWED',
-      message: 'Origin not allowed',
-    });
+    throw new ForbiddenException(API_ERROR.ORIGIN_NOT_ALLOWED);
   }
 }

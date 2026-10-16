@@ -3,6 +3,7 @@ import {
   ApiBadRequestResponse,
   ApiCookieAuth,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -19,6 +20,7 @@ import { LoginDto } from './dto/login.dto.js';
 import type { AuthContext } from './types/auth-context.js';
 import { AuthProfile, toAuthProfile } from './types/auth-profile.js';
 import { TokenService } from './services/token.service.js';
+import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto.js';
 
 @ApiTags('Authentication')
 @Controller({ path: 'auth', version: '1' })
@@ -40,8 +42,16 @@ export class AuthController {
     description: 'Returns the profile and sets the session cookie.',
     type: AuthProfile,
   })
-  @ApiUnauthorizedResponse({ description: 'Invalid credentials.' })
-  @ApiBadRequestResponse({ description: 'Invalid request body.' })
+  @ApiUnauthorizedResponse({ description: 'Invalid credentials.', type: ApiErrorResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid request body.', type: ApiErrorResponseDto })
+  @ApiForbiddenResponse({
+    description: 'The request Origin is not allowed.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'An unexpected server error occurred.',
+    type: ApiErrorResponseDto,
+  })
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) response: Response,
@@ -63,7 +73,18 @@ export class AuthController {
   @ApiCookieAuth('cookieAuth')
   @ApiOperation({ summary: 'Log out and clear the session cookie' })
   @ApiNoContentResponse({ description: 'Session cookie cleared.' })
-  @ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
+  @ApiUnauthorizedResponse({
+    description: 'Session is invalid or missing.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'The request Origin is not allowed.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'An unexpected server error occurred.',
+    type: ApiErrorResponseDto,
+  })
   logout(@Res({ passthrough: true }) response: Response): void {
     const { name, httpOnly, secure, sameSite, path } = this.tokens.cookieOptions();
     response.clearCookie(name, { httpOnly, secure, sameSite, path });
@@ -78,8 +99,15 @@ export class AuthController {
   @ApiCookieAuth('cookieAuth')
   @ApiOperation({ summary: 'Get the current authenticated profile' })
   @ApiOkResponse({ description: 'Returns the current profile.', type: AuthProfile })
-  @ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
-  @ApiForbiddenResponse({ description: 'Password change is required.' })
+  @ApiUnauthorizedResponse({
+    description: 'Session is invalid or missing.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiForbiddenResponse({ description: 'Password change is required.', type: ApiErrorResponseDto })
+  @ApiInternalServerErrorResponse({
+    description: 'An unexpected server error occurred.',
+    type: ApiErrorResponseDto,
+  })
   getMe(
     @CurrentAuth() authContext: AuthContext,
     @Res({ passthrough: true }) response: Response,
@@ -103,9 +131,20 @@ export class AuthController {
   })
   @ApiBadRequestResponse({
     description: 'Current password is incorrect or new password is invalid.',
+    type: ApiErrorResponseDto,
   })
-  @ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
-  @ApiForbiddenResponse({ description: 'Password change is required.' })
+  @ApiUnauthorizedResponse({
+    description: 'Session is invalid or missing.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Password change is required or the request Origin is not allowed.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'An unexpected server error occurred.',
+    type: ApiErrorResponseDto,
+  })
   async changePassword(
     @CurrentAuth() authContext: AuthContext,
     @Body() body: ChangePasswordDto,

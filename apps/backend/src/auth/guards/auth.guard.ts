@@ -10,7 +10,7 @@ import { PinoLogger } from 'nestjs-pino';
 import type { Request } from 'express';
 import { SchoolStatus, UserStatus } from '../../generated/prisma/client.js';
 import { AuthContextRepository } from '../auth-context.repository.js';
-import { AUTHENTICATION_ERROR_MESSAGE } from '../auth.constants.js';
+import { API_ERROR } from '../../common/errors/api-errors.js';
 import { ALLOW_PASSWORD_CHANGE_ROUTE, PUBLIC_ROUTE } from '../decorators/metadata.constants.js';
 import type { AuthContext } from '../types/auth-context.js';
 import { TokenService } from '../services/token.service.js';
@@ -90,10 +90,7 @@ export class AuthGuard implements CanActivate {
       [handler, controller],
     );
     if (user.mustChangePassword && !passwordChangeAllowed) {
-      throw new ForbiddenException({
-        code: 'PASSWORD_CHANGE_REQUIRED',
-        message: 'Password change required',
-      });
+      throw new ForbiddenException(API_ERROR.PASSWORD_CHANGE_REQUIRED);
     }
 
     return true;
@@ -104,6 +101,6 @@ export class AuthGuard implements CanActivate {
       { reason, ...(userId === undefined ? {} : { userId }) },
       'Authentication failed',
     );
-    throw new UnauthorizedException(AUTHENTICATION_ERROR_MESSAGE);
+    throw new UnauthorizedException(API_ERROR.AUTHENTICATION_FAILED);
   }
 }
