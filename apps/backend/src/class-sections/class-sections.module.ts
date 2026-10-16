@@ -11,5 +11,6 @@ import { ClassSectionsService } from './class-sections.service.js';
   imports: [PrismaModule],
   controllers: [ClassSectionsController],
   providers: [ClassSectionsRepository, ClassSectionsService],
+  exports: [ClassSectionsService],
 })
 export class ClassSectionsModule {}

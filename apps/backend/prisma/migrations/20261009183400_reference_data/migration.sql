@@ -47,3 +47,18 @@ CROSS JOIN permissions
 WHERE roles.key = 'admin'
   AND permissions.key IN ('classsection.read', 'classsection.manage')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+INSERT INTO permissions (key, description)
+VALUES
+  ('user.read', 'View users'),
+  ('user.create.teacher', 'Create teacher users'),
+  ('user.create.student', 'Create student users')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM roles
+CROSS JOIN permissions
+WHERE roles.key = 'admin'
+  AND permissions.key IN ('user.read', 'user.create.teacher', 'user.create.student')
+ON CONFLICT (role_id, permission_id) DO NOTHING;

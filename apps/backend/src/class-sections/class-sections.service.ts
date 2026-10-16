@@ -101,6 +101,13 @@ export class ClassSectionsService {
     return toClassSectionResponse(section);
   }
 
+  async assertInSchool(id: string, schoolId: string): Promise<void> {
+    const section = await this.sections.findById(id, schoolId);
+    if (!section) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+  }
+
   // ─────────────────────────────────────────
   // PATCH /class-sections/:id — Update a class section
   // ─────────────────────────────────────────

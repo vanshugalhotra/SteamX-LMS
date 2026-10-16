@@ -80,7 +80,7 @@ describe('Authentication foundation reference data', () => {
     };
   }
 
-  it('seeds class-section permissions for Admin only', async () => {
+  it('seeds permissions for Admin only', async () => {
     const snapshot = await snapshotReferenceData(prisma);
 
     expect(snapshot.roles).toEqual([
@@ -93,14 +93,20 @@ describe('Authentication foundation reference data', () => {
       'classsection.read',
       'school.manage',
       'school.read',
+      'user.create.student',
+      'user.create.teacher',
       'user.password.reset',
+      'user.read',
     ]);
     expect(snapshot.rolePermissions).toEqual([
       { role: 'admin', permission: 'classsection.manage' },
       { role: 'admin', permission: 'classsection.read' },
       { role: 'admin', permission: 'school.manage' },
       { role: 'admin', permission: 'school.read' },
+      { role: 'admin', permission: 'user.create.student' },
+      { role: 'admin', permission: 'user.create.teacher' },
       { role: 'admin', permission: 'user.password.reset' },
+      { role: 'admin', permission: 'user.read' },
     ]);
   });
 

@@ -11,6 +11,7 @@ import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { SchoolsModule } from './schools/schools.module.js';
 import { ClassSectionsModule } from './class-sections/class-sections.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ClassSectionsModule } from './class-sections/class-sections.module.js';
     HealthModule,
     SchoolsModule,
     ClassSectionsModule,
+    UsersModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OriginGuard },
