@@ -1,6 +1,3 @@
-/**
- * Connects user routes to the auth, class-section, and Prisma services.
- */
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { ClassSectionsModule } from '../class-sections/class-sections.module.js';

@@ -1,6 +1,3 @@
-/**
- * Applies user creation, school scope, visibility, and response rules.
- */
 import {
   BadRequestException,
   ConflictException,
