@@ -4,8 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { isPrismaKnownError } from '../../common/errors/prisma-error.js';
 import { AuthContextRepository } from '../auth-context.repository.js';
 import { PasswordService } from './password.service.js';
-import { validatePasswordPolicy } from '../validators/password-policy.js';
-import { isValidSteamxId, normalizeSteamxId } from '../validators/steamx-id.js';
+import { validatePasswordPolicy } from '../../common/validators/password-policy.js';
+import { isValidSteamxId, normalizeSteamxId } from '../../common/validators/steamx-id.js';
 import {
   FirstAdminError,
   type FirstAdminInput,

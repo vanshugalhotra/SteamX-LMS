@@ -166,6 +166,9 @@ describe('Schools endpoints (e2e)', () => {
     await createSchool(adminCookie, createBody('bad!'))
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await createSchool(adminCookie, createBody('A'.repeat(13)))
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
     await createSchool(adminCookie, createBody('BLANK1', { name: '   ' }))
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
@@ -214,7 +217,7 @@ describe('Schools endpoints (e2e)', () => {
 
   it('paginates, filters, searches, and orders platform school lists', async () => {
     const adminCookie = await loginAs(app, fixture.admin);
-    const prefix = `PAG${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
+    const prefix = `PAG${randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase()}`;
     const gamma = await createAndTrack(adminCookie, `${prefix}G`, {
       name: 'Pagination Listing Gamma',
     });

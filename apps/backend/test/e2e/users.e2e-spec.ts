@@ -9,12 +9,14 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
+import { vi } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
 import { PERMISSION } from '../../src/auth/permissions.js';
 import type { Env } from '../../src/config/env.schema.js';
 import { configureApp } from '../../src/configure-app.js';
 import { PrismaClient, SchoolStatus, UserType } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { SteamxIdService } from '../../src/users/steamx-id/steamx-id.service.js';
 import {
   createTwoSchoolFixture,
   TENANCY_TEST_PASSWORD,
@@ -155,7 +157,9 @@ describe('Users endpoints (e2e)', () => {
 
     expect(teacher.name).toBe(`${uniqueName} Teacher`);
     expect(teacher.email).toBe(`${emailPrefix}@example.com`);
-    expect(teacher.steamxId).toMatch(/^[A-Z0-9]{6}$/);
+    expect(teacher.steamxId).toMatch(
+      new RegExp(`^${fixture.schoolA.school.code}-[A-Z]{4,8}[0-9]{3}$`),
+    );
     expect(teacher.role).toEqual({ key: 'teacher', name: 'Teacher' });
     expect(teacher.userType).toBe(UserType.SCHOOL_STAFF);
     expect(teacher.schoolId).toBe(fixture.schoolA.school.id);
@@ -179,6 +183,9 @@ describe('Users endpoints (e2e)', () => {
     }).expect(201);
     createdUserIds.push(studentResponse.body.id as string);
     expect(JSON.stringify(studentResponse.body)).not.toContain('passwordHash');
+    expect(studentResponse.body.steamxId).toMatch(
+      new RegExp(`^${fixture.schoolA.school.code}-[A-Z]{4,8}[0-9]{3}$`),
+    );
     expect(studentResponse.body).toMatchObject({
       role: { key: 'student', name: 'Student' },
       userType: UserType.STUDENT,
@@ -188,6 +195,56 @@ describe('Users endpoints (e2e)', () => {
         classSectionId: fixture.schoolA.section.id,
       },
     });
+  });
+
+  it('retries a steamx_id collision and creates the user with the next candidate', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const retryCandidate = `${fixture.schoolA.school.code}-RETRYN042`;
+    const steamxIds = app.get(SteamxIdService) as unknown as {
+      generateCandidate(schoolCode: string, name: string): string;
+    };
+    const candidateSpy = vi.spyOn(steamxIds, 'generateCandidate');
+    candidateSpy
+      .mockReturnValueOnce(fixture.schoolA.teacher.steamxId)
+      .mockReturnValueOnce(retryCandidate);
+
+    try {
+      const teacher = await createAndTrackTeacher(
+        adminCookie,
+        'Collision Retry',
+        fixture.schoolA.school.id,
+      );
+      expect(teacher.steamxId).toBe(retryCandidate);
+      expect(candidateSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      candidateSpy.mockRestore();
+    }
+  });
+
+  it('returns a clear service error after three SteamX ID collisions', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const steamxIds = app.get(SteamxIdService) as unknown as {
+      generateCandidate(schoolCode: string, name: string): string;
+    };
+    const candidateSpy = vi
+      .spyOn(steamxIds, 'generateCandidate')
+      .mockReturnValue(fixture.schoolA.teacher.steamxId);
+
+    try {
+      const response = await createTeacher(adminCookie, {
+        name: 'Exhausted Collision',
+        password: TENANCY_TEST_PASSWORD,
+        schoolId: fixture.schoolA.school.id,
+      }).expect(409);
+
+      expect(response.body).toMatchObject({
+        code: 'STEAMX_ID_UNAVAILABLE',
+        message: "Couldn't allocate a SteamX ID. Please try again.",
+      });
+      expect(candidateSpy).toHaveBeenCalledTimes(3);
+    } finally {
+      candidateSpy.mockRestore();
+    }
   });
 
   it('requires an active school and keeps school staff inside their school', async () => {

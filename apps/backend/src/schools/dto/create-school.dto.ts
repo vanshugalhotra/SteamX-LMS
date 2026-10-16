@@ -4,13 +4,13 @@ import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'c
 import { Trim } from '../../common/decorators/trim.decorator.js';
 
 export class CreateSchoolDto {
-  @ApiProperty({ example: 'AB-12', minLength: 2, maxLength: 32 })
+  @ApiProperty({ example: 'AB-12', minLength: 2, maxLength: 12 })
   @Trim()
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.toUpperCase() : value,
   )
   @IsString()
-  @Matches(/^[A-Z0-9][A-Z0-9_-]{1,31}$/)
+  @Matches(/^[A-Z0-9][A-Z0-9_-]{1,11}$/)
   code!: string;
 
   @ApiProperty({ example: 'DAV School', maxLength: 120 })

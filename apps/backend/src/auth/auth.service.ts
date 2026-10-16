@@ -10,7 +10,7 @@ import { API_ERROR } from '../common/errors/api-errors.js';
 import { AuthContextRepository } from './auth-context.repository.js';
 import { PasswordService } from './services/password.service.js';
 import { TokenService } from './services/token.service.js';
-import { getPasswordPolicyViolations } from './validators/password-policy.js';
+import { getPasswordPolicyViolations } from '../common/validators/password-policy.js';
 import type { AuthContext } from './types/auth-context.js';
 import { type AuthProfile, toAuthProfile } from './types/auth-profile.js';
 
