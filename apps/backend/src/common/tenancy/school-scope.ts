@@ -4,11 +4,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { UserType } from '../../generated/prisma/client.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
-
-const RESOURCE_NOT_FOUND = {
-  code: 'NOT_FOUND',
-  message: 'Resource not found',
-};
+import { API_ERROR } from '../errors/api-errors.js';
 
 export function resolveSchoolScope(
   auth: AuthContext,
@@ -22,7 +18,7 @@ export function resolveSchoolScope(
     auth.schoolId === null ||
     (requestedSchoolId !== undefined && requestedSchoolId !== auth.schoolId)
   ) {
-    throw new NotFoundException(RESOURCE_NOT_FOUND);
+    throw new NotFoundException(API_ERROR.NOT_FOUND);
   }
 
   return auth.schoolId;

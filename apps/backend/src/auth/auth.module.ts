@@ -6,14 +6,13 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { PermissionGuard } from './guards/permission.guard.js';
 import { PermissionsService } from './services/permissions.service.js';
-import { UserPasswordController } from './user-password.controller.js';
 import { FirstAdminService } from './services/first-admin.service.js';
 import { PasswordService } from './services/password.service.js';
 import { TokenService } from './services/token.service.js';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [AuthController, UserPasswordController],
+  controllers: [AuthController],
   providers: [
     AuthContextRepository,
     AuthGuard,
@@ -24,6 +23,13 @@ import { TokenService } from './services/token.service.js';
     PasswordService,
     TokenService,
   ],
-  exports: [AuthGuard, AuthContextRepository, PasswordService, PermissionGuard, TokenService],
+  exports: [
+    AuthGuard,
+    AuthContextRepository,
+    AuthService,
+    PasswordService,
+    PermissionGuard,
+    TokenService,
+  ],
 })
 export class AuthModule {}

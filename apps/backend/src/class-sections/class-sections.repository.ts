@@ -1,22 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, SchoolStatus } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import type { ClassSection } from '../generated/prisma/client.js';
 import { schoolFilter } from '../common/tenancy/school-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { ClassSectionListQueryDto } from './dto/class-section-list-query.dto.js';
 import type { CreateClassSectionDto } from './dto/create-class-section.dto.js';
 import type { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
+import { paginatedSearch } from '../common/repositories/paginated-search.js';
 
 @Injectable()
 export class ClassSectionsRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  findSchoolStatus(schoolId: string): Promise<{ status: SchoolStatus } | null> {
-    return this.prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { status: true },
-    });
-  }
 
   create(schoolId: string, data: CreateClassSectionDto) {
     return this.prisma.classSection.create({
@@ -28,9 +21,9 @@ export class ClassSectionsRepository {
     });
   }
 
-  async findMany(
+  findMany(
     scope: string | undefined,
-    query: ClassSectionListQueryDto,
+    query: { page: number; limit: number; q?: string },
   ): Promise<{ items: ClassSection[]; total: number }> {
     const where: Prisma.ClassSectionWhereInput = {
       ...schoolFilter(scope),
@@ -43,16 +36,19 @@ export class ClassSectionsRepository {
             ],
           }),
     };
-    const [items, total] = await Promise.all([
-      this.prisma.classSection.findMany({
-        where,
-        orderBy: [{ className: 'asc' }, { sectionName: 'asc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.classSection.count({ where }),
-    ]);
-    return { items, total };
+    const orderBy = [
+      { className: 'asc' },
+      { sectionName: 'asc' },
+      { id: 'asc' },
+    ] satisfies Prisma.ClassSectionOrderByWithRelationInput[];
+    return paginatedSearch({
+      where,
+      orderBy,
+      page: query.page,
+      limit: query.limit,
+      findMany: (args) => this.prisma.classSection.findMany(args),
+      count: (filter) => this.prisma.classSection.count({ where: filter }),
+    });
   }
 
   findById(id: string, scope: string | undefined) {

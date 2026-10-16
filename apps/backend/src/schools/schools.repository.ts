@@ -5,8 +5,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, SchoolStatus } from '../generated/prisma/client.js';
 import type { School } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import type { CreateSchoolDto } from './dto/create-school.dto.js';
-import type { SchoolListQueryDto } from './dto/school-list-query.dto.js';
 import type { UpdateSchoolDto } from './dto/update-school.dto.js';
 
 // Schools scope by their own id, not by a schoolId FK.
@@ -24,9 +24,9 @@ export class SchoolsRepository {
     return this.prisma.school.create({ data });
   }
 
-  async findMany(
+  findMany(
     scope: string | undefined,
-    query: SchoolListQueryDto,
+    query: { page: number; limit: number; q?: string; status?: SchoolStatus },
   ): Promise<{ items: School[]; total: number }> {
     const where: Prisma.SchoolWhereInput = {
       ...selfScopeFilter(scope),
@@ -40,16 +40,18 @@ export class SchoolsRepository {
             ],
           }),
     };
-    const [items, total] = await Promise.all([
-      this.prisma.school.findMany({
-        where,
-        orderBy: [{ name: 'asc' }, { id: 'asc' }],
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      this.prisma.school.count({ where }),
-    ]);
-    return { items, total };
+    const orderBy = [
+      { name: 'asc' },
+      { id: 'asc' },
+    ] satisfies Prisma.SchoolOrderByWithRelationInput[];
+    return paginatedSearch({
+      where,
+      orderBy,
+      page: query.page,
+      limit: query.limit,
+      findMany: (args) => this.prisma.school.findMany(args),
+      count: (filter) => this.prisma.school.count({ where: filter }),
+    });
   }
 
   findById(id: string, scope: string | undefined) {

@@ -13,6 +13,7 @@ import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AUTH_COOKIE_NAME } from './auth/auth.constants.js';
 import type { Env } from './config/env.schema.js';
+import { API_ERROR } from './common/errors/api-errors.js';
 
 type FieldErrors = { field: string; errors: string[] };
 
@@ -71,8 +72,7 @@ export function configureApp(app: INestApplication): void {
       transform: true,
       exceptionFactory: (errors: ValidationError[]) =>
         new BadRequestException({
-          code: 'VALIDATION_ERROR',
-          message: 'Validation failed',
+          ...API_ERROR.VALIDATION_ERROR,
           details: getValidationDetails(errors),
         }),
     }),

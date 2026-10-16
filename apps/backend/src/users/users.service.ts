@@ -1,0 +1,165 @@
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
+import { UserType, type Prisma } from '../generated/prisma/client.js';
+import { PasswordService } from '../auth/services/password.service.js';
+import { USER_ROLE_KEY, type UserRoleKey } from '../auth/permissions.js';
+import type { AuthContext } from '../auth/types/auth-context.js';
+import { ActiveSchoolService } from '../common/tenancy/active-school.service.js';
+import { resolveSchoolScope, schoolFilter } from '../common/tenancy/school-scope.js';
+import { paginate } from '../common/pagination/paginate.js';
+import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
+import { ClassSectionsService } from '../class-sections/class-sections.service.js';
+import { getPasswordPolicyViolations } from '../auth/validators/password-policy.js';
+import { AuthService } from '../auth/auth.service.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
+import type { CreateStudentDto } from './dto/create-student.dto.js';
+import type { CreateTeacherDto } from './dto/create-teacher.dto.js';
+import type { UserListQueryDto } from './dto/user-list-query.dto.js';
+import type { UserListItemResponseDto } from './dto/user-list-item-response.dto.js';
+import type { UserResponseDto } from './dto/user-response.dto.js';
+import { userVisibility } from './user-visibility.js';
+import { toUserListItem, toUserResponse } from './users.mapper.js';
+import { UsersRepository } from './users.repository.js';
+import { SteamxIdService } from './steamx-id.service.js';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    private readonly users: UsersRepository,
+    private readonly passwords: PasswordService,
+    private readonly steamxIds: SteamxIdService,
+    private readonly sections: ClassSectionsService,
+    private readonly authService: AuthService,
+    private readonly activeSchool: ActiveSchoolService,
+    private readonly logger: PinoLogger,
+  ) {}
+
+  // ─────────────────────────────────────────
+  // POST /users/teachers — Create a teacher
+  // ─────────────────────────────────────────
+
+  async createTeacher(actor: AuthContext, body: CreateTeacherDto): Promise<UserResponseDto> {
+    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
+    const role = await this.resolveRole(USER_ROLE_KEY.TEACHER, UserType.SCHOOL_STAFF);
+
+    return this.steamxIds.withUniqueSteamxId(async (steamxId) => {
+      this.validatePassword(body.password, steamxId);
+      const passwordHash = await this.passwords.hash(body.password);
+      const user = await this.users.createTeacher({
+        steamxId,
+        name: body.name,
+        email: body.email ?? null,
+        passwordHash,
+        schoolId,
+        roleId: role.id,
+        userType: UserType.SCHOOL_STAFF,
+        primaryAssignment: body.primaryAssignment ?? null,
+      });
+      this.logger.info(
+        { actorId: actor.userId, userId: user.id, schoolId },
+        'Teacher user created',
+      );
+      return toUserResponse(user);
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // POST /users/students — Create a student
+  // ─────────────────────────────────────────
+
+  async createStudent(actor: AuthContext, body: CreateStudentDto): Promise<UserResponseDto> {
+    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
+    await this.sections.assertInSchool(body.classSectionId, schoolId);
+    const role = await this.resolveRole(USER_ROLE_KEY.STUDENT, UserType.STUDENT);
+
+    return this.steamxIds.withUniqueSteamxId(async (steamxId) => {
+      this.validatePassword(body.password, steamxId);
+      const passwordHash = await this.passwords.hash(body.password);
+      const user = await this.users.createStudent({
+        steamxId,
+        name: body.name,
+        passwordHash,
+        schoolId,
+        roleId: role.id,
+        userType: UserType.STUDENT,
+        classSectionId: body.classSectionId,
+        guardianName: body.guardianName ?? null,
+      });
+      this.logger.info(
+        { actorId: actor.userId, userId: user.id, schoolId },
+        'Student user created',
+      );
+      return toUserResponse(user);
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // GET /users — List users
+  // ─────────────────────────────────────────
+
+  async findMany(
+    actor: AuthContext,
+    query: UserListQueryDto,
+  ): Promise<PaginationResponseDto<UserListItemResponseDto>> {
+    const scope = resolveSchoolScope(actor, query.schoolId);
+    const where: Prisma.UserWhereInput = {
+      ...schoolFilter(scope),
+      ...userVisibility(actor),
+      ...(query.role === undefined ? {} : { role: { is: { key: query.role } } }),
+      ...(query.status === undefined ? {} : { status: query.status }),
+      ...(query.q === undefined
+        ? {}
+        : {
+            OR: [
+              { name: { contains: query.q, mode: 'insensitive' } },
+              { steamxId: { contains: query.q, mode: 'insensitive' } },
+              { email: { contains: query.q, mode: 'insensitive' } },
+            ],
+          }),
+    };
+    const { items, total } = await this.users.findMany(where, query);
+    return paginate(items.map(toUserListItem), query.page, query.limit, total);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /users/:id — Get a user
+  // ─────────────────────────────────────────
+
+  async findById(actor: AuthContext, id: string): Promise<UserResponseDto> {
+    const scope = resolveSchoolScope(actor);
+    const user = await this.users.findById({
+      ...schoolFilter(scope),
+      AND: [{ id }, userVisibility(actor)],
+    });
+    if (!user) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    return toUserResponse(user);
+  }
+
+  async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {
+    await this.authService.resetPassword(actor, userId, newPassword);
+  }
+
+  private async resolveRole(roleKey: UserRoleKey, userType: UserType): Promise<{ id: number }> {
+    const role = await this.users.findRole(roleKey);
+    if (!role || role.userType !== userType) {
+      throw new InternalServerErrorException({
+        ...API_ERROR.ROLE_CONFIGURATION_ERROR,
+      });
+    }
+    return { id: role.id };
+  }
+
+  private validatePassword(password: string, steamxId: string): void {
+    const violations = getPasswordPolicyViolations(password, steamxId);
+    if (violations.length > 0) {
+      throw new BadRequestException({ ...API_ERROR.PASSWORD_POLICY, details: violations });
+    }
+  }
+}

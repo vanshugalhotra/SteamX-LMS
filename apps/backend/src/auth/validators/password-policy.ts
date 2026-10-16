@@ -1,5 +1,5 @@
-const MIN_PASSWORD_CHARACTERS = 8;
-const MAX_PASSWORD_CHARACTERS = 100;
+export const MIN_PASSWORD_CHARACTERS = 8;
+export const MAX_PASSWORD_CHARACTERS = 100;
 const WEAK_PASSWORDS = new Set([
   'password',
   'password1',
