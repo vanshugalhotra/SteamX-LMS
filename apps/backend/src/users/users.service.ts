@@ -44,28 +44,31 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   async createTeacher(actor: AuthContext, body: CreateTeacherDto): Promise<UserResponseDto> {
-    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
+    const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
     const role = await this.resolveRole(USER_ROLE_KEY.TEACHER, UserType.SCHOOL_STAFF);
 
-    return this.steamxIds.withUniqueSteamxId(async (steamxId) => {
-      this.validatePassword(body.password, steamxId);
-      const passwordHash = await this.passwords.hash(body.password);
-      const user = await this.users.createTeacher({
-        steamxId,
-        name: body.name,
-        email: body.email ?? null,
-        passwordHash,
-        schoolId,
-        roleId: role.id,
-        userType: UserType.SCHOOL_STAFF,
-        primaryAssignment: body.primaryAssignment ?? null,
-      });
-      this.logger.info(
-        { actorId: actor.userId, userId: user.id, schoolId },
-        'Teacher user created',
-      );
-      return toUserResponse(user);
-    });
+    return this.steamxIds.withUniqueSteamxId(
+      { schoolCode: school.code, name: body.name },
+      async (steamxId) => {
+        this.validatePassword(body.password, steamxId);
+        const passwordHash = await this.passwords.hash(body.password);
+        const user = await this.users.createTeacher({
+          steamxId,
+          name: body.name,
+          email: body.email ?? null,
+          passwordHash,
+          schoolId: school.id,
+          roleId: role.id,
+          userType: UserType.SCHOOL_STAFF,
+          primaryAssignment: body.primaryAssignment ?? null,
+        });
+        this.logger.info(
+          { actorId: actor.userId, userId: user.id, schoolId: school.id },
+          'Teacher user created',
+        );
+        return toUserResponse(user);
+      },
+    );
   }
 
   // ─────────────────────────────────────────
@@ -73,29 +76,32 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   async createStudent(actor: AuthContext, body: CreateStudentDto): Promise<UserResponseDto> {
-    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
-    await this.sections.assertInSchool(body.classSectionId, schoolId);
+    const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
+    await this.sections.assertInSchool(body.classSectionId, school.id);
     const role = await this.resolveRole(USER_ROLE_KEY.STUDENT, UserType.STUDENT);
 
-    return this.steamxIds.withUniqueSteamxId(async (steamxId) => {
-      this.validatePassword(body.password, steamxId);
-      const passwordHash = await this.passwords.hash(body.password);
-      const user = await this.users.createStudent({
-        steamxId,
-        name: body.name,
-        passwordHash,
-        schoolId,
-        roleId: role.id,
-        userType: UserType.STUDENT,
-        classSectionId: body.classSectionId,
-        guardianName: body.guardianName ?? null,
-      });
-      this.logger.info(
-        { actorId: actor.userId, userId: user.id, schoolId },
-        'Student user created',
-      );
-      return toUserResponse(user);
-    });
+    return this.steamxIds.withUniqueSteamxId(
+      { schoolCode: school.code, name: body.name },
+      async (steamxId) => {
+        this.validatePassword(body.password, steamxId);
+        const passwordHash = await this.passwords.hash(body.password);
+        const user = await this.users.createStudent({
+          steamxId,
+          name: body.name,
+          passwordHash,
+          schoolId: school.id,
+          roleId: role.id,
+          userType: UserType.STUDENT,
+          classSectionId: body.classSectionId,
+          guardianName: body.guardianName ?? null,
+        });
+        this.logger.info(
+          { actorId: actor.userId, userId: user.id, schoolId: school.id },
+          'Student user created',
+        );
+        return toUserResponse(user);
+      },
+    );
   }
 
   // ─────────────────────────────────────────

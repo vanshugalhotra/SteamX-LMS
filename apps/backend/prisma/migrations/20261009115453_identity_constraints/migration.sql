@@ -1,6 +1,6 @@
 -- schools
 ALTER TABLE schools
-  ADD CONSTRAINT schools_code_fmt CHECK (code = upper(code) AND code ~ '^[A-Z0-9][A-Z0-9_-]{1,31}$'),
+  ADD CONSTRAINT schools_code_fmt CHECK (code = upper(code) AND code ~ '^[A-Z0-9][A-Z0-9_-]{1,11}$'),
   ADD CONSTRAINT schools_name_nonempty CHECK (length(btrim(name)) > 0),
   ADD CONSTRAINT schools_city_nonempty CHECK (length(btrim(city)) > 0),
   ADD CONSTRAINT schools_contact_email_norm CHECK (contact_email IS NULL OR contact_email = lower(btrim(contact_email)));

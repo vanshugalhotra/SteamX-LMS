@@ -18,6 +18,14 @@ export class ActiveSchoolService {
   constructor(private readonly prisma: PrismaService) {}
 
   async resolve(actor: AuthContext, requestedSchoolId?: string): Promise<string> {
+    const school = await this.resolveSchool(actor, requestedSchoolId);
+    return school.id;
+  }
+
+  async resolveSchool(
+    actor: AuthContext,
+    requestedSchoolId?: string,
+  ): Promise<{ id: string; code: string }> {
     const schoolId = resolveSchoolScope(actor, requestedSchoolId);
     if (!schoolId) {
       throw new BadRequestException(API_ERROR.SCHOOL_REQUIRED);
@@ -25,7 +33,7 @@ export class ActiveSchoolService {
 
     const school = await this.prisma.school.findUnique({
       where: { id: schoolId },
-      select: { status: true },
+      select: { id: true, code: true, status: true },
     });
     if (!school) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -33,6 +41,6 @@ export class ActiveSchoolService {
     if (school.status !== SchoolStatus.ACTIVE) {
       throw new ConflictException(API_ERROR.SCHOOL_INACTIVE);
     }
-    return schoolId;
+    return { id: school.id, code: school.code };
   }
 }
