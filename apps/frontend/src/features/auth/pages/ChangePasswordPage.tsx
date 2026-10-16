@@ -17,7 +17,7 @@ import {
   PASSWORD_REUSED,
   policyMessages,
 } from '../model/errors';
-import { AUTH_PATHS } from '../model/paths';
+import { getHomePath } from '../model/paths';
 import { sessionQueryOptions } from '../queries';
 
 const changePasswordSchema = z
@@ -65,7 +65,7 @@ export function ChangePasswordPage() {
     try {
       const profile = await changePassword({ currentPassword, newPassword });
       queryClient.setQueryData(sessionQueryOptions.queryKey, profile);
-      await navigate(AUTH_PATHS.afterLogin, { replace: true });
+      await navigate(getHomePath(), { replace: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) return;
       setErrorMessages(getErrorMessages(error));

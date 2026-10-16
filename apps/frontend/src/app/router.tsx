@@ -3,7 +3,7 @@ import { LandingPage } from '@/features/landing/LandingPage';
 import { guestOnlyLoader, changePasswordLoader, protectedLoader } from '@/features/auth/loaders';
 import { AUTH_PATHS } from '@/features/auth/model/paths';
 import { RootFallback, RootError } from './route-fallbacks';
-import { LogoutButton } from '@/features/auth/components/LogoutButton';
+import { ADMIN_PATHS } from '@/features/admin/paths';
 
 export const router = createBrowserRouter([
   {
@@ -29,16 +29,17 @@ export const router = createBrowserRouter([
       },
       {
         loader: protectedLoader,
+        lazy: async () => {
+          const { AdminLayout } = await import('@/features/admin/components/AdminLayout');
+          return { Component: AdminLayout };
+        },
         children: [
-          // protected routes go here
-          // for testing
           {
-            path: '/home',
-            element: (
-              <div className="p-6">
-                <LogoutButton />
-              </div>
-            ),
+            path: ADMIN_PATHS.dashboard,
+            lazy: async () => {
+              const { DashboardPage } = await import('@/features/admin/pages/DashboardPage');
+              return { Component: DashboardPage };
+            },
           },
         ],
       },

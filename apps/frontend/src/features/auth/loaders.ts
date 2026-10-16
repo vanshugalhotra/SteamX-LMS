@@ -1,6 +1,6 @@
 import { redirect } from 'react-router';
 import { queryClient } from '@/lib/query-client';
-import { AUTH_PATHS, getPostLoginPath } from './model/paths';
+import { AUTH_PATHS, getHomePath, getPostLoginPath } from './model/paths';
 import { sessionQueryOptions } from './queries';
 
 export async function guestOnlyLoader() {
@@ -11,7 +11,7 @@ export async function guestOnlyLoader() {
 export async function changePasswordLoader() {
   const session = await queryClient.query(sessionQueryOptions);
   if (!session) return redirect(AUTH_PATHS.login);
-  if (!session.mustChangePassword) return redirect(AUTH_PATHS.afterLogin);
+  if (!session.mustChangePassword) return redirect(getHomePath());
   return session;
 }
 
