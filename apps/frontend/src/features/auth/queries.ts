@@ -1,7 +1,13 @@
-import { queryOptions, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { fetchSession, login, logout } from './api/api';
-import { AUTH_PATHS } from './model/paths';
+import { PATHS } from '@/lib/paths';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api-client';
 
@@ -11,6 +17,11 @@ export const sessionQueryOptions = queryOptions({
   staleTime: 5 * 60_000,
   retry: false,
 });
+
+/** The cached session profile (loaded by the route loaders). */
+export function useSession() {
+  return useQuery(sessionQueryOptions).data;
+}
 
 // User data lives only in the TanStack Query cache, and queryClient.clear() removes all of it.
 // If other in-memory user state is added later (e.g. a store), reset it here too.
@@ -36,7 +47,7 @@ export function useLogout() {
 
   const finishLogout = () => {
     clearSession(queryClient);
-    void navigate(AUTH_PATHS.login, { replace: true });
+    void navigate(PATHS.login, { replace: true });
   };
 
   return useMutation({

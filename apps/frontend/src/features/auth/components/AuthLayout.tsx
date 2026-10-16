@@ -1,27 +1,5 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
-
-function Logo({ onBrand = false, className }: { onBrand?: boolean; className?: string }) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-2.5 text-[22px] font-semibold tracking-tight',
-        className,
-      )}
-    >
-      <span className="relative h-7.5 w-8.5 flex-none" aria-hidden="true">
-        <i className="absolute bottom-0 left-0 size-5.5 rounded-full bg-coral-500" />
-        <i
-          className={cn(
-            'absolute top-0 right-0 size-4 rounded-full',
-            onBrand ? 'bg-white' : 'bg-teal-500 outline-2 outline-white',
-          )}
-        />
-      </span>
-      SteamX
-    </div>
-  );
-}
+import { Logo } from '@/components/Logo';
 
 function BrandArt() {
   return (
@@ -66,7 +44,7 @@ function BrandPanel() {
         className="pointer-events-none absolute -right-18.75 bottom-28 size-62.5 rounded-full bg-magenta-500"
       />
 
-      <Logo onBrand />
+      <Logo accent="white" />
       <div className="relative">
         <h2 className="max-w-[14ch] text-[28px] leading-tight font-semibold tracking-tight min-[1025px]:text-[34px]">
           Your lessons are ready when you are.
@@ -84,7 +62,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <BrandPanel />
       <section className="flex items-start justify-center px-5 py-6 min-[600px]:px-6 min-[600px]:py-12 min-[900px]:items-center min-[900px]:px-2 min-[900px]:py-6">
         <div className="w-full max-w-100 min-[600px]:max-w-120 min-[600px]:rounded-[28px] min-[600px]:bg-white min-[600px]:px-9 min-[600px]:py-10 min-[600px]:shadow-[0_12px_40px_rgba(31,27,78,.08)] min-[900px]:max-w-100 min-[900px]:rounded-none min-[900px]:bg-transparent min-[900px]:p-0 min-[900px]:shadow-none">
-          <Logo className="mb-7 min-[900px]:hidden" />
+          <Logo accent="teal" className="mb-7 min-[900px]:hidden" />
           {children}
         </div>
       </section>

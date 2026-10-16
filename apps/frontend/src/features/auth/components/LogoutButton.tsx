@@ -1,11 +1,12 @@
 import { Button } from '@/components/ui/button';
 import { useLogout } from '../queries';
 
-export function LogoutButton() {
+export function LogoutButton({ className }: { className?: string }) {
   const logout = useLogout();
   return (
     <Button
       variant="secondary"
+      className={className}
       disabled={logout.isPending}
       onClick={() => {
         logout.mutate();
@@ -17,10 +18,10 @@ export function LogoutButton() {
             className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
             aria-hidden="true"
           />
-          Logging out…
+          Signing out…
         </>
       ) : (
-        'Log out'
+        'Sign out'
       )}
     </Button>
   );

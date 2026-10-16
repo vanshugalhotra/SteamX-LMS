@@ -1,6 +1,7 @@
 import { isPasswordChangeRequired } from '@/features/auth/model/errors';
 import type { AuthProfile } from '@/features/auth/api/api';
-import { AUTH_PATHS, SESSION_EXPIRED } from '@/features/auth/model/paths';
+import { SESSION_EXPIRED } from '@/features/auth/model/redirects';
+import { PATHS } from '@/lib/paths';
 import { clearSession, sessionQueryOptions } from '@/features/auth/queries';
 import { setApiHandlers } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -13,8 +14,8 @@ export function registerSessionHandlers() {
       // SPA navigation instead of a full page reload: lets us pass the "session expired"
       // reason through router state, avoids a page flash, and keeps the router and Toaster mounted.
       clearSession(queryClient);
-      if (router.state.location.pathname !== AUTH_PATHS.login) {
-        void router.navigate(AUTH_PATHS.login, {
+      if (router.state.location.pathname !== PATHS.login) {
+        void router.navigate(PATHS.login, {
           replace: true,
           state: { reason: SESSION_EXPIRED },
         });
@@ -26,7 +27,7 @@ export function registerSessionHandlers() {
         queryClient.setQueryData<AuthProfile | null>(sessionQueryOptions.queryKey, (old) =>
           old ? { ...old, mustChangePassword: true } : old,
         );
-        void router.navigate(AUTH_PATHS.changePassword, { replace: true });
+        void router.navigate(PATHS.changePassword, { replace: true });
         return;
       }
       // TODO: Revisit when role-based routing is in place.
