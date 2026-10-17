@@ -15,7 +15,6 @@ import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { ClassSectionsService } from '../class-sections/class-sections.service.js';
 import { getPasswordPolicyViolations } from '../common/validators/password-policy.js';
-import { AuthService } from '../auth/auth.service.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
 import type { CreateStudentDto } from './dto/create-student.dto.js';
@@ -24,9 +23,11 @@ import type { UserListQueryDto } from './dto/user-list-query.dto.js';
 import type { UserListItemResponseDto } from './dto/user-list-item-response.dto.js';
 import type { UserResponseDto } from './dto/user-response.dto.js';
 import type { RenameSteamxIdDto } from './dto/rename-steamx-id.dto.js';
+import type { UpdateUserDto } from './dto/update-user.dto.js';
+import type { UpdateUserStatusDto } from './dto/update-user-status.dto.js';
 import { userVisibility } from './user-visibility.js';
 import { toUserListItem, toUserResponse } from './users.mapper.js';
-import { UsersRepository } from './users.repository.js';
+import { UsersRepository, type UserDetailRecord } from './users.repository.js';
 import { SteamxIdService } from './steamx-id/steamx-id.service.js';
 import { isValidSteamxId } from './steamx-id/steamx-id.js';
 
@@ -37,7 +38,6 @@ export class UsersService {
     private readonly passwords: PasswordService,
     private readonly steamxIds: SteamxIdService,
     private readonly sections: ClassSectionsService,
-    private readonly authService: AuthService,
     private readonly activeSchool: ActiveSchoolService,
     private readonly logger: PinoLogger,
   ) {}
@@ -197,16 +197,145 @@ export class UsersService {
     }
   }
 
+  async update(actor: AuthContext, id: string, body: UpdateUserDto): Promise<UserResponseDto> {
+    const { user, where } = await this.findVisibleTarget(actor, id);
+    this.assertSchoolUser(user);
+
+    if (Object.values(body).every((value) => value === undefined)) {
+      throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
+    }
+
+    if (
+      (user.userType === UserType.STUDENT &&
+        (body.email !== undefined || body.primaryAssignment !== undefined)) ||
+      (user.userType === UserType.SCHOOL_STAFF &&
+        (body.guardianName !== undefined || body.classSectionId !== undefined))
+    ) {
+      throw new BadRequestException(API_ERROR.FIELD_NOT_APPLICABLE);
+    }
+
+    const userData: Prisma.UserUpdateManyMutationInput = {
+      ...(body.name === undefined ? {} : { name: body.name }),
+      ...(body.email === undefined ? {} : { email: body.email }),
+    };
+
+    let profileData:
+      | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
+      | { student: Prisma.StudentProfileUncheckedUpdateManyInput }
+      | undefined;
+    if (user.userType === UserType.SCHOOL_STAFF && body.primaryAssignment !== undefined) {
+      profileData = { teacher: { primaryAssignment: body.primaryAssignment } };
+    }
+    if (user.userType === UserType.STUDENT) {
+      const studentData: Prisma.StudentProfileUncheckedUpdateManyInput = {};
+      if (body.guardianName !== undefined) {
+        studentData.guardianName = body.guardianName;
+      }
+      if (
+        body.classSectionId !== undefined &&
+        body.classSectionId !== user.studentProfile?.classSectionId
+      ) {
+        // TODO(enrollments): mark old-class enrollments COMPLETED
+        await this.sections.assertInSchool(body.classSectionId, user.schoolId);
+        studentData.classSectionId = body.classSectionId;
+      }
+      if (Object.keys(studentData).length > 0) {
+        profileData = { student: studentData };
+      }
+    }
+
+    if (Object.keys(userData).length === 0 && profileData === undefined) {
+      return toUserResponse(user);
+    }
+
+    try {
+      const updated = await this.users.update(id, where, userData, user.schoolId, profileData);
+      if (!updated) {
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
+      }
+      this.logger.info(
+        { actorId: actor.userId, userId: updated.id, schoolId: updated.schoolId },
+        'User updated',
+      );
+      return toUserResponse(updated);
+    } catch (error) {
+      throwConflictOnDuplicate(error, API_ERROR.CONFLICT);
+      throw error;
+    }
+  }
+
+  async updateStatus(
+    actor: AuthContext,
+    id: string,
+    body: UpdateUserStatusDto,
+  ): Promise<UserResponseDto> {
+    const { user, where } = await this.findVisibleTarget(actor, id);
+    if (user.id === actor.userId) {
+      throw new BadRequestException(API_ERROR.CANNOT_DEACTIVATE_SELF);
+    }
+    this.assertSchoolUser(user);
+    if (user.status === body.status) {
+      return toUserResponse(user);
+    }
+
+    const updated = await this.users.updateStatus(where, body.status);
+    if (!updated) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    this.logger.info(
+      {
+        actorId: actor.userId,
+        userId: updated.id,
+        oldStatus: user.status,
+        newStatus: updated.status,
+      },
+      'User status changed',
+    );
+    return toUserResponse(updated);
+  }
+
   async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {
-    await this.authService.resetPassword(actor, userId, newPassword);
+    const { user, where } = await this.findVisibleTarget(actor, userId);
+    if (user.id === actor.userId) {
+      throw new BadRequestException(API_ERROR.CANNOT_RESET_OWN_PASSWORD);
+    }
+
+    this.validatePassword(newPassword, user.steamxId);
+    const passwordHash = await this.passwords.hash(newPassword);
+    const updated = await this.users.resetPassword(where, passwordHash);
+    if (!updated) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    this.logger.info({ actorId: actor.userId, targetId: user.id }, 'Password reset');
+  }
+
+  private async findVisibleTarget(
+    actor: AuthContext,
+    id: string,
+  ): Promise<{ user: UserDetailRecord; where: Prisma.UserWhereInput }> {
+    const scope = resolveSchoolScope(actor);
+    const where: Prisma.UserWhereInput = {
+      AND: [{ id }, schoolFilter(scope), userVisibility(actor)],
+    };
+    const user = await this.users.findById(where);
+    if (!user) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    return { user, where };
+  }
+
+  private assertSchoolUser(
+    user: UserDetailRecord,
+  ): asserts user is UserDetailRecord & { schoolId: string } {
+    if (user.schoolId === null) {
+      throw new BadRequestException(API_ERROR.USER_NOT_MANAGEABLE);
+    }
   }
 
   private async resolveRole(roleKey: UserRoleKey, userType: UserType): Promise<{ id: number }> {
     const role = await this.users.findRole(roleKey);
     if (!role || role.userType !== userType) {
-      throw new InternalServerErrorException({
-        ...API_ERROR.ROLE_CONFIGURATION_ERROR,
-      });
+      throw new InternalServerErrorException(API_ERROR.ROLE_CONFIGURATION_ERROR);
     }
     return { id: role.id };
   }

@@ -80,6 +80,18 @@ export const API_ERROR = {
     code: 'CANNOT_RESET_OWN_PASSWORD',
     message: 'Use change-password to update your own password',
   },
+  USER_NOT_MANAGEABLE: {
+    code: 'USER_NOT_MANAGEABLE',
+    message: 'Platform staff accounts cannot be managed here.',
+  },
+  FIELD_NOT_APPLICABLE: {
+    code: 'FIELD_NOT_APPLICABLE',
+    message: 'A supplied field does not apply to this user type.',
+  },
+  CANNOT_DEACTIVATE_SELF: {
+    code: 'CANNOT_DEACTIVATE_SELF',
+    message: 'You cannot change your own status.',
+  },
   INTERNAL_ERROR: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
   HTTP_ERROR: { code: 'HTTP_ERROR', message: 'Request failed' },
 } as const;

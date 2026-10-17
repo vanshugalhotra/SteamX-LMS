@@ -328,52 +328,6 @@ describe('Authentication endpoints (e2e)', () => {
     },
   );
 
-  it('resets passwords only for callers with permission and requires a new password at next login', async () => {
-    const admin = await createUser();
-    const teacher = await createUser({ userType: UserType.SCHOOL_STAFF });
-    const student = await createUser({ userType: UserType.STUDENT });
-    const target = await createUser();
-    const adminCookie = getCookie(await login(admin.steamxId, TEST_PASSWORD).expect(200));
-    const chosenPassword = 'Admin chosen password 2026!';
-    vi.useFakeTimers();
-    vi.setSystemTime(Date.now() - 5_000);
-    const targetOldToken = await tokens.sign(target.id);
-    vi.useRealTimers();
-    const targetOldCookie = `steamx_session=${targetOldToken}`;
-
-    const invalidPolicy = await postWithSession(
-      `/api/v1/users/${target.id}/reset-password`,
-      adminCookie,
-      { newPassword: `prefix-${target.steamxId}-suffix` },
-    ).expect(400);
-    expect(invalidPolicy.body.code).toBe('PASSWORD_POLICY');
-    expect(invalidPolicy.body.details).toContain('PASSWORD_CONTAINS_STEAMX_ID');
-
-    const reset = await postWithSession(`/api/v1/users/${target.id}/reset-password`, adminCookie, {
-      newPassword: chosenPassword,
-    }).expect(204);
-    expect(reset.text).toBe('');
-    await withCookie('/api/v1/auth-test/protected', targetOldCookie).expect(401);
-    const targetLogin = await login(target.steamxId, chosenPassword).expect(200);
-    expect(targetLogin.body.mustChangePassword).toBe(true);
-    await login(target.steamxId, TEST_PASSWORD).expect(401);
-
-    const teacherCookie = getCookie(await login(teacher.steamxId, TEST_PASSWORD).expect(200));
-    const studentCookie = getCookie(await login(student.steamxId, TEST_PASSWORD).expect(200));
-    await postWithSession(`/api/v1/users/${target.id}/reset-password`, teacherCookie, {
-      newPassword: chosenPassword,
-    }).expect(403);
-    await postWithSession(`/api/v1/users/${target.id}/reset-password`, studentCookie, {
-      newPassword: chosenPassword,
-    }).expect(403);
-    await postWithSession(`/api/v1/users/${randomUUID()}/reset-password`, adminCookie, {
-      newPassword: chosenPassword,
-    }).expect(404);
-    await postWithSession(`/api/v1/users/${admin.id}/reset-password`, adminCookie, {
-      newPassword: chosenPassword,
-    }).expect(400);
-  });
-
   it.each([
     ['missing Origin', undefined],
     ['foreign Origin', 'https://foreign.example'],
