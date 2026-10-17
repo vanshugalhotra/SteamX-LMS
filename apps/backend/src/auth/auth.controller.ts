@@ -11,6 +11,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { AuthenticatedOnly } from './decorators/authenticated-only.decorator.js';
 import { AllowWhenPasswordChangeRequired } from './decorators/allow-when-password-change-required.decorator.js';
 import { CurrentAuth } from './decorators/current-auth.decorator.js';
 import { Public } from './decorators/public.decorator.js';
@@ -64,6 +65,7 @@ export class AuthController {
   // POST /auth/logout — Log out
   // ─────────────────────────────────────────
 
+  @AuthenticatedOnly()
   @AllowWhenPasswordChangeRequired()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -88,6 +90,7 @@ export class AuthController {
   // GET /auth/me — Current profile
   // ─────────────────────────────────────────
 
+  @AuthenticatedOnly()
   @AllowWhenPasswordChangeRequired()
   @Get('me')
   @ApiCookieAuth('cookieAuth')
@@ -112,6 +115,7 @@ export class AuthController {
   // POST /auth/change-password — Change password
   // ─────────────────────────────────────────
 
+  @AuthenticatedOnly()
   @AllowWhenPasswordChangeRequired()
   @Post('change-password')
   @HttpCode(HttpStatus.OK)

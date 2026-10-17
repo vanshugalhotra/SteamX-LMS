@@ -24,6 +24,13 @@ export class SchoolsRepository {
     return this.prisma.school.create({ data });
   }
 
+  findCodeById(schoolId: string): Promise<{ code: string } | null> {
+    return this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { code: true },
+    });
+  }
+
   findMany(
     scope: string | undefined,
     query: { page: number; limit: number; q?: string; status?: SchoolStatus },

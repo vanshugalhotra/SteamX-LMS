@@ -14,6 +14,7 @@ import { resolveSchoolScope, schoolFilter } from '../common/tenancy/school-scope
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { ClassSectionsService } from '../class-sections/class-sections.service.js';
+import { SchoolsService } from '../schools/schools.service.js';
 import { getPasswordPolicyViolations } from '../common/validators/password-policy.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
@@ -38,6 +39,7 @@ export class UsersService {
     private readonly passwords: PasswordService,
     private readonly steamxIds: SteamxIdService,
     private readonly sections: ClassSectionsService,
+    private readonly schools: SchoolsService,
     private readonly activeSchool: ActiveSchoolService,
     private readonly logger: PinoLogger,
   ) {}
@@ -168,7 +170,7 @@ export class UsersService {
       throw new BadRequestException(API_ERROR.STEAMX_ID_NOT_RENAMABLE);
     }
 
-    const school = await this.users.findSchoolCode(user.schoolId);
+    const school = await this.schools.findCodeById(user.schoolId);
     if (!school || !isValidSteamxId(body.steamxId, school.code)) {
       throw new BadRequestException(API_ERROR.INVALID_STEAMX_ID);
     }
