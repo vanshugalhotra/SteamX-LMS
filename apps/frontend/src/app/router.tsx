@@ -40,6 +40,13 @@ export const router = createBrowserRouter([
               return { Component: DashboardPage };
             },
           },
+          {
+            path: PATHS.admin.schools,
+            lazy: async () => {
+              const { SchoolsPage } = await import('@/features/admin/schools/pages/SchoolsPage');
+              return { Component: SchoolsPage };
+            },
+          },
           { path: PATHS.admin.base, loader: () => redirect(PATHS.admin.dashboard) },
         ],
       },
