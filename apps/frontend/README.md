@@ -106,16 +106,29 @@ Signing in lands on the admin shell at `/steamx/admin/dashboard` (sidebar, heade
 
 The global 401/403 handlers (`app/session-handlers.ts`) only run for API calls made without `skipAuthHandlers`. No page makes such a call yet, so the "session expired" message and the "no access" toast cannot be triggered from the UI until a feature calls a protected endpoint.
 
+### Trying the schools page
+
+Open **Schools** in the sidebar (`/steamx/admin/schools`). The signed-in admin needs the `school.read` permission (and `school.manage` to create or edit); both are granted to the admin role by the backend migrations.
+
+- The list loads from `GET /schools`. Search (by name or code, debounced), the status filter (All, Active, Inactive) and pagination are handled by the API.
+- **Add school** opens a drawer. Empty required fields show field errors; a duplicate school code is shown on the code field.
+- **Edit** opens the same drawer. The code cannot be changed, and clearing an optional field saves it as empty.
+- Esc, the close button or a click on the backdrop closes the drawer and returns focus to the button that opened it.
+- If the list cannot be loaded, an error with a **Retry** button is shown.
+
+If the list returns `403` (missing `school.read`), your local database probably has an older version of the `reference_data` migration applied. Reset the dev database (`prisma migrate reset` in `apps/backend`, which wipes local data) and run `admin:create` again.
+
 ## Project structure
 
 ```
 src/
   app/          App wiring: providers, router, session handlers
-  components/   Shared UI (components/ui: Button, Input, PasswordInput, FormField, Alert), Logo
+  components/   Shared UI (components/ui: Button, Input, PasswordInput, FormField, Alert, Drawer, Pagination), Logo
   features/     One folder per feature (landing, auth, admin, ...)
     auth/       api/, pages/, model/, components/, queries.ts, loaders.ts
     admin/      components/ (layout, sidebar, header), pages/, nav.ts
-  lib/          Shared helpers: api-client, env, query-client, paths, utils
+      schools/  api/, model/, components/, pages/, queries.ts
+  lib/          Shared helpers: api-client, env, query-client, paths, pagination, use-debounced-value, utils
 ```
 
 Conventions:
@@ -125,3 +138,4 @@ Conventions:
 - Server state goes through TanStack Query; forms use React Hook Form with a Zod schema.
 - All route paths live in `lib/paths.ts` (`PATHS`). Admin routes are prefixed with `/steamx/admin`. Don't hardcode paths in components.
 - Global 401/403 handling lives in `app/session-handlers.ts`, registered once in `main.tsx`.
+- List endpoints return `{ items, page, limit, total }` (the `Paginated<T>` type in `lib/pagination.ts`). Filtering, search and paging are done by the API, and query keys per feature live in its `queries.ts`.
