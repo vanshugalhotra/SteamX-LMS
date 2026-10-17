@@ -176,6 +176,11 @@ export class UsersRepository {
       | { student: Prisma.StudentProfileUncheckedUpdateManyInput },
   ): Promise<UserDetailRecord | null> {
     return this.prisma.$transaction(async (tx) => {
+      const visible = await tx.user.findFirst({ where, select: { id: true } });
+      if (!visible) {
+        return null;
+      }
+
       if (Object.keys(userData).length > 0) {
         const user = await tx.user.updateMany({ where, data: userData });
         if (user.count === 0) {
