@@ -36,6 +36,8 @@ import { UserResponseDto } from './dto/user-response.dto.js';
 import { UsersService } from './users.service.js';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto.js';
 import { RenameSteamxIdDto } from './dto/rename-steamx-id.dto.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto.js';
 
 @ApiTags('Users')
 @ApiCookieAuth('cookieAuth')
@@ -135,6 +137,43 @@ export class UsersController {
   }
 
   // ─────────────────────────────────────────
+  // PATCH /users/:id — Update a user
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.USER_UPDATE)
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a user' })
+  @ApiOkResponse({ description: 'User updated.', type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'The update is invalid or a field does not apply.' })
+  @ApiConflictResponse({ description: 'Email address is already in use.' })
+  @ApiNotFoundResponse({ description: 'User not found or not visible.' })
+  update(
+    @CurrentAuth() actor: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    return this.users.update(actor, id, body);
+  }
+
+  // ─────────────────────────────────────────
+  // PATCH /users/:id/status — Change user status
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.USER_DEACTIVATE)
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Change a user status' })
+  @ApiOkResponse({ description: 'User status updated.', type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'The user ID or status is invalid.' })
+  @ApiNotFoundResponse({ description: 'User not found or not visible.' })
+  updateStatus(
+    @CurrentAuth() actor: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateUserStatusDto,
+  ): Promise<UserResponseDto> {
+    return this.users.updateStatus(actor, id, body);
+  }
+
+  // ─────────────────────────────────────────
   // PATCH /users/:id/steamx-id — Rename a user's SteamX ID
   // ─────────────────────────────────────────
 
@@ -165,7 +204,7 @@ export class UsersController {
   @ApiBadRequestResponse({
     description: 'The user ID or password is invalid, or this is a self-reset.',
   })
-  @ApiNotFoundResponse({ description: 'User not found.' })
+  @ApiNotFoundResponse({ description: 'User not found or not visible.' })
   resetPassword(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,

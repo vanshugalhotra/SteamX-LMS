@@ -14,10 +14,16 @@ import { AppModule } from '../../src/app.module.js';
 import { PERMISSION } from '../../src/auth/permissions.js';
 import type { Env } from '../../src/config/env.schema.js';
 import { configureApp } from '../../src/configure-app.js';
-import { PrismaClient, SchoolStatus, UserType } from '../../src/generated/prisma/client.js';
+import {
+  PrismaClient,
+  SchoolStatus,
+  UserStatus,
+  UserType,
+} from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { SteamxIdService } from '../../src/users/steamx-id/steamx-id.service.js';
 import {
+  createTestUser,
   createTwoSchoolFixture,
   TENANCY_TEST_PASSWORD,
   type TwoSchoolFixture,
@@ -36,6 +42,7 @@ describe('Users endpoints (e2e)', () => {
   let origin: string;
   let revokeTeacherPermissions: (() => Promise<void>) | undefined;
   const createdUserIds: string[] = [];
+  const createdClassSectionIds: string[] = [];
 
   beforeAll(async () => {
     const databaseUrl = process.env.DATABASE_URL;
@@ -50,6 +57,9 @@ describe('Users endpoints (e2e)', () => {
       PERMISSION.USER_READ,
       PERMISSION.USER_CREATE_TEACHER,
       PERMISSION.USER_STEAMX_ID_UPDATE,
+      PERMISSION.USER_UPDATE,
+      PERMISSION.USER_DEACTIVATE,
+      PERMISSION.USER_PASSWORD_RESET,
     ]);
     revokeTeacherPermissions = grant.revoke;
 
@@ -80,7 +90,7 @@ describe('Users endpoints (e2e)', () => {
           ...createdUserIds,
         ],
         [fixture.schoolA.school.id, fixture.schoolB.school.id],
-        [fixture.schoolA.section.id, fixture.schoolB.section.id],
+        [fixture.schoolA.section.id, fixture.schoolB.section.id, ...createdClassSectionIds],
       );
     }
     await app?.close();
@@ -119,6 +129,30 @@ describe('Users endpoints (e2e)', () => {
       .set('Origin', origin)
       .set('Cookie', cookie)
       .send({ steamxId });
+  }
+
+  function updateUser(cookie: string, id: string, body: object) {
+    return request(app.getHttpServer())
+      .patch(`/api/v1/users/${id}`)
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send(body);
+  }
+
+  function updateUserStatus(cookie: string, id: string, status: UserStatus) {
+    return request(app.getHttpServer())
+      .patch(`/api/v1/users/${id}/status`)
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send({ status });
+  }
+
+  function resetUserPassword(cookie: string, id: string, newPassword: string) {
+    return request(app.getHttpServer())
+      .post(`/api/v1/users/${id}/reset-password`)
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send({ newPassword });
   }
 
   async function createAndTrackTeacher(
@@ -358,6 +392,193 @@ describe('Users endpoints (e2e)', () => {
         data: { status: SchoolStatus.ACTIVE },
       });
     }
+  });
+
+  it('updates school users, validates type-specific fields, and changes student classes atomically', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const prefix = randomUUID().replaceAll('-', '').slice(0, 8).toLowerCase();
+    const teacher = await createAndTrackTeacher(
+      adminCookie,
+      'Editable Teacher',
+      fixture.schoolA.school.id,
+      { email: `${prefix}-teacher@example.com` },
+    );
+    const otherTeacher = await createAndTrackTeacher(
+      adminCookie,
+      'Other Editable Teacher',
+      fixture.schoolA.school.id,
+      { email: `${prefix}-other@example.com` },
+    );
+    const studentResponse = await createStudent(adminCookie, {
+      name: 'Editable Student',
+      password: TENANCY_TEST_PASSWORD,
+      classSectionId: fixture.schoolA.section.id,
+      schoolId: fixture.schoolA.school.id,
+      guardianName: 'Original Guardian',
+    }).expect(201);
+    const studentId = studentResponse.body.id as string;
+    createdUserIds.push(studentId);
+
+    const updatedTeacher = await updateUser(adminCookie, teacher.id, {
+      name: '  Updated Teacher  ',
+      email: `  ${prefix}-updated@example.com  `,
+      primaryAssignment: '  Science  ',
+    }).expect(200);
+    expect(updatedTeacher.body).toMatchObject({
+      name: 'Updated Teacher',
+      email: `${prefix}-updated@example.com`,
+      profile: { primaryAssignment: 'Science' },
+    });
+    expect(JSON.stringify(updatedTeacher.body)).not.toContain('passwordHash');
+
+    await updateUser(adminCookie, teacher.id, {}).expect(400);
+    await updateUser(adminCookie, studentId, { email: `${prefix}-invalid@example.com` })
+      .expect(400)
+      .expect(({ body }) => expect(body.code).toBe('FIELD_NOT_APPLICABLE'));
+    await updateUser(adminCookie, teacher.id, { guardianName: null })
+      .expect(400)
+      .expect(({ body }) => expect(body.code).toBe('FIELD_NOT_APPLICABLE'));
+    await updateUser(adminCookie, teacher.id, { email: otherTeacher.email })
+      .expect(409)
+      .expect(({ body }) => expect(body.code).toBe('CONFLICT'));
+
+    const originalProfile = await prisma.studentProfile.findUniqueOrThrow({
+      where: { userId: studentId },
+      select: { classSectionId: true, guardianName: true },
+    });
+    await updateUser(adminCookie, studentId, {
+      classSectionId: fixture.schoolB.section.id,
+    }).expect(404);
+    await expect(
+      prisma.studentProfile.findUniqueOrThrow({
+        where: { userId: studentId },
+        select: { classSectionId: true, guardianName: true },
+      }),
+    ).resolves.toEqual(originalProfile);
+
+    const newSection = await prisma.classSection.create({
+      data: { schoolId: fixture.schoolA.school.id, className: `Move ${prefix}` },
+      select: { id: true },
+    });
+    createdClassSectionIds.push(newSection.id);
+    const updatedStudent = await updateUser(adminCookie, studentId, {
+      classSectionId: newSection.id,
+    }).expect(200);
+    expect(updatedStudent.body.profile).toEqual({
+      guardianName: 'Original Guardian',
+      classSectionId: newSection.id,
+    });
+    expect(JSON.stringify(updatedStudent.body)).not.toContain('passwordHash');
+  });
+
+  it('changes status immediately for existing sessions and allows reactivation', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const user = await createAndTrackTeacher(
+      adminCookie,
+      'Status Change Target',
+      fixture.schoolA.school.id,
+    );
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mustChangePassword: false },
+    });
+    const userCookie = await loginAs(app, {
+      steamxId: user.steamxId,
+      password: TENANCY_TEST_PASSWORD,
+    });
+    const unaffectedCookie = await loginAs(app, fixture.schoolB.teacher);
+
+    const deactivated = await updateUserStatus(adminCookie, user.id, UserStatus.INACTIVE).expect(
+      200,
+    );
+    expect(deactivated.body.status).toBe(UserStatus.INACTIVE);
+    await getUser(userCookie, user.id).expect(401);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('Origin', origin)
+      .send({ steamxId: user.steamxId, password: TENANCY_TEST_PASSWORD })
+      .expect(401);
+    await getUser(unaffectedCookie, fixture.schoolB.teacher.id).expect(200);
+
+    await updateUserStatus(adminCookie, user.id, UserStatus.ACTIVE).expect(200);
+    await getUser(userCookie, user.id).expect(200);
+    await updateUserStatus(adminCookie, user.id, UserStatus.ACTIVE).expect(200);
+  });
+
+  it('enforces management scope, rejects platform staff targets, and scopes password resets', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+    const platformStaff = await prisma.$transaction((tx) =>
+      createTestUser(tx, {
+        userType: UserType.PLATFORM_STAFF,
+        name: 'Unmanageable Platform Staff',
+        passwordHash: 'test-only-password-hash',
+      }),
+    );
+    createdUserIds.push(platformStaff.id);
+
+    await updateUser(teacherCookie, fixture.schoolB.teacher.id, { name: 'Out of scope' }).expect(
+      404,
+    );
+    await updateUserStatus(teacherCookie, fixture.schoolB.teacher.id, UserStatus.INACTIVE).expect(
+      404,
+    );
+    await resetUserPassword(
+      teacherCookie,
+      fixture.schoolB.teacher.id,
+      'Chosen reset password 2026!',
+    ).expect(404);
+    await updateUser(adminCookie, platformStaff.id, { name: 'Blocked update' })
+      .expect(400)
+      .expect(({ body }) => expect(body.code).toBe('USER_NOT_MANAGEABLE'));
+    await updateUserStatus(adminCookie, platformStaff.id, UserStatus.INACTIVE)
+      .expect(400)
+      .expect(({ body }) => expect(body.code).toBe('USER_NOT_MANAGEABLE'));
+    await updateUserStatus(adminCookie, fixture.admin.id, UserStatus.INACTIVE)
+      .expect(400)
+      .expect(({ body }) => expect(body.code).toBe('CANNOT_DEACTIVATE_SELF'));
+  });
+
+  it('resets passwords with scope checks, token revocation, and a forced password change', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const target = await createAndTrackTeacher(
+      adminCookie,
+      'Password Reset Target',
+      fixture.schoolA.school.id,
+    );
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { mustChangePassword: false },
+    });
+    const targetCookie = await loginAs(app, {
+      steamxId: target.steamxId,
+      password: TENANCY_TEST_PASSWORD,
+    });
+    const chosenPassword = 'Admin chosen reset password 2026!';
+
+    await getUser(targetCookie, target.id).expect(200);
+    await new Promise<void>((resolve) => setTimeout(resolve, 1_100));
+    await resetUserPassword(adminCookie, target.id, `prefix-${target.steamxId}-suffix`)
+      .expect(400)
+      .expect(({ body }) => expect(body.code).toBe('PASSWORD_POLICY'));
+    const reset = await resetUserPassword(adminCookie, target.id, chosenPassword).expect(204);
+    expect(reset.text).toBe('');
+    await getUser(targetCookie, target.id).expect(401);
+
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('Origin', origin)
+      .send({ steamxId: target.steamxId, password: chosenPassword })
+      .expect(200);
+    expect(login.body.mustChangePassword).toBe(true);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('Origin', origin)
+      .send({ steamxId: target.steamxId, password: TENANCY_TEST_PASSWORD })
+      .expect(401);
+    await resetUserPassword(adminCookie, fixture.admin.id, chosenPassword)
+      .expect(400)
+      .expect(({ body }) => expect(body.code).toBe('CANNOT_RESET_OWN_PASSWORD'));
   });
 
   it('validates student sections against the requested school', async () => {

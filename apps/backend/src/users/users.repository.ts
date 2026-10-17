@@ -2,7 +2,7 @@
  * Runs Prisma queries for users and creates each account with its profile atomically.
  */
 import { Injectable } from '@nestjs/common';
-import { Prisma, type UserType } from '../generated/prisma/client.js';
+import { Prisma, type UserStatus, type UserType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { paginatedSearch } from '../common/repositories/paginated-search.js';
 
@@ -164,5 +164,60 @@ export class UsersRepository {
       }
       return tx.user.findFirst({ where, select: USER_DETAIL_SELECT });
     });
+  }
+
+  update(
+    userId: string,
+    where: Prisma.UserWhereInput,
+    userData: Prisma.UserUpdateManyMutationInput,
+    schoolId: string,
+    profileData?:
+      | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
+      | { student: Prisma.StudentProfileUncheckedUpdateManyInput },
+  ): Promise<UserDetailRecord | null> {
+    return this.prisma.$transaction(async (tx) => {
+      if (Object.keys(userData).length > 0) {
+        const user = await tx.user.updateMany({ where, data: userData });
+        if (user.count === 0) {
+          return null;
+        }
+      }
+
+      if (profileData) {
+        if ('teacher' in profileData) {
+          await tx.teacherProfile.updateMany({
+            where: { userId, schoolId },
+            data: profileData.teacher,
+          });
+        } else {
+          await tx.studentProfile.updateMany({
+            where: { userId, schoolId },
+            data: profileData.student,
+          });
+        }
+      }
+
+      return tx.user.findFirst({ where, select: USER_DETAIL_SELECT });
+    });
+  }
+
+  async updateStatus(
+    where: Prisma.UserWhereInput,
+    status: UserStatus,
+  ): Promise<UserDetailRecord | null> {
+    const result = await this.prisma.user.updateMany({ where, data: { status } });
+    return result.count === 0 ? null : this.findById(where);
+  }
+
+  async resetPassword(where: Prisma.UserWhereInput, passwordHash: string): Promise<boolean> {
+    const result = await this.prisma.user.updateMany({
+      where,
+      data: {
+        passwordHash,
+        mustChangePassword: true,
+        passwordChangedAt: new Date(),
+      },
+    });
+    return result.count > 0;
   }
 }
