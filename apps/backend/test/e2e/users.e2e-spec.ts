@@ -315,11 +315,7 @@ describe('Users endpoints (e2e)', () => {
       await renameSteamxId(teacherCookie, fixture.schoolB.teacher.id, newSteamxId).expect(404);
       await renameSteamxId(studentCookie, fixture.schoolA.student.id, newSteamxId).expect(403);
     } finally {
-      await renameSteamxId(
-        adminCookie,
-        targetUser.id,
-        targetUser.steamxId,
-      ).expect(200);
+      await renameSteamxId(adminCookie, targetUser.id, targetUser.steamxId).expect(200);
     }
   });
 
