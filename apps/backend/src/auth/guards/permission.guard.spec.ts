@@ -19,9 +19,7 @@ describe('PermissionGuard', () => {
   it('denies protected routes without explicit authorization metadata', async () => {
     const { guard, context, moduleRef } = await createGuard({});
 
-    expect(() => guard.canActivate(context)).toThrow(
-      new ForbiddenException(API_ERROR.FORBIDDEN),
-    );
+    expect(() => guard.canActivate(context)).toThrow(new ForbiddenException(API_ERROR.FORBIDDEN));
     await moduleRef.close();
   });
 

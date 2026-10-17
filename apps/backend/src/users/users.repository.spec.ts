@@ -25,13 +25,9 @@ describe('UsersRepository', () => {
     const repository = moduleRef.get(UsersRepository);
 
     await expect(
-      repository.update(
-        'user-id',
-        { id: 'user-id' },
-        { name: 'Updated name' },
-        'school-id',
-        { student: { guardianName: 'Guardian' } },
-      ),
+      repository.update('user-id', { id: 'user-id' }, { name: 'Updated name' }, 'school-id', {
+        student: { guardianName: 'Guardian' },
+      }),
     ).rejects.toThrow('Expected student profile update to affect one row');
     expect(transaction).toHaveBeenCalledOnce();
     await moduleRef.close();
