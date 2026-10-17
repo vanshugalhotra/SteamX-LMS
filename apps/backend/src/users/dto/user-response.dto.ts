@@ -27,7 +27,7 @@ export class UserResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ minLength: 6, maxLength: 6 })
+  @ApiProperty({ description: 'School code prefix, 4-8 name letters, and 3 digits.' })
   steamxId!: string;
 
   @ApiProperty()

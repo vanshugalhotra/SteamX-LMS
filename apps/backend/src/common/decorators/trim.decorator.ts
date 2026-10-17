@@ -5,6 +5,7 @@ import { Transform } from 'class-transformer';
 
 type TrimOptions = {
   lowercase?: boolean;
+  uppercase?: boolean;
 };
 
 export function Trim(options: TrimOptions = {}): PropertyDecorator {
@@ -14,6 +15,9 @@ export function Trim(options: TrimOptions = {}): PropertyDecorator {
     }
 
     const trimmed = value.trim();
-    return options.lowercase ? trimmed.toLowerCase() : trimmed;
+    if (options.lowercase) {
+      return trimmed.toLowerCase();
+    }
+    return options.uppercase ? trimmed.toUpperCase() : trimmed;
   });
 }

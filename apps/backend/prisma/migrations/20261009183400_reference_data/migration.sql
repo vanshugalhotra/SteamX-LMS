@@ -62,3 +62,15 @@ CROSS JOIN permissions
 WHERE roles.key = 'admin'
   AND permissions.key IN ('user.read', 'user.create.teacher', 'user.create.student')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+INSERT INTO permissions (key, description)
+VALUES ('user.steamx-id.update', 'Rename a user SteamX ID')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM roles
+CROSS JOIN permissions
+WHERE roles.key = 'admin'
+  AND permissions.key = 'user.steamx-id.update'
+ON CONFLICT (role_id, permission_id) DO NOTHING;

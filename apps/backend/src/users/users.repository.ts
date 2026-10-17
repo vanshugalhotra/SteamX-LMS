@@ -143,4 +143,26 @@ export class UsersRepository {
       select: USER_DETAIL_SELECT,
     });
   }
+
+  findSchoolCode(schoolId: string): Promise<{ code: string } | null> {
+    return this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { code: true },
+    });
+  }
+
+  renameSteamxId(where: Prisma.UserWhereInput, steamxId: string): Promise<UserDetailRecord | null> {
+    return this.prisma.$transaction(async (tx) => {
+      // This repository method is the only application path that enables the guarded ID update.
+      await tx.$queryRaw`SELECT set_config('steamx.allow_steamx_id_change', 'on', true)`;
+      const result = await tx.user.updateMany({
+        where,
+        data: { steamxId },
+      });
+      if (result.count === 0) {
+        return null;
+      }
+      return tx.user.findFirst({ where, select: USER_DETAIL_SELECT });
+    });
+  }
 }
