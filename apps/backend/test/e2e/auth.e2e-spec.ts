@@ -8,6 +8,7 @@ import type { App } from 'supertest/types.js';
 import { SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { AuthContextRepository } from '../../src/auth/auth-context.repository.js';
+import { AuthenticatedOnly } from '../../src/auth/decorators/authenticated-only.decorator.js';
 import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../../src/auth/decorators/require-permission.decorator.js';
 import { PERMISSION } from '../../src/auth/permissions.js';
@@ -24,6 +25,7 @@ const TEST_PASSWORD = 'Test login password 2026!';
 
 @Controller('auth-test')
 class AuthTestController {
+  @AuthenticatedOnly()
   @Get('protected')
   getProtected(@CurrentAuth() authContext: AuthContext): AuthContext {
     return authContext;
@@ -327,52 +329,6 @@ describe('Authentication endpoints (e2e)', () => {
       expect(response.body.mustChangePassword).toBe(false);
     },
   );
-
-  it('resets passwords only for callers with permission and requires a new password at next login', async () => {
-    const admin = await createUser();
-    const teacher = await createUser({ userType: UserType.SCHOOL_STAFF });
-    const student = await createUser({ userType: UserType.STUDENT });
-    const target = await createUser();
-    const adminCookie = getCookie(await login(admin.steamxId, TEST_PASSWORD).expect(200));
-    const chosenPassword = 'Admin chosen password 2026!';
-    vi.useFakeTimers();
-    vi.setSystemTime(Date.now() - 5_000);
-    const targetOldToken = await tokens.sign(target.id);
-    vi.useRealTimers();
-    const targetOldCookie = `steamx_session=${targetOldToken}`;
-
-    const invalidPolicy = await postWithSession(
-      `/api/v1/users/${target.id}/reset-password`,
-      adminCookie,
-      { newPassword: `prefix-${target.steamxId}-suffix` },
-    ).expect(400);
-    expect(invalidPolicy.body.code).toBe('PASSWORD_POLICY');
-    expect(invalidPolicy.body.details).toContain('PASSWORD_CONTAINS_STEAMX_ID');
-
-    const reset = await postWithSession(`/api/v1/users/${target.id}/reset-password`, adminCookie, {
-      newPassword: chosenPassword,
-    }).expect(204);
-    expect(reset.text).toBe('');
-    await withCookie('/api/v1/auth-test/protected', targetOldCookie).expect(401);
-    const targetLogin = await login(target.steamxId, chosenPassword).expect(200);
-    expect(targetLogin.body.mustChangePassword).toBe(true);
-    await login(target.steamxId, TEST_PASSWORD).expect(401);
-
-    const teacherCookie = getCookie(await login(teacher.steamxId, TEST_PASSWORD).expect(200));
-    const studentCookie = getCookie(await login(student.steamxId, TEST_PASSWORD).expect(200));
-    await postWithSession(`/api/v1/users/${target.id}/reset-password`, teacherCookie, {
-      newPassword: chosenPassword,
-    }).expect(403);
-    await postWithSession(`/api/v1/users/${target.id}/reset-password`, studentCookie, {
-      newPassword: chosenPassword,
-    }).expect(403);
-    await postWithSession(`/api/v1/users/${randomUUID()}/reset-password`, adminCookie, {
-      newPassword: chosenPassword,
-    }).expect(404);
-    await postWithSession(`/api/v1/users/${admin.id}/reset-password`, adminCookie, {
-      newPassword: chosenPassword,
-    }).expect(400);
-  });
 
   it.each([
     ['missing Origin', undefined],

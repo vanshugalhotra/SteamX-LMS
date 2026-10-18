@@ -1,3 +1,4 @@
+/** Executes class-section queries with the resolved tenant scope included in each filter. */
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import type { ClassSection } from '../generated/prisma/client.js';

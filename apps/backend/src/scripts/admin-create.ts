@@ -1,3 +1,4 @@
+/** Command-line entry point for initial admin provisioning and deliberate password recovery. */
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { realpathSync } from 'node:fs';
@@ -9,6 +10,7 @@ import { FirstAdminError } from '../auth/types/first-admin.js';
 
 const ADMIN_CREATE_USAGE = 'Usage: pnpm --filter @steamx/backend admin:create [--reset]';
 
+/** Runs setup in a Nest application context and always closes its database resources. */
 export async function runAdminCreate(
   args: string[],
   environment: NodeJS.ProcessEnv = process.env,
@@ -58,6 +60,7 @@ async function main(): Promise<void> {
 }
 
 const entryPoint = process.argv[1];
+// Keep imports from tests from invoking the CLI as a side effect.
 if (
   entryPoint &&
   realpathSync(resolve(entryPoint)) === realpathSync(fileURLToPath(import.meta.url))

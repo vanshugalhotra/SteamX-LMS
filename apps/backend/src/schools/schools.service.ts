@@ -1,3 +1,4 @@
+/** Applies school access rules and coordinates school persistence for API workflows. */
 import {
   BadRequestException,
   ForbiddenException,
@@ -19,6 +20,7 @@ import type { UpdateSchoolDto } from './dto/update-school.dto.js';
 import { toSchoolResponse } from './schools.mapper.js';
 import { SchoolsRepository } from './schools.repository.js';
 
+/** Applies school access rules and maps repository results to API responses. */
 @Injectable()
 export class SchoolsService {
   constructor(
@@ -26,10 +28,16 @@ export class SchoolsService {
     private readonly logger: PinoLogger,
   ) {}
 
+  /** Exposes the school code to collaborating modules without exposing repository access. */
+  findCodeById(schoolId: string): Promise<{ code: string } | null> {
+    return this.schools.findCodeById(schoolId);
+  }
+
   // ─────────────────────────────────────────
   // POST /schools — Create a school
   // ─────────────────────────────────────────
 
+  /** Creates schools only for platform staff, regardless of assigned permissions. */
   async create(actor: AuthContext, body: CreateSchoolDto): Promise<SchoolResponseDto> {
     if (actor.userType !== UserType.PLATFORM_STAFF) {
       // even if a user has SCHOOL_MANAGE permission, they cannot create a school if they are not PLATFORM_STAFF
@@ -50,6 +58,7 @@ export class SchoolsService {
   // GET /schools — List schools
   // ─────────────────────────────────────────
 
+  /** Lists schools within the caller's resolved scope. */
   async findMany(
     actor: AuthContext,
     query: SchoolListQueryDto,
@@ -68,6 +77,7 @@ export class SchoolsService {
   // GET /schools/:id — Get a school
   // ─────────────────────────────────────────
 
+  /** Returns a school only when it is in the caller's scope; foreign IDs remain 404. */
   async findById(actor: AuthContext, id: string): Promise<SchoolResponseDto> {
     const scope = resolveSchoolScope(actor);
     const school = await this.schools.findById(id, scope);
@@ -81,6 +91,7 @@ export class SchoolsService {
   // PATCH /schools/:id — Update a school
   // ─────────────────────────────────────────
 
+  /** Updates a non-empty school patch within the caller's resolved scope. */
   async update(actor: AuthContext, id: string, body: UpdateSchoolDto): Promise<SchoolResponseDto> {
     if (Object.values(body).every((value) => value === undefined)) {
       throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
@@ -100,6 +111,7 @@ export class SchoolsService {
   // PATCH /schools/:id/status — Update status
   // ─────────────────────────────────────────
 
+  /** Changes a school's active state and treats repeating the current state as a no-op. */
   async updateStatus(
     actor: AuthContext,
     id: string,

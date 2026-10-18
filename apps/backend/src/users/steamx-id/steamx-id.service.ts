@@ -1,3 +1,4 @@
+/** Allocates unique SteamX IDs by retrying only collisions on the ID constraint. */
 import { randomInt } from 'node:crypto';
 import { ConflictException, Injectable } from '@nestjs/common';
 import { isPrismaKnownError } from '../../common/errors/prisma-error.js';
@@ -6,8 +7,13 @@ import { buildSteamxId } from './steamx-id.js';
 
 const MAX_STEAMX_ID_ATTEMPTS = 3;
 
+/** Retries account creation only when the generated SteamX ID collides. */
 @Injectable()
 export class SteamxIdService {
+  /**
+   * Generates a candidate and reruns the operation on SteamX ID uniqueness conflicts.
+   * Other database errors propagate; exhaustion throws STEAMX_ID_UNAVAILABLE.
+   */
   async withUniqueSteamxId<T>(
     identity: { schoolCode: string; name: string },
     run: (steamxId: string) => Promise<T>,
@@ -17,6 +23,7 @@ export class SteamxIdService {
       try {
         return await run(candidate);
       } catch (error) {
+        // Retrying other unique constraints could hide a real conflict unrelated to ID generation.
         if (!isSteamxIdUniqueViolation(error)) {
           throw error;
         }
@@ -30,6 +37,7 @@ export class SteamxIdService {
   }
 }
 
+/** Recognizes only Prisma uniqueness failures whose target is the SteamX ID column/index. */
 function isSteamxIdUniqueViolation(error: unknown): boolean {
   if (!isPrismaKnownError(error) || error.code !== 'P2002') {
     return false;

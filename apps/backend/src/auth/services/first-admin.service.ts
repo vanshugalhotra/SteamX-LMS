@@ -1,3 +1,4 @@
+/** Handles one-time platform-admin provisioning and explicit password recovery. */
 import { Injectable } from '@nestjs/common';
 import { Prisma, UserType } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -21,6 +22,7 @@ type NormalizedFirstAdminInput = {
   name: string;
 };
 
+/** Creates the initial platform admin or performs an explicit recovery password reset. */
 @Injectable()
 export class FirstAdminService {
   constructor(
@@ -29,6 +31,7 @@ export class FirstAdminService {
     private readonly users: AuthContextRepository,
   ) {}
 
+  /** Resets only an existing admin account and forces a password change at next login. */
   async resetAdminPassword(input: Pick<FirstAdminInput, 'steamxId' | 'password'>): Promise<string> {
     const steamxId = normalizeSteamxId(input.steamxId);
     try {
@@ -63,6 +66,10 @@ export class FirstAdminService {
     }
   }
 
+  /**
+   * Creates the first admin, optionally inside a caller-owned transaction.
+   * Serializable isolation prevents concurrent setup processes from both winning creation.
+   */
   async create(
     input: FirstAdminInput,
     transaction?: Prisma.TransactionClient,
@@ -95,6 +102,7 @@ export class FirstAdminService {
     }
   }
 
+  /** Normalizes and validates setup input before hashing or opening a transaction. */
   private validateInput(input: FirstAdminInput): NormalizedFirstAdminInput {
     const steamxId = normalizeSteamxId(input.steamxId);
     if (!isValidSteamxId(steamxId)) {
@@ -116,6 +124,7 @@ export class FirstAdminService {
     return { steamxId, password: input.password, name };
   }
 
+  /** Rechecks reference data and existing admins inside the transaction before insert. */
   private async createInTransaction(
     tx: Prisma.TransactionClient,
     input: NormalizedFirstAdminInput,

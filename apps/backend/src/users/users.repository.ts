@@ -2,7 +2,7 @@
  * Runs Prisma queries for users and creates each account with its profile atomically.
  */
 import { Injectable } from '@nestjs/common';
-import { Prisma, type UserType } from '../generated/prisma/client.js';
+import { Prisma, type UserStatus, type UserType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { paginatedSearch } from '../common/repositories/paginated-search.js';
 
@@ -28,6 +28,7 @@ const USER_DETAIL_SELECT = {
 export type UserListRecord = Prisma.UserGetPayload<{ select: typeof USER_LIST_SELECT }>;
 export type UserDetailRecord = Prisma.UserGetPayload<{ select: typeof USER_DETAIL_SELECT }>;
 
+/** Runs user persistence queries; related profile writes stay in the same transaction. */
 @Injectable()
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -49,6 +50,7 @@ export class UsersRepository {
     userType: UserType;
     primaryAssignment: string | null;
   }): Promise<UserDetailRecord> {
+    // The database requires the account and its teacher profile to exist together.
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -87,6 +89,7 @@ export class UsersRepository {
     classSectionId: string;
     guardianName: string | null;
   }): Promise<UserDetailRecord> {
+    // The database requires the account and its student profile to exist together.
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -144,16 +147,10 @@ export class UsersRepository {
     });
   }
 
-  findSchoolCode(schoolId: string): Promise<{ code: string } | null> {
-    return this.prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { code: true },
-    });
-  }
-
   renameSteamxId(where: Prisma.UserWhereInput, steamxId: string): Promise<UserDetailRecord | null> {
     return this.prisma.$transaction(async (tx) => {
-      // This repository method is the only application path that enables the guarded ID update.
+      // A database trigger blocks steamx_id changes unless steamx.allow_steamx_id_change is on.
+      // Transaction-local configuration keeps that exception limited to this rename.
       await tx.$queryRaw`SELECT set_config('steamx.allow_steamx_id_change', 'on', true)`;
       const result = await tx.user.updateMany({
         where,
@@ -164,5 +161,72 @@ export class UsersRepository {
       }
       return tx.user.findFirst({ where, select: USER_DETAIL_SELECT });
     });
+  }
+
+  update(
+    userId: string,
+    where: Prisma.UserWhereInput,
+    userData: Prisma.UserUpdateManyMutationInput,
+    schoolId: string,
+    profileData?:
+      | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
+      | { student: Prisma.StudentProfileUncheckedUpdateManyInput },
+  ): Promise<UserDetailRecord | null> {
+    // User and profile fields must commit together so a partial update is never reported as success.
+    return this.prisma.$transaction(async (tx) => {
+      const visible = await tx.user.findFirst({ where, select: { id: true } });
+      if (!visible) {
+        return null;
+      }
+
+      if (Object.keys(userData).length > 0) {
+        const user = await tx.user.updateMany({ where, data: userData });
+        if (user.count === 0) {
+          return null;
+        }
+      }
+
+      if (profileData) {
+        if ('teacher' in profileData) {
+          const result = await tx.teacherProfile.updateMany({
+            where: { userId, schoolId },
+            data: profileData.teacher,
+          });
+          if (result.count === 0) {
+            throw new Error('Expected teacher profile update to affect one row');
+          }
+        } else {
+          const result = await tx.studentProfile.updateMany({
+            where: { userId, schoolId },
+            data: profileData.student,
+          });
+          if (result.count === 0) {
+            throw new Error('Expected student profile update to affect one row');
+          }
+        }
+      }
+
+      return tx.user.findFirst({ where, select: USER_DETAIL_SELECT });
+    });
+  }
+
+  async updateStatus(
+    where: Prisma.UserWhereInput,
+    status: UserStatus,
+  ): Promise<UserDetailRecord | null> {
+    const result = await this.prisma.user.updateMany({ where, data: { status } });
+    return result.count === 0 ? null : this.findById(where);
+  }
+
+  async resetPassword(where: Prisma.UserWhereInput, passwordHash: string): Promise<boolean> {
+    const result = await this.prisma.user.updateMany({
+      where,
+      data: {
+        passwordHash,
+        mustChangePassword: true,
+        passwordChangedAt: new Date(),
+      },
+    });
+    return result.count > 0;
   }
 }

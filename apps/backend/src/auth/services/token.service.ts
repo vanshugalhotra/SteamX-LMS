@@ -1,3 +1,4 @@
+/** Creates and verifies signed session tokens and supplies their cookie options. */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify } from 'jose';
@@ -9,6 +10,8 @@ import type { AuthCookieOptions, VerifiedToken } from '../types/token.js';
 const JWT_ALGORITHM = 'HS256';
 const JWT_ALGORITHMS = [JWT_ALGORITHM];
 const MILLISECONDS_PER_SECOND = 1_000;
+
+/** Signs and verifies the session JWT stored in the authentication cookie. */
 @Injectable()
 export class TokenService {
   private readonly secret: Uint8Array;
@@ -21,6 +24,7 @@ export class TokenService {
     this.isProduction = config.get('NODE_ENV', { infer: true }) === 'production';
   }
 
+  /** Issues a token with only subject, issued-at, and expiry claims. */
   async sign(userId: string): Promise<string> {
     const issuedAt = Math.floor(Date.now() / MILLISECONDS_PER_SECOND);
     const expiresAt = issuedAt + this.ttlSeconds;
@@ -33,6 +37,7 @@ export class TokenService {
       .sign(this.secret);
   }
 
+  /** Verifies signature and expiry, then rejects unexpected claims or claim types. */
   async verify(token: string): Promise<VerifiedToken> {
     try {
       const { payload } = await jwtVerify(token, this.secret, {
@@ -65,6 +70,7 @@ export class TokenService {
     }
   }
 
+  /** Returns matching cookie settings for issuing and clearing the session cookie. */
   cookieOptions(): AuthCookieOptions {
     return {
       name: AUTH_COOKIE_NAME,

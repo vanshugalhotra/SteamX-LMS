@@ -8,6 +8,7 @@ import type { App } from 'supertest/types.js';
 import { SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { AllowWhenPasswordChangeRequired } from '../../src/auth/decorators/allow-when-password-change-required.decorator.js';
+import { AuthenticatedOnly } from '../../src/auth/decorators/authenticated-only.decorator.js';
 import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js';
 import { Public } from '../../src/auth/decorators/public.decorator.js';
 import type { AuthContext } from '../../src/auth/types/auth-context.js';
@@ -22,11 +23,13 @@ const ALTERNATE_TEST_SECRET = 'different-test-secret-that-is-at-least-32-charact
 
 @Controller('test-auth')
 class AuthGuardTestController {
+  @AuthenticatedOnly()
   @Get('context')
   getContext(@CurrentAuth() auth: AuthContext | undefined): AuthContext | undefined {
     return auth;
   }
 
+  @AuthenticatedOnly()
   @AllowWhenPasswordChangeRequired()
   @Get('password-change')
   getPasswordChange(): { allowed: true } {

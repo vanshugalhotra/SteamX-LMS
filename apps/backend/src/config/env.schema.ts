@@ -1,3 +1,4 @@
+/** Defines and validates the typed environment configuration used by the backend. */
 import { z } from 'zod';
 
 const AUTH_TOKEN_TTL_MIN_SECONDS = 60;
@@ -54,6 +55,7 @@ const envSchema = z
 
 export type Env = z.output<typeof envSchema>;
 
+/** Validates all runtime configuration once, before services read typed values. */
 export function validateEnv(config: Record<string, unknown>): Env {
   const result = envSchema.safeParse(config);
 

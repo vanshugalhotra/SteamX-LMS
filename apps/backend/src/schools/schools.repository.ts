@@ -20,10 +20,23 @@ function selfScopeFilter(scope: string | undefined): Prisma.SchoolWhereInput {
 export class SchoolsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Inserts a school; duplicate-code conflicts are translated by SchoolsService. */
   create(data: CreateSchoolDto) {
     return this.prisma.school.create({ data });
   }
 
+  /** Reads only a school's code for another module's SteamX ID validation. */
+  findCodeById(schoolId: string): Promise<{ code: string } | null> {
+    return this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { code: true },
+    });
+  }
+
+  /**
+   * Returns a page and total count using the same scope and optional filters.
+   * Name and ID ordering keeps page boundaries stable when names match.
+   */
   findMany(
     scope: string | undefined,
     query: { page: number; limit: number; q?: string; status?: SchoolStatus },
@@ -54,12 +67,17 @@ export class SchoolsRepository {
     });
   }
 
+  /** Finds an ID only inside the resolved scope; foreign school IDs therefore return null. */
   findById(id: string, scope: string | undefined) {
     return this.prisma.school.findFirst({
       where: { AND: [{ id }, selfScopeFilter(scope)] },
     });
   }
 
+  /**
+   * Updates only the matching ID and scope, then reads the updated row.
+   * Returns null when no school matched, without first loading a foreign row.
+   */
   async update(
     id: string,
     scope: string | undefined,

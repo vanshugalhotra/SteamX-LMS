@@ -1,3 +1,4 @@
+/** Loads role grants from the database and serves authorization checks. */
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { AuthContextRepository } from '../auth-context.repository.js';
@@ -7,6 +8,11 @@ function isPermissionKey(key: string): key is PermissionKey {
   return Object.values(PERMISSION).some((permission) => permission === key);
 }
 
+/**
+ * Loads role grants seeded by database migrations through AuthContextRepository, then caches them.
+ * PermissionGuard calls has() for each route marked with @RequirePermission; modules do not query
+ * the role-permission tables themselves.
+ */
 @Injectable()
 export class PermissionsService implements OnModuleInit {
   private readonly permissionsByRole = new Map<string, Set<PermissionKey>>();
@@ -18,7 +24,9 @@ export class PermissionsService implements OnModuleInit {
     this.logger.setContext(PermissionsService.name);
   }
 
+  /** Loads role grants at startup; unknown database permission keys are ignored. */
   async onModuleInit(): Promise<void> {
+    // Permission data is migration-managed; keep the guard's lookups out of the request path.
     const rolePermissions = await this.repository.findRolePermissions();
 
     for (const role of rolePermissions) {
@@ -35,6 +43,7 @@ export class PermissionsService implements OnModuleInit {
     }
   }
 
+  /** Checks whether a role has a permission known to this application version. */
   has(roleKey: string, permission: PermissionKey): boolean {
     return this.permissionsByRole.get(roleKey)?.has(permission) ?? false;
   }

@@ -1,9 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+/** Implements authentication rules while leaving cookie and HTTP response handling to the controller. */
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { SchoolStatus, UserStatus } from '../generated/prisma/client.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
@@ -19,6 +15,7 @@ export type LoginResult = {
   profile: AuthProfile;
 };
 
+/** Implements login and password-change business rules. */
 @Injectable()
 export class AuthService {
   constructor(
@@ -32,6 +29,7 @@ export class AuthService {
   // Login
   // ─────────────────────────────────────────
 
+  /** Authenticates an active user and returns a session token with a safe profile. */
   async login(rawSteamxId: string, password: string): Promise<LoginResult> {
     const steamxId = rawSteamxId.trim().toUpperCase();
     const user = await this.users.findLoginUser(steamxId);
@@ -66,6 +64,7 @@ export class AuthService {
   // Change password
   // ─────────────────────────────────────────
 
+  /** Verifies the current password, applies policy, updates credentials, and issues a fresh token. */
   async changePassword(
     auth: AuthContext,
     currentPassword: string,
@@ -98,33 +97,6 @@ export class AuthService {
 
     const profile = toAuthProfile({ ...auth, mustChangePassword: false });
     return { token: await this.tokens.sign(auth.userId), profile };
-  }
-
-  // ─────────────────────────────────────────
-  // Reset password (admin action)
-  // ─────────────────────────────────────────
-
-  async resetPassword(
-    actor: AuthContext,
-    targetUserId: string,
-    newPassword: string,
-  ): Promise<void> {
-    const target = await this.users.findPasswordResetTarget(targetUserId);
-    if (!target) {
-      throw new NotFoundException(API_ERROR.USER_NOT_FOUND);
-    }
-    if (target.id === actor.userId) {
-      throw new BadRequestException({
-        ...API_ERROR.CANNOT_RESET_OWN_PASSWORD,
-      });
-    }
-
-    this.validateNewPassword(newPassword, target.steamxId);
-    const passwordHash = await this.passwords.hash(newPassword);
-
-    // TODO: Add school and teacher scope checks here when scoped reset permissions are introduced.
-    await this.users.updatePassword(target.id, passwordHash, true);
-    this.logger.info({ actorId: actor.userId, targetId: target.id }, 'Password reset');
   }
 
   // ─────────────────────────────────────────
