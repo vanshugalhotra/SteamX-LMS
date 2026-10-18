@@ -13,19 +13,16 @@ import { API_ERROR } from '../errors/api-errors.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import { resolveSchoolScope } from './school-scope.js';
 
-/** Applies caller school scope and rejects missing, unknown, or inactive schools. */
+/**
+ * Requires a concrete school for workflows that need an active school record.
+ * Unlike resolveSchoolScope, this also loads the school and checks its status.
+ */
 @Injectable()
 export class ActiveSchoolService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Returns the applicable school ID for creation workflows. */
-  async resolve(actor: AuthContext, requestedSchoolId?: string): Promise<string> {
-    const school = await this.resolveSchool(actor, requestedSchoolId);
-    return school.id;
-  }
-
   /**
-   * Returns the scoped school's ID and code after confirming it is active.
+   * Returns the required school's ID and code after confirming it is in scope and active.
    * Throws SCHOOL_REQUIRED, NOT_FOUND, or SCHOOL_INACTIVE when resolution fails.
    */
   async resolveSchool(

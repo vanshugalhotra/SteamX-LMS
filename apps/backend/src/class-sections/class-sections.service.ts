@@ -35,10 +35,10 @@ export class ClassSectionsService {
 
   /** Creates a section only in the caller's active school. */
   async create(actor: AuthContext, body: CreateClassSectionDto): Promise<ClassSectionResponseDto> {
-    const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
+    const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
 
     try {
-      const section = await this.sections.create(schoolId, body);
+      const section = await this.sections.create(school.id, body);
       this.logger.info(
         { actorId: actor.userId, schoolId: section.schoolId, sectionId: section.id },
         'Class section created',
