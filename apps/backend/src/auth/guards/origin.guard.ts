@@ -1,3 +1,4 @@
+/** Validates request origins for state-changing cookie-authenticated operations. */
 import { ForbiddenException, Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
@@ -6,6 +7,7 @@ import { API_ERROR } from '../../common/errors/api-errors.js';
 
 const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+/** Rejects cross-origin state changes before cookie-authenticated handlers run. */
 @Injectable()
 export class OriginGuard implements CanActivate {
   private readonly allowedOrigins: Set<string>;
@@ -14,6 +16,7 @@ export class OriginGuard implements CanActivate {
     this.allowedOrigins = new Set(config.get('CORS_ORIGINS', { infer: true }));
   }
 
+  /** Requires state-changing requests to originate from a configured frontend. */
   canActivate(context: ExecutionContext): boolean {
     if (context.getType() !== 'http') {
       return true;
@@ -43,6 +46,7 @@ export class OriginGuard implements CanActivate {
     return true;
   }
 
+  /** Uses one safe response for absent, malformed, and disallowed Origin headers. */
   private rejectOrigin(): never {
     throw new ForbiddenException(API_ERROR.ORIGIN_NOT_ALLOWED);
   }

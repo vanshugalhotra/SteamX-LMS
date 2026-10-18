@@ -1,5 +1,6 @@
 /**
  * Trims DTO strings; lowercase can be enabled for normalized fields like email.
+ * Non-string values pass through so class-validator can report their actual type.
  */
 import { Transform } from 'class-transformer';
 

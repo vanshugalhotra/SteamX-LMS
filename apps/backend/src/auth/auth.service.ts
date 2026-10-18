@@ -1,3 +1,4 @@
+/** Implements authentication rules while leaving cookie and HTTP response handling to the controller. */
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { SchoolStatus, UserStatus } from '../generated/prisma/client.js';
@@ -14,6 +15,7 @@ export type LoginResult = {
   profile: AuthProfile;
 };
 
+/** Implements login and password-change business rules. */
 @Injectable()
 export class AuthService {
   constructor(
@@ -27,6 +29,7 @@ export class AuthService {
   // Login
   // ─────────────────────────────────────────
 
+  /** Authenticates an active user and returns a session token with a safe profile. */
   async login(rawSteamxId: string, password: string): Promise<LoginResult> {
     const steamxId = rawSteamxId.trim().toUpperCase();
     const user = await this.users.findLoginUser(steamxId);
@@ -61,6 +64,7 @@ export class AuthService {
   // Change password
   // ─────────────────────────────────────────
 
+  /** Verifies the current password, applies policy, updates credentials, and issues a fresh token. */
   async changePassword(
     auth: AuthContext,
     currentPassword: string,

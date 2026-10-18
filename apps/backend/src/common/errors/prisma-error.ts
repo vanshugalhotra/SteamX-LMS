@@ -1,3 +1,4 @@
+/** Extracts safe Prisma error information and maps known constraint cases to API exceptions. */
 import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
 import { API_ERROR } from './api-errors.js';
 
@@ -8,6 +9,7 @@ type PrismaKnownError = {
   meta?: unknown;
 };
 
+/** Identifies known Prisma request errors without trusting an arbitrary thrown value. */
 export function isPrismaKnownError(error: unknown): error is PrismaKnownError {
   return (
     typeof error === 'object' &&
@@ -19,6 +21,7 @@ export function isPrismaKnownError(error: unknown): error is PrismaKnownError {
   );
 }
 
+/** Extracts PostgreSQL's driver code when the adapter includes it in Prisma metadata. */
 export function getPostgresCode(error: PrismaKnownError): string | undefined {
   if (
     typeof error.meta !== 'object' ||
@@ -45,6 +48,7 @@ export function getPostgresCode(error: PrismaKnownError): string | undefined {
   return typeof cause.originalCode === 'string' ? cause.originalCode : undefined;
 }
 
+/** Returns the final Prisma error line for internal logs without exposing it to API callers. */
 export function getPrismaReason(error: PrismaKnownError): string {
   if (typeof error.message !== 'string') {
     return '';
@@ -59,6 +63,7 @@ export function getPrismaReason(error: PrismaKnownError): string {
   );
 }
 
+/** Translates only unique-constraint errors; unrelated failures continue to the caller. */
 export function throwConflictOnDuplicate(
   error: unknown,
   response: { code: string; message: string },
@@ -68,6 +73,7 @@ export function throwConflictOnDuplicate(
   }
 }
 
+/** Maps common Prisma constraint failures to safe API exceptions. */
 export function mapPrismaError(error: unknown): HttpException | undefined {
   if (!isPrismaKnownError(error)) {
     return undefined;

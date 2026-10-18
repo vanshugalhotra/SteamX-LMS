@@ -1,5 +1,7 @@
+/** Reads the one-time admin setup credentials from the process environment. */
 import { FirstAdminError, type FirstAdminInput } from '../types/first-admin.js';
 
+/** Fails early with a setup error when either required credential is missing. */
 export function readFirstAdminInput(environment: NodeJS.ProcessEnv): FirstAdminInput {
   const steamxId = environment.ADMIN_STEAMX_ID;
   if (!steamxId) {

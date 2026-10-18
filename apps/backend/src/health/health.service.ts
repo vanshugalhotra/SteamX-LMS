@@ -1,3 +1,4 @@
+/** Performs time-bounded dependency checks for the readiness endpoint. */
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -6,6 +7,7 @@ const RESPONSE_TIMEOUT_MS = 2_000;
 const STATEMENT_TIMEOUT_MS = 1_500;
 const CONNECTION_WAIT_MS = 1_000;
 
+/** Runs bounded readiness checks for dependencies required to serve requests. */
 @Injectable()
 export class HealthService {
   constructor(
@@ -15,6 +17,7 @@ export class HealthService {
     this.logger.setContext(HealthService.name);
   }
 
+  /** Returns false and logs the failure when the database check fails or exceeds its deadline. */
   async isDatabaseReady(): Promise<boolean> {
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -38,6 +41,7 @@ export class HealthService {
     }
   }
 
+  /** Uses a transaction-local timeout so a readiness probe cannot run an unbounded query. */
   private async runDatabaseCheck(): Promise<void> {
     await this.prisma.$transaction(
       async (tx) => {

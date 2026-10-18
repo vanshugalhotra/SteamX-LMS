@@ -1,3 +1,4 @@
+/** Configures request-scoped structured logs, request IDs, and sensitive-field redaction. */
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
@@ -38,6 +39,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
             },
             genReqId: (req: IncomingMessage, res: ServerResponse) => {
               const incomingId = req.headers['x-request-id'];
+              // Accept only UUIDs from callers so arbitrary header content cannot become a log ID.
               const requestId =
                 typeof incomingId === 'string' && UUID_PATTERN.test(incomingId)
                   ? incomingId

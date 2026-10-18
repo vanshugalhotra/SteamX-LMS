@@ -1,3 +1,4 @@
+/** Applies school scoping and domain errors to class-section operations. */
 import {
   BadRequestException,
   ConflictException,
@@ -19,6 +20,7 @@ import type { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
 import { toClassSectionResponse } from './class-sections.mapper.js';
 import { ClassSectionsRepository } from './class-sections.repository.js';
 
+/** Applies school scope and domain errors around class-section persistence. */
 @Injectable()
 export class ClassSectionsService {
   constructor(
@@ -31,6 +33,7 @@ export class ClassSectionsService {
   // POST /class-sections — Create a class section
   // ─────────────────────────────────────────
 
+  /** Creates a section only in the caller's active school. */
   async create(actor: AuthContext, body: CreateClassSectionDto): Promise<ClassSectionResponseDto> {
     const schoolId = await this.activeSchool.resolve(actor, body.schoolId);
 
@@ -53,6 +56,7 @@ export class ClassSectionsService {
   // GET /class-sections — List class sections
   // ─────────────────────────────────────────
 
+  /** Lists sections within the resolved school scope. */
   async findMany(
     actor: AuthContext,
     query: ClassSectionListQueryDto,
@@ -71,6 +75,7 @@ export class ClassSectionsService {
   // GET /class-sections/:id — Get a class section
   // ─────────────────────────────────────────
 
+  /** Returns a section only when its ID belongs to the caller's school scope. */
   async findById(actor: AuthContext, id: string): Promise<ClassSectionResponseDto> {
     const scope = resolveSchoolScope(actor);
     const section = await this.sections.findById(id, scope);
@@ -80,6 +85,7 @@ export class ClassSectionsService {
     return toClassSectionResponse(section);
   }
 
+  /** Verifies a referenced section belongs to the supplied school before assignment. */
   async assertInSchool(id: string, schoolId: string): Promise<void> {
     const section = await this.sections.findById(id, schoolId);
     if (!section) {
@@ -91,6 +97,7 @@ export class ClassSectionsService {
   // PATCH /class-sections/:id — Update a class section
   // ─────────────────────────────────────────
 
+  /** Updates a scoped section and translates duplicate-name conflicts to the API error. */
   async update(
     actor: AuthContext,
     id: string,
@@ -123,6 +130,7 @@ export class ClassSectionsService {
   // DELETE /class-sections/:id — Delete a class section
   // ─────────────────────────────────────────
 
+  /** Deletes a scoped section, reporting in-use sections as conflicts. */
   async delete(actor: AuthContext, id: string): Promise<void> {
     const scope = resolveSchoolScope(actor);
     try {
