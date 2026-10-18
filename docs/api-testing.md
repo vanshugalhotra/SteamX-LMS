@@ -1,0 +1,397 @@
+# API testing checklist
+
+Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
+health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; a path UUID rejected by
+`ParseUUIDPipe` uses the default `BAD_REQUEST` code. Error responses include a request ID.
+
+## Before testing
+
+- Apply migrations to an isolated development or test database.
+- The reference-data migration creates `admin`, `teacher`, and `student` roles.
+- It grants every current permission to `admin` only. Teachers and students get `403` on
+  permission-protected routes unless grants are added before the backend starts.
+- Permission grants are loaded into memory at startup. Restart the backend after changing them.
+- For write requests, send an `Origin` listed in `CORS_ORIGINS`; otherwise `OriginGuard` returns
+  `403 ORIGIN_NOT_ALLOWED` before authentication or permission checks.
+- Auth and test fixtures use database users and schools. Do not use production data for manual tests.
+- Labels: `[auto]` means an existing automated test covers the case; `[manual]` means add or run the
+  case outside the current automated coverage.
+
+## Authentication
+
+### `POST /auth/login`
+
+Caller: public; checks credentials and sets a session cookie for an active user in an active school.
+
+- [auto] When credentials are valid and `Origin` is allowed -> expect `200` and an `httpOnly` session cookie.
+- [auto] When SteamX ID has surrounding spaces or lowercase letters -> expect normalization and successful login.
+- [auto] When platform staff has no school -> expect successful login.
+- [auto] When ID is unknown, password is wrong, user inactive, or school inactive -> expect the same `401 UNAUTHORIZED`.
+- [auto] When login body has empty required fields -> expect `400 VALIDATION_ERROR`.
+- [manual] When body has an unknown field, wrong field type, or SteamX ID exceeds 64 characters -> expect `400 VALIDATION_ERROR`.
+- [manual] When required values contain only whitespace -> expect `400 VALIDATION_ERROR` after SteamX ID trimming; password whitespace is not trimmed.
+- [auto] When `Origin` is missing, `null`, malformed, or not allowed -> expect `403 ORIGIN_NOT_ALLOWED`.
+- [manual] When repeated login attempts are made -> no `429` rate-limit response is currently implemented.
+- [auto] When login succeeds -> expect no `passwordHash` in the profile and `Cache-Control: no-store`.
+
+### `POST /auth/logout`
+
+Caller: any authenticated role, including a user required to change their password; clears the browser cookie.
+
+- [auto] When an active valid cookie and allowed `Origin` are sent -> expect `204` and a cleared cookie.
+- [auto] When no cookie is sent -> expect `401 UNAUTHORIZED`.
+- [auto] When password change is required -> expect logout remains available and returns `204`.
+- [auto] When `Origin` is disallowed -> expect `403 ORIGIN_NOT_ALLOWED` before checking the session.
+- [manual] When an old copied cookie is replayed after logout -> expect it to remain valid until expiry unless another revocation rule applies; logout clears only the browser cookie.
+
+### `GET /auth/me`
+
+Caller: any authenticated role, including a user required to change their password; returns the current profile.
+
+- [auto] When a valid cookie is sent -> expect `200` and `Cache-Control: no-store`.
+- [auto] When cookie is absent, malformed, expired, or has an invalid signature -> expect `401 UNAUTHORIZED`.
+- [auto] When token subject is missing from the database -> expect `401 UNAUTHORIZED`.
+- [auto] When user or school is inactive -> expect `401 UNAUTHORIZED`.
+- [auto] When token was issued before `passwordChangedAt` -> expect `401 UNAUTHORIZED`.
+- [auto] When token and `passwordChangedAt` are in the same whole second -> expect the token to remain valid.
+- [auto] When account requires a password change -> expect `/auth/me` remains available and reports that state.
+- [auto] When profile is returned -> expect no `passwordHash`.
+- [manual] When a valid route cookie is combined with an invalid `Origin` on this GET -> Origin is not required for GET.
+
+### `POST /auth/change-password`
+
+Caller: any authenticated role, including a user required to change their password; changes the caller's password and refreshes their cookie.
+
+- [auto] When current password and new password are valid -> expect `200`, cleared forced-change state, and a new cookie.
+- [auto] When current password is wrong -> expect `400 INVALID_CURRENT_PASSWORD`.
+- [auto] When new password equals current password -> expect `400 PASSWORD_REUSED`.
+- [auto] When new password violates policy -> expect `400 PASSWORD_POLICY` with policy details.
+- [manual] When new password is shorter than 8 or longer than 100 characters, has leading/trailing whitespace, is on the weak-password list, or contains the SteamX ID -> expect policy rejection.
+- [manual] When password is valid but has no special character or digit -> expect acceptance; no character-composition rule exists.
+- [manual] When required password fields are missing, non-string, or exceed DTO length limits -> expect `400 VALIDATION_ERROR`.
+- [auto] When old cookie predates the password update by at least one second -> expect `401 UNAUTHORIZED` on its next protected request.
+- [manual] When old and new token have the same issue-time second -> the old token may remain valid until the next second boundary.
+- [auto] When user no longer exists -> expect `401 UNAUTHORIZED`.
+- [manual] When state-changing request has no allowed Origin -> expect `403 ORIGIN_NOT_ALLOWED`.
+
+## Schools
+
+### `POST /schools`
+
+Caller: platform staff with `school.manage`; creates a school. Non-platform user types are rejected even if granted the permission.
+
+- [auto] When admin sends valid fields -> expect `201`; school code is trimmed and uppercased.
+- [auto] When code already exists, including case-only difference -> expect `409 SCHOOL_CODE_EXISTS`.
+- [auto] When code is malformed or too long -> expect `400 VALIDATION_ERROR`.
+- [auto] When required text is blank or contact email is invalid -> expect `400 VALIDATION_ERROR`.
+- [auto] When optional address/contact fields are null -> expect `201`; the fields remain null.
+- [auto] When optional text is whitespace-only -> expect `400 VALIDATION_ERROR` after trimming.
+- [auto] When an unknown body field is supplied -> expect `400 VALIDATION_ERROR`.
+- [auto] When teacher or student calls the route without permission -> expect `403 FORBIDDEN`.
+- [auto] When an otherwise permitted non-platform caller is used -> expect `403 FORBIDDEN` from the service's platform-staff check.
+- [auto] When allowed Origin is missing -> expect `403 ORIGIN_NOT_ALLOWED`.
+- [manual] When code is at the 2- or 12-character boundary, or another required/optional field is exactly at its length limit -> verify acceptance.
+- [manual] When the same create request is retried -> expect the duplicate code to conflict; there is no idempotency-key behavior.
+
+### `GET /schools`
+
+Caller: authenticated role with `school.read`; lists schools in caller scope with optional status and search.
+
+- [auto] When admin lists without filters -> expect all schools in default pagination.
+- [auto] When teacher has an explicit `school.read` grant -> expect only their own school.
+- [auto] When student or ungranted teacher calls -> expect `403 FORBIDDEN`.
+- [auto] When `status` and `q` filters are combined -> expect rows matching both filters.
+- [auto] When `q` is partial and differently cased -> expect case-insensitive name/code matching.
+- [auto] When names tie -> expect stable ordering by school name then ID.
+- [manual] When each optional filter is used alone -> expect only matching rows.
+- [manual] When page and limit are omitted -> expect page 1 and limit 20.
+- [manual] When limit is 0, negative, non-integer, or over 100, or page is over 100000 -> expect `400 VALIDATION_ERROR`.
+- [manual] When page is beyond the final page -> expect an empty `items` list and total count for the matching filter.
+- [manual] When no records match -> expect an empty page with total zero.
+
+### `GET /schools/:id`
+
+Caller: authenticated role with `school.read`; reads a school only within caller scope.
+
+- [auto] When admin requests an existing school -> expect `200`.
+- [auto] When teacher has `school.read` and requests own school -> expect `200`.
+- [auto] When teacher requests another school's ID or a random UUID -> expect the same `404 NOT_FOUND`.
+- [auto] When student or ungranted teacher calls -> expect `403 FORBIDDEN`.
+- [manual] When path ID is not a UUID -> expect `400 BAD_REQUEST`.
+- [manual] When an error is returned -> verify it includes `requestId` and no stack trace or database detail.
+
+### `PATCH /schools/:id`
+
+Caller: authenticated role with `school.manage`; changes school details but not code or status.
+
+- [auto] When admin updates valid fields -> expect `200`.
+- [auto] When optional nullable fields are set to null -> expect `200` and cleared values.
+- [auto] When body is empty or required text is null -> expect `400 VALIDATION_ERROR`.
+- [auto] When body includes immutable `code` or unknown field -> expect `400 VALIDATION_ERROR`.
+- [auto] When teacher or student calls without permission -> expect `403 FORBIDDEN`.
+- [manual] When ID is foreign to a scoped school caller -> expect `404 NOT_FOUND` if caller has the route permission.
+- [manual] When path ID is invalid -> expect `400 BAD_REQUEST`.
+- [manual] When a field exceeds its DTO length or has the wrong type -> expect `400 VALIDATION_ERROR`.
+- [manual] When valid name/contact text has surrounding whitespace -> expect trimming; contact email is lowercased.
+- [manual] When the same values are submitted -> expect a successful update; this route does not implement a same-value shortcut.
+
+### `PATCH /schools/:id/status`
+
+Caller: authenticated role with `school.manage`; activates or deactivates a school.
+
+- [auto] When admin changes status -> expect `200`.
+- [auto] When admin repeats the current status -> expect `200` with no status change.
+- [auto] When status is padded with spaces -> expect trimming and valid enum handling.
+- [manual] When status is absent, null, wrong type, or not an enum value -> expect `400 VALIDATION_ERROR`.
+- [auto] When school becomes inactive -> expect its school users' next request and login to return `401 UNAUTHORIZED`.
+- [auto] When school is reactivated -> expect its users to log in again.
+- [auto] When teacher or student calls without permission -> expect `403 FORBIDDEN`.
+- [manual] When ID is invalid -> expect `400 BAD_REQUEST`; when foreign or missing -> expect `404 NOT_FOUND`.
+
+## Class sections
+
+### `POST /class-sections`
+
+Caller: authenticated role with `classsection.manage`; creates a class section in one active school.
+
+- [auto] When admin supplies school and class name without section name -> expect `201` and default section name `All`.
+- [auto] When section name is supplied with surrounding whitespace -> expect trimming and `201`.
+- [auto] When school ID is omitted -> expect `400 SCHOOL_REQUIRED`.
+- [auto] When school does not exist -> expect `404 NOT_FOUND`.
+- [auto] When school is inactive -> expect `409 SCHOOL_INACTIVE`.
+- [auto] When class and section names duplicate case-insensitively in the same school -> expect `409 CLASS_SECTION_EXISTS`.
+- [auto] When same names are used in another school -> expect success.
+- [auto] When class or section name is blank, null (section), or over 50 characters -> expect `400 VALIDATION_ERROR`.
+- [auto] When an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
+- [manual] When name is non-string, missing, or exactly at the maximum -> expect validation failure or acceptance at the documented boundary.
+- [auto] When student or teacher lacks permission -> expect `403 FORBIDDEN`.
+- [manual] When platform staff omits school ID or uses a malformed UUID -> expect `400` (`SCHOOL_REQUIRED` or `VALIDATION_ERROR`).
+
+### `GET /class-sections`
+
+Caller: authenticated role with `classsection.read`; lists sections within resolved school scope.
+
+- [auto] When admin lists without school filter -> expect sections across schools.
+- [auto] When admin supplies `schoolId` -> expect only that school's sections.
+- [auto] When teacher is granted `classsection.read` -> expect own-school sections.
+- [auto] When teacher supplies another `schoolId` -> expect `404 NOT_FOUND`.
+- [auto] When student or ungranted teacher calls -> expect `403 FORBIDDEN`.
+- [auto] When partial, differently cased `q` is supplied -> expect matching class or section names.
+- [auto] When pagination is used -> expect stable ordering and page metadata.
+- [manual] When page/limit are omitted -> expect defaults page 1 and limit 20.
+- [manual] When limit is over 100, page over 100000, malformed UUID, or `q` over 100 characters -> expect `400 VALIDATION_ERROR`.
+- [manual] When page is beyond the end or no filter matches -> expect an empty item list and correct total.
+- [manual] When filters are tested one at a time and together -> expect their intersection.
+
+### `GET /class-sections/:id`
+
+Caller: authenticated role with `classsection.read`; reads one section only in caller scope.
+
+- [auto] When admin requests an existing section in either school -> expect `200`.
+- [auto] When teacher with read permission requests own-school section -> expect `200`.
+- [auto] When teacher requests foreign section or missing UUID -> expect the same `404 NOT_FOUND`.
+- [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.
+- [manual] When path ID is not a UUID -> expect `400 BAD_REQUEST`.
+
+### `PATCH /class-sections/:id`
+
+Caller: authenticated role with `classsection.manage`; changes class or section names within caller scope.
+
+- [auto] When admin changes a name -> expect `200`.
+- [auto] When update body is empty or a name is null -> expect `400 VALIDATION_ERROR`.
+- [auto] When update creates a case-insensitive duplicate -> expect `409 CLASS_SECTION_EXISTS`.
+- [auto] When only letter case changes and no other row conflicts -> expect `200`.
+- [auto] When teacher has manage permission and changes a foreign section -> expect `404 NOT_FOUND` and no data change.
+- [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.
+- [manual] When caller sends schoolId or another unknown property -> expect `400 VALIDATION_ERROR`.
+- [manual] When ID is malformed -> expect `400 BAD_REQUEST`; when record is missing -> expect `404 NOT_FOUND`.
+- [manual] When same name values are sent -> expect `200`; there is no explicit no-op shortcut.
+
+### `DELETE /class-sections/:id`
+
+Caller: authenticated role with `classsection.manage`; deletes a section with no referencing student profile.
+
+- [auto] When admin deletes an unused section -> expect `204`.
+- [auto] When student profile references the section -> expect `409 CLASS_SECTION_IN_USE`.
+- [auto] When section does not exist -> expect `404 NOT_FOUND`.
+- [auto] When teacher with manage permission targets a foreign section or missing ID -> expect same `404 NOT_FOUND`.
+- [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.
+- [manual] When ID is not a UUID -> expect `400 BAD_REQUEST`.
+
+## Users
+
+All current `role_permissions` grants belong to admin. The E2E suite adds selected teacher grants
+before starting its app to test scope and visibility; those grants are not the default deployment
+state.
+
+### `POST /users/teachers`
+
+Caller: authenticated role with `user.create.teacher`; creates an active-school staff account and teacher profile.
+
+- [auto] When admin provides valid school, name, and password -> expect `201`, generated SteamX ID, and teacher profile.
+- [auto] When fields include padded name, email, or assignment -> expect trimming; email is lowercased.
+- [auto] When teacher is explicitly granted `user.create.teacher` -> expect creation in their own school.
+- [auto] When school ID is omitted -> expect `400 SCHOOL_REQUIRED`.
+- [auto] When school ID is unknown or belongs to another school caller -> expect `404 NOT_FOUND`.
+- [auto] When school is inactive -> expect `409 SCHOOL_INACTIVE`.
+- [auto] When SteamX ID collides once -> expect retry and successful creation with the next candidate.
+- [auto] When SteamX ID collides three times -> expect `409 STEAMX_ID_UNAVAILABLE`.
+- [auto] When teacher profile insert fails -> expect failed request and no persisted user account.
+- [manual] When email duplicates an existing user -> expect `409 CONFLICT`.
+- [manual] When required field missing/blank, email invalid, unknown field supplied, or field length/type invalid -> expect `400 VALIDATION_ERROR`.
+- [manual] When password violates length, whitespace, common-password, or SteamX-ID policy -> expect `400 PASSWORD_POLICY`.
+- [auto] When response is returned -> expect no `passwordHash`.
+- [manual] When the same successful request is retried without a unique email -> a second account may be created; this route has no idempotency key.
+- [manual] When Origin is missing or unlisted -> expect `403 ORIGIN_NOT_ALLOWED`.
+
+### `POST /users/students`
+
+Caller: authenticated role with `user.create.student`; creates an active-school student and required profile.
+
+- [auto] When admin supplies school, valid class section, name, and password -> expect `201` and student profile.
+- [auto] When guardian name is padded -> expect trimming.
+- [auto] When student body contains an email field -> expect `400 VALIDATION_ERROR` because email is not accepted.
+- [auto] When class section belongs to a different school than requested -> expect `404 NOT_FOUND`.
+- [manual] When school is omitted -> expect `400 SCHOOL_REQUIRED`; when unknown -> expect `404`; when inactive -> expect `409 SCHOOL_INACTIVE`.
+- [manual] When class section ID is invalid UUID -> expect `400 VALIDATION_ERROR`; when nonexistent or foreign -> expect `404 NOT_FOUND`.
+- [manual] When name/password is missing, invalid, over limit, or unknown fields are supplied -> expect `400 VALIDATION_ERROR` or `400 PASSWORD_POLICY` for policy failures.
+- [manual] When creation fails after user insert but before profile insert -> expect the entire user/profile transaction to roll back.
+- [auto] When response is returned -> expect no `passwordHash` and `mustChangePassword` true.
+- [manual] When repeated without a unique field such as email -> a second student may be created; the route has no idempotency key.
+
+### `GET /users`
+
+Caller: authenticated role with `user.read`; returns filtered and paginated users after school scope and user visibility.
+
+- [auto] When admin lists with school, role, status, and search filters -> expect matching paginated results.
+- [auto] When search matches a partial email -> expect the matching user.
+- [auto] When pages split equal-created-time users -> expect stable ID tie-breaking.
+- [auto] When school staff is given `user.read` -> expect only their own user in the list.
+- [auto] When that school staff member requests another school's filter -> expect `404 NOT_FOUND`.
+- [auto] When student or ungranted teacher calls -> expect `403 FORBIDDEN` with permission-related message.
+- [manual] When role, status, school, or search is used alone -> expect only rows matching that filter.
+- [manual] When filters are combined -> expect their intersection.
+- [manual] When search uses mixed case -> expect case-insensitive partial matches in name, SteamX ID, or email.
+- [manual] When defaults are omitted -> expect page 1 and limit 20; limit max is 100 and page max is 100000.
+- [manual] When page exceeds results -> expect empty items and a matching total; when there are no matches -> total zero.
+- [manual] When query UUID, enum, role, page, or limit is invalid -> expect `400 VALIDATION_ERROR`.
+- [auto] When list results are returned -> expect no `passwordHash`.
+
+### `GET /users/:id`
+
+Caller: authenticated role with `user.read`; returns a user only if both school scope and visibility allow it.
+
+- [auto] When admin requests a user in either school -> expect `200`.
+- [auto] When teacher with `user.read` requests their own user -> expect `200`.
+- [auto] When a school caller requests a foreign or otherwise invisible user -> expect `404 NOT_FOUND`, not `403`.
+- [auto] When user ID is a random UUID -> expect same not-found response as an invisible ID.
+- [auto] When a student or ungranted role calls -> expect `403 FORBIDDEN`.
+- [manual] When ID is not a UUID -> expect `400 BAD_REQUEST`.
+- [auto] When response is returned -> expect no `passwordHash`.
+
+### `PATCH /users/:id`
+
+Caller: authenticated role with `user.update`; updates only fields valid for the target account type.
+
+- [auto] When admin updates teacher name/email/primary assignment -> expect `200`, trimmed fields, and lowercase email.
+- [auto] When admin updates student class within same school -> expect `200` and new current class.
+- [auto] When target is a student and email or primary assignment is supplied -> expect `400 FIELD_NOT_APPLICABLE`.
+- [auto] When target is a teacher and guardian/class fields are supplied -> expect `400 FIELD_NOT_APPLICABLE`.
+- [auto] When body is empty -> expect `400 VALIDATION_ERROR`.
+- [auto] When email duplicates another user -> expect `409 CONFLICT`.
+- [auto] When student class section belongs to another school -> expect `404 NOT_FOUND` and unchanged profile.
+- [auto] When admin targets platform-staff account -> expect `400 USER_NOT_MANAGEABLE`.
+- [auto] When school staff targets a foreign account -> expect `404 NOT_FOUND`.
+- [manual] When target is missing or invisible -> expect `404 NOT_FOUND`.
+- [manual] When optional nullable profile fields are set to null -> they are accepted when that field applies; null classSectionId/name is invalid.
+- [manual] When field is unknown, wrong type, too long, or whitespace-only where non-empty is required -> expect `400 VALIDATION_ERROR`.
+- [manual] When user repeats current values -> expect successful response; no explicit no-op branch is implemented.
+- [manual] After changing a student's class -> verify old-class enrollment status; the service currently has a TODO and does not update enrollment state.
+- [auto] When response is returned -> expect no `passwordHash`.
+
+### `PATCH /users/:id/status`
+
+Caller: authenticated role with `user.deactivate`; changes status of another manageable school user.
+
+- [auto] When admin changes active user to inactive -> expect `200`.
+- [auto] When target's cookie is reused immediately -> expect `401 UNAUTHORIZED` on next protected request and login.
+- [auto] When admin reactivates target -> expect `200` and the existing token works again if not otherwise revoked.
+- [auto] When admin repeats current status -> expect `200`.
+- [auto] When caller targets own ID -> expect `400 CANNOT_DEACTIVATE_SELF`.
+- [auto] When target is platform staff -> expect `400 USER_NOT_MANAGEABLE`.
+- [auto] When school staff targets a foreign user -> expect `404 NOT_FOUND`.
+- [manual] When status is absent, null, invalid enum, or unknown fields supplied -> expect `400 VALIDATION_ERROR`.
+- [manual] When ungranted teacher or student calls -> expect `403 FORBIDDEN`.
+- [manual] When ID is malformed -> expect `400 BAD_REQUEST`; when missing/invisible -> expect `404 NOT_FOUND`.
+
+### `PATCH /users/:id/steamx-id`
+
+Caller: authenticated role with `user.steamx-id.update`; changes an eligible school user's login ID.
+
+- [auto] When admin supplies lowercased/padded, valid ID with target school's prefix -> expect `200` and normalized ID.
+- [auto] When prefix is wrong or name/digit format is invalid -> expect `400 INVALID_STEAMX_ID`.
+- [auto] When new ID is already used -> expect `409 STEAMX_ID_TAKEN`.
+- [auto] When target is platform staff -> expect `400 STEAMX_ID_NOT_RENAMABLE`.
+- [auto] When teacher targets foreign user -> expect `404 NOT_FOUND`.
+- [auto] When student lacks permission -> expect `403 FORBIDDEN`.
+- [auto] When login uses old ID after rename -> expect `401`; new ID login succeeds.
+- [manual] When target ID is malformed -> expect `400 BAD_REQUEST`; missing or invisible target -> expect `404 NOT_FOUND`.
+- [manual] When DTO value is empty or over 32 characters -> expect `400 VALIDATION_ERROR`.
+- [manual] When the same current ID is submitted -> expect `200` with no database rename.
+- [manual] When a current session cookie is used after rename -> verify it remains valid; tokens identify immutable user UUID, not SteamX ID.
+
+### `POST /users/:id/reset-password`
+
+Caller: authenticated role with `user.password.reset`; resets another visible user's password and requires a password change.
+
+- [auto] When admin resets a school user's password -> expect `204`.
+- [auto] When target's old cookie is used after reset -> expect `401 UNAUTHORIZED`.
+- [auto] When target logs in with new password -> expect success and forced password change.
+- [auto] When target logs in with old password -> expect `401 UNAUTHORIZED`.
+- [auto] When admin resets own password -> expect `400 CANNOT_RESET_OWN_PASSWORD`.
+- [auto] When reset password violates policy -> expect `400 PASSWORD_POLICY`.
+- [auto] When teacher or student lacks the seeded permission -> expect `403 FORBIDDEN`.
+- [auto] When school staff has a custom reset grant but targets another user -> current self-only visibility returns `404`; targeting self is rejected with `400 CANNOT_RESET_OWN_PASSWORD`.
+- [manual] When target is platform staff -> expect `400 USER_NOT_MANAGEABLE` only if it is visible and not the caller.
+- [manual] When ID is malformed -> expect `400 BAD_REQUEST`; missing or invisible target -> expect `404 NOT_FOUND`.
+- [manual] When reset is repeatedly submitted -> there is no request rate limiter or idempotency key; an accepted reset invalidates prior tokens.
+
+## Health
+
+### `GET /health/live`
+
+Caller: public; confirms the process is responding without checking database readiness.
+
+- [auto] When called without cookie or Origin -> expect `200`.
+- [auto] When called at `/api/v1/health/live` -> expect `404`; this route is unversioned and outside the API prefix.
+
+### `GET /health/ready`
+
+Caller: public; checks PostgreSQL readiness.
+
+- [auto] When database check succeeds -> expect `200`.
+- [auto] When the readiness query fails -> expect `503` with no database connection details in the response.
+- [auto] When called under `/api/v1` -> expect `404`.
+
+## Shared validation and safety checks
+
+- [auto] When nested DTO contains wrong type or unknown field -> expect `400 VALIDATION_ERROR` with nested field paths.
+- [auto] When request ID is a UUID -> expect it echoed in `X-Request-Id` and the error envelope.
+- [auto] When request ID is invalid -> expect a generated UUID.
+- [manual] For every API error -> verify `statusCode`, `code`, `message`, and `requestId`; verify no stack trace, SQL, internal column, or constraint name is exposed.
+- [manual] For every successful user response/list -> verify password hashes and unselected internal fields are absent.
+- [manual] For every state-changing operation -> test an allowed, missing, `null`, malformed, and unlisted Origin where applicable.
+
+## Database rules that bypassing the API must not bypass
+
+- [auto: DB] When a SteamX ID is lowercase, padded, malformed, or outside the database length/format -> expect the `users_steamx_id_fmt` check to reject it.
+- [auto: DB] When school code is malformed/lowercase, school name/city is blank, or contact email is uppercase/padded -> expect the matching school check to reject it.
+- [auto: DB] When platform staff has a school or school staff has none -> expect `users_school_scope` to reject the row.
+- [auto: DB] When student has email, email is uppercase/padded, or name is blank -> expect the matching user check to reject the row.
+- [auto: DB] When student/teacher profile user type does not match its table -> expect the profile type check to reject it.
+- [auto: DB] When student or role `teacher` user is committed without its required profile -> expect the deferred trigger to reject the transaction and roll it back.
+- [auto: DB] When class/section names are blank or have surrounding whitespace -> expect `class_sections_names_ok` to reject them.
+- [auto: DB] When class and section differ only by case in one school -> expect the expression unique index to reject the duplicate; the same names in another school are allowed.
+- [auto: DB] When role key, school code, class-section school ID, or user identity/scope is changed -> expect its immutability trigger to reject it.
+- [auto: DB] When SteamX ID changes outside the controlled transaction-local setting -> expect the trigger to reject it.
+- [manual] When any profile or rename multi-table operation fails midway -> verify all writes roll back together.

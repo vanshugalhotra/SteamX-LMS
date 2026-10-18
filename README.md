@@ -84,7 +84,7 @@ script across workspace packages.
 - `apps/backend/test/` — database and HTTP integration tests; unit tests also live beside source.
 - `apps/frontend/` — React single-page application workspace.
 - `apps/frontend/src/` — React application, features, and shared UI.
-- `docs/` — architecture, access-control, database, and decision notes.
+- `docs/` — architecture, access-control, database, decision, and testing guides.
 - `docs/runbooks/` — operational procedures, including [admin recovery](./docs/runbooks/admin-recovery.md).
 - `infra/` — infrastructure workspace (currently no tracked files).
 - `packages/` — shared-package workspace (currently no package directories).
@@ -98,4 +98,5 @@ script across workspace packages.
 - [Backend environment variables](./apps/backend/.env.example)
 - [Frontend setup and structure](./apps/frontend/README.md)
 - [Backend setup reference](./apps/backend/README.md)
-- [Manual workflow testing](./docs/manual_workflow_testing.md)
+- [API testing checklist](./docs/api-testing.md)
+- [Workflow testing](./docs/workflows-testing.md)
