@@ -1,3 +1,4 @@
+/** Normalizes framework, middleware, and persistence errors into the API response envelope. */
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Logger } from 'nestjs-pino';
@@ -10,6 +11,7 @@ type ExceptionResponse = {
   details?: unknown;
 };
 
+/** Keeps framework and middleware exceptions inside the API's stable error envelope. */
 function getStatusCode(exception: unknown): number {
   if (exception instanceof HttpException) {
     return exception.getStatus();
@@ -77,11 +79,13 @@ function getCode(exceptionResponse: ExceptionResponse | undefined, statusCode: n
   return HTTP_ERROR_CODES[statusCode] ?? API_ERROR.HTTP_ERROR.code;
 }
 
+/** Maps the exception to the public status, code, safe message, and request ID. */
 @Injectable()
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   constructor(private readonly logger: Logger) {}
 
+  /** Logs unexpected server errors internally while withholding details from clients. */
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const request = http.getRequest<Request>();

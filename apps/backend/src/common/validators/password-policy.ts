@@ -1,3 +1,4 @@
+/** Shared policy checks used by self-service changes, account setup, and administrative resets. */
 export const MIN_PASSWORD_CHARACTERS = 8;
 export const MAX_PASSWORD_CHARACTERS = 100;
 const WEAK_PASSWORDS = new Set([
@@ -32,6 +33,7 @@ const PASSWORD_POLICY_MESSAGES: Record<PasswordPolicyViolation, string> = {
   [PASSWORD_POLICY_VIOLATION.CONTAINS_STEAMX_ID]: 'Password must not contain your SteamX ID.',
 };
 
+/** Returns machine-readable violations so API and CLI callers can format them differently. */
 export function getPasswordPolicyViolations(
   password: string,
   steamxId: string,
@@ -59,6 +61,7 @@ export function getPasswordPolicyViolations(
   return violations;
 }
 
+/** Formats policy violations for command-line setup and recovery output. */
 export function validatePasswordPolicy(password: string, steamxId: string): string[] {
   return getPasswordPolicyViolations(password, steamxId).map(
     (violation) => PASSWORD_POLICY_MESSAGES[violation],

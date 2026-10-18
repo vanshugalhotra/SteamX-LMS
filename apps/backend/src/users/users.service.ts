@@ -1,3 +1,4 @@
+/** Applies user-management rules across tenancy, schools, class sections, and persistence. */
 import {
   BadRequestException,
   Injectable,
@@ -32,6 +33,7 @@ import { UsersRepository, type UserDetailRecord } from './users.repository.js';
 import { SteamxIdService } from './steamx-id/steamx-id.service.js';
 import { isValidSteamxId } from './steamx-id/steamx-id.js';
 
+/** Orchestrates user lifecycle rules across auth, tenancy, school, and profile modules. */
 @Injectable()
 export class UsersService {
   constructor(
@@ -48,6 +50,7 @@ export class UsersService {
   // POST /users/teachers — Create a teacher
   // ─────────────────────────────────────────
 
+  /** Creates a teacher in an active scoped school with a unique login ID and hashed password. */
   async createTeacher(actor: AuthContext, body: CreateTeacherDto): Promise<UserResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
     const role = await this.resolveRole(USER_ROLE_KEY.TEACHER, UserType.SCHOOL_STAFF);
@@ -80,6 +83,7 @@ export class UsersService {
   // POST /users/students — Create a student
   // ─────────────────────────────────────────
 
+  /** Creates a student only when the selected class section belongs to the active school. */
   async createStudent(actor: AuthContext, body: CreateStudentDto): Promise<UserResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
     await this.sections.assertInSchool(body.classSectionId, school.id);
@@ -113,6 +117,7 @@ export class UsersService {
   // GET /users — List users
   // ─────────────────────────────────────────
 
+  /** Combines school scope and user visibility before querying to avoid leaking foreign records. */
   async findMany(
     actor: AuthContext,
     query: UserListQueryDto,
@@ -141,10 +146,12 @@ export class UsersService {
   // GET /users/:id — Get a user
   // ─────────────────────────────────────────
 
+  /** Finds a user under both school scope and role-specific visibility; missing and foreign IDs return 404. */
   async findById(actor: AuthContext, id: string): Promise<UserResponseDto> {
     const scope = resolveSchoolScope(actor);
     const user = await this.users.findById({
       ...schoolFilter(scope),
+      // Keep ID and visibility predicates together in the lookup instead of checking ownership after fetch.
       AND: [{ id }, userVisibility(actor)],
     });
     if (!user) {
@@ -153,6 +160,10 @@ export class UsersService {
     return toUserResponse(user);
   }
 
+  /**
+   * Renames a user's school-prefixed ID after checking visibility and validating the school code.
+   * The repository enables the database guard only inside the rename transaction.
+   */
   async renameSteamxId(
     actor: AuthContext,
     id: string,
@@ -199,6 +210,7 @@ export class UsersService {
     }
   }
 
+  /** Applies only fields valid for the target account type and updates the profile atomically. */
   async update(actor: AuthContext, id: string, body: UpdateUserDto): Promise<UserResponseDto> {
     const { user, where } = await this.findVisibleTarget(actor, id);
     this.assertSchoolUser(user);
@@ -266,6 +278,7 @@ export class UsersService {
     }
   }
 
+  /** Changes another manageable school user's status; self-changes are rejected. */
   async updateStatus(
     actor: AuthContext,
     id: string,
@@ -296,6 +309,7 @@ export class UsersService {
     return toUserResponse(updated);
   }
 
+  /** Resets another visible user's password and requires a password change at next login. */
   async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {
     const { user, where } = await this.findVisibleTarget(actor, userId);
     if (user.id === actor.userId) {
@@ -311,6 +325,10 @@ export class UsersService {
     this.logger.info({ actorId: actor.userId, targetId: user.id }, 'Password reset');
   }
 
+  /**
+   * Builds the combined ownership and visibility predicate used by user mutations.
+   * Returning 404 for foreign or invisible IDs prevents callers from probing account existence.
+   */
   private async findVisibleTarget(
     actor: AuthContext,
     id: string,
@@ -326,6 +344,7 @@ export class UsersService {
     return { user, where };
   }
 
+  /** Prevents this management API from mutating platform staff accounts. */
   private assertSchoolUser(
     user: UserDetailRecord,
   ): asserts user is UserDetailRecord & { schoolId: string } {
@@ -334,6 +353,7 @@ export class UsersService {
     }
   }
 
+  /** Treats missing or mismatched role seed data as a server configuration error. */
   private async resolveRole(roleKey: UserRoleKey, userType: UserType): Promise<{ id: number }> {
     const role = await this.users.findRole(roleKey);
     if (!role || role.userType !== userType) {
@@ -342,6 +362,7 @@ export class UsersService {
     return { id: role.id };
   }
 
+  /** Reuses the shared password policy for account creation and administrative resets. */
   private validatePassword(password: string, steamxId: string): void {
     const violations = getPasswordPolicyViolations(password, steamxId);
     if (violations.length > 0) {

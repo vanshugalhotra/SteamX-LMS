@@ -1,3 +1,4 @@
+/** Configures and manages the shared Prisma client and PostgreSQL connection pool. */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +12,7 @@ const MAX_LIFETIME_SECONDS = 1_800;
 const STATEMENT_TIMEOUT_MS = 30_000;
 const IDLE_IN_TRANSACTION_TIMEOUT_MS = 30_000;
 
+/** Owns the PostgreSQL pool and Prisma client for the lifetime of the Nest application. */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly pool: Pool;
@@ -41,6 +43,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     });
   }
 
+  /** Fails application startup when the database cannot be reached. */
   async onModuleInit(): Promise<void> {
     try {
       await this.$connect();
@@ -53,11 +56,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
   }
 
+  /** Closes both Prisma and the underlying pool during application shutdown. */
   async onModuleDestroy(): Promise<void> {
     await this.close();
     this.logger.info('Disconnected from PostgreSQL');
   }
 
+  /** Attempts both close operations so a Prisma disconnect failure does not leak the pool. */
   private async close(): Promise<void> {
     try {
       await this.$disconnect();

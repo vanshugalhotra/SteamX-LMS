@@ -1,3 +1,4 @@
+/** Enforces explicit authorization policy after the authentication guard runs. */
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
@@ -7,6 +8,7 @@ import type { PermissionKey } from '../permissions.js';
 import { PermissionsService } from '../services/permissions.service.js';
 import { API_ERROR, permissionRequiredError } from '../../common/errors/api-errors.js';
 
+/** Requires every protected HTTP route to declare its authorization policy explicitly. */
 @Injectable()
 export class PermissionGuard implements CanActivate {
   constructor(
@@ -14,6 +16,10 @@ export class PermissionGuard implements CanActivate {
     private readonly permissions: PermissionsService,
   ) {}
 
+  /**
+   * Allows public routes, checks declared permissions, and permits marked session-only routes.
+   * Missing or unauthenticated policy declarations fail closed.
+   */
   canActivate(context: ExecutionContext): boolean {
     if (context.getType() !== 'http') {
       return true;
@@ -29,6 +35,7 @@ export class PermissionGuard implements CanActivate {
       REQUIRED_PERMISSION,
       targets,
     );
+    // A declared permission takes precedence over the session-only marker.
     if (requiredPermission) {
       if (!authContext) {
         throw new ForbiddenException(API_ERROR.FORBIDDEN);

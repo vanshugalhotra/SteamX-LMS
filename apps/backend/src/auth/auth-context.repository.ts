@@ -1,10 +1,17 @@
+/** Provides narrow database projections for session authentication and credential workflows. */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 
+/** Selects only the identity and credential fields needed by authentication workflows. */
 @Injectable()
 export class AuthContextRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Loads the current account state for each authenticated request.
+   * Unlike findLoginUser, it does not select passwordHash; it selects passwordChangedAt
+   * so AuthGuard can revoke sessions after a password update.
+   */
   findAuthUser(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },
@@ -23,7 +30,12 @@ export class AuthContextRepository {
     });
   }
 
+  /**
+   * Loads an account for login, including passwordHash for PasswordService.verify.
+   * Do not use this broader projection for ordinary authenticated requests.
+   */
   findLoginUser(steamxId: string) {
+    // This authentication lookup is the only request-path query that loads the password hash.
     return this.prisma.user.findUnique({
       where: { steamxId },
       select: {
@@ -41,6 +53,7 @@ export class AuthContextRepository {
     });
   }
 
+  /** Loads the role-to-permission grants that PermissionsService caches at startup. */
   findRolePermissions(): Promise<
     Array<{ key: string; permissions: Array<{ permission: { key: string } }> }>
   > {
@@ -54,6 +67,7 @@ export class AuthContextRepository {
     });
   }
 
+  /** Loads only the fields needed to verify the current user's password change. */
   findCredentials(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },
@@ -61,6 +75,7 @@ export class AuthContextRepository {
     });
   }
 
+  /** Finds an account and role for the one-time platform-admin recovery command. */
   findAdminPasswordResetTarget(steamxId: string) {
     return this.prisma.user.findUnique({
       where: { steamxId },
@@ -68,6 +83,7 @@ export class AuthContextRepository {
     });
   }
 
+  /** Stores the new hash and timestamp used to invalidate sessions issued before this change. */
   async updatePassword(
     userId: string,
     passwordHash: string,

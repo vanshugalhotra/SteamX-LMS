@@ -28,6 +28,7 @@ const USER_DETAIL_SELECT = {
 export type UserListRecord = Prisma.UserGetPayload<{ select: typeof USER_LIST_SELECT }>;
 export type UserDetailRecord = Prisma.UserGetPayload<{ select: typeof USER_DETAIL_SELECT }>;
 
+/** Runs user persistence queries; related profile writes stay in the same transaction. */
 @Injectable()
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -49,6 +50,7 @@ export class UsersRepository {
     userType: UserType;
     primaryAssignment: string | null;
   }): Promise<UserDetailRecord> {
+    // The database requires the account and its teacher profile to exist together.
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -87,6 +89,7 @@ export class UsersRepository {
     classSectionId: string;
     guardianName: string | null;
   }): Promise<UserDetailRecord> {
+    // The database requires the account and its student profile to exist together.
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -146,7 +149,8 @@ export class UsersRepository {
 
   renameSteamxId(where: Prisma.UserWhereInput, steamxId: string): Promise<UserDetailRecord | null> {
     return this.prisma.$transaction(async (tx) => {
-      // This repository method is the only application path that enables the guarded ID update.
+      // A database trigger blocks steamx_id changes unless steamx.allow_steamx_id_change is on.
+      // Transaction-local configuration keeps that exception limited to this rename.
       await tx.$queryRaw`SELECT set_config('steamx.allow_steamx_id_change', 'on', true)`;
       const result = await tx.user.updateMany({
         where,
@@ -168,6 +172,7 @@ export class UsersRepository {
       | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
       | { student: Prisma.StudentProfileUncheckedUpdateManyInput },
   ): Promise<UserDetailRecord | null> {
+    // User and profile fields must commit together so a partial update is never reported as success.
     return this.prisma.$transaction(async (tx) => {
       const visible = await tx.user.findFirst({ where, select: { id: true } });
       if (!visible) {
