@@ -1,49 +1,13 @@
 import { apiFetch } from '@/lib/api-client';
 import type { Paginated } from '@/lib/pagination';
 import { SCHOOL_ENDPOINTS } from './endpoints';
-
-// Mirrors the backend SchoolResponseDto
-export type SchoolStatus = 'ACTIVE' | 'INACTIVE';
-
-export interface School {
-  id: string;
-  code: string;
-  name: string;
-  streetAddress: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  contactName: string | null;
-  contactEmail: string | null;
-  contactPhone: string | null;
-  status: SchoolStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SchoolListParams {
-  page: number;
-  limit: number;
-  q: string;
-  status: SchoolStatus | 'ALL';
-}
-
-export interface SchoolInput {
-  name: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  streetAddress: string | null;
-  contactName: string | null;
-  contactPhone: string | null;
-  contactEmail: string | null;
-}
-
-export interface CreateSchoolPayload extends SchoolInput {
-  code: string;
-}
+import type {
+  CreateSchoolPayload,
+  School,
+  SchoolInput,
+  SchoolListParams,
+  SchoolStatus,
+} from '../model/types';
 
 /** GET /schools */
 export function fetchSchools({ page, limit, q, status }: SchoolListParams) {
@@ -66,5 +30,13 @@ export function updateSchool(id: string, payload: SchoolInput) {
   return apiFetch<School>(SCHOOL_ENDPOINTS.byId(id), {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+}
+
+/** PATCH /schools/:id/status (not part of the normal update). */
+export function updateSchoolStatus(id: string, status: SchoolStatus) {
+  return apiFetch<School>(SCHOOL_ENDPOINTS.status(id), {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   });
 }

@@ -13,7 +13,13 @@ export function Drawer({ title, onClose, children }: DrawerProps) {
 
   useEffect(() => {
     const dialog = ref.current;
+    // The element that opened the drawer (Add/Edit button) still has focus right now.
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (dialog && !dialog.open) dialog.showModal();
+
+    return () => {
+      opener?.focus();
+    };
   }, []);
 
   return (
@@ -21,9 +27,6 @@ export function Drawer({ title, onClose, children }: DrawerProps) {
       ref={ref}
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) e.currentTarget.close();
-      }}
       className="fixed inset-y-0 right-0 m-0 ml-auto h-svh max-h-none w-full max-w-md flex-col bg-white p-0 text-foreground shadow-2xl backdrop:bg-black/40 open:flex"
     >
       <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">

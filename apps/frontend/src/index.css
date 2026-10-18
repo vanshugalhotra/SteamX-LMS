@@ -70,7 +70,7 @@
   --color-secondary-foreground: var(--color-teal-900);
   --color-ring: var(--color-teal-500);
   --color-muted: var(--color-gray-100);
-  --color-muted-foreground: var(--color-gray-600);
+  --color-muted-foreground: var(--color-gray-400);
   --color-input: var(--color-gray-200);
 }
 

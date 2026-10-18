@@ -4,13 +4,14 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
+import { FormRenderer } from '@/components/form/FormRenderer';
+import { getSchoolFields } from '../model/config';
 import { ApiError } from '@/lib/api-client';
-import type { School, SchoolInput } from '../api/api';
+import type { School, SchoolInput } from '../model/types';
 import { SCHOOL_CODE_EXISTS, schoolErrorMessage, validationFieldErrors } from '../model/errors';
 import { createSchoolSchema, editSchoolSchema, type SchoolFormValues } from '../model/schemas';
 import { useCreateSchool, useUpdateSchool } from '../queries';
+import { SchoolStatusSection } from './SchoolStatusSection';
 
 const toNull = (value: string) => (value === '' ? null : value);
 
@@ -59,13 +60,13 @@ export function SchoolForm({ school, onDone }: SchoolFormProps) {
     handleSubmit,
     setError,
     setFocus,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<SchoolFormValues>({
     resolver: zodResolver(school ? editSchoolSchema : createSchoolSchema),
     defaultValues: toDefaults(school),
   });
 
-  const busy = create.isPending || update.isPending;
+  const busy = isSubmitting || create.isPending || update.isPending;
 
   const showError = (error: unknown) => {
     if (error instanceof ApiError && error.code === SCHOOL_CODE_EXISTS) {
@@ -84,19 +85,19 @@ export function SchoolForm({ school, onDone }: SchoolFormProps) {
     setFormError(schoolErrorMessage(error));
   };
 
-  const onSubmit = handleSubmit((values) => {
+  const onSubmit = handleSubmit(async (values) => {
+    if (busy) return;
     setFormError(null);
-    const callbacks = {
-      onSuccess: () => {
-        toast.success(school ? 'Changes saved' : 'School created');
-        onDone();
-      },
-      onError: showError,
-    };
-    if (school) {
-      update.mutate({ id: school.id, body: toInput(values) }, callbacks);
-    } else {
-      create.mutate({ code: values.code, ...toInput(values) }, callbacks);
+    try {
+      if (school) {
+        await update.mutateAsync({ id: school.id, body: toInput(values) });
+      } else {
+        await create.mutateAsync({ code: values.code, ...toInput(values) });
+      }
+      toast.success(school ? 'Changes saved' : 'School created');
+      onDone();
+    } catch (error) {
+      showError(error);
     }
   });
 
@@ -111,70 +112,14 @@ export function SchoolForm({ school, onDone }: SchoolFormProps) {
       <div className="flex-1 overflow-y-auto px-5 py-5">
         {formError && <Alert className="mb-5">{formError}</Alert>}
 
-        <FormField label="School name *" error={errors.name?.message}>
-          {(control) => (
-            <Input {...control} {...register('name')} autoComplete="off" disabled={busy} />
-          )}
-        </FormField>
+        {school && <SchoolStatusSection school={school} onDone={onDone} />}
 
-        <FormField
-          label={school ? 'School code (cannot be changed)' : 'School code *'}
-          error={errors.code?.message}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              {...register('code')}
-              readOnly={Boolean(school)}
-              autoCapitalize="characters"
-              autoComplete="off"
-              placeholder="e.g. AB-12"
-              disabled={busy}
-            />
-          )}
-        </FormField>
-
-        <div className="grid gap-x-3 sm:grid-cols-2">
-          <FormField label="City *" error={errors.city?.message}>
-            {(control) => <Input {...control} {...register('city')} disabled={busy} />}
-          </FormField>
-          <FormField label="State *" error={errors.state?.message}>
-            {(control) => <Input {...control} {...register('state')} disabled={busy} />}
-          </FormField>
-          <FormField label="Postal code *" error={errors.postalCode?.message}>
-            {(control) => <Input {...control} {...register('postalCode')} disabled={busy} />}
-          </FormField>
-          <FormField label="Country *" error={errors.country?.message}>
-            {(control) => <Input {...control} {...register('country')} disabled={busy} />}
-          </FormField>
-        </div>
-
-        <FormField label="Street address" error={errors.streetAddress?.message}>
-          {(control) => <Input {...control} {...register('streetAddress')} disabled={busy} />}
-        </FormField>
-
-        <div className="grid gap-x-3 sm:grid-cols-2">
-          <FormField label="Contact name" error={errors.contactName?.message}>
-            {(control) => <Input {...control} {...register('contactName')} disabled={busy} />}
-          </FormField>
-          <FormField label="Contact phone" error={errors.contactPhone?.message}>
-            {(control) => (
-              <Input {...control} {...register('contactPhone')} type="tel" disabled={busy} />
-            )}
-          </FormField>
-        </div>
-
-        <FormField label="Contact email" error={errors.contactEmail?.message}>
-          {(control) => (
-            <Input
-              {...control}
-              {...register('contactEmail')}
-              type="email"
-              autoComplete="off"
-              disabled={busy}
-            />
-          )}
-        </FormField>
+        <FormRenderer
+          fields={getSchoolFields(Boolean(school))}
+          register={register}
+          errors={errors}
+          disabled={busy}
+        />
       </div>
 
       <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">

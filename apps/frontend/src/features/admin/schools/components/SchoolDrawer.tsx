@@ -1,5 +1,5 @@
 import { Drawer } from '@/components/ui/drawer';
-import type { School } from '../api/api';
+import type { School } from '../model/types';
 import { SchoolForm } from './SchoolForm';
 
 interface SchoolDrawerProps {

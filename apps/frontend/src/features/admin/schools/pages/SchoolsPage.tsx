@@ -1,44 +1,40 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
-import type { School, SchoolStatus } from '../api/api';
+import type { School, SchoolStatusFilter } from '../model/types';
 import { SchoolDrawer } from '../components/SchoolDrawer';
-import { SchoolList } from '../components/SchoolList';
+import { DataTable } from '@/components/ui/data-table';
+import { getSchoolColumns } from '../components/schoolColumns';
 import { useSchools } from '../queries';
-
-const PAGE_SIZE = 10;
-
-const FILTERS: { value: SchoolStatus | 'ALL'; label: string }[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'INACTIVE', label: 'Inactive' },
-];
+import { SCHOOLS_PAGE_SIZE, SCHOOL_STATUS_FILTERS } from '../model/config';
 
 type DrawerState = { school?: School } | null;
 
 export function SchoolsPage() {
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<SchoolStatus | 'ALL'>('ALL');
-  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<SchoolStatusFilter>('ALL');
   const [drawer, setDrawer] = useState<DrawerState>(null);
 
-  const triggerRef = useRef<HTMLElement | null>(null);
-  const openDrawer = (state: DrawerState) => {
-    triggerRef.current = document.activeElement as HTMLElement | null;
-    setDrawer(state);
-  };
-  const closeDrawer = () => {
-    setDrawer(null);
-    triggerRef.current?.focus();
-  };
+  const columns = getSchoolColumns((school) => {
+    setDrawer({ school });
+  });
 
   const q = useDebouncedValue(search.trim());
+  const filterKey = `${q}|${status}`;
+
+  // The page belongs to the filters it was chosen for; new filters mean page 1.
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
+  const page = pageState.key === filterKey ? pageState.page : 1;
+  const setPage = (next: number) => {
+    setPageState({ key: filterKey, page: next });
+  };
+
   const { data, isPending, isError, refetch } = useSchools({
     page,
-    limit: PAGE_SIZE,
+    limit: SCHOOLS_PAGE_SIZE,
     q,
     status,
   });
@@ -52,7 +48,7 @@ export function SchoolsPage() {
         </div>
         <Button
           onClick={() => {
-            openDrawer({});
+            setDrawer({});
           }}
         >
           <Plus className="size-4" aria-hidden="true" />
@@ -67,24 +63,22 @@ export function SchoolsPage() {
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
-              setPage(1);
             }}
             placeholder="Search by name or code"
             aria-label="Search schools"
-            className="w-full min-w-0 bg-transparent text-xs text-foreground outline-none placeholder:text-gray-600"
+            className="w-full min-w-0 bg-transparent text-xs text-foreground outline-none placeholder:text-gray-400"
           />
           <Search className="size-4 shrink-0" aria-hidden="true" />
         </label>
 
         <div role="group" aria-label="Filter by status" className="flex gap-2">
-          {FILTERS.map((filter) => (
+          {SCHOOL_STATUS_FILTERS.map((filter) => (
             <button
               key={filter.value}
               type="button"
               aria-pressed={status === filter.value}
               onClick={() => {
                 setStatus(filter.value);
-                setPage(1);
               }}
               className={cn(
                 'rounded-full px-4 py-2 text-[11px] font-medium outline-none focus-visible:ring-4 focus-visible:ring-ring/40',
@@ -98,14 +92,16 @@ export function SchoolsPage() {
       </div>
 
       <section className="mt-6 rounded-2xl bg-gray-50 p-2">
-        <SchoolList
-          schools={data?.items}
+        <DataTable
+          columns={columns}
+          rows={data?.items}
+          getRowId={(school) => school.id}
           isPending={isPending}
           isError={isError}
           onRetry={() => void refetch()}
-          onEdit={(school) => {
-            openDrawer({ school });
-          }}
+          emptyMessage="No schools match your filters."
+          errorMessage="We couldn't load the schools. Please try again."
+          loadingLabel="Loading schools"
         />
         {data && data.total > 0 && (
           <Pagination
@@ -121,7 +117,9 @@ export function SchoolsPage() {
         <SchoolDrawer
           key={drawer.school?.id ?? 'new'}
           school={drawer.school}
-          onClose={closeDrawer}
+          onClose={() => {
+            setDrawer(null);
+          }}
         />
       )}
     </>
