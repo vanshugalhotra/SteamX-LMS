@@ -35,6 +35,10 @@
 - `GET /api/v1/auth/me`
 - `POST /api/v1/auth/change-password`
 
+All other protected routes must declare a permission. The permission guard denies routes
+without an explicit permission or authenticated-only declaration; public routes must be
+explicitly marked public.
+
 ## Public routes
 
 - `GET /health/live`

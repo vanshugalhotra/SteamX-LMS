@@ -8,5 +8,6 @@ import { SchoolsService } from './schools.service.js';
   imports: [PrismaModule],
   controllers: [SchoolsController],
   providers: [SchoolsRepository, SchoolsService],
+  exports: [SchoolsService],
 })
 export class SchoolsModule {}

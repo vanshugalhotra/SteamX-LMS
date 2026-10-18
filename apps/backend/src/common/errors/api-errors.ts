@@ -39,7 +39,6 @@ export const API_ERROR = {
     code: 'FORBIDDEN',
     message: 'Only platform staff can create schools.',
   },
-  USER_NOT_FOUND: { code: 'NOT_FOUND', message: 'User not found' },
   STEAMX_ID_NOT_RENAMABLE: {
     code: 'STEAMX_ID_NOT_RENAMABLE',
     message: 'Platform staff SteamX IDs cannot be renamed.',

@@ -8,6 +8,7 @@ import type { App } from 'supertest/types.js';
 import { SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { AuthContextRepository } from '../../src/auth/auth-context.repository.js';
+import { AuthenticatedOnly } from '../../src/auth/decorators/authenticated-only.decorator.js';
 import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../../src/auth/decorators/require-permission.decorator.js';
 import { PERMISSION } from '../../src/auth/permissions.js';
@@ -24,6 +25,7 @@ const TEST_PASSWORD = 'Test login password 2026!';
 
 @Controller('auth-test')
 class AuthTestController {
+  @AuthenticatedOnly()
   @Get('protected')
   getProtected(@CurrentAuth() authContext: AuthContext): AuthContext {
     return authContext;

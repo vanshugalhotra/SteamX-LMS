@@ -18,6 +18,7 @@ import type { Env } from '../../src/config/env.schema.js';
 import { SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { AUTH_COOKIE_NAME } from '../../src/auth/auth.constants.js';
+import { AuthenticatedOnly } from '../../src/auth/decorators/authenticated-only.decorator.js';
 import { PasswordService } from '../../src/auth/services/password.service.js';
 import { RequirePermission } from '../../src/auth/decorators/require-permission.decorator.js';
 import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js';
@@ -39,6 +40,7 @@ const CHANGED_PASSWORD = 'Changed after reset password 2026!';
 
 @Controller({ path: 'auth-invariants', version: '1' })
 class AuthInvariantTestController {
+  @AuthenticatedOnly()
   @Get('normal')
   normal(@CurrentAuth() auth: AuthContext): { userId: string } {
     return { userId: auth.userId };

@@ -144,13 +144,6 @@ export class UsersRepository {
     });
   }
 
-  findSchoolCode(schoolId: string): Promise<{ code: string } | null> {
-    return this.prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { code: true },
-    });
-  }
-
   renameSteamxId(where: Prisma.UserWhereInput, steamxId: string): Promise<UserDetailRecord | null> {
     return this.prisma.$transaction(async (tx) => {
       // This repository method is the only application path that enables the guarded ID update.
@@ -190,15 +183,21 @@ export class UsersRepository {
 
       if (profileData) {
         if ('teacher' in profileData) {
-          await tx.teacherProfile.updateMany({
+          const result = await tx.teacherProfile.updateMany({
             where: { userId, schoolId },
             data: profileData.teacher,
           });
+          if (result.count === 0) {
+            throw new Error('Expected teacher profile update to affect one row');
+          }
         } else {
-          await tx.studentProfile.updateMany({
+          const result = await tx.studentProfile.updateMany({
             where: { userId, schoolId },
             data: profileData.student,
           });
+          if (result.count === 0) {
+            throw new Error('Expected student profile update to affect one row');
+          }
         }
       }
 

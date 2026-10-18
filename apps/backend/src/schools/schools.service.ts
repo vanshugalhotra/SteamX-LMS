@@ -26,6 +26,10 @@ export class SchoolsService {
     private readonly logger: PinoLogger,
   ) {}
 
+  findCodeById(schoolId: string): Promise<{ code: string } | null> {
+    return this.schools.findCodeById(schoolId);
+  }
+
   // ─────────────────────────────────────────
   // POST /schools — Create a school
   // ─────────────────────────────────────────
