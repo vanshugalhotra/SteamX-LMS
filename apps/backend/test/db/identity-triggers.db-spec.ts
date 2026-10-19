@@ -1,311 +1,261 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
-import { Prisma, UserType } from '../../src/generated/prisma/client.js';
-import { AppModule } from '../../src/app.module.js';
-import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTestUser } from '../support/factories/fixtures.js';
-import { withRollback } from '../support/setup/with-rollback.js';
-import { expectTriggerMessage } from '../support/setup/expect-trigger.js';
+import type { Client } from 'pg';
+import { connectRawClient } from '../support/raw-sql.js';
+import { createRawDbContext, type RawDbContext } from '../support/raw-db-context.js';
 
-const PASSWORD_HASH = 'test-only-password-hash';
+describe('identity triggers', () => {
+  let client: Client;
+  let db: RawDbContext;
 
-describe('Identity and profile triggers', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-
-  beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
-    prisma = app.get(PrismaService);
+  beforeEach(async () => {
+    client = await connectRawClient();
+    await client.query('BEGIN');
+    db = createRawDbContext(client);
   });
 
-  afterAll(async () => {
-    await app.close();
+  afterEach(async () => {
+    await client.query('ROLLBACK');
+    await client.end();
   });
 
-  async function createSchool(tx: Prisma.TransactionClient): Promise<{ id: string }> {
-    return tx.school.create({
-      data: {
-        code: `TRG${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
-        name: 'Trigger Test School',
-        city: 'Test City',
-        state: 'Test State',
-        postalCode: '00000',
-        country: 'Test Country',
-      },
-      select: { id: true },
-    });
-  }
-
-  it('rejects changes to roles.key', async () => {
-    await withRollback(prisma, async (tx) => {
-      const role = await tx.role.create({
-        data: {
-          key: 'trigger-test-role',
-          name: 'Trigger Test Role',
-          userType: UserType.PLATFORM_STAFF,
-        },
-        select: { id: true },
-      });
-
-      await expectTriggerMessage(
-        () =>
-          tx.$executeRaw`UPDATE roles SET key = 'trigger-test-role-renamed' WHERE id = ${role.id}`,
-        'roles.key is immutable',
-      );
-    });
-  });
-
-  it('rejects changes to schools.code', async () => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-
-      await expectTriggerMessage(
-        () => tx.$executeRaw`UPDATE schools SET code = 'TRGCHANGED' WHERE id = ${school.id}::uuid`,
-        'schools.code is immutable',
-      );
-    });
-  });
-
-  it('rejects changes to class_sections.school_id', async () => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-      const anotherSchool = await createSchool(tx);
-      const classSection = await tx.classSection.create({
-        data: { schoolId: school.id, className: 'Trigger Test Class' },
-        select: { id: true },
-      });
-
-      await expectTriggerMessage(
-        () =>
-          tx.$executeRaw`UPDATE class_sections SET school_id = ${anotherSchool.id}::uuid WHERE id = ${classSection.id}::uuid`,
-        'class_sections.school_id is immutable',
-      );
-    });
-  });
-
-  it.each([
-    { column: 'user_type', value: 'STUDENT', expected: 'users.user_type is immutable' },
-    { column: 'school_id', value: null, expected: 'users.school_id is immutable' },
-    { column: 'steamx_id', value: 'CHANGED123', expected: 'users.steamx_id is immutable' },
-  ])('rejects changes to users.$column', async ({ column, value, expected }) => {
-    await withRollback(prisma, async (tx) => {
-      const user = await createTestUser(tx, {
-        userType: UserType.SCHOOL_STAFF,
-        name: 'Immutable User',
-        passwordHash: PASSWORD_HASH,
-      });
-
-      const operation =
-        column === 'user_type'
-          ? () => tx.$executeRaw`UPDATE users SET user_type = 'STUDENT' WHERE id = ${user.id}::uuid`
-          : column === 'school_id'
-            ? () => tx.$executeRaw`UPDATE users SET school_id = NULL WHERE id = ${user.id}::uuid`
-            : () =>
-                tx.user.update({
-                  where: { id: user.id },
-                  data: { steamxId: value ?? '' },
-                });
-
-      await expectTriggerMessage(operation, expected);
-    });
-  });
-
-  it('allows mutable updates to school and user names', async () => {
-    await withRollback(prisma, async (tx) => {
-      const user = await createTestUser(tx, {
-        userType: UserType.SCHOOL_STAFF,
-        name: 'Before Update',
-        passwordHash: PASSWORD_HASH,
-      });
-
-      await expect(
-        tx.$executeRaw`UPDATE schools SET name = 'Renamed School' WHERE id = ${user.schoolId}::uuid`,
-      ).resolves.toBe(1);
-      await expect(
-        tx.$executeRaw`UPDATE users SET name = 'Renamed User' WHERE id = ${user.id}::uuid`,
-      ).resolves.toBe(1);
-      await expect(
-        tx.user.findUniqueOrThrow({ where: { id: user.id }, select: { name: true } }),
-      ).resolves.toEqual({ name: 'Renamed User' });
-    });
-  });
-
-  it.each([
-    {
-      userType: UserType.STUDENT,
-      roleKey: 'student',
-      message: 'users.student_profile is required',
-    },
-    {
-      userType: UserType.SCHOOL_STAFF,
+  it('rejects changes to immutable role keys, school codes, class school IDs, and user identity', async () => {
+    const schoolId = await db.createSchool();
+    const otherSchoolId = await db.createSchool();
+    const sectionId = await db.createClassSection(schoolId);
+    const userId = await db.createUser({
+      userType: 'SCHOOL_STAFF',
       roleKey: 'teacher',
-      message: 'users.teacher_profile is required',
-    },
-  ])(
-    'rejects a $roleKey user without a profile when constraints are immediate',
-    async ({ userType, roleKey, message }) => {
-      await withRollback(prisma, async (tx) => {
-        const school = await createSchool(tx);
-        const role = await tx.role.findUniqueOrThrow({
-          where: { key: roleKey },
-          select: { id: true },
-        });
-
-        await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-        await expectTriggerMessage(
-          () =>
-            tx.user.create({
-              data: {
-                steamxId: `TRG${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
-                name: 'Profileless User',
-                passwordHash: PASSWORD_HASH,
-                roleId: role.id,
-                userType,
-                schoolId: school.id,
-              },
-            }),
-          message,
-        );
-      });
-    },
-  );
-
-  it('allows valid profiles and a platform admin when constraints are immediate', async () => {
-    await withRollback(prisma, async (tx) => {
-      const student = await createTestUser(tx, {
-        userType: UserType.STUDENT,
-        name: 'Valid Student',
-        passwordHash: PASSWORD_HASH,
-      });
-      const teacher = await createTestUser(tx, {
-        userType: UserType.SCHOOL_STAFF,
-        name: 'Valid Teacher',
-        passwordHash: PASSWORD_HASH,
-      });
-      const admin = await createTestUser(tx, {
-        userType: UserType.PLATFORM_STAFF,
-        name: 'Platform Admin',
-        passwordHash: PASSWORD_HASH,
-      });
-
-      await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-      await expect(
-        tx.user.findMany({ where: { id: { in: [student.id, teacher.id, admin.id] } } }),
-      ).resolves.toHaveLength(3);
+      schoolId,
     });
+    const role = await client.query<{ id: number }>(`SELECT id FROM roles WHERE key = 'teacher'`);
+    await db.expectTriggerFailure(
+      'UPDATE roles SET key = $1 WHERE id = $2',
+      [`changed-${randomUUID()}`, db.firstRow(role.rows).id],
+      'trg_roles_immutable_key',
+      'roles.key is immutable',
+    );
+    await db.expectTriggerFailure(
+      'UPDATE schools SET code = $1 WHERE id = $2',
+      [`X${randomUUID().slice(0, 10).toUpperCase()}`, schoolId],
+      'trg_schools_immutable_code',
+      'schools.code is immutable',
+    );
+    await db.expectTriggerFailure(
+      'UPDATE class_sections SET school_id = $1 WHERE id = $2',
+      [otherSchoolId, sectionId],
+      'trg_class_sections_immutable_school_id',
+      'class_sections.school_id is immutable',
+    );
+    await db.expectTriggerFailure(
+      "UPDATE users SET user_type = 'STUDENT' WHERE id = $1",
+      [userId],
+      'trg_users_immutable_identity',
+      'users.user_type is immutable',
+    );
+    await db.expectTriggerFailure(
+      'UPDATE users SET school_id = NULL WHERE id = $1',
+      [userId],
+      'trg_users_immutable_identity',
+      'users.school_id is immutable',
+    );
   });
 
-  it('allows an unprofiled user to be inserted and deleted in the same transaction', async () => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-      const role = await tx.role.findUniqueOrThrow({
-        where: { key: 'student' },
-        select: { id: true },
-      });
-      const user = await tx.user.create({
-        data: {
-          steamxId: `TRG${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
-          name: 'Deleted Before Commit',
-          passwordHash: PASSWORD_HASH,
-          roleId: role.id,
-          userType: UserType.STUDENT,
-          schoolId: school.id,
-        },
-        select: { id: true },
-      });
-
-      await tx.user.delete({ where: { id: user.id } });
+  it('allows mutable updates while protecting SteamX ID changes with transaction-local authorization', async () => {
+    const schoolId = await db.createSchool();
+    const userId = await db.createUser({
+      userType: 'SCHOOL_STAFF',
+      roleKey: 'teacher',
+      schoolId,
     });
-  });
+    await client.query(
+      `INSERT INTO teacher_profiles (user_id, school_id, updated_at)
+       VALUES ($1, $2, now())`,
+      [userId, schoolId],
+    );
+    await client.query("SELECT set_config('steamx.allow_steamx_id_change', 'on', true)");
+    await client.query(`UPDATE users SET steamx_id = $1, name = 'Updated User' WHERE id = $2`, [
+      `U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`,
+      userId,
+    ]);
+    await client.query(`UPDATE schools SET name = 'Updated School' WHERE id = $1`, [schoolId]);
+    await client.query('COMMIT');
+    await client.query('BEGIN');
+    await db.expectTriggerFailure(
+      'UPDATE users SET steamx_id = $1 WHERE id = $2',
+      [`U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`, userId],
+      'trg_users_immutable_steamx_id',
+      'users.steamx_id is immutable',
+    );
 
-  it('checks the current role when the role changes before commit', async () => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-      const teacherRole = await tx.role.findUniqueOrThrow({
-        where: { key: 'teacher' },
-        select: { id: true },
-      });
-      const otherSchoolStaffRole = await tx.role.create({
-        data: {
-          key: `trigger-school-staff-${randomUUID().replaceAll('-', '').slice(0, 8)}`,
-          name: 'Other School Staff',
-          userType: UserType.SCHOOL_STAFF,
-        },
-        select: { id: true },
-      });
-      const user = await tx.user.create({
-        data: {
-          steamxId: `TRG${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
-          name: 'Role Changed Before Commit',
-          passwordHash: PASSWORD_HASH,
-          roleId: teacherRole.id,
-          userType: UserType.SCHOOL_STAFF,
-          schoolId: school.id,
-        },
-        select: { id: true },
-      });
-
-      await tx.user.update({
-        where: { id: user.id },
-        data: { roleId: otherSchoolStaffRole.id },
-      });
-    });
-  });
-
-  it('rejects a student without a profile at commit and rolls back the user', async () => {
-    const steamxId = `TRG${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-    const schoolCode = `TRG${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`;
-    let commitError: unknown;
-
+    const otherClient = await connectRawClient();
     try {
-      await prisma.$transaction(async (tx) => {
-        const school = await tx.school.create({
-          data: {
-            code: schoolCode,
-            name: 'Commit Trigger School',
-            city: 'Test City',
-            state: 'Test State',
-            postalCode: '00000',
-            country: 'Test Country',
-          },
-          select: { id: true },
-        });
-        const role = await tx.role.findUniqueOrThrow({
-          where: { key: 'student' },
-          select: { id: true },
-        });
-
-        await tx.user.create({
-          data: {
-            steamxId,
-            name: 'Unprofiled Student',
-            passwordHash: PASSWORD_HASH,
-            roleId: role.id,
-            userType: UserType.STUDENT,
-            schoolId: school.id,
-          },
-        });
-      });
-    } catch (error) {
-      commitError = error;
+      await expect(
+        otherClient.query('UPDATE users SET steamx_id = $1 WHERE id = $2', [
+          `U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`,
+          userId,
+        ]),
+      ).rejects.toMatchObject({ code: '23000' });
+    } finally {
+      await otherClient.end();
     }
+  });
 
-    const metadata =
-      typeof commitError === 'object' && commitError !== null && 'meta' in commitError
-        ? commitError.meta
-        : undefined;
-    const errorText = commitError instanceof Error ? commitError.message : String(commitError);
-    expect(commitError).toBeDefined();
-    expect(`${errorText} ${JSON.stringify(metadata)}`).toContain(
+  it('does not retain SteamX ID authorization after a transaction commits or rolls back', async () => {
+    const userId = await db.createUser();
+    await client.query("SELECT set_config('steamx.allow_steamx_id_change', 'on', true)");
+    await client.query(`UPDATE users SET steamx_id = $1 WHERE id = $2`, [
+      `U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`,
+      userId,
+    ]);
+    await client.query('COMMIT');
+    await client.query('BEGIN');
+    await db.expectTriggerFailure(
+      'UPDATE users SET steamx_id = $1 WHERE id = $2',
+      [`U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`, userId],
+      'trg_users_immutable_steamx_id',
+      'users.steamx_id is immutable',
+    );
+    await client.query('ROLLBACK');
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('steamx.allow_steamx_id_change', 'on', true)");
+    await client.query('ROLLBACK');
+    await client.query('BEGIN');
+    await db.expectTriggerFailure(
+      'UPDATE users SET steamx_id = $1 WHERE id = $2',
+      [`U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`, userId],
+      'trg_users_immutable_steamx_id',
+      'users.steamx_id is immutable',
+    );
+  });
+
+  it('defers required student and teacher profiles until COMMIT', async () => {
+    const studentSchoolCode = `R${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`;
+    const schoolId = await db.createSchool({ code: studentSchoolCode });
+    const studentSteamxId = `S${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`;
+    await db.createUser({
+      userType: 'STUDENT',
+      roleKey: 'student',
+      schoolId,
+      steamxId: studentSteamxId,
+    });
+    await db.expectDeferredCommitFailure(
+      'trg_users_require_profile',
       'users.student_profile is required',
     );
-    await expect(prisma.user.findUnique({ where: { steamxId } })).resolves.toBeNull();
-    await expect(prisma.school.findUnique({ where: { code: schoolCode } })).resolves.toBeNull();
+
+    await client.query('ROLLBACK');
+    const rolledBackStudent = await client.query('SELECT 1 FROM users WHERE steamx_id = $1', [
+      studentSteamxId,
+    ]);
+    const rolledBackSchool = await client.query('SELECT 1 FROM schools WHERE code = $1', [
+      studentSchoolCode,
+    ]);
+    expect(rolledBackStudent.rowCount).toBe(0);
+    expect(rolledBackSchool.rowCount).toBe(0);
+    await client.query('BEGIN');
+    const teacherSchoolId = await db.createSchool();
+    await db.createUser({
+      userType: 'SCHOOL_STAFF',
+      roleKey: 'teacher',
+      schoolId: teacherSchoolId,
+    });
+    await db.expectDeferredCommitFailure(
+      'trg_users_require_profile',
+      'users.teacher_profile is required',
+    );
+  });
+
+  it('rejects deleting a required profile at COMMIT', async () => {
+    const studentSchoolId = await db.createSchool();
+    const studentSectionId = await db.createClassSection(studentSchoolId);
+    const studentId = await db.createUser({
+      userType: 'STUDENT',
+      roleKey: 'student',
+      schoolId: studentSchoolId,
+    });
+    await client.query(
+      `INSERT INTO student_profiles (user_id, school_id, class_section_id, updated_at)
+       VALUES ($1, $2, $3, now())`,
+      [studentId, studentSchoolId, studentSectionId],
+    );
+    await client.query('DELETE FROM student_profiles WHERE user_id = $1', [studentId]);
+    await db.expectDeferredCommitFailure(
+      'trg_student_profiles_require_user_profile',
+      'users.student_profile is required',
+    );
+
+    await client.query('ROLLBACK');
+    await client.query('BEGIN');
+    const schoolId = await db.createSchool();
+    const userId = await db.createUser({
+      userType: 'SCHOOL_STAFF',
+      roleKey: 'teacher',
+      schoolId,
+    });
+    await client.query(
+      `INSERT INTO teacher_profiles (user_id, school_id, updated_at) VALUES ($1, $2, now())`,
+      [userId, schoolId],
+    );
+    await client.query('DELETE FROM teacher_profiles WHERE user_id = $1', [userId]);
+    await db.expectDeferredCommitFailure(
+      'trg_teacher_profiles_require_user_profile',
+      'users.teacher_profile is required',
+    );
+  });
+
+  it('allows creating a student user and profile in one transaction', async () => {
+    const schoolId = await db.createSchool();
+    const sectionId = await db.createClassSection(schoolId);
+    const userId = await db.createUser({
+      userType: 'STUDENT',
+      roleKey: 'student',
+      schoolId,
+    });
+    await client.query(
+      `INSERT INTO student_profiles (user_id, school_id, class_section_id, updated_at)
+       VALUES ($1, $2, $3, now())`,
+      [userId, schoolId, sectionId],
+    );
+    await client.query('COMMIT');
+    const profiles = await client.query(`SELECT 1 FROM student_profiles WHERE user_id = $1`, [
+      userId,
+    ]);
+    expect(profiles.rowCount).toBe(1);
+  });
+
+  it('allows deleting an unprofiled student before COMMIT', async () => {
+    const schoolId = await db.createSchool();
+    const userId = await db.createUser({
+      userType: 'STUDENT',
+      roleKey: 'student',
+      schoolId,
+    });
+    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+    await client.query('COMMIT');
+  });
+
+  it('checks the current role when a teacher role changes before COMMIT', async () => {
+    const schoolId = await db.createSchool();
+    const role = await client.query<{ id: number }>(
+      `INSERT INTO roles (key, name, user_type)
+       VALUES ($1, 'School Staff', 'SCHOOL_STAFF') RETURNING id`,
+      [`school-staff-${randomUUID()}`],
+    );
+    const teacher = await client.query<{ id: string }>(
+      `INSERT INTO users
+         (id, steamx_id, name, password_hash, role_id, user_type, school_id, updated_at)
+       SELECT $1, $2, 'Role Changed User', 'test-hash', id, 'SCHOOL_STAFF', $3, now()
+       FROM roles WHERE key = 'teacher'
+       RETURNING id`,
+      [randomUUID(), `T${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`, schoolId],
+    );
+    await client.query('UPDATE users SET role_id = $1 WHERE id = $2', [
+      db.firstRow(role.rows).id,
+      db.firstRow(teacher.rows).id,
+    ]);
+    await client.query('COMMIT');
+    await client.query('DELETE FROM users WHERE id = $1', [db.firstRow(teacher.rows).id]);
+    await client.query('DELETE FROM roles WHERE id = $1', [db.firstRow(role.rows).id]);
+    await client.query('DELETE FROM schools WHERE id = $1', [schoolId]);
   });
 });

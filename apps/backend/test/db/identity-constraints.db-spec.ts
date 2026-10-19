@@ -1,366 +1,263 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { Prisma, UserType } from '../../src/generated/prisma/client.js';
-import { AppModule } from '../../src/app.module.js';
-import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { withRollback } from '../support/setup/with-rollback.js';
-import { expectConstraint } from '../support/setup/expect-constraint.js';
+import { randomUUID } from 'node:crypto';
+import type { Client } from 'pg';
+import { connectRawClient } from '../support/raw-sql.js';
+import { createRawDbContext, type RawDbContext } from '../support/raw-db-context.js';
 
-const PASSWORD_HASH = 'test-only-password-hash';
+describe('identity checks and uniqueness', () => {
+  let client: Client;
+  let db: RawDbContext;
 
-type SchoolOverrides = {
-  code?: string;
-  name?: string;
-  city?: string;
-  contactEmail?: string | null;
-};
-
-describe('Identity database constraints', () => {
-  let app: INestApplication;
-  let prisma: PrismaService;
-
-  beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
-    prisma = app.get(PrismaService);
+  beforeEach(async () => {
+    client = await connectRawClient();
+    await client.query('BEGIN');
+    db = createRawDbContext(client);
   });
 
-  afterAll(async () => {
-    await app.close();
+  afterEach(async () => {
+    await client.query('ROLLBACK');
+    await client.end();
   });
 
-  async function createSchool(
-    tx: Prisma.TransactionClient,
-    overrides: SchoolOverrides = {},
-  ): Promise<{ id: string }> {
-    return tx.school.create({
-      data: {
-        code: 'TST1',
-        name: 'Test School',
-        city: 'Test City',
-        state: 'Test State',
-        postalCode: '00000',
-        country: 'Test Country',
-        ...overrides,
-      },
-      select: { id: true },
-    });
-  }
-
-  async function createUser(
-    tx: Prisma.TransactionClient,
-    userType: UserType,
-    schoolId: string | null,
-    overrides: Partial<Prisma.UserUncheckedCreateInput> = {},
-  ): Promise<{ id: string }> {
-    const role = await tx.role.create({
-      data: {
-        key: `test-${userType.toLowerCase()}`,
-        name: 'Test Role',
-        userType,
-      },
-    });
-
-    return tx.user.create({
-      data: {
-        steamxId: 'TST123',
-        name: 'Test User',
-        passwordHash: PASSWORD_HASH,
-        roleId: role.id,
-        userType,
-        schoolId,
-        ...overrides,
-      },
-      select: { id: true },
-    });
-  }
-
-  const allowedCases: Array<{
-    name: string;
-    run: (tx: Prisma.TransactionClient) => Promise<void>;
-  }> = [
-    {
-      name: 'valid school',
-      run: async (tx) => {
-        await expect(createSchool(tx)).resolves.toMatchObject({ id: expect.any(String) });
-      },
-    },
-    {
-      name: 'platform staff without a school',
-      run: async (tx) => {
-        await expect(createUser(tx, UserType.PLATFORM_STAFF, null)).resolves.toMatchObject({
-          id: expect.any(String),
-        });
-      },
-    },
-    {
-      name: 'teacher with a school',
-      run: async (tx) => {
-        const school = await createSchool(tx);
-        const user = await createUser(tx, UserType.SCHOOL_STAFF, school.id);
-        const profile = await tx.teacherProfile.create({
-          data: { userId: user.id, schoolId: school.id },
-        });
-
-        expect(profile.userType).toBe(UserType.SCHOOL_STAFF);
-      },
-    },
-    {
-      name: 'student without an email',
-      run: async (tx) => {
-        const school = await createSchool(tx);
-        const user = await createUser(tx, UserType.STUDENT, school.id);
-        const section = await tx.classSection.create({
-          data: { schoolId: school.id, className: 'Class 5' },
-          select: { id: true },
-        });
-        const profile = await tx.studentProfile.create({
-          data: {
-            userId: user.id,
-            schoolId: school.id,
-            classSectionId: section.id,
-          },
-        });
-
-        expect(profile.userType).toBe(UserType.STUDENT);
-      },
-    },
-    {
-      name: 'same class and section names in different schools',
-      run: async (tx) => {
-        const firstSchool = await createSchool(tx, { code: 'TST1' });
-        const secondSchool = await createSchool(tx, { code: 'TST2' });
-        const first = await tx.classSection.create({
-          data: { schoolId: firstSchool.id, className: 'Class 5', sectionName: 'A' },
-        });
-        const second = await tx.classSection.create({
-          data: { schoolId: secondSchool.id, className: 'Class 5', sectionName: 'A' },
-        });
-
-        expect(first.id).not.toBe(second.id);
-      },
-    },
-  ];
-
-  it.each(allowedCases)('allows $name', async ({ run }) => {
-    await withRollback(prisma, run);
+  it('accepts school codes at the two-character and twelve-character boundaries', async () => {
+    await db.createSchool({ code: 'A1' });
+    await db.createSchool({ code: 'ABCDEFGHIJKL' });
+    await db.createSchool({ code: 'AB_C-D12' });
   });
 
-  const invalidSteamxIds = [
-    { name: 'lowercase', value: 'abc' },
-    { name: 'spaces', value: 'AB C' },
-    { name: 'leading or trailing whitespace', value: ' TST123 ' },
-    { name: 'invalid characters', value: 'AB$C' },
-  ];
-
-  it.each(invalidSteamxIds)('rejects a $name steamx_id', async ({ value }) => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-      await expectConstraint(
-        () =>
-          createUser(tx, UserType.SCHOOL_STAFF, school.id, {
-            steamxId: value,
-          }),
-        '23514',
-        'users_steamx_id_fmt',
+  it.each(['a1', 'A', 'A'.repeat(13), 'A!'])(
+    'rejects school code %j unless it is uppercase, allowed, and 2-12 characters',
+    async (code) => {
+      await db.expectFailure(
+        `INSERT INTO schools (id, code, name, city, state, postal_code, country, updated_at)
+         VALUES ($1, $2, 'Test School', 'Test City', 'State', '00000', 'Country', now())`,
+        [randomUUID(), code],
+        { code: '23514', constraint: 'schools_code_fmt' },
       );
-    });
+    },
+  );
+
+  it.each([
+    { column: 'name', constraint: 'schools_name_nonempty' },
+    { column: 'city', constraint: 'schools_city_nonempty' },
+  ])('rejects blank school $column values', async ({ column, constraint }) => {
+    const name = column === 'name' ? '   ' : 'Test School';
+    const city = column === 'city' ? '   ' : 'Test City';
+    await db.expectFailure(
+      `INSERT INTO schools (id, code, name, city, state, postal_code, country, updated_at)
+       VALUES ($1, $2, $3, $4, 'State', '00000', 'Country', now())`,
+      [randomUUID(), `T${randomUUID().slice(0, 10).toUpperCase()}`, name, city],
+      { code: '23514', constraint },
+    );
   });
 
-  const invalidUserCases: Array<{
-    name: string;
-    userType: UserType;
-    schoolId: 'present' | 'missing';
-    email?: string;
-    nameValue?: string;
-    constraint: string;
-  }> = [
-    {
-      name: 'platform staff with a school',
-      userType: UserType.PLATFORM_STAFF,
-      schoolId: 'present',
-      constraint: 'users_school_scope',
-    },
-    {
-      name: 'school staff without a school',
-      userType: UserType.SCHOOL_STAFF,
-      schoolId: 'missing',
-      constraint: 'users_school_scope',
-    },
-    {
-      name: 'student with an email',
-      userType: UserType.STUDENT,
-      schoolId: 'present',
-      email: 'student@example.com',
-      constraint: 'users_student_no_email',
-    },
-    {
-      name: 'user with uppercase email',
-      userType: UserType.SCHOOL_STAFF,
-      schoolId: 'present',
-      email: 'USER@example.com',
-      constraint: 'users_email_norm',
-    },
-    {
-      name: 'user with whitespace around email',
-      userType: UserType.SCHOOL_STAFF,
-      schoolId: 'present',
-      email: ' user@example.com ',
-      constraint: 'users_email_norm',
-    },
-    {
-      name: 'user with a blank name',
-      userType: UserType.SCHOOL_STAFF,
-      schoolId: 'present',
-      nameValue: '   ',
-      constraint: 'users_name_nonempty',
-    },
-  ];
-
-  it.each(invalidUserCases)('rejects $name', async (testCase) => {
-    await withRollback(prisma, async (tx) => {
-      const school = testCase.schoolId === 'present' ? await createSchool(tx) : undefined;
-      await expectConstraint(
-        () =>
-          createUser(tx, testCase.userType, school?.id ?? null, {
-            ...(testCase.email === undefined ? {} : { email: testCase.email }),
-            ...(testCase.nameValue === undefined ? {} : { name: testCase.nameValue }),
-          }),
-        '23514',
-        testCase.constraint,
+  it('accepts normalized school contact email and rejects whitespace or uppercase', async () => {
+    await db.createSchool({ contactEmail: 'school@example.test' });
+    for (const email of [' School@example.test ', 'school@example.test ']) {
+      await db.expectFailure(
+        `INSERT INTO schools (id, code, name, city, state, postal_code, country, contact_email, updated_at)
+         VALUES ($1, $2, 'Test School', 'Test City', 'State', '00000', 'Country', $3, now())`,
+        [randomUUID(), `T${randomUUID().slice(0, 10).toUpperCase()}`, email],
+        { code: '23514', constraint: 'schools_contact_email_norm' },
       );
-    });
+    }
+    await db.createSchool({ contactEmail: null });
   });
 
-  const invalidSchoolCases: Array<{
-    name: string;
-    overrides: SchoolOverrides;
-    constraint: string;
-  }> = [
-    { name: 'malformed code', overrides: { code: 'lowercase' }, constraint: 'schools_code_fmt' },
-    { name: 'blank name', overrides: { name: '   ' }, constraint: 'schools_name_nonempty' },
-    { name: 'blank city', overrides: { city: '   ' }, constraint: 'schools_city_nonempty' },
-    {
-      name: 'uppercase contact email',
-      overrides: { contactEmail: 'ADMIN@example.com' },
-      constraint: 'schools_contact_email_norm',
-    },
-  ];
+  it('checks names for non-blank content without normalizing surrounding spaces', async () => {
+    await db.createSchool({ name: '  Test School  ', city: '  Test City  ' });
+    await db.createUser({ name: '  Test User  ' });
+  });
 
-  it.each(invalidSchoolCases)('rejects a school with $name', async (testCase) => {
-    await withRollback(prisma, async (tx) => {
-      await expectConstraint(
-        () => createSchool(tx, testCase.overrides),
-        '23514',
-        testCase.constraint,
+  it('reproduces tab-only names accepted by the database trim checks', async () => {
+    const schoolId = await db.createSchool({ name: '\t', city: '\t' });
+    await db.createUser({ name: '\t' });
+    await db.createClassSection(schoolId, '\t', '\t');
+  });
+
+  it.each([
+    { id: 'ABC', constraint: null },
+    { id: `A${'B'.repeat(31)}`, constraint: null },
+    { id: 'AB', constraint: 'users_steamx_id_fmt' },
+    { id: 'A'.repeat(33), constraint: 'users_steamx_id_fmt' },
+    { id: 'abc123', constraint: 'users_steamx_id_fmt' },
+    { id: ' ABC123 ', constraint: 'users_steamx_id_fmt' },
+    { id: 'AB!123', constraint: 'users_steamx_id_fmt' },
+  ])('checks SteamX ID normalization and length for $id', async ({ id, constraint }) => {
+    if (constraint) {
+      await db.expectFailure(
+        `INSERT INTO users (id, steamx_id, name, password_hash, role_id, user_type, updated_at)
+         SELECT $1, $2, 'Test User', 'test-hash', id, 'PLATFORM_STAFF', now()
+         FROM roles WHERE key = 'admin'`,
+        [randomUUID(), id],
+        { code: '23514', constraint },
       );
-    });
+      return;
+    }
+    await db.createUser({ steamxId: id });
   });
 
-  const invalidProfiles: Array<{
-    name: string;
-    profileType: 'student' | 'teacher';
-    userType: UserType;
-    constraint: string;
-  }> = [
-    {
-      name: 'student profile for school staff',
-      profileType: 'student',
-      userType: UserType.SCHOOL_STAFF,
-      constraint: 'student_profiles_type',
-    },
-    {
-      name: 'teacher profile for a student',
-      profileType: 'teacher',
-      userType: UserType.STUDENT,
-      constraint: 'teacher_profiles_type',
-    },
-  ];
-
-  it.each(invalidProfiles)('rejects a $name', async (testCase) => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-      const user = await createUser(tx, testCase.userType, school.id);
-      const section = await tx.classSection.create({
-        data: { schoolId: school.id, className: 'Class 5' },
-        select: { id: true },
-      });
-
-      if (testCase.profileType === 'student') {
-        await expectConstraint(
-          () =>
-            tx.studentProfile.create({
-              data: {
-                userId: user.id,
-                schoolId: school.id,
-                userType: testCase.userType,
-                classSectionId: section.id,
-              },
-            }),
-          '23514',
-          testCase.constraint,
-        );
-      } else {
-        await expectConstraint(
-          () =>
-            tx.teacherProfile.create({
-              data: {
-                userId: user.id,
-                schoolId: school.id,
-                userType: testCase.userType,
-              },
-            }),
-          '23514',
-          testCase.constraint,
-        );
-      }
-    });
-  });
-
-  const invalidSectionNames = [
-    { name: 'blank class name', className: '   ', sectionName: 'A' },
-    { name: 'blank section name', className: 'Class 5', sectionName: '   ' },
-    { name: 'whitespace-padded class name', className: ' Class 5', sectionName: 'A' },
-    { name: 'whitespace-padded section name', className: 'Class 5', sectionName: 'A ' },
-  ];
-
-  it.each(invalidSectionNames)('rejects a section with $name', async (testCase) => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-      await expectConstraint(
-        () =>
-          tx.classSection.create({
-            data: {
-              schoolId: school.id,
-              className: testCase.className,
-              sectionName: testCase.sectionName,
-            },
-          }),
-        '23514',
-        'class_sections_names_ok',
+  it('accepts NULL and normalized user email, but rejects non-normalized email', async () => {
+    await db.createUser({ email: null });
+    await db.createUser({ email: 'user@example.test' });
+    for (const email of ['User@example.test', ' user@example.test ']) {
+      await db.expectFailure(
+        `INSERT INTO users (id, steamx_id, name, email, password_hash, role_id, user_type, updated_at)
+         SELECT $1, $2, 'Test User', $3, 'test-hash', id, 'PLATFORM_STAFF', now()
+         FROM roles WHERE key = 'admin'`,
+        [randomUUID(), `T${randomUUID().slice(0, 10).toUpperCase()}`, email],
+        { code: '23514', constraint: 'users_email_norm' },
       );
+    }
+  });
+
+  it('requires students to have no email', async () => {
+    const schoolId = await db.createSchool();
+    await db.expectFailure(
+      `INSERT INTO users (id, steamx_id, name, email, password_hash, role_id, user_type, school_id, updated_at)
+       SELECT $1, $2, 'Test Student', 'student@example.test', 'test-hash', id, 'STUDENT', $3, now()
+       FROM roles WHERE key = 'student'`,
+      [randomUUID(), `T${randomUUID().slice(0, 10).toUpperCase()}`, schoolId],
+      { code: '23514', constraint: 'users_student_no_email' },
+    );
+  });
+
+  it('requires non-empty user names while allowing nonblank surrounding spaces', async () => {
+    await db.createUser({ name: '  Test User  ' });
+    await db.expectFailure(
+      `INSERT INTO users (id, steamx_id, name, password_hash, role_id, user_type, updated_at)
+       SELECT $1, $2, '  ', 'test-hash', id, 'PLATFORM_STAFF', now()
+       FROM roles WHERE key = 'admin'`,
+      [randomUUID(), `T${randomUUID().slice(0, 10).toUpperCase()}`],
+      { code: '23514', constraint: 'users_name_nonempty' },
+    );
+  });
+
+  it.each([
+    { type: 'PLATFORM_STAFF', schoolId: null },
+    { type: 'SCHOOL_STAFF', schoolId: 'school' },
+    { type: 'STUDENT', schoolId: 'school' },
+  ])('accepts the $type school-scope pairing', async ({ type, schoolId }) => {
+    const id = schoolId === 'school' ? await db.createSchool() : null;
+    await db.createUser({
+      userType: type as 'PLATFORM_STAFF' | 'SCHOOL_STAFF' | 'STUDENT',
+      roleKey: type === 'PLATFORM_STAFF' ? 'admin' : type === 'STUDENT' ? 'student' : 'teacher',
+      schoolId: id,
     });
   });
 
-  it('rejects class and section names that differ only by case within a school', async () => {
-    await withRollback(prisma, async (tx) => {
-      const school = await createSchool(tx);
-      await tx.classSection.create({
-        data: { schoolId: school.id, className: 'Class 5', sectionName: 'A' },
-      });
+  it.each([
+    { type: 'PLATFORM_STAFF', hasSchool: true },
+    { type: 'SCHOOL_STAFF', hasSchool: false },
+    { type: 'STUDENT', hasSchool: false },
+  ])('rejects $type with an invalid school-scope pairing', async ({ type, hasSchool }) => {
+    const schoolId = hasSchool ? await db.createSchool() : null;
+    const roleKey =
+      type === 'PLATFORM_STAFF' ? 'admin' : type === 'STUDENT' ? 'student' : 'teacher';
+    await db.expectFailure(
+      `INSERT INTO users (id, steamx_id, name, password_hash, role_id, user_type, school_id, updated_at)
+       SELECT $1, $2, 'Test User', 'test-hash', id, $3, $4, now()
+       FROM roles WHERE key = $5`,
+      [randomUUID(), `T${randomUUID().slice(0, 10).toUpperCase()}`, type, schoolId, roleKey],
+      { code: '23514', constraint: 'users_school_scope' },
+    );
+  });
 
-      await expectConstraint(
-        () =>
-          tx.classSection.create({
-            data: { schoolId: school.id, className: 'class 5', sectionName: 'a' },
-          }),
-        '23505',
-        'class_sections_school_names_uq',
-      );
+  it('accepts only STUDENT profiles for student users', async () => {
+    const schoolId = await db.createSchool();
+    const sectionId = await db.createClassSection(schoolId);
+    const userId = await db.createUser({
+      userType: 'STUDENT',
+      roleKey: 'student',
+      schoolId,
     });
+    await client.query(
+      `INSERT INTO student_profiles (user_id, school_id, class_section_id, updated_at)
+       VALUES ($1, $2, $3, now())`,
+      [userId, schoolId, sectionId],
+    );
+    await db.expectFailure(
+      `INSERT INTO student_profiles (user_id, school_id, user_type, class_section_id, updated_at)
+       VALUES ($1, $2, 'SCHOOL_STAFF', $3, now())`,
+      [randomUUID(), schoolId, sectionId],
+      { code: '23514', constraint: 'student_profiles_type' },
+    );
+  });
+
+  it('accepts only SCHOOL_STAFF profiles for teacher users', async () => {
+    const schoolId = await db.createSchool();
+    await db.expectFailure(
+      `INSERT INTO teacher_profiles (user_id, school_id, user_type, updated_at)
+       VALUES ($1, $2, 'STUDENT', now())`,
+      [randomUUID(), schoolId],
+      { code: '23514', constraint: 'teacher_profiles_type' },
+    );
+  });
+
+  it('requires non-empty class and section names without surrounding whitespace', async () => {
+    const schoolId = await db.createSchool();
+    await db.createClassSection(schoolId, 'Class 5', 'A');
+    for (const [className, sectionName] of [
+      [' ', 'A'],
+      ['Class 5', '  '],
+      [' Class 5', 'A'],
+      ['Class 5', 'A '],
+    ]) {
+      await db.expectFailure(
+        `INSERT INTO class_sections (id, school_id, class_name, section_name, updated_at)
+         VALUES ($1, $2, $3, $4, now())`,
+        [randomUUID(), schoolId, className, sectionName],
+        { code: '23514', constraint: 'class_sections_names_ok' },
+      );
+    }
+  });
+
+  it('treats school code as unique', async () => {
+    const code = `U${randomUUID().slice(0, 10).toUpperCase()}`;
+    await db.createSchool({ code });
+    await db.expectFailure(
+      `INSERT INTO schools (id, code, name, city, state, postal_code, country, updated_at)
+       VALUES ($1, $2, 'Other School', 'City', 'State', '00000', 'Country', now())`,
+      [randomUUID(), code],
+      { code: '23505', constraint: 'schools_code_key' },
+    );
+  });
+
+  it('treats SteamX ID and non-null email as unique while allowing multiple NULL emails', async () => {
+    const steamxId = `U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`;
+    const email = `${randomUUID()}@example.test`;
+    await db.createUser({ steamxId, email });
+    await db.createUser({ email: null });
+    await db.createUser({ email: null });
+    for (const [field, value, constraint] of [
+      ['steamx_id', steamxId, 'users_steamx_id_key'],
+      ['email', email, 'users_email_key'],
+    ]) {
+      await db.expectFailure(
+        `INSERT INTO users (id, steamx_id, name, email, password_hash, role_id, user_type, updated_at)
+         SELECT $1, $2, 'Test User', $3, 'test-hash', id, 'PLATFORM_STAFF', now()
+         FROM roles WHERE key = 'admin'`,
+        [
+          randomUUID(),
+          field === 'steamx_id'
+            ? value
+            : `U${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`,
+          field === 'email' ? value : null,
+        ],
+        { code: '23505', constraint },
+      );
+    }
+  });
+
+  it('treats class, section, and school names as case-insensitively unique', async () => {
+    const schoolId = await db.createSchool();
+    await db.createClassSection(schoolId, 'Class 5', 'A');
+    await db.expectFailure(
+      `INSERT INTO class_sections (id, school_id, class_name, section_name, updated_at)
+       VALUES ($1, $2, 'cLaSs 5', 'a', now())`,
+      [randomUUID(), schoolId],
+      { code: '23505', constraint: 'class_sections_school_names_uq' },
+    );
+    const otherSchoolId = await db.createSchool();
+    await db.createClassSection(otherSchoolId, 'class 5', 'a');
   });
 });
