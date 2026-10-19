@@ -28,10 +28,10 @@ Caller: public; checks credentials and sets a session cookie for an active user 
 - [auto] When platform staff has no school -> expect successful login.
 - [auto] When ID is unknown, password is wrong, user inactive, or school inactive -> expect the same `401 UNAUTHORIZED`.
 - [auto] When login body has empty required fields -> expect `400 VALIDATION_ERROR`.
-- [manual] When body has an unknown field, wrong field type, or SteamX ID exceeds 64 characters -> expect `400 VALIDATION_ERROR`.
-- [manual] When required values contain only whitespace -> expect `400 VALIDATION_ERROR` after SteamX ID trimming; password whitespace is not trimmed.
+- [auto] When body has an unknown field, wrong field type, or SteamX ID exceeds 64 characters -> expect `400 VALIDATION_ERROR`.
+- [auto] When SteamX ID contains only whitespace -> expect `400 VALIDATION_ERROR` after trimming; a whitespace password is checked as supplied and fails credentials with `401`.
 - [auto] When `Origin` is missing, `null`, malformed, or not allowed -> expect `403 ORIGIN_NOT_ALLOWED`.
-- [manual] When repeated login attempts are made -> no `429` rate-limit response is currently implemented.
+- [auto] When repeated login attempts are made -> no `429` rate-limit response is currently implemented; each failure remains `401 UNAUTHORIZED`.
 - [auto] When login succeeds -> expect no `passwordHash` in the profile and `Cache-Control: no-store`.
 
 ### `POST /auth/logout`
@@ -42,7 +42,7 @@ Caller: any authenticated role, including a user required to change their passwo
 - [auto] When no cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When password change is required -> expect logout remains available and returns `204`.
 - [auto] When `Origin` is disallowed -> expect `403 ORIGIN_NOT_ALLOWED` before checking the session.
-- [manual] When an old copied cookie is replayed after logout -> expect it to remain valid until expiry unless another revocation rule applies; logout clears only the browser cookie.
+- [auto] When an old copied cookie is replayed after logout -> expect it to remain valid until expiry unless another revocation rule applies; logout clears only the browser cookie.
 
 ### `GET /auth/me`
 
@@ -56,7 +56,7 @@ Caller: any authenticated role, including a user required to change their passwo
 - [auto] When token and `passwordChangedAt` are in the same whole second -> expect the token to remain valid.
 - [auto] When account requires a password change -> expect `/auth/me` remains available and reports that state.
 - [auto] When profile is returned -> expect no `passwordHash`.
-- [manual] When a valid route cookie is combined with an invalid `Origin` on this GET -> Origin is not required for GET.
+- [auto] When a valid route cookie is combined with an invalid `Origin` on this GET -> Origin is not required for GET.
 
 ### `POST /auth/change-password`
 
@@ -66,13 +66,13 @@ Caller: any authenticated role, including a user required to change their passwo
 - [auto] When current password is wrong -> expect `400 INVALID_CURRENT_PASSWORD`.
 - [auto] When new password equals current password -> expect `400 PASSWORD_REUSED`.
 - [auto] When new password violates policy -> expect `400 PASSWORD_POLICY` with policy details.
-- [manual] When new password is shorter than 8 or longer than 100 characters, has leading/trailing whitespace, is on the weak-password list, or contains the SteamX ID -> expect policy rejection.
-- [manual] When password is valid but has no special character or digit -> expect acceptance; no character-composition rule exists.
-- [manual] When required password fields are missing, non-string, or exceed DTO length limits -> expect `400 VALIDATION_ERROR`.
+- [auto] When new password is shorter than 8 characters, has leading/trailing whitespace, is on the weak-password list, or contains the SteamX ID -> expect `400 PASSWORD_POLICY`.
+- [auto] When password is valid but has no special character or digit -> expect acceptance; no character-composition rule exists.
+- [auto] When required password fields are missing or non-string, or exceed DTO length limits -> expect `400 VALIDATION_ERROR` (100-character new passwords are accepted; over 100 are rejected).
 - [auto] When old cookie predates the password update by at least one second -> expect `401 UNAUTHORIZED` on its next protected request.
-- [manual] When old and new token have the same issue-time second -> the old token may remain valid until the next second boundary.
+- [auto] When old and new token have the same issue-time second -> the old token may remain valid until the next second boundary.
 - [auto] When user no longer exists -> expect `401 UNAUTHORIZED`.
-- [manual] When state-changing request has no allowed Origin -> expect `403 ORIGIN_NOT_ALLOWED`.
+- [auto] When state-changing request has no allowed Origin -> expect `403 ORIGIN_NOT_ALLOWED`.
 
 ## Schools
 

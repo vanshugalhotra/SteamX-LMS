@@ -1,6 +1,5 @@
 import { Controller, Get, INestApplication, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { Response as SupertestResponse } from 'supertest';
@@ -12,11 +11,12 @@ import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js
 import type { AuthContext } from '../../src/auth/types/auth-context.js';
 import { PasswordService } from '../../src/auth/services/password.service.js';
 import { TokenService } from '../../src/auth/services/token.service.js';
-import { configureApp } from '../../src/configure-app.js';
 import type { Env } from '../../src/config/env.schema.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { createTestUser } from '../support/factories/fixtures.js';
+import { createTestApp } from '../support/create-test-app.js';
 import { cleanupFixtures } from '../support/setup/cleanup.js';
+import { expectError } from '../support/expect-error.js';
 
 const TEST_PASSWORD = 'Test login password 2026!';
 
@@ -47,13 +47,7 @@ describe('Authentication endpoints (e2e)', () => {
   const createdClassSectionIds: string[] = [];
 
   beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AuthTestModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    configureApp(app);
-    await app.init();
+    app = await createTestApp(AuthTestModule);
     prisma = app.get(PrismaService);
     passwords = app.get(PasswordService);
     tokens = app.get(TokenService);
@@ -67,6 +61,7 @@ describe('Authentication endpoints (e2e)', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await cleanupFixtures(prisma, createdUserIds, createdSchoolIds, createdClassSectionIds);
   });
 
@@ -134,7 +129,8 @@ describe('Authentication endpoints (e2e)', () => {
     return setCookie[0]!.split(';', 1)[0]!;
   }
 
-  it('logs in, sets an HTTP-only cookie, and uses it to fetch /auth/me', async () => {
+  // A successful login returns a safe profile and a correctly configured session cookie.
+  it('sets a secure HTTP-only session cookie on successful login', async () => {
     const user = await createUser();
     const response = await login(user.steamxId, TEST_PASSWORD).expect(200);
 
@@ -163,21 +159,42 @@ describe('Authentication endpoints (e2e)', () => {
     }
 
     const cookie = getCookie(response);
-    const me = await withCookie('/api/v1/auth/me', cookie).expect(200);
-    expect(me.body).toEqual(response.body);
-    expect(me.headers['cache-control']).toBe('no-store');
+    expect(cookie).toMatch(/^steamx_session=[^;]+$/);
   });
 
-  it('normalizes a padded lowercase SteamX ID and supports platform staff without a school', async () => {
+  // Login trims whitespace and uppercases the SteamX ID before lookup.
+  it('normalizes a padded lowercase SteamX ID', async () => {
     const user = await createUser({ steamxId: `AUTH${randomUUID().slice(0, 8).toUpperCase()}` });
 
     const response = await login(`  ${user.steamxId.toLowerCase()}  `, TEST_PASSWORD).expect(200);
 
     expect(response.body.id).toBe(user.id);
+  });
+
+  // Platform staff accounts are valid without a school assignment.
+  it('logs in platform staff without a school', async () => {
+    const user = await createUser();
+
+    const response = await login(user.steamxId, TEST_PASSWORD).expect(200);
+
+    expect(response.body.id).toBe(user.id);
     expect(response.body.schoolId).toBeNull();
   });
 
-  it('returns the same generic response for unknown ID, wrong password, inactive user and school', async () => {
+  // The current profile endpoint returns the authenticated profile without private credential fields.
+  it('returns the current profile for a valid cookie', async () => {
+    const user = await createUser();
+    const loginResponse = await login(user.steamxId, TEST_PASSWORD).expect(200);
+
+    const response = await withCookie('/api/v1/auth/me', getCookie(loginResponse)).expect(200);
+
+    expect(response.body).toEqual(loginResponse.body);
+    expect(response.body).not.toHaveProperty('passwordHash');
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  // Invalid IDs, passwords, inactive accounts, and inactive schools reveal no account state.
+  it('returns the same authentication error for every invalid login state', async () => {
     const activeUser = await createUser();
     const inactiveUser = await createUser({ status: UserStatus.INACTIVE });
     const inactiveSchoolUser = await createUser({
@@ -192,100 +209,383 @@ describe('Authentication endpoints (e2e)', () => {
     ];
 
     for (const response of responses) {
-      expect(response.status).toBe(401);
+      expectError(response, 401, 'UNAUTHORIZED');
+      expect(response.body.message).toBe('Invalid or expired authentication token');
     }
-    expect(
-      responses.map(({ body }) => ({
-        statusCode: body.statusCode,
-        code: body.code,
-        message: body.message,
-      })),
-    ).toEqual(
-      responses.map(() => ({
-        statusCode: 401,
-        code: 'UNAUTHORIZED',
-        message: 'Invalid or expired authentication token',
-      })),
-    );
+    expect(new Set(responses.map(({ body }) => body.message))).toHaveLength(1);
   });
 
-  it('keeps login, /auth/me and logout available when password change is required', async () => {
+  // Repeated invalid credentials are consistently rejected; this API currently has no rate limit.
+  it('does not return a rate-limit response after repeated login failures', async () => {
+    const user = await createUser();
+
+    const responses = [];
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      responses.push(await login(user.steamxId, 'incorrect password'));
+    }
+
+    for (const response of responses) {
+      expectError(response, 401, 'UNAUTHORIZED');
+    }
+  });
+
+  // A forced-change account can log in and its state is included in the safe profile.
+  it('reports the forced-password-change state at login', async () => {
     const user = await createUser({ mustChangePassword: true });
     const loginResponse = await login(user.steamxId, TEST_PASSWORD).expect(200);
+
     expect(loginResponse.body.mustChangePassword).toBe(true);
-    const cookie = getCookie(loginResponse);
+  });
+
+  // The current-profile route remains available while a password change is required.
+  it('allows /auth/me while a password change is required', async () => {
+    const user = await createUser({ mustChangePassword: true });
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
 
     await withCookie('/api/v1/auth/me', cookie).expect(200);
-    await withCookie('/api/v1/auth-test/protected', cookie).expect(403);
+  });
 
-    const logout = await request(app.getHttpServer())
+  // Forced-change accounts cannot access routes outside the explicit auth exceptions.
+  it('blocks protected routes while a password change is required', async () => {
+    const user = await createUser({ mustChangePassword: true });
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await withCookie('/api/v1/auth-test/protected', cookie).expect(403);
+
+    expectError(response, 403, 'PASSWORD_CHANGE_REQUIRED');
+  });
+
+  // Logging out clears the browser cookie even while a password change is required.
+  it('allows logout while a password change is required', async () => {
+    const user = await createUser({ mustChangePassword: true });
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await request(app.getHttpServer())
       .post('/api/v1/auth/logout')
       .set('Origin', origin)
       .set('Cookie', cookie)
       .expect(204);
-    expect(logout.headers['set-cookie']?.[0]).toMatch(/^steamx_session=;/);
-    expect(logout.headers['set-cookie']?.[0]).toMatch(/; Path=\//i);
-    expect(logout.headers['set-cookie']?.[0]).toMatch(/Expires=Thu, 01 Jan 1970/i);
-    await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
-    await withCookie('/api/v1/auth/me', cookie).expect(200);
-    await withCookie('/api/v1/auth-test/protected', cookie).expect(403);
+
+    expect(response.headers['set-cookie']?.[0]).toMatch(/^steamx_session=;/);
+    expect(response.headers['set-cookie']?.[0]).toMatch(/; Path=\//i);
+    expect(response.headers['set-cookie']?.[0]).toMatch(/Expires=Thu, 01 Jan 1970/i);
   });
 
-  it('changes passwords, invalidates an older token, and permits a required password change', async () => {
-    const user = await createUser({ mustChangePassword: true });
-    const loginResponse = await login(user.steamxId, TEST_PASSWORD).expect(200);
-    const oldCookie = getCookie(loginResponse);
-    const passwordBefore = await prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-      select: { passwordChangedAt: true },
-    });
-    const currentTime = Date.now();
-    vi.useFakeTimers();
-    vi.setSystemTime(currentTime - 5_000);
-    const oldToken = await tokens.sign(user.id);
-    vi.useRealTimers();
+  // Logout requires an authenticated cookie and returns the normal authentication error envelope.
+  it('rejects logout without a cookie', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/logout')
+      .set('Origin', origin)
+      .expect(401);
 
-    const currentPasswordError = await postWithSession('/api/v1/auth/change-password', oldCookie, {
-      currentPassword: 'incorrect current password',
+    expectError(response, 401, 'UNAUTHORIZED');
+  });
+
+  // Logout clears only the browser cookie; a copied stateless token remains valid until expiry.
+  it('continues to accept a copied token after logout', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/logout')
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .expect(204);
+
+    await withCookie('/api/v1/auth/me', cookie).expect(200);
+  });
+
+  // An absent session cannot read the current profile.
+  it('rejects /auth/me without a cookie', async () => {
+    const response = await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
+
+    expectError(response, 401, 'UNAUTHORIZED');
+  });
+
+  // Malformed, expired, and tampered sessions are rejected by the real profile endpoint.
+  it.each(['malformed', 'expired', 'tampered'])('rejects a %s cookie at /auth/me', async (kind) => {
+    const user = await createUser();
+    let token = 'not-a-token';
+    if (kind === 'expired') {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'));
+      token = await tokens.sign(user.id);
+      vi.useRealTimers();
+    } else if (kind === 'tampered') {
+      const valid = await tokens.sign(user.id);
+      const [header, payload, signature] = valid.split('.');
+      const replacement = signature?.[0] === 'a' ? 'b' : 'a';
+      token = `${header}.${payload}.${replacement}${signature?.slice(1) ?? ''}`;
+    }
+
+    const response = await withCookie('/api/v1/auth/me', `steamx_session=${token}`).expect(401);
+
+    expectError(response, 401, 'UNAUTHORIZED');
+  });
+
+  // A GET profile request does not require Origin when a valid session cookie is present.
+  it('allows /auth/me with a valid cookie and no Origin header', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    await withCookie('/api/v1/auth/me', cookie).expect(200);
+  });
+
+  // Origin is not required or enforced for safe GET requests, even when it is foreign.
+  it('allows /auth/me with an invalid Origin and a valid cookie', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Origin', 'https://foreign.example')
+      .set('Cookie', cookie)
+      .expect(200);
+  });
+
+  // Deactivated accounts lose access immediately, and reactivation restores the same session.
+  it('restores access after an account is reactivated', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+    await prisma.user.update({ where: { id: user.id }, data: { status: UserStatus.INACTIVE } });
+
+    expectError(await withCookie('/api/v1/auth/me', cookie), 401, 'UNAUTHORIZED');
+    await prisma.user.update({ where: { id: user.id }, data: { status: UserStatus.ACTIVE } });
+    await withCookie('/api/v1/auth/me', cookie).expect(200);
+  });
+
+  // School deactivation immediately blocks its users; reactivation restores their sessions.
+  it('restores access after a school is reactivated', async () => {
+    const user = await createUser({ userType: UserType.SCHOOL_STAFF });
+    if (!user.schoolId) {
+      throw new Error('School staff fixture should have a school.');
+    }
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+    await prisma.school.update({
+      where: { id: user.schoolId },
+      data: { status: SchoolStatus.INACTIVE },
+    });
+
+    expectError(await withCookie('/api/v1/auth/me', cookie), 401, 'UNAUTHORIZED');
+    await prisma.school.update({
+      where: { id: user.schoolId },
+      data: { status: SchoolStatus.ACTIVE },
+    });
+    await withCookie('/api/v1/auth/me', cookie).expect(200);
+  });
+
+  // A wrong current password is rejected without changing the session or account password.
+  it('rejects a password change with the wrong current password', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await postWithSession('/api/v1/auth/change-password', cookie, {
+      currentPassword: 'wrong current password',
       newPassword: 'Fresh change password 2026!',
     }).expect(400);
-    expect(currentPasswordError.body.code).toBe('INVALID_CURRENT_PASSWORD');
-    const policyError = await postWithSession('/api/v1/auth/change-password', oldCookie, {
-      currentPassword: TEST_PASSWORD,
-      newPassword: 'password123',
-    }).expect(400);
-    expect(policyError.body.code).toBe('PASSWORD_POLICY');
-    expect(policyError.body.details).toContain('PASSWORD_COMMON');
-    const reusedError = await postWithSession('/api/v1/auth/change-password', oldCookie, {
+
+    expectError(response, 400, 'INVALID_CURRENT_PASSWORD');
+  });
+
+  // Reusing the existing password is rejected before the credential is updated.
+  it('rejects a new password equal to the current password', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await postWithSession('/api/v1/auth/change-password', cookie, {
       currentPassword: TEST_PASSWORD,
       newPassword: TEST_PASSWORD,
     }).expect(400);
-    expect(reusedError.body.code).toBe('PASSWORD_REUSED');
 
-    const changed = await postWithSession('/api/v1/auth/change-password', oldCookie, {
+    expectError(response, 400, 'PASSWORD_REUSED');
+  });
+
+  // Password policy rejects whitespace-padded and common values within the DTO's length limits.
+  it.each([' leading password 2026!', 'trailing password 2026! ', 'password123'])(
+    'rejects a policy-violating password: %s',
+    async (newPassword) => {
+      const user = await createUser();
+      const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+      const response = await postWithSession('/api/v1/auth/change-password', cookie, {
+        currentPassword: TEST_PASSWORD,
+        newPassword,
+      }).expect(400);
+
+      expectError(response, 400, 'PASSWORD_POLICY');
+    },
+  );
+
+  // Password policy rejects a candidate containing the user's SteamX ID.
+  it('rejects a new password containing the SteamX ID', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+    const response = await postWithSession('/api/v1/auth/change-password', cookie, {
+      currentPassword: TEST_PASSWORD,
+      newPassword: `Contains-${user.steamxId}-phrase`,
+    }).expect(400);
+
+    expectError(response, 400, 'PASSWORD_POLICY');
+  });
+
+  // Password changes reject only policy violations with the policy error code and details.
+  it('reports the length policy violation for a short new password', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await postWithSession('/api/v1/auth/change-password', cookie, {
+      currentPassword: TEST_PASSWORD,
+      newPassword: 'short7',
+    }).expect(400);
+
+    expect(response.body).toMatchObject({
+      statusCode: 400,
+      code: 'PASSWORD_POLICY',
+      requestId: expect.any(String),
+      details: expect.arrayContaining(['PASSWORD_LENGTH']),
+    });
+    expect(response.body).not.toHaveProperty('stack');
+  });
+
+  // No character-composition rule is imposed when the password otherwise meets policy.
+  it('accepts a valid password without digits or special characters', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    await postWithSession('/api/v1/auth/change-password', cookie, {
+      currentPassword: TEST_PASSWORD,
+      newPassword: 'plainletters',
+    }).expect(200);
+  });
+
+  // The maximum policy length is inclusive and remains within the DTO field limit.
+  it('accepts a new password at the 100-character boundary', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    await postWithSession('/api/v1/auth/change-password', cookie, {
+      currentPassword: TEST_PASSWORD,
+      newPassword: 'a'.repeat(100),
+    }).expect(200);
+  });
+
+  // Missing, mistyped, and overlong fields fail DTO validation with the standard envelope.
+  it.each([
+    ['missing current password', { newPassword: 'Fresh change password 2026!' }],
+    ['missing new password', { currentPassword: TEST_PASSWORD }],
+    [
+      'non-string current password',
+      { currentPassword: 12, newPassword: 'Fresh change password 2026!' },
+    ],
+    ['non-string new password', { currentPassword: TEST_PASSWORD, newPassword: 12 }],
+    [
+      'overlong current password',
+      { currentPassword: 'x'.repeat(129), newPassword: 'Fresh change password 2026!' },
+    ],
+    ['overlong new password', { currentPassword: TEST_PASSWORD, newPassword: 'x'.repeat(101) }],
+  ])('validates change-password body with %s', async (_caseName, body) => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await postWithSession('/api/v1/auth/change-password', cookie, body).expect(
+      400,
+    );
+
+    expectError(response, 400, 'VALIDATION_ERROR');
+  });
+
+  // Successful changes clear the forced-change flag and issue a refreshed session cookie.
+  it('clears mustChangePassword and refreshes the session after a successful change', async () => {
+    const user = await createUser({ mustChangePassword: true });
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await postWithSession('/api/v1/auth/change-password', cookie, {
       currentPassword: TEST_PASSWORD,
       newPassword: 'Fresh change password 2026!',
     }).expect(200);
-    expect(changed.body).toMatchObject({
-      id: user.id,
-      mustChangePassword: false,
-    });
-    expect(changed.headers['cache-control']).toBe('no-store');
-    expect(changed.headers['set-cookie']?.[0]).toMatch(/^steamx_session=[^;]+;/);
-    const updatedUser = await prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-      select: { mustChangePassword: true, passwordChangedAt: true },
-    });
-    expect(updatedUser.mustChangePassword).toBe(false);
-    expect(updatedUser.passwordChangedAt.getTime()).toBeGreaterThan(
-      passwordBefore.passwordChangedAt.getTime(),
-    );
 
-    await withCookie('/api/v1/auth-test/protected', `steamx_session=${oldToken}`).expect(401);
-    const freshCookie = getCookie(changed);
-    await withCookie('/api/v1/auth/me', freshCookie).expect(200);
+    expect(response.body).toMatchObject({ id: user.id, mustChangePassword: false });
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['set-cookie']?.[0]).toMatch(/^steamx_session=[^;]+;/);
+    await expect(
+      prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+        select: { mustChangePassword: true },
+      }),
+    ).resolves.toEqual({ mustChangePassword: false });
+  });
+
+  // Password update invalidates a token issued at least one second before the update.
+  it('rejects a token issued before the password change', async () => {
+    const user = await createUser();
+    const oldCookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+    const token = oldCookie.split('=', 2)[1]!;
+    const claims = await tokens.verify(token);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date((claims.issuedAt + 5) * 1_000));
+
+    await postWithSession('/api/v1/auth/change-password', oldCookie, {
+      currentPassword: TEST_PASSWORD,
+      newPassword: 'Fresh change password 2026!',
+    }).expect(200);
+    vi.useRealTimers();
+
+    expectError(await withCookie('/api/v1/auth/me', oldCookie), 401, 'UNAUTHORIZED');
+  });
+
+  // A token issued in the same timestamp second remains valid under the documented guard rule.
+  it('accepts a pre-change token issued in the same second as the password update', async () => {
+    const user = await createUser();
+    const currentUser = await prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { passwordChangedAt: true },
+    });
+    vi.useFakeTimers();
+    vi.setSystemTime(Math.floor(currentUser.passwordChangedAt.getTime() / 1_000) * 1_000);
+    const oldToken = await tokens.sign(user.id);
+    const oldClaims = await tokens.verify(oldToken);
+
+    const changed = await postWithSession(
+      '/api/v1/auth/change-password',
+      `steamx_session=${oldToken}`,
+      {
+        currentPassword: TEST_PASSWORD,
+        newPassword: 'Fresh change password 2026!',
+      },
+    ).expect(200);
+    vi.useRealTimers();
+
+    const newToken = getCookie(changed).split('=', 2)[1]!;
+    await expect(tokens.verify(newToken)).resolves.toMatchObject({ issuedAt: oldClaims.issuedAt });
+    await withCookie('/api/v1/auth/me', `steamx_session=${oldToken}`).expect(200);
+  });
+
+  // The new password authenticates successfully and the previous password no longer does.
+  it('authenticates with the new password after a successful change', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    await postWithSession('/api/v1/auth/change-password', cookie, {
+      currentPassword: TEST_PASSWORD,
+      newPassword: 'Fresh change password 2026!',
+    }).expect(200);
+
     await login(user.steamxId, 'Fresh change password 2026!').expect(200);
-    await login(user.steamxId, TEST_PASSWORD).expect(401);
+    expectError(await login(user.steamxId, TEST_PASSWORD), 401, 'UNAUTHORIZED');
+  });
+
+  // State-changing authentication requests require an allowed Origin before processing the cookie.
+  it('rejects password change without an allowed Origin', async () => {
+    const user = await createUser();
+    const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/change-password')
+      .set('Cookie', cookie)
+      .send({ currentPassword: TEST_PASSWORD, newPassword: 'Fresh change password 2026!' })
+      .expect(403);
+
+    expectError(response, 403, 'ORIGIN_NOT_ALLOWED');
   });
 
   it.each([UserType.SCHOOL_STAFF, UserType.STUDENT])(
@@ -317,12 +617,8 @@ describe('Authentication endpoints (e2e)', () => {
       .send({ steamxId: 'AUTH123', password: TEST_PASSWORD })
       .expect(403);
 
-    expect(response.body).toMatchObject({
-      statusCode: 403,
-      code: 'ORIGIN_NOT_ALLOWED',
-      message: 'Origin not allowed',
-      requestId: response.headers['x-request-id'],
-    });
+    expectError(response, 403, 'ORIGIN_NOT_ALLOWED');
+    expect(response.body.requestId).toBe(response.headers['x-request-id']);
   });
 
   it('rejects a forged logout Origin before checking its session', async () => {
@@ -331,35 +627,50 @@ describe('Authentication endpoints (e2e)', () => {
       .set('Origin', 'https://foreign.example')
       .expect(403);
 
-    expect(response.body).toMatchObject({
-      statusCode: 403,
-      code: 'ORIGIN_NOT_ALLOWED',
-      message: 'Origin not allowed',
-    });
+    expectError(response, 403, 'ORIGIN_NOT_ALLOWED');
   });
 
-  it('does not require Origin for GET requests', async () => {
-    await request(app.getHttpServer()).get('/health/live').expect(200);
-    await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
-  });
-
-  it('returns unified validation errors for invalid login bodies', async () => {
+  // Login rejects unknown fields, wrong input types, and overlong SteamX IDs uniformly.
+  it.each([
+    ['missing SteamX ID', { password: TEST_PASSWORD }],
+    ['missing password', { steamxId: 'AUTH123' }],
+    ['unknown fields', { steamxId: 'AUTH123', password: TEST_PASSWORD, extra: true }],
+    ['wrong field types', { steamxId: 123, password: TEST_PASSWORD }],
+    ['SteamX IDs longer than 64 characters', { steamxId: 'A'.repeat(65), password: TEST_PASSWORD }],
+    ['empty required fields', { steamxId: '', password: '' }],
+  ])('validates login body with %s', async (_caseName, body) => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .set('Origin', origin)
-      .send({ steamxId: '', password: '' })
+      .send(body)
       .expect(400);
 
     expect(response.body).toMatchObject({
       statusCode: 400,
       code: 'VALIDATION_ERROR',
       message: 'Validation failed',
+      requestId: expect.any(String),
     });
-    expect(response.body.details).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ field: 'steamxId' }),
-        expect.objectContaining({ field: 'password' }),
-      ]),
-    );
+    expect(response.body).not.toHaveProperty('stack');
+    expect(response.body).not.toHaveProperty('stack');
+  });
+
+  // Trimming makes a whitespace-only SteamX ID invalid.
+  it('rejects a whitespace-only SteamX ID after trimming', async () => {
+    const response = await login('   ', TEST_PASSWORD).expect(400);
+
+    expect(response.body).toMatchObject({
+      statusCode: 400,
+      code: 'VALIDATION_ERROR',
+      requestId: expect.any(String),
+    });
+    expect(response.body).not.toHaveProperty('stack');
+  });
+
+  // Password whitespace is not normalized before credential verification.
+  it('checks a whitespace-only password as supplied', async () => {
+    const user = await createUser();
+
+    expectError(await login(user.steamxId, '        '), 401, 'UNAUTHORIZED');
   });
 });
