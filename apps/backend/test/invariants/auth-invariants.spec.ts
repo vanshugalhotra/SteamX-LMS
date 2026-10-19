@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA, VERSION_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
+import type { NextFunction, Request, Response as ExpressResponse } from 'express';
 import { Test } from '@nestjs/testing';
 import { DiscoveryModule, DiscoveryService, Reflector } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
@@ -29,9 +30,10 @@ import { FirstAdminError } from '../../src/auth/types/first-admin.js';
 import { runAdminCreate } from '../../src/scripts/admin-create.js';
 import { configureApp } from '../../src/configure-app.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTestUser } from '../factories/fixtures.js';
-import { loginAs } from '../setup/login.js';
-import { cleanupFixtures } from '../setup/cleanup.js';
+import { createTestUser } from '../support/factories/fixtures.js';
+import { loginAsCookie as loginAs } from '../support/login.js';
+import { cleanupFixtures } from '../support/setup/cleanup.js';
+import { assertSafeResponseBody } from '../support/invariant-api.js';
 
 const INITIAL_PASSWORD = 'Starting invariant password 2026!';
 const RECOVERY_PASSWORD = 'Recovered admin password 2026!';
@@ -109,6 +111,14 @@ describe('Authentication invariants (e2e)', () => {
     }).compile();
     app = moduleFixture.createNestApplication();
     configureApp(app);
+    app.use((_request: Request, response: ExpressResponse, next: NextFunction) => {
+      const originalJson = response.json.bind(response);
+      response.json = ((body: unknown) => {
+        assertSafeResponseBody(response.statusCode, body);
+        return originalJson(body);
+      }) as typeof response.json;
+      next();
+    });
     await app.init();
 
     prisma = app.get(PrismaService);
@@ -123,6 +133,7 @@ describe('Authentication invariants (e2e)', () => {
 
   afterEach(async () => {
     await cleanupFixtures(prisma, createdUserIds, createdSchoolIds, createdClassSectionIds);
+    vi.useRealTimers();
   });
 
   afterAll(async () => {
@@ -196,13 +207,6 @@ describe('Authentication invariants (e2e)', () => {
     ]);
   }
 
-  async function waitUntilNextSecond(): Promise<void> {
-    const issuedSecond = Math.floor(Date.now() / 1_000);
-    while (Math.floor(Date.now() / 1_000) === issuedSecond) {
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, 25));
-    }
-  }
-
   describe('deactivated user', () => {
     it('accepts the initial session, then rejects both requests and login after deactivation', async () => {
       const user = await createUser();
@@ -257,7 +261,8 @@ describe('Authentication invariants (e2e)', () => {
       const adminCookie = await login(admin);
       const teacherCookie = await login(teacher);
 
-      await waitUntilNextSecond();
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 2_000);
       await post(
         `/api/v1/users/${teacher.id}/reset-password`,
         { newPassword: RESET_PASSWORD },
@@ -271,7 +276,7 @@ describe('Authentication invariants (e2e)', () => {
       const blocked = await get('/api/v1/auth-invariants/normal', resetCookie).expect(403);
       expect(blocked.body.code).toBe('PASSWORD_CHANGE_REQUIRED');
 
-      await waitUntilNextSecond();
+      vi.setSystemTime(Date.now() + 2_000);
       const changed = await post(
         '/api/v1/auth/change-password',
         { currentPassword: RESET_PASSWORD, newPassword: CHANGED_PASSWORD },
@@ -469,7 +474,8 @@ describe('Authentication invariants (e2e)', () => {
       const userCount = await prisma.user.count();
       const schoolCount = await prisma.school.count();
 
-      await waitUntilNextSecond();
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 2_000);
       const output = await runAdminCreate(['--reset'], {
         ...process.env,
         ADMIN_STEAMX_ID: ` ${admin.steamxId.toLowerCase()} `,

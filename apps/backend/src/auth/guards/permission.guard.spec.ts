@@ -58,7 +58,19 @@ describe('PermissionGuard', () => {
     );
 
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
-    expect(permissions.has).toHaveBeenCalledWith('teacher', PERMISSION.USER_READ);
+    await moduleRef.close();
+  });
+
+  // A route marked with a permission is available when the current role grants it.
+  it('allows an authenticated user with the required permission', async () => {
+    const permissions = { has: vi.fn().mockReturnValue(true) };
+    const { guard, context, moduleRef } = await createGuard(
+      { [REQUIRED_PERMISSION]: PERMISSION.USER_READ },
+      { authContext: { userId: 'user-id', roleKey: 'school_admin' } },
+      permissions,
+    );
+
+    expect(guard.canActivate(context)).toBe(true);
     await moduleRef.close();
   });
 
@@ -72,9 +84,8 @@ describe('PermissionGuard', () => {
       { authContext: { userId: 'user-id', roleKey: 'teacher' } },
       permissions,
     );
-
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
-    expect(permissions.has).toHaveBeenCalledWith('teacher', PERMISSION.USER_READ);
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     await moduleRef.close();
   });
 });

@@ -1,6 +1,5 @@
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
@@ -9,14 +8,14 @@ import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/app.module.js';
 import { PERMISSION } from '../../src/auth/permissions.js';
 import type { Env } from '../../src/config/env.schema.js';
-import { configureApp } from '../../src/configure-app.js';
 import { SchoolStatus } from '../../src/generated/prisma/client.js';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTwoSchoolFixture, type TwoSchoolFixture } from '../factories/fixtures.js';
-import { grantPermissions } from '../setup/grant-permissions.js';
-import { loginAs } from '../setup/login.js';
-import '../setup/setup-env.js';
+import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
+import { grantPermissions } from '../support/setup/grant-permissions.js';
+import { loginAsCookie as loginAs } from '../support/login.js';
+import { createTestApp } from '../support/create-test-app.js';
+import { expectError } from '../support/expect-error.js';
 
 const REQUIRED_SCHOOL_FIELDS = {
   name: 'New Academy',
@@ -34,6 +33,7 @@ describe('Schools endpoints (e2e)', () => {
   let fixture: TwoSchoolFixture;
   let origin: string;
   let revokeTeacherRead: (() => Promise<void>) | undefined;
+  let revokeTeacherManage: (() => Promise<void>) | undefined;
   const createdSchoolIds: string[] = [];
 
   beforeAll(async () => {
@@ -45,13 +45,14 @@ describe('Schools endpoints (e2e)', () => {
     setupPool = new Pool({ connectionString: databaseUrl });
     setupClient = new PrismaClient({ adapter: new PrismaPg(setupPool) });
     await setupClient.$connect();
-    const grant = await grantPermissions(setupClient, 'teacher', [PERMISSION.SCHOOL_READ]);
-    revokeTeacherRead = grant.revoke;
+    const grants = await Promise.all([
+      grantPermissions(setupClient, 'teacher', [PERMISSION.SCHOOL_READ]),
+      grantPermissions(setupClient, 'teacher', [PERMISSION.SCHOOL_MANAGE]),
+    ]);
+    revokeTeacherRead = grants[0].revoke;
+    revokeTeacherManage = grants[1].revoke;
 
-    const moduleFixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleFixture.createNestApplication();
-    configureApp(app);
-    await app.init();
+    app = await createTestApp(AppModule);
 
     prisma = app.get(PrismaService);
     const config = app.get<ConfigService<Env, true>>(ConfigService);
@@ -72,6 +73,10 @@ describe('Schools endpoints (e2e)', () => {
         fixture.schoolB.student.id,
       ];
       await prisma.$transaction(async (tx) => {
+        await tx.school.updateMany({
+          where: { id: { in: [fixture.schoolA.school.id, fixture.schoolB.school.id] } },
+          data: { status: SchoolStatus.ACTIVE },
+        });
         await tx.teacherProfile.deleteMany({ where: { userId: { in: userIds } } });
         await tx.studentProfile.deleteMany({ where: { userId: { in: userIds } } });
         await tx.user.deleteMany({ where: { id: { in: userIds } } });
@@ -89,6 +94,7 @@ describe('Schools endpoints (e2e)', () => {
     }
 
     await app?.close();
+    await revokeTeacherManage?.();
     await revokeTeacherRead?.();
     await setupClient?.$disconnect();
     await setupPool?.end();
@@ -154,16 +160,19 @@ describe('Schools endpoints (e2e)', () => {
       status: SchoolStatus.ACTIVE,
     });
     expect(created.body).not.toHaveProperty('schoolId');
+    expect(created.body).not.toHaveProperty('passwordHash');
 
-    await createSchool(adminCookie, createBody('ab-12'))
-      .expect(409)
-      .then(({ body }) =>
-        expect(body).toMatchObject({
-          code: 'SCHOOL_CODE_EXISTS',
-          message: 'School code already exists',
-        }),
-      );
+    expectError(await createSchool(adminCookie, createBody('ab-12')), 409, 'SCHOOL_CODE_EXISTS');
     await createSchool(adminCookie, createBody('bad!'))
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await createSchool(adminCookie, createBody('A'))
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await createSchool(adminCookie, { ...createBody('TYPE01'), code: 12 })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await createSchool(adminCookie, createBody('   '))
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
     await createSchool(adminCookie, createBody('A'.repeat(13)))
@@ -178,7 +187,7 @@ describe('Schools endpoints (e2e)', () => {
     for (const field of ['streetAddress', 'contactName', 'contactPhone']) {
       await createSchool(
         adminCookie,
-        createBody(`SPACE${field.slice(0, 1).toUpperCase()}`, {
+        createBody(`S${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}`, {
           [field]: '   ',
         }),
       )
@@ -188,6 +197,51 @@ describe('Schools endpoints (e2e)', () => {
     await createSchool(adminCookie, { ...createBody('UNKNOWN1'), extra: true })
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+  });
+
+  // Required and optional school fields enforce types, trimmed non-empty content, and length limits.
+  it.each([
+    ['missing name', { name: undefined }],
+    ['null name', { name: null }],
+    ['non-string name', { name: 42 }],
+    ['overlong name', { name: 'N'.repeat(121) }],
+    ['missing city', { city: undefined }],
+    ['whitespace city', { city: '   ' }],
+    ['overlong address', { streetAddress: 'A'.repeat(256) }],
+    ['whitespace optional contact name', { contactName: '   ' }],
+    ['non-string contact phone', { contactPhone: 123 }],
+  ])('rejects %s with a validation error', async (_caseName, fields) => {
+    const adminCookie = await loginAs(app, fixture.admin);
+
+    const response = await createSchool(
+      adminCookie,
+      createBody(`VAL${randomUUID().replaceAll('-', '').slice(0, 5).toUpperCase()}`, fields),
+    ).expect(400);
+
+    expectError(response, 400, 'VALIDATION_ERROR');
+  });
+
+  // School code and text field limits include both documented code boundaries.
+  it('accepts school code lengths two and twelve and text values at their maximum', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const twoCharacter = await createAndTrack(
+      adminCookie,
+      `A${randomUUID().slice(0, 1).toUpperCase()}`,
+    );
+    const twelveCharacter = await createAndTrack(adminCookie, 'ABCDEFGHIJKL', {
+      name: 'N'.repeat(120),
+      city: 'C'.repeat(100),
+      state: 'S'.repeat(100),
+      postalCode: 'P'.repeat(20),
+      country: 'C'.repeat(100),
+      streetAddress: 'A'.repeat(255),
+      contactName: 'N'.repeat(120),
+      contactPhone: '1'.repeat(32),
+    });
+
+    expect(twoCharacter.code).toHaveLength(2);
+    expect(twelveCharacter.code).toBe('ABCDEFGHIJKL');
+    expect(twelveCharacter.name).toHaveLength(120);
   });
 
   it('updates schools without permitting code changes and allows nullable optional fields', async () => {
@@ -213,6 +267,64 @@ describe('Schools endpoints (e2e)', () => {
     await patchSchool(adminCookie, fixture.schoolA.school.id, { code: 'CHANGED1' }).expect(400);
     await patchSchool(adminCookie, fixture.schoolA.school.id, {}).expect(400);
     await patchSchool(adminCookie, fixture.schoolA.school.id, { name: null }).expect(400);
+    await patchSchool(adminCookie, fixture.schoolA.school.id, { name: '   ' })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+  });
+
+  // A school-scoped manager can update only its own school; foreign IDs remain indistinguishable from missing.
+  it('hides foreign school updates from a school-scoped manager', async () => {
+    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+
+    const foreign = await patchSchool(teacherCookie, fixture.schoolB.school.id, {
+      name: 'Should not change',
+    }).expect(404);
+    const missing = await patchSchool(teacherCookie, randomUUID(), {
+      name: 'Should not change',
+    }).expect(404);
+
+    expect(foreign.body.code).toBe('NOT_FOUND');
+    expect(missing.body.code).toBe('NOT_FOUND');
+    expect(foreign.body).not.toHaveProperty('stack');
+  });
+
+  // Valid school patches trim values and normalize contact emails before persistence.
+  it('trims school update fields and lowercases contact email', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+
+    const response = await patchSchool(adminCookie, fixture.schoolA.school.id, {
+      name: '  Trimmed School  ',
+      city: '  Test City  ',
+      contactEmail: '  OFFICE@EXAMPLE.COM  ',
+    }).expect(200);
+
+    expect(response.body).toMatchObject({
+      name: 'Trimmed School',
+      city: 'Test City',
+      contactEmail: 'office@example.com',
+    });
+    expect(response.body).not.toHaveProperty('passwordHash');
+  });
+
+  // Unknown fields, invalid IDs, and overlong/wrongly typed values fail with the standard validation shape.
+  it.each([
+    ['unknown field', { name: 'Valid', schoolId: 'not-accepted' }],
+    ['wrong field type', { name: 4 }],
+    ['overlong field', { city: 'C'.repeat(101) }],
+  ])('rejects an invalid school update with %s', async (_caseName, body) => {
+    const adminCookie = await loginAs(app, fixture.admin);
+
+    const response = await patchSchool(adminCookie, fixture.schoolA.school.id, body).expect(400);
+
+    expectError(response, 400, 'VALIDATION_ERROR');
+  });
+
+  // Path IDs are parsed as UUIDs before a school update is delegated.
+  it('rejects a malformed school update ID', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const response = await patchSchool(adminCookie, 'not-a-uuid', { name: 'Valid' }).expect(400);
+
+    expectError(response, 400, 'BAD_REQUEST');
   });
 
   it('paginates, filters, searches, and orders platform school lists', async () => {
@@ -267,21 +379,72 @@ describe('Schools endpoints (e2e)', () => {
       [tiedFirst.id, tiedSecond.id].sort(),
     );
 
-    await request(app.getHttpServer())
+    for (const invalidQuery of [
+      { limit: 0 },
+      { limit: -1 },
+      { limit: 1.5 },
+      { limit: 101 },
+      { page: 100001 },
+    ]) {
+      expectError(
+        await request(app.getHttpServer())
+          .get('/api/v1/schools')
+          .set('Cookie', adminCookie)
+          .query(invalidQuery),
+        400,
+        'VALIDATION_ERROR',
+      );
+    }
+
+    const defaults = await request(app.getHttpServer())
       .get('/api/v1/schools')
       .set('Cookie', adminCookie)
-      .query({ limit: 101 })
-      .expect(400);
-    await request(app.getHttpServer())
+      .query({ q: 'No school can match this value' })
+      .expect(200);
+    expect(defaults.body).toMatchObject({ page: 1, limit: 20, total: 0, items: [] });
+
+    const maxPage = await request(app.getHttpServer())
       .get('/api/v1/schools')
       .set('Cookie', adminCookie)
-      .query({ page: Number.MAX_SAFE_INTEGER })
-      .expect(400);
+      .query({ q: prefix, limit: 100 })
+      .expect(200);
+    expect(maxPage.body.limit).toBe(100);
+
+    const beyondLast = await request(app.getHttpServer())
+      .get('/api/v1/schools')
+      .set('Cookie', adminCookie)
+      .query({ q: prefix, page: 100, limit: 2 })
+      .expect(200);
+    expect(beyondLast.body).toMatchObject({ page: 100, limit: 2, total: 5, items: [] });
+
+    const statusOnly = await request(app.getHttpServer())
+      .get('/api/v1/schools')
+      .set('Cookie', adminCookie)
+      .query({ status: SchoolStatus.INACTIVE })
+      .expect(200);
+    expect(
+      statusOnly.body.items.every(
+        (school: { status: string }) => school.status === SchoolStatus.INACTIVE,
+      ),
+    ).toBe(true);
+    const searchOnly = await request(app.getHttpServer())
+      .get('/api/v1/schools')
+      .set('Cookie', adminCookie)
+      .query({ q: prefix.toLowerCase() })
+      .expect(200);
+    expect(searchOnly.body.total).toBe(5);
   });
 
   it('scopes school reads and lists, with identical errors for foreign and missing ids', async () => {
     const adminCookie = await loginAs(app, fixture.admin);
     const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+
+    const ownUpdate = await patchSchool(teacherCookie, fixture.schoolA.school.id, {
+      name: 'Teacher Managed School',
+    }).expect(200);
+    expect(ownUpdate.body.name).toBe('Teacher Managed School');
+    await changeStatus(teacherCookie, fixture.schoolA.school.id, SchoolStatus.INACTIVE).expect(200);
+    await changeStatus(adminCookie, fixture.schoolA.school.id, SchoolStatus.ACTIVE).expect(200);
 
     await request(app.getHttpServer())
       .get(`/api/v1/schools/${fixture.schoolB.school.id}`)
@@ -292,6 +455,7 @@ describe('Schools endpoints (e2e)', () => {
       .set('Cookie', teacherCookie)
       .expect(200);
     expect(own.body.id).toBe(fixture.schoolA.school.id);
+    expect(own.body).not.toHaveProperty('passwordHash');
 
     const foreign = await request(app.getHttpServer())
       .get(`/api/v1/schools/${fixture.schoolB.school.id}`)
@@ -314,6 +478,14 @@ describe('Schools endpoints (e2e)', () => {
     expect(listed.body.items.map((school: { id: string }) => school.id)).toEqual([
       fixture.schoolA.school.id,
     ]);
+    expect(listed.body.items[0]).not.toHaveProperty('users');
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get(`/api/v1/schools/${fixture.schoolA.school.id}`)
+          .set('Cookie', teacherCookie)
+      ).body,
+    ).not.toHaveProperty('users');
   });
 
   it('enforces session, permission, platform-only create, and Origin checks', async () => {
@@ -335,8 +507,11 @@ describe('Schools endpoints (e2e)', () => {
     await changeStatus(studentCookie, fixture.schoolA.school.id, SchoolStatus.INACTIVE).expect(403);
 
     await createSchool(teacherCookie, createBody(`TC${randomUUID().slice(0, 6)}`)).expect(403);
-    await patchSchool(teacherCookie, fixture.schoolA.school.id, { name: 'Denied' }).expect(403);
-    await changeStatus(teacherCookie, fixture.schoolA.school.id, SchoolStatus.INACTIVE).expect(403);
+    await patchSchool(teacherCookie, fixture.schoolA.school.id, { name: 'Teacher update' }).expect(
+      200,
+    );
+    await changeStatus(teacherCookie, fixture.schoolA.school.id, SchoolStatus.INACTIVE).expect(200);
+    await changeStatus(adminCookie, fixture.schoolA.school.id, SchoolStatus.ACTIVE).expect(200);
 
     await request(app.getHttpServer())
       .post('/api/v1/schools')
@@ -353,6 +528,73 @@ describe('Schools endpoints (e2e)', () => {
       .set('Cookie', adminCookie)
       .send({ status: SchoolStatus.INACTIVE })
       .expect(403);
+  });
+
+  // Every school route requires authentication before evaluating its permission or scope.
+  it('rejects unauthenticated requests to each school endpoint', async () => {
+    expectError(
+      await request(app.getHttpServer()).post('/api/v1/schools').set('Origin', origin).send({}),
+      401,
+      'UNAUTHORIZED',
+    );
+    expectError(await request(app.getHttpServer()).get('/api/v1/schools'), 401, 'UNAUTHORIZED');
+    expectError(
+      await request(app.getHttpServer()).get(`/api/v1/schools/${fixture.schoolA.school.id}`),
+      401,
+      'UNAUTHORIZED',
+    );
+    expectError(
+      await request(app.getHttpServer())
+        .patch(`/api/v1/schools/${fixture.schoolA.school.id}`)
+        .set('Origin', origin)
+        .send({ name: 'No session' }),
+      401,
+      'UNAUTHORIZED',
+    );
+    expectError(
+      await request(app.getHttpServer())
+        .patch(`/api/v1/schools/${fixture.schoolA.school.id}/status`)
+        .set('Origin', origin)
+        .send({ status: SchoolStatus.ACTIVE }),
+      401,
+      'UNAUTHORIZED',
+    );
+  });
+
+  it('rejects malformed school IDs on read and status routes', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    expectError(
+      await request(app.getHttpServer())
+        .get('/api/v1/schools/not-a-uuid')
+        .set('Cookie', adminCookie),
+      400,
+      'BAD_REQUEST',
+    );
+    expectError(
+      await changeStatus(adminCookie, 'not-a-uuid', SchoolStatus.ACTIVE),
+      400,
+      'BAD_REQUEST',
+    );
+  });
+
+  // Read permission grants teachers only their own school; school staff still cannot create schools.
+  it('allows a school staff reader only its own school and denies its create attempt', async () => {
+    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+    await request(app.getHttpServer())
+      .get('/api/v1/schools')
+      .set('Cookie', teacherCookie)
+      .expect(200)
+      .then(({ body }) =>
+        expect(body.items.map((school: { id: string }) => school.id)).toEqual([
+          fixture.schoolA.school.id,
+        ]),
+      );
+
+    expectError(
+      await createSchool(teacherCookie, createBody(`TC${randomUUID().slice(0, 6)}`)),
+      403,
+      'FORBIDDEN',
+    );
   });
 
   it('deactivates schools idempotently, blocks their sessions and restores access on activation', async () => {
@@ -388,5 +630,54 @@ describe('Schools endpoints (e2e)', () => {
         password: fixture.schoolA.teacher.password,
       })
       .expect(200);
+  });
+
+  // Status payload validation rejects missing, null, non-string, and unknown values.
+  it.each([
+    ['missing status', {}],
+    ['null status', { status: null }],
+    ['non-string status', { status: 1 }],
+    ['unknown status', { status: 'PAUSED' }],
+  ])('rejects a status update with %s', async (_caseName, body) => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const response = await request(app.getHttpServer())
+      .patch(`/api/v1/schools/${fixture.schoolA.school.id}/status`)
+      .set('Origin', origin)
+      .set('Cookie', adminCookie)
+      .send(body)
+      .expect(400);
+
+    expectError(response, 400, 'VALIDATION_ERROR');
+  });
+
+  // School-scoped status changes hide foreign and missing IDs behind the same 404.
+  it('hides foreign school status changes from a school-scoped manager', async () => {
+    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+
+    const foreign = await changeStatus(teacherCookie, fixture.schoolB.school.id, 'INACTIVE').expect(
+      404,
+    );
+    const missing = await changeStatus(teacherCookie, randomUUID(), 'INACTIVE').expect(404);
+
+    expect(foreign.body.code).toBe('NOT_FOUND');
+    expect(missing.body.code).toBe('NOT_FOUND');
+  });
+
+  // School ID syntax errors are rejected before status lookup, with a uniform client error.
+  it('rejects a malformed school ID on status change', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const response = await changeStatus(adminCookie, 'not-a-uuid', SchoolStatus.ACTIVE).expect(400);
+
+    expectError(response, 400, 'BAD_REQUEST');
+  });
+
+  // A school code is immutable at the API boundary and cannot be supplied in a partial update.
+  it('rejects a code change with a validation error', async () => {
+    const adminCookie = await loginAs(app, fixture.admin);
+    const response = await patchSchool(adminCookie, fixture.schoolA.school.id, {
+      code: 'CHANGED',
+    }).expect(400);
+
+    expectError(response, 400, 'VALIDATION_ERROR');
   });
 });

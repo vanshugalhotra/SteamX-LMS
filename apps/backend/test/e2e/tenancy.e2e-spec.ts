@@ -27,10 +27,9 @@ import { configureApp } from '../../src/configure-app.js';
 import { schoolFilter, resolveSchoolScope } from '../../src/common/tenancy/school-scope.js';
 import { PrismaModule } from '../../src/prisma/prisma.module.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTwoSchoolFixture, type TwoSchoolFixture } from '../factories/fixtures.js';
-import { grantPermissions } from '../setup/grant-permissions.js';
-import { loginAs } from '../setup/login.js';
-import '../setup/setup-env.js';
+import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
+import { grantPermissions } from '../support/setup/grant-permissions.js';
+import { loginAsCookie as loginAs } from '../support/login.js';
 
 type ScopedUser = {
   id: string;

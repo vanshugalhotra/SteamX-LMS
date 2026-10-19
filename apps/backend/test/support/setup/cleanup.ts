@@ -1,4 +1,4 @@
-import type { PrismaService } from '../../src/prisma/prisma.service.js';
+import type { PrismaService } from '../../../src/prisma/prisma.service.js';
 
 /**
  * Deletes test-created users (and their profiles), class sections, and schools,

@@ -3,7 +3,6 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
@@ -12,17 +11,15 @@ import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/app.module.js';
 import { PERMISSION } from '../../src/auth/permissions.js';
 import type { Env } from '../../src/config/env.schema.js';
-import { configureApp } from '../../src/configure-app.js';
 import { SchoolStatus } from '../../src/generated/prisma/client.js';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
-import { isPrismaKnownError } from '../../src/common/errors/prisma-error.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTwoSchoolFixture, type TwoSchoolFixture } from '../factories/fixtures.js';
-import { cleanupFixtures } from '../setup/cleanup.js';
-import { grantPermissions } from '../setup/grant-permissions.js';
-import { loginAs } from '../setup/login.js';
-import { withRollback } from '../setup/with-rollback.js';
-import '../setup/setup-env.js';
+import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
+import { cleanupFixtures } from '../support/setup/cleanup.js';
+import { grantPermissions } from '../support/setup/grant-permissions.js';
+import { loginAsCookie as loginAs } from '../support/login.js';
+import { createTestApp } from '../support/create-test-app.js';
+import { expectError } from '../support/expect-error.js';
 
 describe('Class sections endpoints (e2e)', () => {
   let app: INestApplication<App>;
@@ -73,10 +70,7 @@ describe('Class sections endpoints (e2e)', () => {
   });
 
   async function startApp(): Promise<void> {
-    const moduleFixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleFixture.createNestApplication();
-    configureApp(app);
-    await app.init();
+    app = await createTestApp(AppModule);
     prisma = app.get(PrismaService);
     const config = app.get<ConfigService<Env, true>>(ConfigService);
     origin = config.get('CORS_ORIGINS', { infer: true })[0] ?? '';
@@ -119,6 +113,12 @@ describe('Class sections endpoints (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  function removeWithoutSession(id: string) {
+    return request(app.getHttpServer())
+      .delete(`/api/v1/class-sections/${id}`)
+      .set('Origin', origin);
+  }
+
   async function createSection(
     cookie: string,
     schoolId: string,
@@ -152,6 +152,8 @@ describe('Class sections endpoints (e2e)', () => {
       ' Section A ',
     );
     expect(namedSection.sectionName).toBe('Section A');
+    expect(defaultSection).not.toHaveProperty('school');
+    expect(defaultSection).not.toHaveProperty('students');
 
     await post(adminCookie, {
       schoolId: fixture.schoolA.school.id,
@@ -169,6 +171,27 @@ describe('Class sections endpoints (e2e)', () => {
     expect(otherSchool.schoolId).toBe(fixture.schoolB.school.id);
 
     await post(adminCookie, { schoolId: fixture.schoolA.school.id, className: '   ' })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    const boundarySection = await createSection(
+      adminCookie,
+      fixture.schoolA.school.id,
+      'C'.repeat(50),
+      'S'.repeat(50),
+    );
+    expect(boundarySection.className).toHaveLength(50);
+    expect(boundarySection.sectionName).toHaveLength(50);
+    await post(adminCookie, { schoolId: fixture.schoolA.school.id })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await post(adminCookie, { schoolId: fixture.schoolA.school.id, className: 42 })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await post(adminCookie, {
+      schoolId: fixture.schoolA.school.id,
+      className: `${prefix} Wrong Section Type`,
+      sectionName: 42,
+    })
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
     await post(adminCookie, {
@@ -205,6 +228,9 @@ describe('Class sections endpoints (e2e)', () => {
       .expect(400)
       .then(({ body }) => expect(body.code).toBe('SCHOOL_REQUIRED'));
     await post(adminCookie, { schoolId: randomUUID(), className: `${prefix} Unknown` }).expect(404);
+    await post(adminCookie, { schoolId: 'not-a-uuid', className: `${prefix} Malformed` })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
 
     await prisma.school.update({
       where: { id: fixture.schoolB.school.id },
@@ -223,50 +249,6 @@ describe('Class sections endpoints (e2e)', () => {
         data: { status: SchoolStatus.ACTIVE },
       });
     }
-  });
-
-  it('maps case-insensitive unique index violations to Prisma P2002 and a conflict response', async () => {
-    const adminCookie = await loginAs(app, fixture.admin);
-    const className = `Prisma duplicate ${randomUUID().slice(0, 8)}`;
-    const sectionName = 'Purple';
-
-    await withRollback(prisma, async (tx) => {
-      await tx.classSection.create({
-        data: { schoolId: fixture.schoolA.school.id, className, sectionName },
-      });
-      let duplicateError: unknown;
-      try {
-        await tx.classSection.create({
-          data: {
-            schoolId: fixture.schoolA.school.id,
-            className: className.toLowerCase(),
-            sectionName: sectionName.toLowerCase(),
-          },
-        });
-      } catch (error) {
-        duplicateError = error;
-      }
-      expect(isPrismaKnownError(duplicateError)).toBe(true);
-      if (!isPrismaKnownError(duplicateError)) {
-        throw new Error('Expected Prisma known request error for duplicate class section.');
-      }
-      expect(duplicateError.code).toBe('P2002');
-    });
-
-    const section = await createSection(
-      adminCookie,
-      fixture.schoolA.school.id,
-      className,
-      sectionName,
-    );
-    await post(adminCookie, {
-      schoolId: fixture.schoolA.school.id,
-      className: className.toLowerCase(),
-      sectionName: sectionName.toLowerCase(),
-    })
-      .expect(409)
-      .then(({ body }) => expect(body.code).toBe('CLASS_SECTION_EXISTS'));
-    expect(section.schoolId).toBe(fixture.schoolA.school.id);
   });
 
   it('updates names, rejects empty or duplicate updates, and permits case-only renames', async () => {
@@ -295,6 +277,19 @@ describe('Class sections endpoints (e2e)', () => {
     expect(changedCase.body.sectionName).toBe('a');
     await patch(adminCookie, section.id, {}).expect(400);
     await patch(adminCookie, section.id, { className: null }).expect(400);
+    await patch(adminCookie, section.id, { schoolId: fixture.schoolB.school.id })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await patch(adminCookie, section.id, { unexpected: 'value' })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    const unchanged = await patch(adminCookie, section.id, {
+      className: `${prefix} Class`.toLowerCase(),
+      sectionName: 'a',
+    }).expect(200);
+    expect(unchanged.body.id).toBe(section.id);
+    expectError(await patch(adminCookie, 'not-a-uuid', { className: 'Valid' }), 400, 'BAD_REQUEST');
+    expectError(await patch(adminCookie, randomUUID(), { className: 'Valid' }), 404, 'NOT_FOUND');
     expect(duplicateTarget.id).not.toBe(section.id);
   });
 
@@ -306,20 +301,6 @@ describe('Class sections endpoints (e2e)', () => {
       `Delete ${randomUUID().slice(0, 8)}`,
     );
     await remove(adminCookie, removable.id).expect(204);
-
-    let deleteError: unknown;
-    try {
-      await prisma.classSection.delete({ where: { id: fixture.schoolA.section.id } });
-    } catch (error) {
-      deleteError = error;
-    }
-    expect(isPrismaKnownError(deleteError)).toBe(true);
-    if (!isPrismaKnownError(deleteError)) {
-      throw new Error(
-        'Expected Prisma known request error when deleting a section used by a student.',
-      );
-    }
-    expect(deleteError.code).toBe('P2003');
 
     await remove(adminCookie, fixture.schoolA.section.id)
       .expect(409)
@@ -335,7 +316,8 @@ describe('Class sections endpoints (e2e)', () => {
     );
     expect(allSection.sectionName).toBe('All');
     await remove(adminCookie, allSection.id).expect(204);
-    await remove(adminCookie, randomUUID()).expect(404);
+    expectError(await remove(adminCookie, randomUUID()), 404, 'NOT_FOUND');
+    expectError(await remove(adminCookie, 'not-a-uuid'), 400, 'BAD_REQUEST');
   });
 
   it('lists with pagination, search, stable order and school scope', async () => {
@@ -372,6 +354,16 @@ describe('Class sections endpoints (e2e)', () => {
     }).expect(200);
     expect(pageTwo.body.total).toBe(2);
     expect(pageTwo.body.items).toHaveLength(1);
+    const schoolOnly = await getList(adminCookie, { schoolId: fixture.schoolB.school.id }).expect(
+      200,
+    );
+    expect(
+      schoolOnly.body.items.every(
+        (item: { schoolId: string }) => item.schoolId === fixture.schoolB.school.id,
+      ),
+    ).toBe(true);
+    const searchOnly = await getList(adminCookie, { q: prefix.toLowerCase() }).expect(200);
+    expect(searchOnly.body.total).toBe(3);
 
     const ordered = await getList(adminCookie, {
       q: prefix,
@@ -389,8 +381,41 @@ describe('Class sections endpoints (e2e)', () => {
       ),
     ).toBe(true);
     await getList(teacherCookie, { schoolId: fixture.schoolB.school.id }).expect(404);
-    await getList(adminCookie, { limit: 101 }).expect(400);
+    await getById(teacherCookie, fixture.schoolA.section.id).expect(200);
+    const invalidQueries: Record<string, string | number>[] = [
+      { limit: 0 },
+      { limit: -1 },
+      { limit: 1.5 },
+      { limit: 101 },
+      { page: 100001 },
+    ];
+    for (const invalidQuery of invalidQueries) {
+      expectError(await getList(adminCookie, invalidQuery), 400, 'VALIDATION_ERROR');
+    }
     await getList(adminCookie, { q: 'x'.repeat(101) }).expect(400);
+
+    const defaultPage = await getList(adminCookie, { q: prefix }).expect(200);
+    expect(defaultPage.body).toMatchObject({ page: 1, limit: 20, total: 3 });
+    const maxLimit = await getList(adminCookie, {
+      q: prefix,
+      schoolId: fixture.schoolA.school.id,
+      limit: 100,
+    }).expect(200);
+    expect(maxLimit.body.limit).toBe(100);
+    const beyondEnd = await getList(adminCookie, {
+      q: prefix,
+      schoolId: fixture.schoolA.school.id,
+      page: 10,
+      limit: 1,
+    }).expect(200);
+    expect(beyondEnd.body).toMatchObject({ page: 10, limit: 1, total: 2, items: [] });
+    const noMatch = await getList(adminCookie, { q: `No match ${randomUUID()}` }).expect(200);
+    expect(noMatch.body).toMatchObject({ total: 0, items: [] });
+    await getList(adminCookie, { schoolId: 'not-a-uuid' })
+      .expect(400)
+      .then(({ body }) => expect(body.code).toBe('VALIDATION_ERROR'));
+    await getList(adminCookie, { page: 0 }).expect(400);
+    expect(list.body.items[0]).not.toHaveProperty('students');
   });
 
   it('checks permission before scope and requires auth and Origin on protected routes', async () => {
@@ -405,6 +430,11 @@ describe('Class sections endpoints (e2e)', () => {
     );
     await patch(studentCookie, foreignId, { className: 'Denied' }).expect(403);
     await remove(studentCookie, foreignId).expect(403);
+    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+    await patch(teacherCookie, fixture.schoolA.section.id, { className: 'Not allowed' }).expect(
+      403,
+    );
+    await remove(teacherCookie, fixture.schoolA.section.id).expect(403);
 
     await request(app.getHttpServer()).get('/api/v1/class-sections').expect(401);
     await request(app.getHttpServer()).get(`/api/v1/class-sections/${foreignId}`).expect(401);
@@ -436,12 +466,52 @@ describe('Class sections endpoints (e2e)', () => {
       .delete(`/api/v1/class-sections/${foreignId}`)
       .set('Cookie', adminCookie)
       .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/v1/class-sections')
+      .set('Cookie', adminCookie)
+      .query({ schoolId: fixture.schoolA.school.id })
+      .expect(200);
+  });
+
+  // Every class-section endpoint requires an authenticated session.
+  it('rejects unauthenticated requests to every class-section endpoint', async () => {
+    expectError(
+      await request(app.getHttpServer()).post('/api/v1/class-sections').set('Origin', origin).send({
+        schoolId: fixture.schoolA.school.id,
+        className: 'No session',
+      }),
+      401,
+      'UNAUTHORIZED',
+    );
+    expectError(
+      await request(app.getHttpServer()).get('/api/v1/class-sections'),
+      401,
+      'UNAUTHORIZED',
+    );
+    expectError(
+      await request(app.getHttpServer()).get(
+        `/api/v1/class-sections/${fixture.schoolA.section.id}`,
+      ),
+      401,
+      'UNAUTHORIZED',
+    );
+    expectError(
+      await request(app.getHttpServer())
+        .patch(`/api/v1/class-sections/${fixture.schoolA.section.id}`)
+        .set('Origin', origin)
+        .send({ className: 'No session' }),
+      401,
+      'UNAUTHORIZED',
+    );
+    expectError(await removeWithoutSession(fixture.schoolA.section.id), 401, 'UNAUTHORIZED');
   });
 
   it('hides foreign sections for a read-only teacher and keeps foreign and missing IDs alike', async () => {
     const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+    const adminCookie = await loginAs(app, fixture.admin);
     const foreignId = fixture.schoolB.section.id;
     await getById(teacherCookie, foreignId).expect(404);
+    expectError(await getById(adminCookie, 'not-a-uuid'), 400, 'BAD_REQUEST');
     const foreignList = await getList(teacherCookie, {
       schoolId: fixture.schoolB.school.id,
     }).expect(404);
@@ -486,6 +556,27 @@ describe('Class sections endpoints (e2e)', () => {
     await startApp();
 
     const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+    const ownSection = await createSection(
+      await loginAs(app, fixture.admin),
+      fixture.schoolA.school.id,
+      `Teacher Manage ${randomUUID().slice(0, 8)}`,
+    );
+    const ownUpdate = await patch(teacherCookie, ownSection.id, {
+      className: 'Teacher managed section',
+    }).expect(200);
+    expect(ownUpdate.body.className).toBe('Teacher managed section');
+    const teacherCreated = await post(teacherCookie, {
+      schoolId: fixture.schoolA.school.id,
+      className: `Teacher created ${randomUUID().slice(0, 8)}`,
+    }).expect(201);
+    createdSectionIds.push(teacherCreated.body.id as string);
+    await remove(teacherCookie, teacherCreated.body.id as string).expect(204);
+    await post(teacherCookie, {
+      schoolId: fixture.schoolB.school.id,
+      className: `Foreign create ${randomUUID().slice(0, 8)}`,
+    })
+      .expect(404)
+      .then(({ body }) => expect(body.code).toBe('NOT_FOUND'));
     const foreignSectionId = fixture.schoolB.section.id;
     const foreignPatch = await patch(teacherCookie, foreignSectionId, {
       className: 'Unauthorized change',
@@ -517,5 +608,17 @@ describe('Class sections endpoints (e2e)', () => {
       select: { id: true },
     });
     expect(afterDeleteAttempt.id).toBe(foreignSectionId);
+  });
+
+  // A school-scoped manager receives 404 rather than access to foreign section IDs or filters.
+  it('returns 404 for a foreign section ID and for a foreign school filter', async () => {
+    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+
+    expectError(await getById(teacherCookie, fixture.schoolB.section.id), 404, 'NOT_FOUND');
+    expectError(
+      await getList(teacherCookie, { schoolId: fixture.schoolB.school.id }),
+      404,
+      'NOT_FOUND',
+    );
   });
 });

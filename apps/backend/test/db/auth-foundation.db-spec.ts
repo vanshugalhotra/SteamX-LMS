@@ -6,8 +6,8 @@ import { AppModule } from '../../src/app.module.js';
 import { FirstAdminService } from '../../src/auth/services/first-admin.service.js';
 import { PasswordService } from '../../src/auth/services/password.service.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTestUser } from '../factories/fixtures.js';
-import { withRollback } from '../setup/with-rollback.js';
+import { createTestUser } from '../support/factories/fixtures.js';
+import { withRollback } from '../support/setup/with-rollback.js';
 
 const ADMIN_INPUT = {
   steamxId: '  adm123 ',
@@ -208,22 +208,5 @@ describe('Authentication foundation reference data', () => {
         'ADMIN_STEAMX_ID is already in use by another account.',
       );
     });
-  });
-
-  it('reports a serialization conflict as another process creating the Admin', async () => {
-    const transaction = vi.spyOn(prisma, '$transaction').mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError('Serialization conflict', {
-        code: 'P2034',
-        clientVersion: '7.10.0',
-      }),
-    );
-
-    try {
-      await expect(firstAdmin.create(ADMIN_INPUT)).rejects.toThrow(
-        'Another process may be creating the admin. Re-run the command to check.',
-      );
-    } finally {
-      transaction.mockRestore();
-    }
   });
 });

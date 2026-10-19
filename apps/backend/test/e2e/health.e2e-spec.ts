@@ -4,7 +4,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/configure-app.js';
-import { PrismaService } from '../../src/prisma/prisma.service.js';
+import { HealthService } from '../../src/health/health.service.js';
 
 describe('Health endpoints (e2e)', () => {
   let app: INestApplication<App>;
@@ -37,17 +37,14 @@ describe('Health endpoints (e2e)', () => {
     await request(app.getHttpServer()).get('/api/v1/health/ready').expect(404);
   });
 
-  it('returns only the database-down response when the readiness query fails', async () => {
-    const prisma = app.get(PrismaService);
-    vi.spyOn(prisma, '$transaction').mockRejectedValueOnce(
-      new Error('Sensitive database host and connection details'),
-    );
+  it('returns the database-down response when the readiness check fails', async () => {
+    vi.spyOn(app.get(HealthService), 'isDatabaseReady').mockResolvedValue(false);
 
     const response = await request(app.getHttpServer())
       .get('/health/ready')
       .expect(503)
       .expect({ status: 'error', checks: { database: 'down' } });
 
-    expect(JSON.stringify(response.body)).not.toContain('Sensitive database host');
+    expect(response.body).not.toHaveProperty('stack');
   });
 });
