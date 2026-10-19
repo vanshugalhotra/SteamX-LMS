@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA, VERSION_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
+import type { NextFunction, Request, Response as ExpressResponse } from 'express';
 import { Test } from '@nestjs/testing';
 import { DiscoveryModule, DiscoveryService, Reflector } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
@@ -32,6 +33,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { createTestUser } from '../support/factories/fixtures.js';
 import { loginAsCookie as loginAs } from '../support/login.js';
 import { cleanupFixtures } from '../support/setup/cleanup.js';
+import { assertSafeResponseBody } from '../support/invariant-api.js';
 
 const INITIAL_PASSWORD = 'Starting invariant password 2026!';
 const RECOVERY_PASSWORD = 'Recovered admin password 2026!';
@@ -109,6 +111,14 @@ describe('Authentication invariants (e2e)', () => {
     }).compile();
     app = moduleFixture.createNestApplication();
     configureApp(app);
+    app.use((_request: Request, response: ExpressResponse, next: NextFunction) => {
+      const originalJson = response.json.bind(response);
+      response.json = ((body: unknown) => {
+        assertSafeResponseBody(response.statusCode, body);
+        return originalJson(body);
+      }) as typeof response.json;
+      next();
+    });
     await app.init();
 
     prisma = app.get(PrismaService);
