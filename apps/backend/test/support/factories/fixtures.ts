@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { Prisma, SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
-import type { ClassSection, School } from '../../src/generated/prisma/client.js';
-import { PasswordService } from '../../src/auth/services/password.service.js';
-import type { PrismaService } from '../../src/prisma/prisma.service.js';
+import {
+  Prisma,
+  SchoolStatus,
+  UserStatus,
+  UserType,
+} from '../../../src/generated/prisma/client.js';
+import type { ClassSection, School } from '../../../src/generated/prisma/client.js';
+import { PasswordService } from '../../../src/auth/services/password.service.js';
+import type { PrismaService } from '../../../src/prisma/prisma.service.js';
 
 export const TENANCY_TEST_PASSWORD = 'Tenancy test password 2026!';
 

@@ -4,6 +4,7 @@ import { AuthContextRepository } from '../auth-context.repository.js';
 import { FirstAdminService } from './first-admin.service.js';
 import { PasswordService } from './password.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { Prisma } from '../../generated/prisma/client.js';
 
 describe('FirstAdminService', () => {
   afterEach(() => {
@@ -78,6 +79,32 @@ describe('FirstAdminService', () => {
     await expect(service.resetAdminPassword(input)).rejects.toThrow(
       'Database migrations have not been applied. Run migrate:deploy.',
     );
+    await moduleRef.close();
+  });
+
+  it('reports a serialization conflict as another process creating the Admin', async () => {
+    const transaction = vi.fn().mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Serialization conflict', {
+        code: 'P2034',
+        clientVersion: '7.10.0',
+      }),
+    );
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        FirstAdminService,
+        { provide: PrismaService, useValue: { $transaction: transaction } },
+        { provide: PasswordService, useValue: { hash: vi.fn() } },
+        { provide: AuthContextRepository, useValue: {} },
+      ],
+    }).compile();
+    const service = moduleRef.get(FirstAdminService);
+
+    await expect(
+      service.create({
+        steamxId: 'ADM123',
+        password: 'Recovered admin password 2026!',
+      }),
+    ).rejects.toThrow('Another process may be creating the admin. Re-run the command to check.');
     await moduleRef.close();
   });
 

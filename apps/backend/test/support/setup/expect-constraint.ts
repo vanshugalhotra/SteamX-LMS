@@ -1,4 +1,4 @@
-import { isPrismaKnownError, getPostgresCode } from '../../src/common/errors/prisma-error.js';
+import { isPrismaKnownError, getPostgresCode } from '../../../src/common/errors/prisma-error.js';
 
 /**
  * Asserts that a database operation fails with a specific PostgreSQL

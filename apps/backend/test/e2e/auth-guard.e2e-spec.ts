@@ -15,8 +15,8 @@ import type { AuthContext } from '../../src/auth/types/auth-context.js';
 import { TokenService } from '../../src/auth/services/token.service.js';
 import { configureApp } from '../../src/configure-app.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTestUser } from '../factories/fixtures.js';
-import { cleanupFixtures } from '../setup/cleanup.js';
+import { createTestUser } from '../support/factories/fixtures.js';
+import { cleanupFixtures } from '../support/setup/cleanup.js';
 
 const TEST_PASSWORD_HASH = 'test-only-password-hash';
 const ALTERNATE_TEST_SECRET = 'different-test-secret-that-is-at-least-32-characters';

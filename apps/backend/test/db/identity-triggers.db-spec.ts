@@ -4,9 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { Prisma, UserType } from '../../src/generated/prisma/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTestUser } from '../factories/fixtures.js';
-import { withRollback } from '../setup/with-rollback.js';
-import { expectTriggerMessage } from '../setup/expect-trigger.js';
+import { createTestUser } from '../support/factories/fixtures.js';
+import { withRollback } from '../support/setup/with-rollback.js';
+import { expectTriggerMessage } from '../support/setup/expect-trigger.js';
 
 const PASSWORD_HASH = 'test-only-password-hash';
 

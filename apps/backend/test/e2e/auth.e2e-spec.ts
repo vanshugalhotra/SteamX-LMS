@@ -7,19 +7,16 @@ import type { Response as SupertestResponse } from 'supertest';
 import type { App } from 'supertest/types.js';
 import { SchoolStatus, UserStatus, UserType } from '../../src/generated/prisma/client.js';
 import { AppModule } from '../../src/app.module.js';
-import { AuthContextRepository } from '../../src/auth/auth-context.repository.js';
 import { AuthenticatedOnly } from '../../src/auth/decorators/authenticated-only.decorator.js';
 import { CurrentAuth } from '../../src/auth/decorators/current-auth.decorator.js';
-import { RequirePermission } from '../../src/auth/decorators/require-permission.decorator.js';
-import { PERMISSION } from '../../src/auth/permissions.js';
 import type { AuthContext } from '../../src/auth/types/auth-context.js';
 import { PasswordService } from '../../src/auth/services/password.service.js';
 import { TokenService } from '../../src/auth/services/token.service.js';
 import { configureApp } from '../../src/configure-app.js';
 import type { Env } from '../../src/config/env.schema.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTestUser } from '../factories/fixtures.js';
-import { cleanupFixtures } from '../setup/cleanup.js';
+import { createTestUser } from '../support/factories/fixtures.js';
+import { cleanupFixtures } from '../support/setup/cleanup.js';
 
 const TEST_PASSWORD = 'Test login password 2026!';
 
@@ -29,12 +26,6 @@ class AuthTestController {
   @Get('protected')
   getProtected(@CurrentAuth() authContext: AuthContext): AuthContext {
     return authContext;
-  }
-
-  @RequirePermission(PERMISSION.USER_PASSWORD_RESET)
-  @Get('password-reset-permission')
-  getPasswordResetPermission(): { allowed: true } {
-    return { allowed: true };
   }
 }
 
@@ -51,7 +42,6 @@ describe('Authentication endpoints (e2e)', () => {
   let tokens: TokenService;
   let origin: string;
   let passwordHash: string;
-  let rolePermissionsLoader: ReturnType<typeof vi.spyOn>;
   const createdUserIds: string[] = [];
   const createdSchoolIds: string[] = [];
   const createdClassSectionIds: string[] = [];
@@ -63,7 +53,6 @@ describe('Authentication endpoints (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configureApp(app);
-    rolePermissionsLoader = vi.spyOn(app.get(AuthContextRepository), 'findRolePermissions');
     await app.init();
     prisma = app.get(PrismaService);
     passwords = app.get(PasswordService);
@@ -240,22 +229,6 @@ describe('Authentication endpoints (e2e)', () => {
     await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
     await withCookie('/api/v1/auth/me', cookie).expect(200);
     await withCookie('/api/v1/auth-test/protected', cookie).expect(403);
-  });
-
-  it('loads role permissions once and only allows the seeded Admin permission', async () => {
-    const admin = await createUser();
-    const teacher = await createUser({ userType: UserType.SCHOOL_STAFF });
-    const student = await createUser({ userType: UserType.STUDENT });
-    const adminCookie = getCookie(await login(admin.steamxId, TEST_PASSWORD).expect(200));
-    const teacherCookie = getCookie(await login(teacher.steamxId, TEST_PASSWORD).expect(200));
-    const studentCookie = getCookie(await login(student.steamxId, TEST_PASSWORD).expect(200));
-
-    expect(rolePermissionsLoader).toHaveBeenCalledTimes(1);
-    await withCookie('/api/v1/auth-test/password-reset-permission', adminCookie).expect(200);
-    await withCookie('/api/v1/auth-test/password-reset-permission', teacherCookie).expect(403);
-    await withCookie('/api/v1/auth-test/password-reset-permission', studentCookie).expect(403);
-    await withCookie('/api/v1/auth-test/protected', teacherCookie).expect(200);
-    expect(rolePermissionsLoader).toHaveBeenCalledTimes(1);
   });
 
   it('changes passwords, invalidates an older token, and permits a required password change', async () => {

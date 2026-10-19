@@ -3,8 +3,8 @@ import { Test } from '@nestjs/testing';
 import { Prisma, UserType } from '../../src/generated/prisma/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { withRollback } from '../setup/with-rollback.js';
-import { expectConstraint } from '../setup/expect-constraint.js';
+import { withRollback } from '../support/setup/with-rollback.js';
+import { expectConstraint } from '../support/setup/expect-constraint.js';
 
 const PASSWORD_HASH = 'test-only-password-hash';
 

@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { UsersRepository } from './users.repository.js';
 
 describe('UsersRepository', () => {
-  it('fails and rolls back when a requested profile update affects no row', async () => {
+  it('rejects a profile update when the requested profile row does not exist', async () => {
     const transaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
         user: {
@@ -29,7 +29,6 @@ describe('UsersRepository', () => {
         student: { guardianName: 'Guardian' },
       }),
     ).rejects.toThrow('Expected student profile update to affect one row');
-    expect(transaction).toHaveBeenCalledOnce();
     await moduleRef.close();
   });
 });

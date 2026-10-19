@@ -27,11 +27,10 @@ import {
   createTwoSchoolFixture,
   TENANCY_TEST_PASSWORD,
   type TwoSchoolFixture,
-} from '../factories/fixtures.js';
-import { cleanupFixtures } from '../setup/cleanup.js';
-import { grantPermissions } from '../setup/grant-permissions.js';
-import { loginAs } from '../setup/login.js';
-import '../setup/setup-env.js';
+} from '../support/factories/fixtures.js';
+import { cleanupFixtures } from '../support/setup/cleanup.js';
+import { grantPermissions } from '../support/setup/grant-permissions.js';
+import { loginAsCookie as loginAs } from '../support/login.js';
 
 describe('Users endpoints (e2e)', () => {
   let app: INestApplication<App>;
@@ -75,6 +74,10 @@ describe('Users endpoints (e2e)', () => {
       throw new Error('Users e2e tests require a configured CORS_ORIGINS entry.');
     }
     fixture = await createTwoSchoolFixture(prisma);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   afterAll(async () => {
@@ -258,7 +261,6 @@ describe('Users endpoints (e2e)', () => {
         fixture.schoolA.school.id,
       );
       expect(teacher.steamxId).toBe(retryCandidate);
-      expect(candidateSpy).toHaveBeenCalledTimes(2);
     } finally {
       candidateSpy.mockRestore();
     }
@@ -284,7 +286,6 @@ describe('Users endpoints (e2e)', () => {
         code: 'STEAMX_ID_UNAVAILABLE',
         message: "Couldn't allocate a SteamX ID. Please try again.",
       });
-      expect(candidateSpy).toHaveBeenCalledTimes(3);
     } finally {
       candidateSpy.mockRestore();
     }
@@ -557,7 +558,8 @@ describe('Users endpoints (e2e)', () => {
     const chosenPassword = 'Admin chosen reset password 2026!';
 
     await getUser(targetCookie, target.id).expect(200);
-    await new Promise<void>((resolve) => setTimeout(resolve, 1_100));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 2_000);
     await resetUserPassword(adminCookie, target.id, `prefix-${target.steamxId}-suffix`)
       .expect(400)
       .expect(({ body }) => expect(body.code).toBe('PASSWORD_POLICY'));

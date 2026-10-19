@@ -13,10 +13,9 @@ import { configureApp } from '../../src/configure-app.js';
 import { SchoolStatus } from '../../src/generated/prisma/client.js';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTwoSchoolFixture, type TwoSchoolFixture } from '../factories/fixtures.js';
-import { grantPermissions } from '../setup/grant-permissions.js';
-import { loginAs } from '../setup/login.js';
-import '../setup/setup-env.js';
+import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
+import { grantPermissions } from '../support/setup/grant-permissions.js';
+import { loginAsCookie as loginAs } from '../support/login.js';
 
 const REQUIRED_SCHOOL_FIELDS = {
   name: 'New Academy',

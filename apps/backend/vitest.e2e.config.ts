@@ -4,9 +4,12 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['test/e2e/**/*.e2e-spec.ts', 'test/invariants/**/*.e2e-spec.ts'],
-    setupFiles: ['./test/setup/setup-env.ts'],
-    globalSetup: ['./test/setup/global-setup.ts'],
+    include: ['test/e2e/*.e2e-spec.ts'],
+    setupFiles: [
+      './test/support/setup/setup-env.ts',
+      './test/support/setup/reset-test-database.ts',
+    ],
+    globalSetup: ['./test/support/setup/global-setup.ts'],
     fileParallelism: false,
   },
   resolve: {

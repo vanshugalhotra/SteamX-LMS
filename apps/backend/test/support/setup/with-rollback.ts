@@ -1,5 +1,5 @@
-import type { Prisma } from '../../src/generated/prisma/client.js';
-import type { PrismaService } from '../../src/prisma/prisma.service.js';
+import type { Prisma } from '../../../src/generated/prisma/client.js';
+import type { PrismaService } from '../../../src/prisma/prisma.service.js';
 
 const ROLLBACK_SENTINEL = new Error('ROLLBACK_TEST');
 

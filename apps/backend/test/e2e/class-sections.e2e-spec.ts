@@ -17,12 +17,11 @@ import { SchoolStatus } from '../../src/generated/prisma/client.js';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
 import { isPrismaKnownError } from '../../src/common/errors/prisma-error.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTwoSchoolFixture, type TwoSchoolFixture } from '../factories/fixtures.js';
-import { cleanupFixtures } from '../setup/cleanup.js';
-import { grantPermissions } from '../setup/grant-permissions.js';
-import { loginAs } from '../setup/login.js';
-import { withRollback } from '../setup/with-rollback.js';
-import '../setup/setup-env.js';
+import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
+import { cleanupFixtures } from '../support/setup/cleanup.js';
+import { grantPermissions } from '../support/setup/grant-permissions.js';
+import { loginAsCookie as loginAs } from '../support/login.js';
+import { withRollback } from '../support/setup/with-rollback.js';
 
 describe('Class sections endpoints (e2e)', () => {
   let app: INestApplication<App>;
