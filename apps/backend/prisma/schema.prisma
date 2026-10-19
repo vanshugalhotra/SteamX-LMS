@@ -338,8 +338,8 @@ model Course {
   // [CHECK] length(btrim(title)) > 0
   // [TRG]   Status transitions cannot return to DRAFT. Archiving cascades to ACTIVE modules and lessons only.
   //         Subscriptions require an ACTIVE course; new deliveries cannot reference an ARCHIVED course.
-  // [RULE]  DRAFT is never student-visible; ACTIVE is usable; ARCHIVED is retired from new use. Existing releases
-  //         continue serving ACTIVE or ARCHIVED content; subscription expiry alone cuts access.
+  // [RULE]  DRAFT is never student-visible; ACTIVE is usable; ARCHIVED is retired from new use. Archiving does not
+  //         change existing delivery or release rows; released ACTIVE or ARCHIVED content remains served until expiry.
 
   @@map("courses")
 }
@@ -445,7 +445,8 @@ model AssetFile {
   // [CHECK] storage_key starts with 'assets/' || asset_id || '/' || id || '/'; playback_key has the same prefix when set.
   // [CHECK] size_bytes IS NULL OR size_bytes > 0.
   // [TRG]   Start in UPLOADING; allow UPLOADING -> UPLOADED/FAILED, UPLOADED -> PROCESSING/FAILED,
-  //         PROCESSING -> READY/FAILED. READY and FAILED reject every UPDATE; VIDEO requires playback_key when READY.
+  //         IMAGE/PDF UPLOADED -> READY, PROCESSING -> READY/FAILED. VIDEO/PPTX must pass through PROCESSING.
+  //         READY and FAILED reject every UPDATE; VIDEO requires playback_key when READY.
   //         G4 on delete.
   // [RULE]  IDs are client-generated UUIDv7 and inserts must supply them. File type must match asset.type in the
   //         upload endpoint; no stable MIME-to-asset-type mapping is defined here.

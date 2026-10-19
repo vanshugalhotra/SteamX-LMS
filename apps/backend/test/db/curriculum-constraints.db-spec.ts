@@ -521,18 +521,37 @@ describe('curriculum and asset database rules', () => {
     const archivedCourse = await createCourse('ARCHIVED');
     const draftCourse = await createCourse('DRAFT');
 
+    const subscriptionId = randomUUID();
     await client.query(
       `INSERT INTO subscriptions
          (id, school_id, course_id, start_date, end_date, max_deliveries, updated_at)
        VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_DATE, 1, now())`,
-      [randomUUID(), schoolId, activeCourse],
+      [subscriptionId, schoolId, activeCourse],
     );
+    const activeDeliveryId = randomUUID();
     await client.query(
       `INSERT INTO deliveries
          (id, school_id, course_id, class_section_id, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
-      [randomUUID(), schoolId, activeCourse, sectionId],
+      [activeDeliveryId, schoolId, activeCourse, sectionId],
     );
+    await client.query(`UPDATE courses SET status = 'ARCHIVED' WHERE id = $1`, [activeCourse]);
+    const runningDelivery = await client.query(
+      `SELECT d.status AS delivery_status, c.status AS course_status,
+              s.id AS subscription_id
+       FROM deliveries d
+       JOIN courses c ON c.id = d.course_id
+       JOIN subscriptions s ON s.course_id = c.id AND s.school_id = d.school_id
+       WHERE d.id = $1`,
+      [activeDeliveryId],
+    );
+    expect(runningDelivery.rows).toEqual([
+      {
+        delivery_status: 'ACTIVE',
+        course_status: 'ARCHIVED',
+        subscription_id: subscriptionId,
+      },
+    ]);
     await expectPgFailure(
       `INSERT INTO subscriptions
          (id, school_id, course_id, start_date, end_date, max_deliveries, updated_at)
@@ -955,6 +974,33 @@ describe('curriculum and asset database rules', () => {
       { code: '23000', name: 'trg_asset_files_guard_update' },
     );
     await client.query(`UPDATE asset_files SET status = 'FAILED' WHERE id = $1`, [processingFile]);
+  });
+
+  it.each(['IMAGE', 'PDF'])('allows %s files to become READY without processing', async (type) => {
+    const asset = await createAsset(type);
+    const file = await createAssetFile(asset);
+    await client.query(`UPDATE asset_files SET status = 'UPLOADED' WHERE id = $1`, [file]);
+    await client.query(
+      `UPDATE asset_files
+       SET status = 'READY', mime_type = $1, size_bytes = 1
+       WHERE id = $2`,
+      [type === 'IMAGE' ? 'image/png' : 'application/pdf', file],
+    );
+    const state = await client.query(`SELECT status FROM asset_files WHERE id = $1`, [file]);
+    expect(state.rows[0]?.status).toBe('READY');
+  });
+
+  it('requires VIDEO files to pass through PROCESSING before READY', async () => {
+    const asset = await createAsset('VIDEO');
+    const file = await createAssetFile(asset);
+    await client.query(`UPDATE asset_files SET status = 'UPLOADED' WHERE id = $1`, [file]);
+    await expectPgFailure(
+      `UPDATE asset_files
+       SET status = 'READY', mime_type = 'video/mp4', size_bytes = 1, playback_key = $1
+       WHERE id = $2`,
+      [`assets/${asset}/${file}/playback`, file],
+      { code: '23000', name: 'trg_asset_files_guard_update' },
+    );
   });
 
   it('enqueues a deleted asset-file prefix once and checks cleanup queue timestamps', async () => {

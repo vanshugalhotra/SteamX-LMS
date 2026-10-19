@@ -80,17 +80,18 @@ comments have a database trigger unless an applied migration creates it.
   rows. Use unused temporary positions when reordering; delete and recreate two-column children
   rather than swapping columns.
 - **Status:** modules require active courses; lessons require active modules. Archiving a course or
-  module archives active descendants only. Status cannot return to DRAFT. DRAFT is not
-  student-visible; released ACTIVE or ARCHIVED content remains available until subscription
-  expiry.
+  module archives active descendants only and does not change existing deliveries or releases.
+  Status cannot return to DRAFT. DRAFT is not student-visible; released ACTIVE or ARCHIVED content
+  remains available until subscription expiry.
 - **New use:** subscriptions require an active course; new deliveries cannot reference an archived
   course.
 - **Asset files:** IDs are supplied by Prisma (UUIDv7 client generation). Storage and playback keys
-  must start with `assets/<asset_id>/<asset_file_id>/`. Sizes must be positive when set; READY files
+  must start with `assets/<asset_id>/<asset_file_id>/` because deletion queues that prefix. Sizes
+  must be positive when set; READY files
   require a MIME type and positive size. Only one file per asset may be READY. READY and FAILED
   rows reject all updates; READY VIDEO files require a playback key. New files start at UPLOADING;
-  allowed transitions are UPLOADING → UPLOADED or FAILED, UPLOADED → PROCESSING or FAILED, and
-  PROCESSING → READY or FAILED.
+  IMAGE/PDF files may move UPLOADED → READY; VIDEO/PPTX files pass through PROCESSING. All types
+  may fail from UPLOADING/UPLOADED/PROCESSING.
 - **Cleanup queue:** deleting an asset file queues its object prefix; deleting a submission file
   queues its exact object key. Do not reuse a file prefix while its cleanup is pending; workers
   must delete before marking a job done. Pending jobs have partial indexes; `done_at` cannot

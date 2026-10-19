@@ -305,11 +305,27 @@ BEGIN
         CONSTRAINT = TG_NAME;
   END IF;
 
+  IF NEW."status" = 'READY' THEN
+    SELECT "type" INTO asset_type
+    FROM "assets"
+    WHERE "id" = NEW."asset_id";
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND OLD."status" = 'UPLOADED'
+     AND NEW."status" = 'READY'
+     AND asset_type NOT IN ('IMAGE', 'PDF') THEN
+    RAISE EXCEPTION '% asset_files must pass through PROCESSING before READY', asset_type
+      USING ERRCODE = 'integrity_constraint_violation',
+        CONSTRAINT = TG_NAME;
+  END IF;
+
   IF TG_OP = 'UPDATE'
      AND NEW."status" IS DISTINCT FROM OLD."status"
      AND NOT (
        (OLD."status" = 'UPLOADING' AND NEW."status" IN ('UPLOADED', 'FAILED'))
        OR (OLD."status" = 'UPLOADED' AND NEW."status" IN ('PROCESSING', 'FAILED'))
+       OR (OLD."status" = 'UPLOADED' AND NEW."status" = 'READY' AND asset_type IN ('IMAGE', 'PDF'))
        OR (OLD."status" = 'PROCESSING' AND NEW."status" IN ('READY', 'FAILED'))
      ) THEN
     RAISE EXCEPTION 'invalid asset_files status transition: % -> %', OLD."status", NEW."status"
@@ -318,10 +334,6 @@ BEGIN
   END IF;
 
   IF NEW."status" = 'READY' THEN
-    SELECT "type" INTO asset_type
-    FROM "assets"
-    WHERE "id" = NEW."asset_id";
-
     IF asset_type = 'VIDEO' AND NEW."playback_key" IS NULL THEN
       RAISE EXCEPTION 'VIDEO asset_files require playback_key when READY'
         USING ERRCODE = 'integrity_constraint_violation',
