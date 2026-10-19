@@ -923,7 +923,7 @@ describe('curriculum and asset database rules', () => {
   });
 
   it('allows only forward asset-file lifecycle transitions and failure from nonterminal states', async () => {
-    const asset = await createAsset('IMAGE');
+    const asset = await createAsset('PPTX');
     await createAssetFile(asset, { status: 'UPLOADED' });
     await createAssetFile(asset, { status: 'PROCESSING' });
     await createAssetFile(asset, { status: 'READY' });
