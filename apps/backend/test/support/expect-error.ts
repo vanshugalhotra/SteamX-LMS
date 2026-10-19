@@ -18,4 +18,5 @@ export function expectError(response: Response, status: number, code: string): v
     ),
   ).toBe(true);
   expect(response.body).not.toHaveProperty('stack');
+  expect(JSON.stringify(response.body)).not.toContain('passwordHash');
 }
