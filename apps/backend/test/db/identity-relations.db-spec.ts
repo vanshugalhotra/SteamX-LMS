@@ -242,6 +242,6 @@ describe('identity foreign keys and indexes', () => {
        JOIN pg_namespace schema_name ON schema_name.oid = table_name.relnamespace
        WHERE schema_name.nspname = 'public' AND indisunique`,
     );
-    expect(db.firstRow(uniqueIndexes.rows)).toEqual({ total: 71, partial: 0, valid: 71 });
+    expect(db.firstRow(uniqueIndexes.rows)).toEqual({ total: 73, partial: 2, valid: 73 });
   });
 });

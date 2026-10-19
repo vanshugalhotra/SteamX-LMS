@@ -10,11 +10,11 @@
 //     Used by triggers on every *_by_id column (assigned/ended/released/graded/created by).
 // G3. STABLE SQL functions: has_course_access(school_id, course_id, at_date), can_purge(school_id, course_id).
 //     "Expired" and "Retained" are DERIVED from subscription dates, never stored (renewal restores access automatically).
-// G4. AFTER DELETE triggers on asset_files / submission_files enqueue storage keys into storage_cleanup_queue.
+// G4. AFTER DELETE triggers on asset_files enqueue their private object prefix; submission_files enqueue storage keys.
 // G5. [NULLSET]: composite FKs with nullable columns are MATCH SIMPLE (any NULL = FK skipped).
 //     Every nullable composite FK gets CHECK (all columns NULL or all NOT NULL).
-// G6. Access queries for students re-check live state (lesson ACTIVE + STUDENT, module/course ACTIVE, subscription),
-//     never only the existence of a release row.
+// G6. Access queries for students re-check live state (released lesson status ACTIVE or ARCHIVED, STUDENT audience,
+//     module/course status ACTIVE or ARCHIVED, subscription), never only the existence of a release row.
 
 generator client {
   provider     = "prisma-client"
@@ -336,8 +336,10 @@ model Course {
   deliveries          Delivery[]
   assignmentTemplates AssignmentTemplate[]
   // [CHECK] length(btrim(title)) > 0
-  // [TRG]   Status consistency: module/lesson can be ACTIVE only if parent is ACTIVE; archiving a parent archives children.
-  // [RULE]  ARCHIVED course = no NEW subscriptions/deliveries; existing deliveries keep working.
+  // [TRG]   Status transitions cannot return to DRAFT. Archiving cascades to ACTIVE modules and lessons only.
+  //         Subscriptions require an ACTIVE course; new deliveries cannot reference an ARCHIVED course.
+  // [RULE]  DRAFT is never student-visible; ACTIVE is usable; ARCHIVED is retired from new use. Existing releases
+  //         continue serving ACTIVE or ARCHIVED content; subscription expiry alone cuts access.
 
   @@map("courses")
 }
@@ -356,8 +358,10 @@ model Module {
   assignments         Assignment[]
   assignmentTemplates AssignmentTemplate[]
   // [CHECK] length(btrim(title)) > 0; position >= 1
-  // [IDX]   UNIQUE (course_id, position) DEFERRABLE INITIALLY DEFERRED (reorder in one tx)
-  // [TRG]   course_id immutable.
+  // [IDX]   UNIQUE (course_id, position); reorder using unused temporary positions to avoid collisions.
+  // [RULE]  Do not upsert positional rows; duplicate positions fail immediately.
+  // [TRG]   course_id immutable; ACTIVE requires an ACTIVE course (parent locked against archive races);
+  //         no return to DRAFT. Archiving cascades to ACTIVE lessons only.
 
   @@unique([id, courseId])
   @@unique([courseId, position])
@@ -384,8 +388,11 @@ model Lesson {
   releases            DeliveryLessonRelease[]
   completions         LessonCompletion[]
   // [CHECK] length(btrim(title)) > 0; position >= 1
-  // [IDX]   UNIQUE (module_id, position) DEFERRABLE INITIALLY DEFERRED
+  // [IDX]   UNIQUE (module_id, position); reorder using unused temporary positions to avoid collisions.
+  // [RULE]  Do not upsert positional rows; duplicate positions fail immediately.
   // [TRG]   course_id immutable (moving between modules of the SAME course is allowed; FK guarantees same course).
+  //         module_id remains mutable; ACTIVE requires an ACTIVE module (parent locked against archive races);
+  //         no return to DRAFT.
   // [RULE]  Release guard lives on delivery_lesson_releases.
 
   @@unique([id, courseId])
@@ -434,10 +441,14 @@ model AssetFile {
 
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   // [IDX]   UNIQUE (asset_id) WHERE status = 'READY'   -> at most one live file per asset (old row deleted before new flips READY).
-  // [CHECK] status <> 'READY' OR (mime_type IS NOT NULL AND size_bytes > 0)
-  // [CHECK] storage_key LIKE 'assets/%' (private bucket prefix)
-  // [RULE]  File type must match asset.type (validated by upload endpoint); VIDEO needs playback_key when READY (app).
-  // [TRG]   Immutable once READY: asset_id, storage_key, size_bytes. G4 on delete.
+  // [CHECK] status <> 'READY' OR (mime_type IS NOT NULL AND size_bytes IS NOT NULL AND size_bytes > 0)
+  // [CHECK] storage_key starts with 'assets/' || asset_id || '/' || id || '/'; playback_key has the same prefix when set.
+  // [CHECK] size_bytes IS NULL OR size_bytes > 0.
+  // [TRG]   Start in UPLOADING; allow UPLOADING -> UPLOADED/FAILED, UPLOADED -> PROCESSING/FAILED,
+  //         PROCESSING -> READY/FAILED. READY and FAILED reject every UPDATE; VIDEO requires playback_key when READY.
+  //         G4 on delete.
+  // [RULE]  IDs are client-generated UUIDv7 and inserts must supply them. File type must match asset.type in the
+  //         upload endpoint; no stable MIME-to-asset-type mapping is defined here.
 
   @@index([assetId])
   @@index([status])
@@ -465,11 +476,13 @@ model LessonBlock {
   children LessonBlock[] @relation("BlockChildren")
   // [CHECK] jsonb_typeof(content) = 'object'
   // [CHECK] asset blocks: (type IN ('IMAGE','VIDEO','PDF','PPTX')) = (asset_id IS NOT NULL)
-  // [CHECK] top-level vs child: (parent_block_id IS NULL) = (position IS NOT NULL) AND (parent_block_id IS NULL) = (column_index IS NULL)
-  // [CHECK] column_index IN (0,1); parent_block_id IS NULL OR type <> 'TWO_COLUMN' (no nested layout)
-  // [CHECK] position >= 1; TWO_COLUMN has no asset_id
-  // [TRG]   BEFORE INSERT/UPDATE: parent block must be type TWO_COLUMN; asset.type must match block type.
-  // [IDX]   UNIQUE (lesson_id, position) DEFERRABLE INITIALLY DEFERRED. UNIQUE (parent_block_id, column_index) = max one block per column.
+  // [CHECK] top-level vs child: parent_block_id IS NULL iff position IS NOT NULL and column_index IS NULL.
+  // [CHECK] column_index IN (0,1); children cannot be TWO_COLUMN; position >= 1.
+  // [TRG]   BEFORE INSERT/UPDATE: parent block must be TWO_COLUMN; asset.type must match block type.
+  // [TRG]   lesson_id and type immutable. Moving a block to another lesson requires copy + delete.
+  // [IDX]   UNIQUE (lesson_id, position) and UNIQUE (parent_block_id, column_index). Reordering top-level blocks
+  //         uses an unused temporary position; changing column assignments uses delete + create, not a swap.
+  // [RULE]  Do not upsert positional rows; duplicate positions fail immediately.
   // [RULE]  Child -> parent FK reuses lesson_id, so a child can never live in another lesson. Delete parent = delete children first (app).
   // [RULE]  Rich text stored as structured JSON, sanitized on write; never raw HTML.
 
@@ -905,11 +918,11 @@ model SubmissionCriterionScore {
 model StorageCleanupQueue {
   id        String    @id @default(uuid(7)) @db.Uuid
   objectKey String    @map("object_key")
+  isPrefix  Boolean   @default(false) @map("is_prefix")
   queuedAt  DateTime  @default(now()) @map("queued_at") @db.Timestamptz
   doneAt    DateTime? @map("done_at") @db.Timestamptz
-  // [IDX] Replace with partial (queued_at) WHERE done_at IS NULL; UNIQUE (object_key) WHERE done_at IS NULL (no duplicate jobs).
+  // [IDX] Partial index (queued_at) WHERE done_at IS NULL; UNIQUE (object_key) WHERE done_at IS NULL.
   // [CHECK] done_at IS NULL OR done_at >= queued_at. Fed by G4 triggers.
 
-  @@index([doneAt])
   @@map("storage_cleanup_queue")
 }
