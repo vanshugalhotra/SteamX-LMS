@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "user_type" AS ENUM ('PLATFORM_STAFF', 'SCHOOL_STAFF', 'STUDENT');
 
@@ -453,6 +456,7 @@ CREATE TABLE "submission_criterion_scores" (
 CREATE TABLE "storage_cleanup_queue" (
     "id" UUID NOT NULL,
     "object_key" TEXT NOT NULL,
+    "is_prefix" BOOLEAN NOT NULL DEFAULT false,
     "queued_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "done_at" TIMESTAMPTZ,
 
@@ -671,9 +675,6 @@ CREATE INDEX "submission_criterion_scores_school_id_idx" ON "submission_criterio
 
 -- CreateIndex
 CREATE UNIQUE INDEX "submission_criterion_scores_submission_id_criterion_id_key" ON "submission_criterion_scores"("submission_id", "criterion_id");
-
--- CreateIndex
-CREATE INDEX "storage_cleanup_queue_done_at_idx" ON "storage_cleanup_queue"("done_at");
 
 -- AddForeignKey
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
