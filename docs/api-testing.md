@@ -80,6 +80,7 @@ Caller: any authenticated role, including a user required to change their passwo
 
 Caller: platform staff with `school.manage`; creates a school. Non-platform user types are rejected even if granted the permission.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin sends valid fields -> expect `201`; school code is trimmed and uppercased.
 - [auto] When code already exists, including case-only difference -> expect `409 SCHOOL_CODE_EXISTS`.
 - [auto] When code is malformed or too long -> expect `400 VALIDATION_ERROR`.
@@ -90,63 +91,69 @@ Caller: platform staff with `school.manage`; creates a school. Non-platform user
 - [auto] When teacher or student calls the route without permission -> expect `403 FORBIDDEN`.
 - [auto] When an otherwise permitted non-platform caller is used -> expect `403 FORBIDDEN` from the service's platform-staff check.
 - [auto] When allowed Origin is missing -> expect `403 ORIGIN_NOT_ALLOWED`.
-- [manual] When code is at the 2- or 12-character boundary, or another required/optional field is exactly at its length limit -> verify acceptance.
-- [manual] When the same create request is retried -> expect the duplicate code to conflict; there is no idempotency-key behavior.
+- [auto] When code is at the 2- or 12-character boundary, or another required/optional field is exactly at its length limit -> expect `201`.
+- [auto] When the same create request is retried -> expect the duplicate code to conflict; there is no idempotency-key behavior.
 
 ### `GET /schools`
 
 Caller: authenticated role with `school.read`; lists schools in caller scope with optional status and search.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin lists without filters -> expect all schools in default pagination.
 - [auto] When teacher has an explicit `school.read` grant -> expect only their own school.
 - [auto] When student or ungranted teacher calls -> expect `403 FORBIDDEN`.
 - [auto] When `status` and `q` filters are combined -> expect rows matching both filters.
 - [auto] When `q` is partial and differently cased -> expect case-insensitive name/code matching.
 - [auto] When names tie -> expect stable ordering by school name then ID.
-- [manual] When each optional filter is used alone -> expect only matching rows.
-- [manual] When page and limit are omitted -> expect page 1 and limit 20.
-- [manual] When limit is 0, negative, non-integer, or over 100, or page is over 100000 -> expect `400 VALIDATION_ERROR`.
-- [manual] When page is beyond the final page -> expect an empty `items` list and total count for the matching filter.
-- [manual] When no records match -> expect an empty page with total zero.
+- [auto] When each optional filter is used alone -> expect only matching rows.
+- [auto] When page and limit are omitted -> expect page 1 and limit 20.
+- [auto] When limit is 0, negative, non-integer, or over 100, or page is over 100000 -> expect `400 VALIDATION_ERROR`.
+- [auto] When page is beyond the final page -> expect an empty `items` list and total count for the matching filter.
+- [auto] When no records match -> expect an empty page with total zero.
 
 ### `GET /schools/:id`
 
 Caller: authenticated role with `school.read`; reads a school only within caller scope.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin requests an existing school -> expect `200`.
 - [auto] When teacher has `school.read` and requests own school -> expect `200`.
 - [auto] When teacher requests another school's ID or a random UUID -> expect the same `404 NOT_FOUND`.
 - [auto] When student or ungranted teacher calls -> expect `403 FORBIDDEN`.
-- [manual] When path ID is not a UUID -> expect `400 BAD_REQUEST`.
-- [manual] When an error is returned -> verify it includes `requestId` and no stack trace or database detail.
+- [auto] When path ID is not a UUID -> expect `400 BAD_REQUEST`.
+- [auto] When an error is returned -> verify it includes `requestId` and no stack trace or database detail.
 
 ### `PATCH /schools/:id`
 
 Caller: authenticated role with `school.manage`; changes school details but not code or status.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin updates valid fields -> expect `200`.
+- [auto] When a school manager updates its own school -> expect `200`; a foreign school ID returns `404 NOT_FOUND`.
 - [auto] When optional nullable fields are set to null -> expect `200` and cleared values.
 - [auto] When body is empty or required text is null -> expect `400 VALIDATION_ERROR`.
 - [auto] When body includes immutable `code` or unknown field -> expect `400 VALIDATION_ERROR`.
 - [auto] When teacher or student calls without permission -> expect `403 FORBIDDEN`.
-- [manual] When ID is foreign to a scoped school caller -> expect `404 NOT_FOUND` if caller has the route permission.
-- [manual] When path ID is invalid -> expect `400 BAD_REQUEST`.
-- [manual] When a field exceeds its DTO length or has the wrong type -> expect `400 VALIDATION_ERROR`.
-- [manual] When valid name/contact text has surrounding whitespace -> expect trimming; contact email is lowercased.
-- [manual] When the same values are submitted -> expect a successful update; this route does not implement a same-value shortcut.
+- [auto] When ID is foreign to a scoped school caller -> expect `404 NOT_FOUND` if caller has the route permission.
+- [auto] When path ID is invalid -> expect `400 BAD_REQUEST`.
+- [auto] When a field exceeds its DTO length or has the wrong type -> expect `400 VALIDATION_ERROR`.
+- [auto] When valid name/contact text has surrounding whitespace -> expect trimming; contact email is lowercased.
+- [auto] When the same values are submitted -> expect a successful update; this route does not implement a same-value shortcut.
 
 ### `PATCH /schools/:id/status`
 
 Caller: authenticated role with `school.manage`; activates or deactivates a school.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin changes status -> expect `200`.
+- [auto] When a school manager changes its own school's status -> expect `200`; foreign and missing IDs return `404 NOT_FOUND`.
 - [auto] When admin repeats the current status -> expect `200` with no status change.
 - [auto] When status is padded with spaces -> expect trimming and valid enum handling.
-- [manual] When status is absent, null, wrong type, or not an enum value -> expect `400 VALIDATION_ERROR`.
+- [auto] When status is absent, null, wrong type, or not an enum value -> expect `400 VALIDATION_ERROR`.
 - [auto] When school becomes inactive -> expect its school users' next request and login to return `401 UNAUTHORIZED`.
 - [auto] When school is reactivated -> expect its users to log in again.
 - [auto] When teacher or student calls without permission -> expect `403 FORBIDDEN`.
-- [manual] When ID is invalid -> expect `400 BAD_REQUEST`; when foreign or missing -> expect `404 NOT_FOUND`.
+- [auto] When ID is invalid -> expect `400 BAD_REQUEST`; when foreign or missing -> expect `404 NOT_FOUND`.
 
 ## Class sections
 
@@ -154,7 +161,9 @@ Caller: authenticated role with `school.manage`; activates or deactivates a scho
 
 Caller: authenticated role with `classsection.manage`; creates a class section in one active school.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin supplies school and class name without section name -> expect `201` and default section name `All`.
+- [auto] When a teacher with explicit manage permission creates in its own school -> expect `201`; a foreign school ID returns `404 NOT_FOUND`.
 - [auto] When section name is supplied with surrounding whitespace -> expect trimming and `201`.
 - [auto] When school ID is omitted -> expect `400 SCHOOL_REQUIRED`.
 - [auto] When school does not exist -> expect `404 NOT_FOUND`.
@@ -163,14 +172,15 @@ Caller: authenticated role with `classsection.manage`; creates a class section i
 - [auto] When same names are used in another school -> expect success.
 - [auto] When class or section name is blank, null (section), or over 50 characters -> expect `400 VALIDATION_ERROR`.
 - [auto] When an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
-- [manual] When name is non-string, missing, or exactly at the maximum -> expect validation failure or acceptance at the documented boundary.
+- [auto] When name is non-string, missing, or exactly at the maximum -> expect validation failure or acceptance at the documented boundary.
 - [auto] When student or teacher lacks permission -> expect `403 FORBIDDEN`.
-- [manual] When platform staff omits school ID or uses a malformed UUID -> expect `400` (`SCHOOL_REQUIRED` or `VALIDATION_ERROR`).
+- [auto] When platform staff omits school ID or uses a malformed UUID -> expect `400` (`SCHOOL_REQUIRED` or `VALIDATION_ERROR`).
 
 ### `GET /class-sections`
 
 Caller: authenticated role with `classsection.read`; lists sections within resolved school scope.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin lists without school filter -> expect sections across schools.
 - [auto] When admin supplies `schoolId` -> expect only that school's sections.
 - [auto] When teacher is granted `classsection.read` -> expect own-school sections.
@@ -178,45 +188,48 @@ Caller: authenticated role with `classsection.read`; lists sections within resol
 - [auto] When student or ungranted teacher calls -> expect `403 FORBIDDEN`.
 - [auto] When partial, differently cased `q` is supplied -> expect matching class or section names.
 - [auto] When pagination is used -> expect stable ordering and page metadata.
-- [manual] When page/limit are omitted -> expect defaults page 1 and limit 20.
-- [manual] When limit is over 100, page over 100000, malformed UUID, or `q` over 100 characters -> expect `400 VALIDATION_ERROR`.
-- [manual] When page is beyond the end or no filter matches -> expect an empty item list and correct total.
-- [manual] When filters are tested one at a time and together -> expect their intersection.
+- [auto] When page/limit are omitted -> expect defaults page 1 and limit 20.
+- [auto] When limit is over 100, page over 100000, malformed UUID, or `q` over 100 characters -> expect `400 VALIDATION_ERROR`.
+- [auto] When page is beyond the end or no filter matches -> expect an empty item list and correct total.
+- [auto] When filters are tested one at a time and together -> expect their intersection.
 
 ### `GET /class-sections/:id`
 
 Caller: authenticated role with `classsection.read`; reads one section only in caller scope.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin requests an existing section in either school -> expect `200`.
 - [auto] When teacher with read permission requests own-school section -> expect `200`.
 - [auto] When teacher requests foreign section or missing UUID -> expect the same `404 NOT_FOUND`.
 - [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.
-- [manual] When path ID is not a UUID -> expect `400 BAD_REQUEST`.
+- [auto] When path ID is not a UUID -> expect `400 BAD_REQUEST`.
 
 ### `PATCH /class-sections/:id`
 
 Caller: authenticated role with `classsection.manage`; changes class or section names within caller scope.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin changes a name -> expect `200`.
 - [auto] When update body is empty or a name is null -> expect `400 VALIDATION_ERROR`.
 - [auto] When update creates a case-insensitive duplicate -> expect `409 CLASS_SECTION_EXISTS`.
 - [auto] When only letter case changes and no other row conflicts -> expect `200`.
 - [auto] When teacher has manage permission and changes a foreign section -> expect `404 NOT_FOUND` and no data change.
 - [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.
-- [manual] When caller sends schoolId or another unknown property -> expect `400 VALIDATION_ERROR`.
-- [manual] When ID is malformed -> expect `400 BAD_REQUEST`; when record is missing -> expect `404 NOT_FOUND`.
-- [manual] When same name values are sent -> expect `200`; there is no explicit no-op shortcut.
+- [auto] When caller sends schoolId or another unknown property -> expect `400 VALIDATION_ERROR`.
+- [auto] When ID is malformed -> expect `400 BAD_REQUEST`; when record is missing -> expect `404 NOT_FOUND`.
+- [auto] When same name values are sent -> expect `200`; there is no explicit no-op shortcut.
 
 ### `DELETE /class-sections/:id`
 
 Caller: authenticated role with `classsection.manage`; deletes a section with no referencing student profile.
 
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin deletes an unused section -> expect `204`.
 - [auto] When student profile references the section -> expect `409 CLASS_SECTION_IN_USE`.
 - [auto] When section does not exist -> expect `404 NOT_FOUND`.
 - [auto] When teacher with manage permission targets a foreign section or missing ID -> expect same `404 NOT_FOUND`.
 - [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.
-- [manual] When ID is not a UUID -> expect `400 BAD_REQUEST`.
+- [auto] When ID is not a UUID -> expect `400 BAD_REQUEST`.
 
 ## Users
 
