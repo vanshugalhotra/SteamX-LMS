@@ -6,12 +6,8 @@ import {
 } from './password-policy.js';
 
 describe('getPasswordPolicyViolations', () => {
-  it('rejects empty passwords', () => {
-    expect(getPasswordPolicyViolations('', '')).toContain(PASSWORD_POLICY_VIOLATION.LENGTH);
-  });
-
-  it('rejects passwords shorter than the minimum', () => {
-    expect(getPasswordPolicyViolations('short7', '')).toContain(PASSWORD_POLICY_VIOLATION.LENGTH);
+  it.each(['', 'short7'])('rejects passwords below the minimum length: %s', (password) => {
+    expect(getPasswordPolicyViolations(password, '')).toContain(PASSWORD_POLICY_VIOLATION.LENGTH);
   });
 
   it('rejects passwords longer than the maximum', () => {
@@ -20,17 +16,14 @@ describe('getPasswordPolicyViolations', () => {
     );
   });
 
-  it('rejects passwords with leading whitespace', () => {
-    expect(getPasswordPolicyViolations(' password123', '')).toContain(
-      PASSWORD_POLICY_VIOLATION.WHITESPACE,
-    );
-  });
-
-  it('rejects passwords with trailing whitespace', () => {
-    expect(getPasswordPolicyViolations('password123 ', '')).toContain(
-      PASSWORD_POLICY_VIOLATION.WHITESPACE,
-    );
-  });
+  it.each([' password123', 'password123 '])(
+    'rejects passwords with leading or trailing whitespace: %s',
+    (password) => {
+      expect(getPasswordPolicyViolations(password, '')).toContain(
+        PASSWORD_POLICY_VIOLATION.WHITESPACE,
+      );
+    },
+  );
 
   it('rejects common passwords', () => {
     expect(getPasswordPolicyViolations('password123', '')).toContain(

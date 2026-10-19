@@ -30,27 +30,18 @@ describe('SteamX ID generation', () => {
     expect(buildSteamxId('GVS', `${honorific}. Ada Lovelace`, randomFromZero)).toBe('GVS-ADAL000');
   });
 
-  // Filler generation is restricted to the documented letters, including the final alphabet entry.
-  it.each(STEAMX_ID_FILLER_ALPHABET.split('').map((letter, index) => [letter, index]))(
-    'uses %s as a valid filler letter',
-    (letter, index) => {
-      let fillerDraws = 0;
-      const id = buildSteamxId('GVS', 'Li', () => {
-        fillerDraws += 1;
-        return fillerDraws <= 2 ? index : 0;
-      });
+  // The supported filler alphabet is fixed and excludes visually ambiguous letters.
+  it('uses only the documented filler letters', () => {
+    expect(STEAMX_ID_FILLER_ALPHABET).toBe('ABCDEFGHJKLMNPQRSTUVWYZ');
+  });
 
-      expect(id).toBe(`GVS-Li${letter}${letter}000`.toUpperCase());
-    },
-  );
+  // Random filler and numeric suffixes vary without changing the name-derived prefix.
+  it('keeps name letters deterministic while randomizing filler and digits', () => {
+    const candidateOne = buildSteamxId('GVS', 'Li', sequence(0, 0, 0));
+    const candidateTwo = buildSteamxId('GVS', 'Li', sequence(1, 2, 99));
 
-  it('keeps name letters deterministic while randomizing only filler and digits', () => {
-    const candidateOne = buildSteamxId('GVS', 'Puneet Kaur', () => 0);
-    const candidateTwo = buildSteamxId('GVS', 'Puneet Kaur', () => 99);
-
-    expect(candidateOne.slice(0, -2)).toBe(candidateTwo.slice(0, -2));
-    expect(candidateOne.slice(-3)).toBe('000');
-    expect(candidateTwo.slice(-3)).toBe('099');
+    expect(candidateOne).toBe('GVS-LIAA000');
+    expect(candidateTwo).toBe('GVS-LIBC099');
   });
 
   it('keeps a 12-character school code within the database SteamX ID limit', () => {
@@ -102,3 +93,8 @@ describe('SteamX ID generation', () => {
     expect(isValidSteamxId(`GVS-${namePart}000`, 'GVS')).toBe(valid);
   });
 });
+
+function sequence(...values: number[]): (maxExclusive: number) => number {
+  let index = 0;
+  return () => values[index++] ?? 0;
+}

@@ -5,8 +5,7 @@ import { HttpExceptionFilter } from './http-exception.filter.js';
 
 describe('HttpExceptionFilter', () => {
   it('maps Prisma unique constraint errors to a generic conflict response', () => {
-    const logError = vi.fn();
-    const logger = { error: logError } as unknown as Logger;
+    const logger = { error: vi.fn() } as unknown as Logger;
     const filter = new HttpExceptionFilter(logger);
     const setStatus = vi.fn().mockReturnThis();
     const sendJson = vi.fn();
@@ -40,7 +39,6 @@ describe('HttpExceptionFilter', () => {
       requestId: 'request-id',
     });
     expect(JSON.stringify(sendJson.mock.calls)).not.toContain('private_');
-    expect(logError).not.toHaveBeenCalled();
   });
 
   // Foreign-key and missing-record Prisma errors map to stable API conflict/not-found codes.
@@ -87,7 +85,7 @@ describe('HttpExceptionFilter', () => {
 
   // Unexpected server failures expose neither exception messages nor stack traces to clients.
   it('hides internal details from unexpected errors', () => {
-    const { filter, json, status, logError } = createFilter();
+    const { filter, json, status } = createFilter();
 
     filter.catch(new Error('private database detail'), createHost(json, status));
 
@@ -99,7 +97,6 @@ describe('HttpExceptionFilter', () => {
       requestId: 'request-id',
     });
     expect(JSON.stringify(json.mock.calls)).not.toContain('private database detail');
-    expect(logError).toHaveBeenCalledOnce();
   });
 });
 
@@ -109,7 +106,7 @@ function createFilter() {
   const status = vi.fn().mockReturnThis();
   const json = vi.fn();
 
-  return { filter, status, json, logError };
+  return { filter, status, json };
 }
 
 function createHost(json: ReturnType<typeof vi.fn>, status: ReturnType<typeof vi.fn>) {

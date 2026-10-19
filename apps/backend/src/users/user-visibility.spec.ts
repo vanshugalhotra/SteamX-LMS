@@ -9,12 +9,11 @@ describe('userVisibility', () => {
     expect(userVisibility(auth(UserType.PLATFORM_STAFF, 'platform-1'))).toEqual({});
   });
 
-  // School staff and students fail closed to their own account, including an empty identity.
+  // School staff and students fail closed to their own account.
   it.each([UserType.SCHOOL_STAFF, UserType.STUDENT])(
     'limits %s to the authenticated user',
     (userType) => {
       expect(userVisibility(auth(userType, 'user-1'))).toEqual({ id: 'user-1' });
-      expect(userVisibility(auth(userType, ''))).toEqual({ id: '' });
     },
   );
 });

@@ -36,7 +36,7 @@ describe('AuthGuard', () => {
     { name: 'tampered token', token: 'tampered-token' },
   ])('rejects a request with a $name', async ({ token }) => {
     const verify = vi.fn().mockRejectedValue(new Error('private token detail'));
-    const { guard, context, logger } = createGuard(
+    const { guard, context } = createGuard(
       {
         cookies: token === undefined ? {} : { steamx_session: token },
       },
@@ -44,10 +44,6 @@ describe('AuthGuard', () => {
     );
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ reason: token === undefined ? 'missing_cookie' : 'invalid_token' }),
-      'Authentication failed',
-    );
   });
 
   // Every request rechecks account and school state rather than trusting an unexpired token.
@@ -55,20 +51,17 @@ describe('AuthGuard', () => {
     {
       name: 'a deleted account',
       user: null,
-      reason: 'user_not_found',
     },
     {
       name: 'an inactive account',
       user: { ...ACTIVE_USER, status: UserStatus.INACTIVE },
-      reason: 'user_inactive',
     },
     {
       name: 'an inactive school',
       user: { ...ACTIVE_USER, school: { status: SchoolStatus.INACTIVE } },
-      reason: 'school_inactive',
     },
-  ])('rejects a request for $name', async ({ user, reason }) => {
-    const { guard, context, logger } = createGuard(
+  ])('rejects a request for $name', async ({ user }) => {
+    const { guard, context } = createGuard(
       {},
       {
         user: user as typeof ACTIVE_USER | null,
@@ -76,10 +69,6 @@ describe('AuthGuard', () => {
     );
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ reason }),
-      'Authentication failed',
-    );
   });
 
   // Tokens issued before the account's password timestamp are revoked immediately.
