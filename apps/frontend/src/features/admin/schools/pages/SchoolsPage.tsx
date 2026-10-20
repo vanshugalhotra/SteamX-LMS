@@ -6,7 +6,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { useListParams } from '@/lib/use-list-params';
 import { PATHS } from '@/lib/paths';
 import { SchoolStatsCards } from '../components/SchoolStatsCards';
-import { SCHOOL_STATUS_FILTERS, SCHOOLS_PAGE_SIZE, schoolColumns } from '../config/schools.config';
+import { SCHOOL_STATUS_FILTERS, SCHOOLS_PAGE_SIZE, schoolColumns, SCHOOLS_SEARCH_MAX_LENGTH } from '../config/schools.config';
 import type { SchoolStatusFilter } from '../model/types';
 import { useSchools } from '../queries';
 import { HeaderSlot } from '../../components/HeaderSlot';
@@ -29,6 +29,7 @@ export function SchoolsPage() {
           onChange={setSearch}
           placeholder="Search by name or code"
           label="Search schools"
+          maxLength={SCHOOLS_SEARCH_MAX_LENGTH}
         />
       </HeaderSlot>
       <div className="flex flex-wrap items-end justify-between gap-4">

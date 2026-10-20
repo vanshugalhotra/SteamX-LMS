@@ -11,14 +11,16 @@ interface SearchBoxProps {
   onChange: (value: string) => void;
   placeholder: string;
   label: string;
+  maxLength?: number;
 }
 
-export function SearchBox({ value, onChange, placeholder, label }: SearchBoxProps) {
+export function SearchBox({ value, onChange, placeholder, label, maxLength }: SearchBoxProps) {
   return (
     <label className="flex max-w-xs min-w-0 flex-1 items-center gap-2 rounded-full bg-gray-100 px-5 py-3 text-gray-600 focus-within:ring-4 focus-within:ring-ring/40">
       <input
         type="search"
         value={value}
+        maxLength={maxLength}
         onChange={(e) => {
           onChange(e.target.value);
         }}

@@ -9,10 +9,8 @@ import type { School, SchoolStatusFilter } from '../model/types';
 import { AvatarInitial } from '@/components/ui/avatar-initial';
 
 export const SCHOOLS_PAGE_SIZE = 10;
+export const SCHOOLS_SEARCH_MAX_LENGTH = 120;
 
-// TODO: these are the school's own ACTIVE/INACTIVE statuses. The design's filters
-// (Active, Expiring soon, Expired, Revoked) are subscription statuses; replace these once
-// the subscription API exists.
 export const SCHOOL_STATUS_FILTERS: { value: SchoolStatusFilter; label: string }[] = [
   { value: 'ALL', label: 'All' },
   { value: 'ACTIVE', label: 'Active' },
