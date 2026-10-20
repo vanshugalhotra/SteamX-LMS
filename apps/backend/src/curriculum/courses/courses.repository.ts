@@ -13,15 +13,19 @@ export class CoursesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   create(data: CreateCourseDto): Promise<Course> {
-    return this.prisma.course.create({ data });
+    return this.prisma.course.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        status: ContentStatus.DRAFT,
+      },
+    });
   }
 
   findMany(query: CourseListQueryDto): Promise<{ items: Course[]; total: number }> {
     const where: Prisma.CourseWhereInput = {
       ...(query.status === undefined ? {} : { status: query.status }),
-      ...(query.search === undefined
-        ? {}
-        : { title: { contains: query.search, mode: 'insensitive' } }),
+      ...(query.q === undefined ? {} : { title: { contains: query.q, mode: 'insensitive' } }),
     };
     const orderBy = [
       { createdAt: 'desc' },

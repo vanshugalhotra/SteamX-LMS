@@ -7,6 +7,24 @@ import { CoursesRepository } from './courses.repository.js';
 import { CoursesService } from './courses.service.js';
 
 describe('CoursesService', () => {
+  it.each([
+    [UserType.SCHOOL_STAFF, 'teacher'],
+    [UserType.STUDENT, 'student'],
+  ])('rejects %s role %s from curriculum service methods', async (userType, roleKey) => {
+    const { service, repository } = createService();
+    const nonAdmin = {
+      ...actor,
+      userType,
+      roleKey,
+      schoolId: '550e8400-e29b-41d4-a716-446655440002',
+    };
+
+    await expect(service.findMany(nonAdmin, { page: 1, limit: 20 })).rejects.toMatchObject({
+      response: API_ERROR.FORBIDDEN,
+    });
+    expect(repository.findMany).not.toHaveBeenCalled();
+  });
+
   it('maps database content-status trigger violations to the transition conflict', async () => {
     const { service, repository } = createService();
     repository.updateStatus.mockRejectedValue(

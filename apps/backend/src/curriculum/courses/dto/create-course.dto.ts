@@ -1,12 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, MaxLength, MinLength, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Trim } from '../../../common/decorators/trim.decorator.js';
 
 export class CreateCourseDto {
-  @ApiProperty({ maxLength: 200 })
+  @ApiProperty({ minLength: 1, maxLength: 200 })
   @Trim()
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(200)
   title!: string;
 

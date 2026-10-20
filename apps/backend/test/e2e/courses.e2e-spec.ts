@@ -3,26 +3,48 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'node:crypto';
+import { Pool } from 'pg';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/app.module.js';
+import { PERMISSION } from '../../src/auth/permissions.js';
 import type { Env } from '../../src/config/env.schema.js';
 import { ContentStatus } from '../../src/generated/prisma/client.js';
+import { PrismaClient } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
 import { cleanupFixtures } from '../support/setup/cleanup.js';
+import { grantPermissions } from '../support/setup/grant-permissions.js';
 import { loginAsCookie } from '../support/login.js';
 import { createTestApp } from '../support/create-test-app.js';
 
 describe('Courses endpoints (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let setupClient: PrismaClient;
+  let setupPool: Pool;
   let fixture: TwoSchoolFixture;
   let origin: string;
+  let revokeTeacherPermissions: (() => Promise<void>) | undefined;
+  let revokeStudentPermissions: (() => Promise<void>) | undefined;
   const createdCourseIds: string[] = [];
 
   beforeAll(async () => {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error('Courses e2e tests require DATABASE_URL.');
+    }
+    setupPool = new Pool({ connectionString: databaseUrl });
+    setupClient = new PrismaClient({ adapter: new PrismaPg(setupPool) });
+    await setupClient.$connect();
+    const curriculumPermissions = [PERMISSION.CURRICULUM_READ, PERMISSION.CURRICULUM_WRITE];
+    const teacherGrant = await grantPermissions(setupClient, 'teacher', curriculumPermissions);
+    const studentGrant = await grantPermissions(setupClient, 'student', curriculumPermissions);
+    revokeTeacherPermissions = teacherGrant.revoke;
+    revokeStudentPermissions = studentGrant.revoke;
+
     await startApp();
     fixture = await createTwoSchoolFixture(prisma);
   });
@@ -50,6 +72,10 @@ describe('Courses endpoints (e2e)', () => {
       );
     }
     await app?.close();
+    await revokeStudentPermissions?.();
+    await revokeTeacherPermissions?.();
+    await setupClient?.$disconnect();
+    await setupPool?.end();
   });
 
   async function startApp(): Promise<void> {
@@ -183,9 +209,10 @@ describe('Courses endpoints (e2e)', () => {
     const tiesById = [tiedA, tiedB].sort((left, right) =>
       left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
     );
-    const search = `cur3 ${suffix}`;
+    const q = `cur3 ${suffix}`;
 
-    const firstPage = await getCourses(cookie, { search, page: 1, limit: 2 }).expect(200);
+    const firstPage = await getCourses(cookie, { q, page: 1, limit: 2 }).expect(200);
+    await getCourses(cookie, { search: q }).expect(400);
     expect(firstPage.body.total).toBe(4);
     expect(firstPage.body.items.map((course: { id: string }) => course.id)).toEqual([
       newest.id,
@@ -194,21 +221,19 @@ describe('Courses endpoints (e2e)', () => {
     expect(firstPage.body.page).toBe(1);
     expect(firstPage.body.limit).toBe(2);
 
-    const secondPage = await getCourses(cookie, { search, page: 2, limit: 2 }).expect(200);
+    const secondPage = await getCourses(cookie, { q, page: 2, limit: 2 }).expect(200);
     expect(secondPage.body.items.map((course: { id: string }) => course.id)).toEqual([
       tiesById[1]!.id,
       oldest.id,
     ]);
 
     const active = await getCourses(cookie, {
-      search: suffix,
+      q: suffix,
       status: ContentStatus.ACTIVE,
     }).expect(200);
     expect(active.body.items.map((course: { id: string }) => course.id)).toEqual([tiedA.id]);
 
-    const draft = await getCourses(cookie, { search: suffix, status: ContentStatus.DRAFT }).expect(
-      200,
-    );
+    const draft = await getCourses(cookie, { q: suffix, status: ContentStatus.DRAFT }).expect(200);
     expect(draft.body.total).toBe(3);
   });
 
@@ -328,24 +353,43 @@ describe('Courses endpoints (e2e)', () => {
     }
   });
 
-  it('requires authentication and denies school staff and students without curriculum permissions', async () => {
+  it('denies non-admin roles even when they have curriculum permissions', async () => {
     await request(app.getHttpServer()).get('/api/v1/courses').expect(401);
+    const adminCookie = await loginAsCookie(app, fixture.admin);
+    const course = await createCourse(adminCookie, `Denied access ${randomUUID().slice(0, 8)}`);
 
     for (const user of [fixture.schoolA.teacher, fixture.schoolA.student]) {
       const cookie = await loginAsCookie(app, user);
       await getCourses(cookie).expect(403);
+      await getCourse(cookie, course.id).expect(403);
       await postCourse(cookie, { title: `Denied ${randomUUID().slice(0, 8)}` }).expect(403);
+      await patchCourse(cookie, course.id, { title: 'Denied update' }).expect(403);
+      await patchCourseStatus(cookie, course.id, ContentStatus.ACTIVE).expect(403);
     }
   });
 
-  it('returns 404 for unknown or malformed IDs and does not expose stack traces', async () => {
+  it('returns 400 for malformed IDs and 404 for unknown UUIDs without exposing stack traces', async () => {
     const cookie = await loginAsCookie(app, fixture.admin);
-    for (const id of [randomUUID(), 'not-a-uuid']) {
-      const response = await getCourse(cookie, id).expect(404);
-      expect(response.body.code).toBe('NOT_FOUND');
-      expectSafeError(response.body);
-    }
-    await patchCourse(cookie, 'not-a-uuid', { title: 'Updated title' }).expect(404);
+    const unknownId = randomUUID();
+    const unknownResponse = await getCourse(cookie, unknownId).expect(404);
+    expect(unknownResponse.body.code).toBe('NOT_FOUND');
+    expectSafeError(unknownResponse.body);
+
+    const malformedGet = await getCourse(cookie, 'not-a-uuid').expect(400);
+    expect(malformedGet.body.code).toBe('BAD_REQUEST');
+    expectSafeError(malformedGet.body);
+
+    const malformedPatch = await patchCourse(cookie, 'not-a-uuid', {
+      title: 'Updated title',
+    }).expect(400);
+    expect(malformedPatch.body.code).toBe('BAD_REQUEST');
+    const malformedStatus = await patchCourseStatus(
+      cookie,
+      'not-a-uuid',
+      ContentStatus.ACTIVE,
+    ).expect(400);
+    expect(malformedStatus.body.code).toBe('BAD_REQUEST');
+
     await patchCourse(cookie, randomUUID(), { title: 'Updated title' }).expect(404);
     await patchCourseStatus(cookie, randomUUID(), ContentStatus.ACTIVE).expect(404);
   });

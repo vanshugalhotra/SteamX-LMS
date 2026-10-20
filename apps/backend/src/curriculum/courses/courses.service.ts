@@ -2,12 +2,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { isUUID } from 'class-validator';
 import { PinoLogger } from 'nestjs-pino';
-import { ContentStatus } from '../../generated/prisma/client.js';
+import { ContentStatus, UserType } from '../../generated/prisma/client.js';
+import { USER_ROLE_KEY } from '../../auth/permissions.js';
 import { getPostgresCode, isPrismaKnownError } from '../../common/errors/prisma-error.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import { paginate } from '../../common/pagination/paginate.js';
@@ -30,13 +31,28 @@ export class CoursesService {
     this.logger.setContext(CoursesService.name);
   }
 
+  // ─────────────────────────────────────────
+  // POST /courses — Create a course
+  // ─────────────────────────────────────────
+
+  /** Creates global curriculum content in DRAFT status. */
   async create(actor: AuthContext, body: CreateCourseDto): Promise<CourseResponseDto> {
+    this.assertAdmin(actor);
     const course = await this.courses.create(body);
     this.logger.info({ actorId: actor.userId, courseId: course.id }, 'Course created');
     return toCourseResponse(course);
   }
 
-  async findMany(query: CourseListQueryDto): Promise<PaginationResponseDto<CourseResponseDto>> {
+  // ─────────────────────────────────────────
+  // GET /courses — List courses
+  // ─────────────────────────────────────────
+
+  /** Lists global courses using the requested filters and pagination. */
+  async findMany(
+    actor: AuthContext,
+    query: CourseListQueryDto,
+  ): Promise<PaginationResponseDto<CourseResponseDto>> {
+    this.assertAdmin(actor);
     const { items, total } = await this.courses.findMany(query);
     return paginate(
       items.map((course) => toCourseResponse(course)),
@@ -46,8 +62,13 @@ export class CoursesService {
     );
   }
 
-  async findById(id: string): Promise<CourseResponseDto> {
-    this.assertValidId(id);
+  // ─────────────────────────────────────────
+  // GET /courses/:id — Get a course
+  // ─────────────────────────────────────────
+
+  /** Returns a global course; malformed IDs are rejected by the controller's UUID pipe. */
+  async findById(actor: AuthContext, id: string): Promise<CourseResponseDto> {
+    this.assertAdmin(actor);
     const course = await this.courses.findById(id);
     if (!course) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -55,8 +76,13 @@ export class CoursesService {
     return toCourseResponse(course);
   }
 
+  // ─────────────────────────────────────────
+  // PATCH /courses/:id — Update a course
+  // ─────────────────────────────────────────
+
+  /** Updates a non-empty course patch and logs the actor and target. */
   async update(actor: AuthContext, id: string, body: UpdateCourseDto): Promise<CourseResponseDto> {
-    this.assertValidId(id);
+    this.assertAdmin(actor);
     if (Object.values(body).every((value) => value === undefined)) {
       throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
@@ -69,12 +95,17 @@ export class CoursesService {
     return toCourseResponse(course);
   }
 
+  // ─────────────────────────────────────────
+  // PATCH /courses/:id/status — Update status
+  // ─────────────────────────────────────────
+
+  /** Changes course status; database triggers remain the backstop for status rules. */
   async updateStatus(
     actor: AuthContext,
     id: string,
     status: ContentStatus,
   ): Promise<CourseResponseDto> {
-    this.assertValidId(id);
+    this.assertAdmin(actor);
     const current = await this.courses.findById(id);
     if (!current) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -120,9 +151,9 @@ export class CoursesService {
     }
   }
 
-  private assertValidId(id: string): void {
-    if (!isUUID(id)) {
-      throw new NotFoundException(API_ERROR.NOT_FOUND);
+  private assertAdmin(actor: AuthContext): void {
+    if (actor.userType !== UserType.PLATFORM_STAFF || actor.roleKey !== USER_ROLE_KEY.ADMIN) {
+      throw new ForbiddenException(API_ERROR.FORBIDDEN);
     }
   }
 }
