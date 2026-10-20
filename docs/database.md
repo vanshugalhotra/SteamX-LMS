@@ -81,8 +81,9 @@ comments have a database trigger unless an applied migration creates it.
   rather than swapping columns.
 - **Status:** modules require active courses; lessons require active modules. Archiving a course or
   module archives active descendants only and does not change existing deliveries or releases.
-  Status cannot return to DRAFT. DRAFT is not student-visible; released ACTIVE or ARCHIVED content
-  remains available until subscription expiry.
+  Draft content may be archived while no delete/discard endpoint exists. Status cannot return to
+  DRAFT. DRAFT is not student-visible; released ACTIVE or ARCHIVED content remains available until
+  subscription expiry.
 - **New use:** subscriptions require an active course; new deliveries cannot reference an archived
   course.
 - **Asset files:** IDs are supplied by Prisma (UUIDv7 client generation). Storage and playback keys

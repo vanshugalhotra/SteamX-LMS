@@ -11,6 +11,7 @@ import { HealthModule } from './health/health.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { SchoolsModule } from './schools/schools.module.js';
 import { ClassSectionsModule } from './class-sections/class-sections.module.js';
+import { CurriculumModule } from './curriculum/curriculum.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module.js';
     HealthModule,
     SchoolsModule,
     ClassSectionsModule,
+    CurriculumModule,
     UsersModule,
   ],
   providers: [

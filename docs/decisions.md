@@ -65,6 +65,16 @@ duplicates immediately; reordering uses unused temporary positions. For the two-
 delete and recreate children rather than swapping their column indexes. This avoids raw deferred
 constraints and commit-time uniqueness errors.
 
+## Curriculum course API
+
+- **Course deletion:** allow deletion only when the course has no dependent records; restrictive
+  foreign keys block deletion once content or delivery records reference it.
+- **Shared status helper:** courses, modules, and lessons use one pure transition helper.
+- **Draft archival:** allow `DRAFT -> ARCHIVED`; this remains useful for populated draft content
+  that cannot be deleted because it has dependent records. Content may not transition back to `DRAFT`.
+- **Course titles are not unique:** global content titles may be reused, including after archival.
+  Admins are responsible for avoiding confusing duplicate active course titles.
+
 ## Prefix-based asset storage keys
 
 Each asset-file object's storage and playback keys live below
