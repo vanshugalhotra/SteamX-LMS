@@ -246,7 +246,7 @@ email, names, and creation times.
 ## Workflows to add when modules land
 
 - School subscription creation/renewal, date boundaries, delivery caps, and school/course isolation.
-- Curriculum course/module/lesson lifecycle, unused-course deletion, ordering, audience rules, and content publication.
+- Curriculum course/module/lesson lifecycle, full-list module reordering, FK-guarded deletion, audience rules, and content publication.
 - Private asset upload, processing failure, replacement, signed access, and queued storage cleanup.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.

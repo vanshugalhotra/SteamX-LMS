@@ -2,6 +2,7 @@ import { Prisma } from '../../generated/prisma/client.js';
 import {
   getPostgresCode,
   getPrismaReason,
+  isForeignKeyViolation,
   isPrismaKnownError,
   mapPrismaError,
   throwConflictOnDuplicate,
@@ -77,6 +78,21 @@ describe('Prisma error helpers', () => {
     if (isPrismaKnownError(error)) {
       expect(getPostgresCode(error)).toBe('57014');
     }
+  });
+
+  it.each(['P2003', 'P3003'])('recognizes Prisma foreign-key error %s', (code) => {
+    expect(isForeignKeyViolation(createPrismaError(code))).toBe(true);
+  });
+
+  it('recognizes PostgreSQL foreign-key errors from adapter metadata', () => {
+    expect(
+      isForeignKeyViolation(
+        createPrismaError('P2010', {
+          driverAdapterError: { cause: { originalCode: '23503' } },
+        }),
+      ),
+    ).toBe(true);
+    expect(isForeignKeyViolation(createPrismaError('P2010'))).toBe(false);
   });
 
   it('returns the last non-empty trimmed message line', () => {

@@ -6,7 +6,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { isPrismaKnownError, throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
+import {
+  isForeignKeyViolation,
+  isPrismaKnownError,
+  throwConflictOnDuplicate,
+} from '../common/errors/prisma-error.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
@@ -140,8 +144,8 @@ export class ClassSectionsService {
         'Class section deleted',
       );
     } catch (error) {
-      if (isPrismaKnownError(error) && error.code === 'P2003') {
-        throw new ConflictException(API_ERROR.CLASS_SECTION_IN_USE);
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictException(API_ERROR.RESOURCE_IN_USE);
       }
       if (isPrismaKnownError(error) && error.code === 'P2025') {
         throw new NotFoundException(API_ERROR.NOT_FOUND);

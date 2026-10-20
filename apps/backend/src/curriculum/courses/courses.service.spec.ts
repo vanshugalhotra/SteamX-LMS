@@ -74,7 +74,7 @@ describe('CoursesService', () => {
     );
   });
 
-  it('maps a related-record constraint to a course-in-use conflict', async () => {
+  it('maps a related-record constraint to RESOURCE_IN_USE', async () => {
     const { service, repository } = createService();
     repository.delete.mockRejectedValue(
       Object.assign(new Error('private database detail'), {
@@ -84,7 +84,7 @@ describe('CoursesService', () => {
     );
 
     await expect(service.delete(actor, courseRecord.id)).rejects.toMatchObject({
-      response: API_ERROR.COURSE_IN_USE,
+      response: API_ERROR.RESOURCE_IN_USE,
     });
   });
 

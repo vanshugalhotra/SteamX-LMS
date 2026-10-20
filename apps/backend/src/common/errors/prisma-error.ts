@@ -48,6 +48,14 @@ export function getPostgresCode(error: PrismaKnownError): string | undefined {
   return typeof cause.originalCode === 'string' ? cause.originalCode : undefined;
 }
 
+/** Identifies Prisma and PostgreSQL foreign-key violations. */
+export function isForeignKeyViolation(error: unknown): boolean {
+  return (
+    isPrismaKnownError(error) &&
+    (error.code === 'P2003' || error.code === 'P3003' || getPostgresCode(error) === '23503')
+  );
+}
+
 /** Returns the final Prisma error line for internal logs without exposing it to API callers. */
 export function getPrismaReason(error: PrismaKnownError): string {
   if (typeof error.message !== 'string') {

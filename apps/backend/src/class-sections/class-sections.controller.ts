@@ -144,7 +144,7 @@ export class ClassSectionsController {
   @ApiBadRequestResponse({
     description: 'The class-section ID is not a UUID.',
   })
-  @ApiConflictResponse({ description: 'Class section is in use.' })
+  @ApiConflictResponse({ description: 'Section has dependent records and cannot be deleted.' })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
   delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.sections.delete(actor, id);

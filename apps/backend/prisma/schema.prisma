@@ -339,7 +339,7 @@ model Course {
   // [TRG]   Status transitions cannot return to DRAFT. Archiving cascades to ACTIVE modules and lessons only.
   //         Subscriptions require an ACTIVE course; new deliveries cannot reference an ARCHIVED course.
   // [RULE]  DRAFT is never student-visible; ACTIVE is usable; ARCHIVED is retired from new use. Archiving does not
-  //         change existing delivery or release rows; released ACTIVE or ARCHIVED content remains served until expiry.
+//         change existing delivery or release rows; released ACTIVE or ARCHIVED content remains served until expiry.
 
   @@map("courses")
 }
