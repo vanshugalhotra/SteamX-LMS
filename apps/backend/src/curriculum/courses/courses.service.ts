@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { ContentStatus, UserType } from '../../generated/prisma/client.js';
-import { USER_ROLE_KEY } from '../../auth/permissions.js';
 import { getPostgresCode, isPrismaKnownError } from '../../common/errors/prisma-error.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import { paginate } from '../../common/pagination/paginate.js';
@@ -152,7 +151,7 @@ export class CoursesService {
   }
 
   private assertAdmin(actor: AuthContext): void {
-    if (actor.userType !== UserType.PLATFORM_STAFF || actor.roleKey !== USER_ROLE_KEY.ADMIN) {
+    if (actor.userType !== UserType.PLATFORM_STAFF) {
       throw new ForbiddenException(API_ERROR.FORBIDDEN);
     }
   }

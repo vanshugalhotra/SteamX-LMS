@@ -10,7 +10,7 @@ health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; path UUIDs r
 - The reference-data migration creates `admin`, `teacher`, and `student` roles.
 - It grants every current permission to `admin` only. Teachers and students get `403` on
   permission-protected routes unless grants are added before the backend starts. Curriculum
-  services additionally require the platform `admin` role, even if another role is granted its
+  services additionally require platform staff, even if a school role is mistakenly granted its
   permissions.
 - Permission grants are loaded into memory at startup. Restart the backend after changing them.
 - For write requests, send an `Origin` listed in `CORS_ORIGINS`; otherwise `OriginGuard` returns

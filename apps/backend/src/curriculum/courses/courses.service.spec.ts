@@ -25,6 +25,18 @@ describe('CoursesService', () => {
     expect(repository.findMany).not.toHaveBeenCalled();
   });
 
+  it('allows platform staff regardless of role key', async () => {
+    const platformStaff = { ...actor, roleKey: 'platform_content_manager' };
+    const { service, repository } = createService();
+    repository.findMany.mockResolvedValue({ items: [courseRecord], total: 1 });
+
+    await expect(service.findMany(platformStaff, { page: 1, limit: 20 })).resolves.toMatchObject({
+      items: [{ id: courseRecord.id }],
+      total: 1,
+    });
+    expect(repository.findMany).toHaveBeenCalledOnce();
+  });
+
   it('maps database content-status trigger violations to the transition conflict', async () => {
     const { service, repository } = createService();
     repository.updateStatus.mockRejectedValue(

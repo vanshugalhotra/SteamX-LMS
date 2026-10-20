@@ -36,9 +36,9 @@ At startup, `PermissionsService` loads role grants from the database and caches 
 backend after changing grants. Route definitions and API details are documented in Swagger.
 
 Curriculum is global content with no school ownership or school-scope filtering. Course routes
-require `curriculum.read` or `curriculum.write`, and services also require the platform `admin`
-role. Reference data grants both permissions to that role only; a mistakenly granted permission
-does not give curriculum access to teacher or student roles.
+require `curriculum.read` or `curriculum.write`, and services additionally require a platform-staff
+account. Reference data grants both permissions to the `admin` role only; a mistakenly granted
+permission does not give curriculum access to school staff or students.
 
 ## School scope and user visibility
 
