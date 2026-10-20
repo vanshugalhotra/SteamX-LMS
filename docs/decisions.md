@@ -65,6 +65,21 @@ duplicates immediately; reordering uses unused temporary positions. For the two-
 delete and recreate children rather than swapping their column indexes. This avoids raw deferred
 constraints and commit-time uniqueness errors.
 
+## Course module ordering
+
+- **Full-list reorder:** `PUT /courses/:courseId/modules/order` accepts the complete ordered module
+  ID list. Under a parent course row lock, park positions before assigning final positions because
+  `(course_id, position)` is immediately unique. Evaluate deferred constraints with one set-based
+  update only if reorder becomes a measured bottleneck.
+- **Position gaps:** deleting a module does not renumber siblings; create appends after the highest
+  position and reorder normalizes the list.
+- **Nested list pagination:** the course's module list is deliberately unpaginated so reorder clients
+  receive the complete ordered set.
+- **Module deletion:** allow deletion only when no dependent record references the module; restrictive
+  foreign keys are the guard.
+- **Delete conflict response:** all foreign-key-restricted deletes use the shared `RESOURCE_IN_USE`
+  error code.
+
 ## Curriculum course API
 
 - **Course deletion:** allow deletion only when the course has no dependent records; restrictive

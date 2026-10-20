@@ -282,7 +282,7 @@ describe('Courses endpoints (e2e)', () => {
       data: { courseId: inUse.id, title: 'Referenced module', position: 1 },
     });
     const conflict = await deleteCourse(cookie, inUse.id).expect(409);
-    expect(conflict.body.code).toBe('COURSE_IN_USE');
+    expect(conflict.body.code).toBe('RESOURCE_IN_USE');
     expectSafeError(conflict.body);
     await getCourse(cookie, inUse.id).expect(200);
   });

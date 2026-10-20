@@ -145,7 +145,7 @@ export class CoursesController {
   @ApiOperation({ summary: 'Delete a course' })
   @ApiNoContentResponse({ description: 'Course deleted.' })
   @ApiBadRequestResponse({ description: 'The course ID is not a UUID.' })
-  @ApiConflictResponse({ description: 'Course has related records and cannot be deleted.' })
+  @ApiConflictResponse({ description: 'Course has dependent records and cannot be deleted.' })
   @ApiNotFoundResponse({ description: 'Course not found.' })
   delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.courses.delete(actor, id);

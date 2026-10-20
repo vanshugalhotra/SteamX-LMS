@@ -137,11 +137,62 @@ Caller: platform `admin` with `curriculum.write`; changes global course status.
 Caller: platform `admin` with `curriculum.write`; deletes an unused global course.
 
 - [auto] When admin deletes a course with no related records -> expect `204` and the course no longer exists.
-- [auto] When a course is referenced by a module or other record -> expect `409 COURSE_IN_USE`; the course remains.
+- [auto] When a course is referenced by a module or other record -> expect `409 RESOURCE_IN_USE`; the course remains.
 - [auto] When the course ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
 - [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When an error response is returned -> verify it has no stack trace or database details.
+
+## Course modules
+
+### `POST /courses/:courseId/modules`
+
+Caller: platform `admin` with `curriculum.write`; creates a draft module at the end of the course.
+
+- [auto] When title is valid -> expect `201`, trimmed title, DRAFT status, and position after existing modules.
+- [auto] When title is blank, whitespace, too long, or an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
+- [auto] When course ID is malformed -> expect `400 BAD_REQUEST`; when valid but unknown -> expect `404 NOT_FOUND`.
+- [auto] When two creates run concurrently -> expect both `201` responses and distinct ordered positions.
+- [auto] When teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
+
+### `GET /courses/:courseId/modules`
+
+Caller: platform `admin` with `curriculum.read`; lists every module in position order (deliberately not paginated).
+
+- [auto] When course has modules -> expect the complete list ordered by strictly increasing positions.
+- [auto] When course has no modules -> expect an empty array.
+- [auto] When course ID is malformed -> expect `400 BAD_REQUEST`; when valid but unknown -> expect `404 NOT_FOUND`.
+- [auto] When teacher/school staff or student calls -> expect `403 FORBIDDEN`.
+
+### `PUT /courses/:courseId/modules/order`
+
+Caller: platform `admin` with `curriculum.write`; replaces the full module order.
+
+- [auto] When IDs are the exact course module set -> expect `200` with the requested order and strictly increasing positions.
+- [auto] When IDs omit, add, or duplicate a module, including a nonempty list for an empty course -> expect `400 INVALID_ORDER`.
+- [auto] When an empty list is sent for an empty course -> expect `200` with an empty array.
+- [auto] When course ID is malformed -> expect `400 BAD_REQUEST`; when valid but unknown -> expect `404 NOT_FOUND`.
+
+### `GET /modules/:id`, `PATCH /modules/:id`, and `PATCH /modules/:id/status`
+
+Caller: platform admin with `curriculum.read` for GET and `curriculum.write` for PATCH.
+
+- [auto] When module exists -> GET returns the module response; title PATCH returns the trimmed title.
+- [auto] When title is blank, whitespace, too long, or an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
+- [auto] When activating under a DRAFT or ARCHIVED course -> expect `409 PARENT_NOT_ACTIVE`.
+- [auto] When a status transition is forbidden -> expect `409 INVALID_STATUS_TRANSITION`; database triggers archive active lessons when a module is archived.
+- [auto] When module ID is malformed -> expect `400 BAD_REQUEST`; when valid but unknown -> expect `404 NOT_FOUND`.
+- [auto] When teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
+
+### `DELETE /modules/:id`
+
+Caller: platform `admin` with `curriculum.write`; deletes a module with no dependent records.
+
+- [auto] When module has no dependent records -> expect `204`; repeating deletion returns `404 NOT_FOUND`.
+- [auto] When a lesson or other dependent record references the module -> expect `409 RESOURCE_IN_USE` and preserve module and lesson.
+- [auto] After deletion leaves a position gap -> a new module appends after the highest remaining position without renumbering.
+- [auto] When module ID is malformed -> expect `400 BAD_REQUEST`; when valid but unknown -> expect `404 NOT_FOUND`.
+- [auto] When teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
 ## Schools
 
@@ -294,7 +345,7 @@ Caller: authenticated role with `classsection.manage`; deletes a section with no
 
 - [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin deletes an unused section -> expect `204`.
-- [auto] When student profile references the section -> expect `409 CLASS_SECTION_IN_USE`.
+- [auto] When a student profile references the section -> expect `409 RESOURCE_IN_USE`.
 - [auto] When section does not exist -> expect `404 NOT_FOUND`.
 - [auto] When teacher with manage permission targets a foreign section or missing ID -> expect same `404 NOT_FOUND`.
 - [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.

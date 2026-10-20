@@ -8,7 +8,11 @@ import {
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { ContentStatus, UserType } from '../../generated/prisma/client.js';
-import { getPostgresCode, isPrismaKnownError } from '../../common/errors/prisma-error.js';
+import {
+  getPostgresCode,
+  isForeignKeyViolation,
+  isPrismaKnownError,
+} from '../../common/errors/prisma-error.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import { paginate } from '../../common/pagination/paginate.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
@@ -161,8 +165,8 @@ export class CoursesService {
       const course = await this.courses.delete(id);
       this.logger.info({ actorId: actor.userId, courseId: course.id }, 'Course deleted');
     } catch (error) {
-      if (isPrismaKnownError(error) && error.code === 'P2003') {
-        throw new ConflictException(API_ERROR.COURSE_IN_USE);
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictException(API_ERROR.RESOURCE_IN_USE);
       }
       if (isPrismaKnownError(error) && error.code === 'P2025') {
         throw new NotFoundException(API_ERROR.NOT_FOUND);
