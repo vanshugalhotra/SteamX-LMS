@@ -150,6 +150,27 @@ export class CoursesService {
     }
   }
 
+  // ─────────────────────────────────────────
+  // DELETE /courses/:id — Delete an unused course
+  // ─────────────────────────────────────────
+
+  /** Deletes a course only when no database records reference it. */
+  async delete(actor: AuthContext, id: string): Promise<void> {
+    this.assertAdmin(actor);
+    try {
+      const course = await this.courses.delete(id);
+      this.logger.info({ actorId: actor.userId, courseId: course.id }, 'Course deleted');
+    } catch (error) {
+      if (isPrismaKnownError(error) && error.code === 'P2003') {
+        throw new ConflictException(API_ERROR.COURSE_IN_USE);
+      }
+      if (isPrismaKnownError(error) && error.code === 'P2025') {
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
+      }
+      throw error;
+    }
+  }
+
   private assertAdmin(actor: AuthContext): void {
     if (actor.userType !== UserType.PLATFORM_STAFF) {
       throw new ForbiddenException(API_ERROR.FORBIDDEN);

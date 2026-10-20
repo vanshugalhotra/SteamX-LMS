@@ -73,6 +73,31 @@ describe('CoursesService', () => {
       'Course status changed',
     );
   });
+
+  it('maps a related-record constraint to a course-in-use conflict', async () => {
+    const { service, repository } = createService();
+    repository.delete.mockRejectedValue(
+      Object.assign(new Error('private database detail'), {
+        name: 'PrismaClientKnownRequestError',
+        code: 'P2003',
+      }),
+    );
+
+    await expect(service.delete(actor, courseRecord.id)).rejects.toMatchObject({
+      response: API_ERROR.COURSE_IN_USE,
+    });
+  });
+
+  it('logs successful course deletion with the actor and course IDs', async () => {
+    const { service, repository, logger } = createService();
+    repository.delete.mockResolvedValue({ id: courseRecord.id });
+
+    await expect(service.delete(actor, courseRecord.id)).resolves.toBeUndefined();
+    expect(logger.info).toHaveBeenCalledWith(
+      { actorId: actor.userId, courseId: courseRecord.id },
+      'Course deleted',
+    );
+  });
 });
 
 const actor: AuthContext = {
@@ -101,6 +126,7 @@ function createService() {
     findById: vi.fn().mockResolvedValue(courseRecord),
     update: vi.fn(),
     updateStatus: vi.fn(),
+    delete: vi.fn(),
   };
   const logger = { setContext: vi.fn(), info: vi.fn() };
 

@@ -1,9 +1,22 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
@@ -120,5 +133,21 @@ export class CoursesController {
     @Body() body: UpdateCourseStatusDto,
   ): Promise<CourseResponseDto> {
     return this.courses.updateStatus(actor, id, body.status);
+  }
+
+  // ─────────────────────────────────────────
+  // DELETE /courses/:id — Delete an unused course
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.CURRICULUM_WRITE)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a course' })
+  @ApiNoContentResponse({ description: 'Course deleted.' })
+  @ApiBadRequestResponse({ description: 'The course ID is not a UUID.' })
+  @ApiConflictResponse({ description: 'Course has related records and cannot be deleted.' })
+  @ApiNotFoundResponse({ description: 'Course not found.' })
+  delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.courses.delete(actor, id);
   }
 }

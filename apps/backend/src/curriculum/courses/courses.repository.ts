@@ -64,4 +64,11 @@ export class CoursesRepository {
       return result.count === 0 ? null : tx.course.findUnique({ where: { id } });
     });
   }
+
+  delete(id: string): Promise<{ id: string }> {
+    return this.prisma.course.delete({
+      where: { id },
+      select: { id: true },
+    });
+  }
 }

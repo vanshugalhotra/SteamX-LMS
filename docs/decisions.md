@@ -67,11 +67,11 @@ constraints and commit-time uniqueness errors.
 
 ## Curriculum course API
 
-- **No course delete endpoint:** archive courses through the status route instead.
+- **Course deletion:** allow deletion only when the course has no dependent records; restrictive
+  foreign keys block deletion once content or delivery records reference it.
 - **Shared status helper:** courses, modules, and lessons use one pure transition helper.
-- **Draft archival:** allow `DRAFT -> ARCHIVED` while no delete/discard endpoint exists; consider
-  forbidding this later if archive should mean content that was previously active. Content may not
-  transition back to `DRAFT`.
+- **Draft archival:** allow `DRAFT -> ARCHIVED`; this remains useful for populated draft content
+  that cannot be deleted because it has dependent records. Content may not transition back to `DRAFT`.
 - **Course titles are not unique:** global content titles may be reused, including after archival.
   Admins are responsible for avoiding confusing duplicate active course titles.
 

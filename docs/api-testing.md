@@ -132,6 +132,17 @@ Caller: platform `admin` with `curriculum.write`; changes global course status.
 - [auto] When ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] When an error response is returned -> verify it has no stack trace or database details.
 
+### `DELETE /courses/:id`
+
+Caller: platform `admin` with `curriculum.write`; deletes an unused global course.
+
+- [auto] When admin deletes a course with no related records -> expect `204` and the course no longer exists.
+- [auto] When a course is referenced by a module or other record -> expect `409 COURSE_IN_USE`; the course remains.
+- [auto] When the course ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
+- [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
+- [auto] When an error response is returned -> verify it has no stack trace or database details.
+
 ## Schools
 
 ### `POST /schools`

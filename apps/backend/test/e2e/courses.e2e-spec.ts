@@ -120,6 +120,13 @@ describe('Courses endpoints (e2e)', () => {
       .send({ status });
   }
 
+  function deleteCourse(cookie: string, id: string) {
+    return request(app.getHttpServer())
+      .delete(`/api/v1/courses/${id}`)
+      .set('Origin', origin)
+      .set('Cookie', cookie);
+  }
+
   async function createCourse(
     cookie: string,
     title: string,
@@ -263,6 +270,23 @@ describe('Courses endpoints (e2e)', () => {
     await patchCourseStatus(cookie, course.id, ContentStatus.ACTIVE).expect(200);
   });
 
+  it('deletes unused courses and rejects courses with related records', async () => {
+    const cookie = await loginAsCookie(app, fixture.admin);
+    const unused = await createCourse(cookie, `Delete ${randomUUID().slice(0, 8)}`);
+
+    await deleteCourse(cookie, unused.id).expect(204);
+    await getCourse(cookie, unused.id).expect(404);
+
+    const inUse = await createCourse(cookie, `In use ${randomUUID().slice(0, 8)}`);
+    await prisma.module.create({
+      data: { courseId: inUse.id, title: 'Referenced module', position: 1 },
+    });
+    const conflict = await deleteCourse(cookie, inUse.id).expect(409);
+    expect(conflict.body.code).toBe('COURSE_IN_USE');
+    expectSafeError(conflict.body);
+    await getCourse(cookie, inUse.id).expect(200);
+  });
+
   it('archives active modules and lessons through database triggers without reviving descendants', async () => {
     const cookie = await loginAsCookie(app, fixture.admin);
     const course = await createCourse(cookie, `Cascade ${randomUUID().slice(0, 8)}`);
@@ -356,6 +380,7 @@ describe('Courses endpoints (e2e)', () => {
     await request(app.getHttpServer()).get('/api/v1/courses').expect(401);
     const adminCookie = await loginAsCookie(app, fixture.admin);
     const course = await createCourse(adminCookie, `Denied access ${randomUUID().slice(0, 8)}`);
+    await deleteCourse('', course.id).expect(401);
 
     for (const user of [fixture.schoolA.teacher, fixture.schoolA.student]) {
       const cookie = await loginAsCookie(app, user);
@@ -364,6 +389,7 @@ describe('Courses endpoints (e2e)', () => {
       await postCourse(cookie, { title: `Denied ${randomUUID().slice(0, 8)}` }).expect(403);
       await patchCourse(cookie, course.id, { title: 'Denied update' }).expect(403);
       await patchCourseStatus(cookie, course.id, ContentStatus.ACTIVE).expect(403);
+      await deleteCourse(cookie, course.id).expect(403);
     }
   });
 
@@ -388,9 +414,13 @@ describe('Courses endpoints (e2e)', () => {
       ContentStatus.ACTIVE,
     ).expect(400);
     expect(malformedStatus.body.code).toBe('BAD_REQUEST');
+    const malformedDelete = await deleteCourse(cookie, 'not-a-uuid').expect(400);
+    expect(malformedDelete.body.code).toBe('BAD_REQUEST');
 
     await patchCourse(cookie, randomUUID(), { title: 'Updated title' }).expect(404);
     await patchCourseStatus(cookie, randomUUID(), ContentStatus.ACTIVE).expect(404);
+    const unknownDelete = await deleteCourse(cookie, randomUUID()).expect(404);
+    expectSafeError(unknownDelete.body);
   });
 
   function expectSafeError(body: Record<string, unknown>): void {
