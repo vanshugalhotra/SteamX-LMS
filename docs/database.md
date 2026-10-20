@@ -66,6 +66,40 @@ Other uniqueness and relationship rules are defined by primary keys, unique inde
 keys in the Prisma schema and initial migration. Do not assume rules described only in schema
 comments have a database trigger unless an applied migration creates it.
 
+### Curriculum and asset library
+
+- **Titles and positions:** course/module/lesson/asset titles must be nonblank; module, lesson,
+  and top-level block positions must be positive.
+- **Blocks:** content must be a JSON object. Database checks enforce asset/block shape, two-column
+  layout, column range, and valid parent and asset types.
+- **Immutable fields:** module `course_id`, lesson `course_id`, asset `type`, and lesson-block
+  `lesson_id` and `type` cannot change. Lessons may move between modules in the same course;
+  moving a block to another lesson requires copy + delete.
+- **Ordering:** Prisma unique constraints prevent duplicate module, lesson, and top-level block
+  positions, and duplicate child columns. They are checked immediately; do not upsert positional
+  rows. Use unused temporary positions when reordering; delete and recreate two-column children
+  rather than swapping columns.
+- **Status:** modules require active courses; lessons require active modules. Archiving a course or
+  module archives active descendants only and does not change existing deliveries or releases.
+  Draft content may be archived while no delete/discard endpoint exists. Status cannot return to
+  DRAFT. DRAFT is not student-visible; released ACTIVE or ARCHIVED content remains available until
+  subscription expiry.
+- **New use:** subscriptions require an active course; new deliveries cannot reference an archived
+  course.
+- **Asset files:** IDs are supplied by Prisma (UUIDv7 client generation). Storage and playback keys
+  must start with `assets/<asset_id>/<asset_file_id>/` because deletion queues that prefix. Sizes
+  must be positive when set; READY files
+  require a MIME type and positive size. Only one file per asset may be READY. READY and FAILED
+  rows reject all updates; READY VIDEO files require a playback key. New files start at UPLOADING;
+  IMAGE/PDF files may move UPLOADED → READY; VIDEO/PPTX files pass through PROCESSING. All types
+  may fail from UPLOADING/UPLOADED/PROCESSING.
+- **Cleanup queue:** deleting an asset file queues its object prefix; deleting a submission file
+  queues its exact object key. Do not reuse a file prefix while its cleanup is pending; workers
+  must delete before marking a job done. Pending jobs have partial indexes; `done_at` cannot
+  precede `queued_at`.
+- **Application responsibility:** MIME-to-asset-type matching, serving only assets with a READY
+  file, and coordinating replacements/cleanup are not enforced by the database.
+
 ## Migrations and reference data
 
 Prisma schema changes are applied through migrations in `apps/backend/prisma/migrations/`. There is

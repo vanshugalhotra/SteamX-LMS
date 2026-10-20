@@ -8,6 +8,8 @@ export const PERMISSION = {
   USER_DEACTIVATE: 'user.deactivate',
   SCHOOL_READ: 'school.read',
   SCHOOL_MANAGE: 'school.manage',
+  CURRICULUM_READ: 'curriculum.read',
+  CURRICULUM_WRITE: 'curriculum.write',
   CLASSSECTION_READ: 'classsection.read',
   CLASSSECTION_MANAGE: 'classsection.manage',
 } as const;

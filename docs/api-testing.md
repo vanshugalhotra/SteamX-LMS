@@ -1,15 +1,17 @@
 # API testing checklist
 
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
-health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; a path UUID rejected by
-`ParseUUIDPipe` uses the default `BAD_REQUEST` code. Error responses include a request ID.
+health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; path UUIDs rejected by
+`ParseUUIDPipe` use the default `BAD_REQUEST` code. Error responses include a request ID.
 
 ## Before testing
 
 - Apply migrations to an isolated development or test database.
 - The reference-data migration creates `admin`, `teacher`, and `student` roles.
 - It grants every current permission to `admin` only. Teachers and students get `403` on
-  permission-protected routes unless grants are added before the backend starts.
+  permission-protected routes unless grants are added before the backend starts. Curriculum
+  services additionally require platform staff, even if a school role is mistakenly granted its
+  permissions.
 - Permission grants are loaded into memory at startup. Restart the backend after changing them.
 - For write requests, send an `Origin` listed in `CORS_ORIGINS`; otherwise `OriginGuard` returns
   `403 ORIGIN_NOT_ALLOWED` before authentication or permission checks.
@@ -74,6 +76,72 @@ Caller: any authenticated role, including a user required to change their passwo
 - [auto] When old and new token have the same issue-time second -> the old token may remain valid until the next second boundary.
 - [auto] When user no longer exists -> expect `401 UNAUTHORIZED`.
 - [auto] When state-changing request has no allowed Origin -> expect `403 ORIGIN_NOT_ALLOWED`.
+
+## Courses
+
+### `POST /courses`
+
+Caller: platform `admin` with `curriculum.write`; creates a global course in `DRAFT`.
+
+- [auto] When admin sends a trimmed nonblank title and optional description -> expect `201`.
+- [auto] When title is empty, whitespace-only, or over 200 characters -> expect `400 VALIDATION_ERROR`.
+- [auto] When description exceeds 2000 characters or an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
+- [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
+
+### `GET /courses`
+
+Caller: platform `admin` with `curriculum.read`; lists global courses.
+
+- [auto] When admin lists courses -> expect paginated `items`, `page`, `limit`, and `total`.
+- [auto] When `status` is supplied -> expect only courses with that content status.
+- [auto] When `q` is partial and differently cased -> expect case-insensitive title matching.
+- [auto] When results share a creation timestamp -> expect stable ID ordering after newest-first creation ordering.
+- [auto] When page and limit are supplied -> expect the matching deterministic slice.
+- [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
+
+### `GET /courses/:id`
+
+Caller: platform `admin` with `curriculum.read`; reads a global course.
+
+- [auto] When admin requests an existing course -> expect `200` and only the course response fields.
+- [auto] When ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
+- [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
+
+### `PATCH /courses/:id`
+
+Caller: platform `admin` with `curriculum.write`; updates title and/or description.
+
+- [auto] When admin updates valid fields -> expect `200` with trimmed values.
+- [auto] When body is empty, title is blank/null/too long, or an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
+- [auto] When description is set to null -> expect `200` with a cleared description.
+- [auto] When ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
+- [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
+
+### `PATCH /courses/:id/status`
+
+Caller: platform `admin` with `curriculum.write`; changes global course status.
+
+- [auto] When admin requests `DRAFT -> ACTIVE`, `DRAFT -> ARCHIVED`, `ACTIVE -> ARCHIVED`, or `ARCHIVED -> ACTIVE` -> expect `200`.
+- [auto] When admin repeats the current status -> expect `200` without a status change.
+- [auto] When admin requests a forbidden transition -> expect `409 INVALID_STATUS_TRANSITION`.
+- [auto] When a course is archived -> expect database triggers to archive active modules and lessons only; draft descendants stay draft.
+- [auto] When a course is reactivated -> expect archived descendants to stay archived and draft descendants to stay draft.
+- [auto] When status is missing or invalid -> expect `400 VALIDATION_ERROR`.
+- [auto] When ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
+- [auto] When an error response is returned -> verify it has no stack trace or database details.
+
+### `DELETE /courses/:id`
+
+Caller: platform `admin` with `curriculum.write`; deletes an unused global course.
+
+- [auto] When admin deletes a course with no related records -> expect `204` and the course no longer exists.
+- [auto] When a course is referenced by a module or other record -> expect `409 COURSE_IN_USE`; the course remains.
+- [auto] When the course ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
+- [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
+- [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
+- [auto] When an error response is returned -> verify it has no stack trace or database details.
 
 ## Schools
 
