@@ -113,7 +113,7 @@ export class LessonsService {
     if (Object.values(body).every((value) => value === undefined)) {
       throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
-    // TODO(deliveries): consider released lessons.
+    // Add release-aware audience validation when delivery release APIs are implemented.
     const lesson = await this.lessons.update(id, body);
     if (!lesson) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
