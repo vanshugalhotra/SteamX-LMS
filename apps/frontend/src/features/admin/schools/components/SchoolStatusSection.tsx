@@ -5,7 +5,7 @@ import { schoolErrorMessage } from '../model/errors';
 import { useUpdateSchoolStatus } from '../queries';
 import { SchoolStatusBadge } from './SchoolStatusBadge';
 
-export function SchoolStatusSection({ school, onDone }: { school: School; onDone: () => void }) {
+export function SchoolStatusSection({ school, onDone }: { school: School; onDone?: () => void }) {
   const mutation = useUpdateSchoolStatus();
   const isActive = school.status === 'ACTIVE';
 
@@ -15,7 +15,7 @@ export function SchoolStatusSection({ school, onDone }: { school: School; onDone
       {
         onSuccess: () => {
           toast.success(isActive ? 'School deactivated' : 'School activated');
-          onDone();
+          onDone?.();
         },
         onError: (error) => {
           toast.error(schoolErrorMessage(error), { id: 'school-status-failed' });

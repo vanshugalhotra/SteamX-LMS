@@ -19,7 +19,7 @@ export function Pagination({ page, limit, total, onPageChange }: PaginationProps
       </p>
       <div className="flex items-center gap-2">
         <Button
-          variant="secondary"
+          variant="dark"
           size="sm"
           disabled={page <= 1}
           onClick={() => {
@@ -32,7 +32,7 @@ export function Pagination({ page, limit, total, onPageChange }: PaginationProps
           {page} / {pageCount}
         </span>
         <Button
-          variant="secondary"
+          variant="dark"
           size="sm"
           disabled={page >= pageCount}
           onClick={() => {
