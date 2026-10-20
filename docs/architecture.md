@@ -20,14 +20,15 @@ out of API responses. Shared helpers live under `src/common/`; feature rules sta
 | `UsersModule`         | User creation, lookup, profile changes, status, passwords, and SteamX IDs.        | None                                                                                                      |
 | `SchoolsModule`       | School management.                                                                | `SchoolsService`                                                                                          |
 | `ClassSectionsModule` | Class-section management.                                                         | `ClassSectionsService`                                                                                    |
+| `CurriculumModule`    | Global course management and status transitions.                                  | None                                                                                                      |
 | `TenancyModule`       | Resolves a required active school for workflows that need one.                    | `ActiveSchoolService`                                                                                     |
 | `PrismaModule`        | Provides the configured Prisma client.                                            | `PrismaService`                                                                                           |
 | `HealthModule`        | Liveness and database-readiness checks.                                           | None                                                                                                      |
 | `LoggingModule`       | Configures Pino request logging, request IDs, and redaction.                      | None                                                                                                      |
 | Global `ConfigModule` | Validates and provides typed environment configuration.                           | Global Nest provider                                                                                      |
 
-The backend source currently has no curriculum, delivery, enrollment, or assignment API modules;
-their schema tables are described in [Database](./database.md).
+The backend source currently has no delivery, enrollment, or assignment API modules; their schema
+tables are described in [Database](./database.md).
 
 ## Request lifecycle
 

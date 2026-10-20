@@ -35,6 +35,10 @@ Permission keys are defined in `src/auth/permissions.ts`. The migration-managed 
 At startup, `PermissionsService` loads role grants from the database and caches them in memory; restart the
 backend after changing grants. Route definitions and API details are documented in Swagger.
 
+Curriculum is global content with no school ownership or school-scope filtering. Course routes are
+protected only by `curriculum.read` or `curriculum.write`; reference data grants both permissions to
+the `admin` role only.
+
 ## School scope and user visibility
 
 These are separate filters:

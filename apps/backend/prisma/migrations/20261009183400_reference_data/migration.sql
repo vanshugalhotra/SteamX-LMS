@@ -88,3 +88,17 @@ CROSS JOIN permissions
 WHERE roles.key = 'admin'
   AND permissions.key IN ('user.update', 'user.deactivate')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+INSERT INTO permissions (key, description)
+VALUES
+  ('curriculum.read', 'View global curriculum content'),
+  ('curriculum.write', 'Create and manage global curriculum content')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM roles
+CROSS JOIN permissions
+WHERE roles.key = 'admin'
+  AND permissions.key IN ('curriculum.read', 'curriculum.write')
+ON CONFLICT (role_id, permission_id) DO NOTHING;

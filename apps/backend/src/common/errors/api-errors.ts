@@ -59,6 +59,10 @@ export const API_ERROR = {
     code: 'CLASS_SECTION_IN_USE',
     message: 'Class section is in use',
   },
+  INVALID_STATUS_TRANSITION: {
+    code: 'INVALID_STATUS_TRANSITION',
+    message: 'The requested content status transition is not allowed',
+  },
   ROLE_CONFIGURATION_ERROR: {
     code: 'ROLE_CONFIGURATION_ERROR',
     message: 'User role is not configured correctly',

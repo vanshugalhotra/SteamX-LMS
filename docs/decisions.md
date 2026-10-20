@@ -65,6 +65,11 @@ duplicates immediately; reordering uses unused temporary positions. For the two-
 delete and recreate children rather than swapping their column indexes. This avoids raw deferred
 constraints and commit-time uniqueness errors.
 
+## Curriculum course API
+
+- **No course delete endpoint:** archive courses through the status route instead.
+- **Shared status helper:** courses, modules, and lessons use one pure transition helper.
+
 ## Prefix-based asset storage keys
 
 Each asset-file object's storage and playback keys live below
