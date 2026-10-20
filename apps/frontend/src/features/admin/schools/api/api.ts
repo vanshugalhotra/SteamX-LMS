@@ -40,3 +40,8 @@ export function updateSchoolStatus(id: string, status: SchoolStatus) {
     body: JSON.stringify({ status }),
   });
 }
+
+/** GET /schools/:id */
+export function fetchSchool(id: string) {
+  return apiFetch<School>(SCHOOL_ENDPOINTS.byId(id));
+}

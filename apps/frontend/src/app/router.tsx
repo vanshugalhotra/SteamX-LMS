@@ -47,6 +47,22 @@ export const router = createBrowserRouter([
               return { Component: SchoolsPage };
             },
           },
+          {
+            path: PATHS.admin.schoolNew,
+            lazy: async () => {
+              const { SchoolCreatePage } =
+                await import('@/features/admin/schools/pages/SchoolCreatePage');
+              return { Component: SchoolCreatePage };
+            },
+          },
+          {
+            path: PATHS.admin.schoolEdit(':id'),
+            lazy: async () => {
+              const { SchoolEditPage } =
+                await import('@/features/admin/schools/pages/SchoolEditPage');
+              return { Component: SchoolEditPage };
+            },
+          },
           { path: PATHS.admin.base, loader: () => redirect(PATHS.admin.dashboard) },
         ],
       },

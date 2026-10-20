@@ -5,13 +5,24 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { createSchool, fetchSchools, updateSchool, updateSchoolStatus } from './api/api';
+import {
+  createSchool,
+  fetchSchools,
+  updateSchool,
+  updateSchoolStatus,
+  fetchSchool,
+} from './api/api';
 import { type SchoolInput, type SchoolListParams, type SchoolStatus } from './model/types';
 
 export const schoolKeys = {
   all: ['schools'] as const,
   list: (params: SchoolListParams) => [...schoolKeys.all, 'list', params] as const,
+  detail: (id: string) => [...schoolKeys.all, 'detail', id] as const,
 };
+
+export function useSchool(id: string) {
+  return useQuery({ queryKey: schoolKeys.detail(id), queryFn: () => fetchSchool(id) });
+}
 
 export function schoolsQueryOptions(params: SchoolListParams) {
   return queryOptions({

@@ -8,5 +8,7 @@ export const PATHS = {
     base: ADMIN_BASE,
     dashboard: `${ADMIN_BASE}/dashboard`,
     schools: `${ADMIN_BASE}/schools`,
+    schoolNew: `${ADMIN_BASE}/schools/new`,
+    schoolEdit: (id: string) => `${ADMIN_BASE}/schools/${id}/edit`,
   },
 } as const;
