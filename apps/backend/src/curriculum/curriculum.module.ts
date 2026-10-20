@@ -6,10 +6,20 @@ import { CoursesService } from './courses/courses.service.js';
 import { CourseModulesController } from './course-modules/course-modules.controller.js';
 import { CourseModulesRepository } from './course-modules/course-modules.repository.js';
 import { CourseModulesService } from './course-modules/course-modules.service.js';
+import { LessonsController } from './lessons/lessons.controller.js';
+import { LessonsRepository } from './lessons/lessons.repository.js';
+import { LessonsService } from './lessons/lessons.service.js';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [CoursesController, CourseModulesController],
-  providers: [CoursesRepository, CoursesService, CourseModulesRepository, CourseModulesService],
+  controllers: [CoursesController, CourseModulesController, LessonsController],
+  providers: [
+    CoursesRepository,
+    CoursesService,
+    CourseModulesRepository,
+    CourseModulesService,
+    LessonsRepository,
+    LessonsService,
+  ],
 })
 export class CurriculumModule {}

@@ -243,10 +243,13 @@ email, names, and creation times.
 - `GET /health/live` does not query the database; `GET /health/ready` returns `503` when its
   database check fails.
 
-## Workflows to add when modules land
+## Course authoring workflow
 
 - School subscription creation/renewal, date boundaries, delivery caps, and school/course isolation.
-- Curriculum course/module/lesson lifecycle, full-list module reordering, FK-guarded deletion, audience rules, and content publication.
+- Create a course, add modules and lessons, reorder both lists, then activate course → modules → lessons top-down.
+- Archive an active course and verify the database cascades to active modules and lessons only; reactivation must not revive archived descendants.
+- Delete an empty lesson, module, and course; verify deletion is blocked with `RESOURCE_IN_USE` when dependent records remain.
+- Verify lesson audiences, including teacher-only lessons and lessons visible to students.
 - Private asset upload, processing failure, replacement, signed access, and queued storage cleanup.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.
