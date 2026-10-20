@@ -123,7 +123,7 @@ Caller: platform `admin` with `curriculum.write`; updates title and/or descripti
 
 Caller: platform `admin` with `curriculum.write`; changes global course status.
 
-- [auto] When admin requests `DRAFT -> ACTIVE`, `ACTIVE -> ARCHIVED`, or `ARCHIVED -> ACTIVE` -> expect `200`.
+- [auto] When admin requests `DRAFT -> ACTIVE`, `DRAFT -> ARCHIVED`, `ACTIVE -> ARCHIVED`, or `ARCHIVED -> ACTIVE` -> expect `200`.
 - [auto] When admin repeats the current status -> expect `200` without a status change.
 - [auto] When admin requests a forbidden transition -> expect `409 INVALID_STATUS_TRANSITION`.
 - [auto] When a course is archived -> expect database triggers to archive active modules and lessons only; draft descendants stay draft.

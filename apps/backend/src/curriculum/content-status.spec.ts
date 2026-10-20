@@ -6,6 +6,7 @@ describe('canTransitionContentStatus', () => {
   it.each([
     [ContentStatus.DRAFT, ContentStatus.DRAFT],
     [ContentStatus.DRAFT, ContentStatus.ACTIVE],
+    [ContentStatus.DRAFT, ContentStatus.ARCHIVED],
     [ContentStatus.ACTIVE, ContentStatus.ACTIVE],
     [ContentStatus.ACTIVE, ContentStatus.ARCHIVED],
     [ContentStatus.ARCHIVED, ContentStatus.ARCHIVED],
@@ -15,7 +16,6 @@ describe('canTransitionContentStatus', () => {
   });
 
   it.each([
-    [ContentStatus.DRAFT, ContentStatus.ARCHIVED],
     [ContentStatus.ACTIVE, ContentStatus.DRAFT],
     [ContentStatus.ARCHIVED, ContentStatus.DRAFT],
   ])('rejects %s -> %s', (current, next) => {

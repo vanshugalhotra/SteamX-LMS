@@ -240,15 +240,14 @@ describe('Courses endpoints (e2e)', () => {
   it('changes status only along allowed transitions and reports conflicts safely', async () => {
     const cookie = await loginAsCookie(app, fixture.admin);
     const course = await createCourse(cookie, `Status ${randomUUID().slice(0, 8)}`);
+    const discardDraft = await createCourse(cookie, `Discard draft ${randomUUID().slice(0, 8)}`);
 
-    const draftToArchived = await patchCourseStatus(
+    const archivedDraft = await patchCourseStatus(
       cookie,
-      course.id,
+      discardDraft.id,
       ContentStatus.ARCHIVED,
-    ).expect(409);
-    expect(draftToArchived.body.code).toBe('INVALID_STATUS_TRANSITION');
-    expectSafeError(draftToArchived.body);
-
+    ).expect(200);
+    expect(archivedDraft.body.status).toBe(ContentStatus.ARCHIVED);
     await patchCourseStatus(cookie, course.id, ContentStatus.ACTIVE).expect(200);
     await patchCourseStatus(cookie, course.id, ContentStatus.ACTIVE).expect(200);
     const activeToDraft = await patchCourseStatus(cookie, course.id, ContentStatus.DRAFT).expect(
