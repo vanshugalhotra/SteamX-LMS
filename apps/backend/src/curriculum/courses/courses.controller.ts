@@ -45,7 +45,7 @@ import { CoursesService } from './courses.service.js';
     'The required curriculum permission is missing, the caller is not an admin, or Origin is invalid.',
 })
 @ApiInternalServerErrorResponse({ description: 'An unexpected server error occurred.' })
-@Controller({ path: 'courses', version: '1' })
+@Controller({ path: 'courses' })
 export class CoursesController {
   constructor(private readonly courses: CoursesService) {}
 
