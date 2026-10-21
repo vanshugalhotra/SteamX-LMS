@@ -13,3 +13,5 @@ apps/backend/src/generated/prisma/
 .vscode/*
 AGENTS.md
 *.tsbuildinfo
+cdk.out/
+infra/node_modules/
