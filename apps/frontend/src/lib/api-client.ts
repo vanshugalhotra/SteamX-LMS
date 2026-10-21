@@ -5,6 +5,7 @@ const BASE_URL = `${env.VITE_API_URL}${API_PREFIX}`;
 
 interface ApiErrorBody {
   code?: string;
+  message?: string;
   details?: unknown;
   requestId?: string;
 }
@@ -35,12 +36,6 @@ let handlers: Handlers = {};
 export function setApiHandlers(next: Handlers) {
   handlers = next;
 }
-
-const FALLBACK_MESSAGES: Partial<Record<number, string>> = {
-  401: 'Your session has expired. Please log in again.',
-  403: "You don't have access to this.",
-  404: "We couldn't find what you were looking for.",
-};
 
 export interface ApiRequestOptions extends RequestInit {
   /**
@@ -74,9 +69,13 @@ export async function apiFetch<T>(
   const data: unknown = res.status === 204 ? null : await res.json().catch(() => null);
 
   if (!res.ok) {
-    const message = FALLBACK_MESSAGES[res.status] ?? 'Something went wrong. Please try again.';
     const body = typeof data === 'object' && data !== null ? (data as ApiErrorBody) : undefined;
-    const error = new ApiError(res.status, message, body);
+    // `message` is for logs/debugging only; the UI uses getErrorMessage().
+    const error = new ApiError(
+      res.status,
+      body?.message ?? `Request failed (${String(res.status)})`,
+      body,
+    );
 
     if (!skipAuthHandlers) {
       if (res.status === 401) handlers.onUnauthorized?.(error);

@@ -6,22 +6,15 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
-import { ApiError } from '@/lib/api-client';
 import { AuthLayout } from '../components/AuthLayout';
 import { getPostLoginPath, SESSION_EXPIRED } from '../model/redirects';
 import { useLogin } from '../queries';
 import { loginSchema, type LoginValues } from '../model/schemas';
+import { getErrorMessage, type ErrorOverrides } from '@/lib/api-errors';
 
-function getLoginErrorMessage(error: Error) {
-  if (error instanceof ApiError) {
-    if (error.status === 401) {
-      return 'We couldn’t sign you in. Check your SteamX ID and password, or ask your teacher.';
-    }
-    if (error.status === 429) return 'Too many attempts. Please wait a minute and try again.';
-    if (error.status === 0) return error.message; // network error
-  }
-  return 'Something went wrong on our side. Please try again.';
-}
+const LOGIN_ERRORS: ErrorOverrides = {
+  UNAUTHORIZED: 'We couldn’t sign you in. Check your SteamX ID and password, or ask your teacher.',
+};
 
 function isSessionExpired(state: unknown) {
   return (
@@ -70,7 +63,9 @@ export function LoginPage() {
         <Alert className="mb-5">Your session has expired. Please sign in again.</Alert>
       )}
 
-      {login.isError && <Alert className="mb-5">{getLoginErrorMessage(login.error)}</Alert>}
+      {login.isError && (
+        <Alert className="mb-5">{getErrorMessage(login.error, LOGIN_ERRORS)}</Alert>
+      )}
 
       <form
         noValidate

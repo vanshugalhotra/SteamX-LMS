@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import type { School } from '../model/types';
-import { schoolErrorMessage } from '../model/errors';
+import { getErrorMessage } from '@/lib/api-errors';
 import { useUpdateSchoolStatus } from '../queries';
 import { SchoolStatusBadge } from './SchoolStatusBadge';
 
@@ -18,7 +18,7 @@ export function SchoolStatusSection({ school, onDone }: { school: School; onDone
           onDone?.();
         },
         onError: (error) => {
-          toast.error(schoolErrorMessage(error), { id: 'school-status-failed' });
+          toast.error(getErrorMessage(error), { id: 'school-status-failed' });
         },
       },
     );

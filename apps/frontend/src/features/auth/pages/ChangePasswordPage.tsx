@@ -11,12 +11,7 @@ import { ApiError } from '@/lib/api-client';
 import { queryClient } from '@/lib/query-client';
 import { changePassword } from '../api/api';
 import { AuthLayout } from '../components/AuthLayout';
-import {
-  INVALID_CURRENT_PASSWORD,
-  PASSWORD_POLICY,
-  PASSWORD_REUSED,
-  policyMessages,
-} from '../model/errors';
+import { getErrorMessages } from '@/lib/api-errors';
 import { getHomePath } from '../model/redirects';
 import { sessionQueryOptions } from '../queries';
 
@@ -32,20 +27,6 @@ const changePasswordSchema = z
   });
 
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
-
-function getErrorMessages(error: unknown): string[] {
-  if (!(error instanceof ApiError)) return ['Something went wrong. Please try again.'];
-  switch (error.code) {
-    case PASSWORD_POLICY:
-      return policyMessages(error.details);
-    case INVALID_CURRENT_PASSWORD:
-      return ['Your current password is incorrect.'];
-    case PASSWORD_REUSED:
-      return ['Your new password must be different from your current password.'];
-    default:
-      return [error.message];
-  }
-}
 
 export function ChangePasswordPage() {
   const navigate = useNavigate();
