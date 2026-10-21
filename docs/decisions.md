@@ -79,6 +79,8 @@ constraints and commit-time uniqueness errors.
   foreign keys are the guard.
 - **Delete conflict response:** all foreign-key-restricted deletes use the shared `RESOURCE_IN_USE`
   error code.
+- **Lesson deletion:** allow deletion only when no blocks or other dependent records reference it;
+  restrictive foreign keys are the guard.
 
 ## Curriculum course API
 

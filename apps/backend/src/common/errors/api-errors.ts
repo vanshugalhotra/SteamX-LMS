@@ -61,7 +61,7 @@ export const API_ERROR = {
   },
   INVALID_ORDER: {
     code: 'INVALID_ORDER',
-    message: 'Module IDs must include every module in the course exactly once',
+    message: 'The supplied IDs must include every item in the parent exactly once',
   },
   PARENT_NOT_ACTIVE: {
     code: 'PARENT_NOT_ACTIVE',
