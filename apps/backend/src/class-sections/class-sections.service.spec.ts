@@ -52,7 +52,7 @@ describe('ClassSectionsService', () => {
     );
 
     await expect(service.delete(actor, 'section-1')).rejects.toMatchObject({
-      response: API_ERROR.CLASS_SECTION_IN_USE,
+      response: API_ERROR.RESOURCE_IN_USE,
     });
   });
 });

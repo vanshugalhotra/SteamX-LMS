@@ -47,7 +47,7 @@ import { ClassSectionsService } from './class-sections.service.js';
 @ApiInternalServerErrorResponse({
   description: 'An unexpected server error occurred.',
 })
-@Controller({ path: 'class-sections', version: '1' })
+@Controller({ path: 'class-sections' })
 export class ClassSectionsController {
   constructor(private readonly sections: ClassSectionsService) {}
 
@@ -144,7 +144,7 @@ export class ClassSectionsController {
   @ApiBadRequestResponse({
     description: 'The class-section ID is not a UUID.',
   })
-  @ApiConflictResponse({ description: 'Class section is in use.' })
+  @ApiConflictResponse({ description: 'Section has dependent records and cannot be deleted.' })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
   delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.sections.delete(actor, id);

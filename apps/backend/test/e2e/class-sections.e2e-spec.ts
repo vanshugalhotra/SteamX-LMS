@@ -293,7 +293,7 @@ describe('Class sections endpoints (e2e)', () => {
     expect(duplicateTarget.id).not.toBe(section.id);
   });
 
-  it('deletes empty sections and maps student references to CLASS_SECTION_IN_USE', async () => {
+  it('deletes empty sections and maps student references to RESOURCE_IN_USE', async () => {
     const adminCookie = await loginAs(app, fixture.admin);
     const removable = await createSection(
       adminCookie,
@@ -305,8 +305,8 @@ describe('Class sections endpoints (e2e)', () => {
     await remove(adminCookie, fixture.schoolA.section.id)
       .expect(409)
       .then(({ body }) => {
-        expect(body.code).toBe('CLASS_SECTION_IN_USE');
-        expect(body.message).toBe('Class section is in use');
+        expect(body.code).toBe('RESOURCE_IN_USE');
+        expect(body.message).toBe('Resource has dependent records and cannot be deleted');
       });
 
     const allSection = await createSection(

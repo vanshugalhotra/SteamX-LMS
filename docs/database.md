@@ -73,8 +73,9 @@ comments have a database trigger unless an applied migration creates it.
 - **Blocks:** content must be a JSON object. Database checks enforce asset/block shape, two-column
   layout, column range, and valid parent and asset types.
 - **Immutable fields:** module `course_id`, lesson `course_id`, asset `type`, and lesson-block
-  `lesson_id` and `type` cannot change. Lessons may move between modules in the same course;
-  moving a block to another lesson requires copy + delete.
+  `lesson_id` and `type` cannot change. The database permits changing a lesson's `module_id` within
+  its course, but the application currently exposes no lesson-move endpoint; moving a block to
+  another lesson requires copy + delete.
 - **Ordering:** Prisma unique constraints prevent duplicate module, lesson, and top-level block
   positions, and duplicate child columns. They are checked immediately; do not upsert positional
   rows. Use unused temporary positions when reordering; delete and recreate two-column children

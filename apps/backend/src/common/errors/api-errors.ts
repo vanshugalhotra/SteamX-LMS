@@ -55,13 +55,17 @@ export const API_ERROR = {
     code: 'CLASS_SECTION_EXISTS',
     message: 'Class section already exists',
   },
-  CLASS_SECTION_IN_USE: {
-    code: 'CLASS_SECTION_IN_USE',
-    message: 'Class section is in use',
+  RESOURCE_IN_USE: {
+    code: 'RESOURCE_IN_USE',
+    message: 'Resource has dependent records and cannot be deleted',
   },
-  COURSE_IN_USE: {
-    code: 'COURSE_IN_USE',
-    message: 'Course has related content or records and cannot be deleted',
+  INVALID_ORDER: {
+    code: 'INVALID_ORDER',
+    message: 'The supplied IDs must include every item in the parent exactly once',
+  },
+  PARENT_NOT_ACTIVE: {
+    code: 'PARENT_NOT_ACTIVE',
+    message: 'The parent course must be active',
   },
   INVALID_STATUS_TRANSITION: {
     code: 'INVALID_STATUS_TRANSITION',

@@ -243,10 +243,22 @@ email, names, and creation times.
 - `GET /health/live` does not query the database; `GET /health/ready` returns `503` when its
   database check fails.
 
-## Workflows to add when modules land
+## Course authoring workflow
 
 - School subscription creation/renewal, date boundaries, delivery caps, and school/course isolation.
-- Curriculum course/module/lesson lifecycle, unused-course deletion, ordering, audience rules, and content publication.
+- Create a course and call `GET /api/v1/courses/:id/outline`; verify course fields and `modules: []`.
+- Add modules and call the outline after each addition; verify position order and `lessons: []` for
+  modules without lessons.
+- Add lessons and call the outline after each addition; verify their module nesting and position order.
+- Reorder modules and lessons, calling the outline after each reorder to verify both orders.
+- Move a lesson to another module, delete content, and call the outline after each change to verify
+  the current hierarchy and position gaps.
+- Activate course → modules → lessons top-down, calling the outline after each status change to
+  verify the updated status.
+- Archive an active course and verify the outline shows the database cascade to active modules and
+  lessons only; draft descendants stay draft and reactivation does not revive archived descendants.
+- Delete an empty lesson, module, and course; verify deletion is blocked with `RESOURCE_IN_USE` when dependent records remain.
+- Verify lesson audiences, including teacher-only lessons and lessons visible to students.
 - Private asset upload, processing failure, replacement, signed access, and queued storage cleanup.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.

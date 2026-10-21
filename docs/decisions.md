@@ -65,6 +65,23 @@ duplicates immediately; reordering uses unused temporary positions. For the two-
 delete and recreate children rather than swapping their column indexes. This avoids raw deferred
 constraints and commit-time uniqueness errors.
 
+## Course module ordering
+
+- **Full-list reorder:** `PUT /courses/:courseId/modules/order` accepts the complete ordered module
+  ID list. Under a parent course row lock, park positions before assigning final positions because
+  `(course_id, position)` is immediately unique. Evaluate deferred constraints with one set-based
+  update only if reorder becomes a measured bottleneck.
+- **Position gaps:** deleting a module does not renumber siblings; create appends after the highest
+  position and reorder normalizes the list.
+- **Nested list pagination:** the course's module list is deliberately unpaginated so reorder clients
+  receive the complete ordered set.
+- **Module deletion:** allow deletion only when no dependent record references the module; restrictive
+  foreign keys are the guard.
+- **Delete conflict response:** all foreign-key-restricted deletes use the shared `RESOURCE_IN_USE`
+  error code.
+- **Lesson deletion:** allow deletion only when no blocks or other dependent records reference it;
+  restrictive foreign keys are the guard.
+
 ## Curriculum course API
 
 - **Course deletion:** allow deletion only when the course has no dependent records; restrictive
@@ -74,6 +91,13 @@ constraints and commit-time uniqueness errors.
   that cannot be deleted because it has dependent records. Content may not transition back to `DRAFT`.
 - **Course titles are not unique:** global content titles may be reused, including after archival.
   Admins are responsible for avoiding confusing duplicate active course titles.
+
+## Course outline read model
+
+`GET /courses/:id/outline` is a deliberate read-only exception to curriculum module boundaries: one
+repository query reads the course, modules, and lessons together. All writes remain in the courses,
+course-modules, and lessons folders. The endpoint is admin-only, unfiltered, and unpaginated; teacher
+and student outlines require separate release- and audience-filtered endpoints.
 
 ## Prefix-based asset storage keys
 
