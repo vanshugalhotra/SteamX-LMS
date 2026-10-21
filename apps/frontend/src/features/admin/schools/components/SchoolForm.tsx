@@ -6,9 +6,8 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { FormRenderer } from '@/components/form/FormRenderer';
 import { getSchoolFields } from '../config/schools.config';
-import { ApiError } from '@/lib/api-client';
 import type { School, SchoolInput } from '../model/types';
-import { SCHOOL_CODE_EXISTS, schoolErrorMessage, validationFieldErrors } from '../model/errors';
+import { API_ERROR_CODE, getErrorMessage, getFieldErrors, hasErrorCode } from '@/lib/api-errors';
 import { createSchoolSchema, editSchoolSchema, type SchoolFormValues } from '../model/schemas';
 import { useCreateSchool, useUpdateSchool } from '../queries';
 
@@ -69,12 +68,12 @@ export function SchoolForm({ school, onDone, onCancel }: SchoolFormProps) {
   const busy = isSubmitting || create.isPending || update.isPending;
 
   const showError = (error: unknown) => {
-    if (error instanceof ApiError && error.code === SCHOOL_CODE_EXISTS) {
-      setError('code', { message: 'This school code is already in use.' });
+    if (hasErrorCode(error, API_ERROR_CODE.SCHOOL_CODE_EXISTS)) {
+      setError('code', { message: getErrorMessage(error) });
       setFocus('code');
       return;
     }
-    const fieldErrors = validationFieldErrors(error);
+    const fieldErrors = getFieldErrors(error);
     const known = Object.keys(fieldErrors).filter((field) => field in toDefaults());
     if (known.length > 0) {
       for (const field of known) {
@@ -82,7 +81,7 @@ export function SchoolForm({ school, onDone, onCancel }: SchoolFormProps) {
       }
       return;
     }
-    setFormError(schoolErrorMessage(error));
+    setFormError(getErrorMessage(error));
   };
 
   const onSubmit = handleSubmit(async (values) => {

@@ -1,4 +1,4 @@
-import { isPasswordChangeRequired } from '@/features/auth/model/errors';
+import { API_ERROR_CODE, getErrorMessage, hasErrorCode } from '@/lib/api-errors';
 import type { AuthProfile } from '@/features/auth/api/api';
 import { SESSION_EXPIRED } from '@/features/auth/model/redirects';
 import { PATHS } from '@/lib/paths';
@@ -22,7 +22,7 @@ export function registerSessionHandlers() {
       }
     },
     onForbidden: (error) => {
-      if (isPasswordChangeRequired(error)) {
+      if (hasErrorCode(error, API_ERROR_CODE.PASSWORD_CHANGE_REQUIRED)) {
         // The cached profile is stale; update it so changePasswordLoader doesn't bounce back to "/".
         queryClient.setQueryData<AuthProfile | null>(sessionQueryOptions.queryKey, (old) =>
           old ? { ...old, mustChangePassword: true } : old,
@@ -31,7 +31,7 @@ export function registerSessionHandlers() {
         return;
       }
       // TODO: Revisit when role-based routing is in place.
-      toast.error("You don't have access to this.", { id: 'forbidden' });
+      toast.error(getErrorMessage(error), { id: 'forbidden' });
     },
   });
 }
