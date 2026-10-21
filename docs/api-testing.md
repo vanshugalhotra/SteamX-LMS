@@ -109,6 +109,27 @@ Caller: platform `admin` with `curriculum.read`; reads a global course.
 - [auto] When ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] When teacher/school staff or student calls, even with curriculum permissions granted -> expect `403 FORBIDDEN`.
 
+### `GET /courses/:id/outline`
+
+Caller: platform `admin` with `curriculum.read`; reads the complete, unfiltered global outline.
+
+- [auto] When the course has several modules and lessons -> expect only the documented nested
+  `course` object, modules, and lessons, ordered by position at both levels.
+- [auto] When module or lesson positions have gaps after deletion -> expect the remaining content in
+  ascending position order without renumbering.
+- [auto] When course/module/lesson statuses are mixed -> expect all statuses and lesson audiences;
+  no status or audience filtering is applied.
+- [auto] When the course has no modules -> expect `modules: []`; when a module has no lessons ->
+  expect `lessons: []`.
+- [auto] After reorder, moving a lesson to another module, deletion, or archive cascade -> expect
+  the next outline read to reflect the current hierarchy and statuses.
+- [auto] When the course has 20 modules with 10 lessons each -> expect all 200 lessons and
+  position-ordered modules and lessons.
+- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When teacher, school staff, or student calls, even with `curriculum.read` granted ->
+  expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
+- [auto] When the response is returned -> verify no fields exist outside the documented nested set.
+
 ### `PATCH /courses/:id`
 
 Caller: platform `admin` with `curriculum.write`; updates title and/or description.

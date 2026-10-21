@@ -92,6 +92,13 @@ constraints and commit-time uniqueness errors.
 - **Course titles are not unique:** global content titles may be reused, including after archival.
   Admins are responsible for avoiding confusing duplicate active course titles.
 
+## Course outline read model
+
+`GET /courses/:id/outline` is a deliberate read-only exception to curriculum module boundaries: one
+repository query reads the course, modules, and lessons together. All writes remain in the courses,
+course-modules, and lessons folders. The endpoint is admin-only, unfiltered, and unpaginated; teacher
+and student outlines require separate release- and audience-filtered endpoints.
+
 ## Prefix-based asset storage keys
 
 Each asset-file object's storage and playback keys live below

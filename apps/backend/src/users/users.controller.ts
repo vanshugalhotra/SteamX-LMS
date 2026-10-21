@@ -50,7 +50,7 @@ import { UpdateUserStatusDto } from './dto/update-user-status.dto.js';
 @ApiInternalServerErrorResponse({
   description: 'An unexpected server error occurred.',
 })
-@Controller({ path: 'users', version: '1' })
+@Controller({ path: 'users' })
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 

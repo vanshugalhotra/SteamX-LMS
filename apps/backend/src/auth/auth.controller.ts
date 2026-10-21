@@ -23,7 +23,7 @@ import { AuthProfile, toAuthProfile } from './types/auth-profile.js';
 import { TokenService } from './services/token.service.js';
 
 @ApiTags('Authentication')
-@Controller({ path: 'auth', version: '1' })
+@Controller({ path: 'auth' })
 export class AuthController {
   constructor(
     private readonly auth: AuthService,

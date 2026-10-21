@@ -47,7 +47,7 @@ import { ClassSectionsService } from './class-sections.service.js';
 @ApiInternalServerErrorResponse({
   description: 'An unexpected server error occurred.',
 })
-@Controller({ path: 'class-sections', version: '1' })
+@Controller({ path: 'class-sections' })
 export class ClassSectionsController {
   constructor(private readonly sections: ClassSectionsService) {}
 

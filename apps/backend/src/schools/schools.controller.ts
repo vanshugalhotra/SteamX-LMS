@@ -36,7 +36,7 @@ import { SchoolsService } from './schools.service.js';
 @ApiInternalServerErrorResponse({
   description: 'An unexpected server error occurred.',
 })
-@Controller({ path: 'schools', version: '1' })
+@Controller({ path: 'schools' })
 export class SchoolsController {
   constructor(private readonly schools: SchoolsService) {}
 
