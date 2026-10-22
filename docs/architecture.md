@@ -2,30 +2,30 @@
 
 ## Backend layers
 
-| Layer | Responsibility |
-| --- | --- |
-| Controller | HTTP routes, validated DTOs, auth context → delegates to service → returns result. |
-| Service | Business rules, permission checks, school scope. Calls other modules via exported services. |
-| Repository | Prisma queries and transactions. No HTTP or business logic. |
+| Layer      | Responsibility                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| Controller | HTTP routes, validated DTOs, auth context → delegates to service → returns result.          |
+| Service    | Business rules, permission checks, school scope. Calls other modules via exported services. |
+| Repository | Prisma queries and transactions. No HTTP or business logic.                                 |
 
 Response mappers convert database records → response DTOs. Shared helpers live in `src/common/`; feature rules stay in their modules.
 
 ## Module map
 
-| Module | Responsibility | Exports |
-| --- | --- | --- |
-| `AppModule` | Root composition: config, feature modules, global guards, exception filter. | — |
-| `AuthModule` | Login, passwords, sessions, permissions. | `AuthGuard`, `AuthContextRepository`, `AuthService`, `PasswordService`, `PermissionGuard`, `TokenService` |
-| `UsersModule` | User CRUD, profiles, status, SteamX IDs. | — |
-| `SchoolsModule` | School management. | `SchoolsService` |
-| `ClassSectionsModule` | Class-section management. | `ClassSectionsService` |
-| `CurriculumModule` | Global course/module/lesson lifecycle, ordering, status transitions, outline. | `CoursesService`, `CourseModulesService`, `LessonsService`, `CourseOutlineService` |
-| `StorageModule` | S3 boundary: presigned URLs, object metadata, prefix deletion. | `StorageService` |
-| `TenancyModule` | Resolves a required active school for workflows. | `ActiveSchoolService` |
-| `PrismaModule` | Configured Prisma client. | `PrismaService` |
-| `HealthModule` | Liveness + database readiness checks. | — |
-| `LoggingModule` | Pino request logging, request IDs, redaction. | — |
-| Global `ConfigModule` | Validated environment config. | Global Nest provider |
+| Module                | Responsibility                                                                | Exports                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `AppModule`           | Root composition: config, feature modules, global guards, exception filter.   | —                                                                                                         |
+| `AuthModule`          | Login, passwords, sessions, permissions.                                      | `AuthGuard`, `AuthContextRepository`, `AuthService`, `PasswordService`, `PermissionGuard`, `TokenService` |
+| `UsersModule`         | User CRUD, profiles, status, SteamX IDs.                                      | —                                                                                                         |
+| `SchoolsModule`       | School management.                                                            | `SchoolsService`                                                                                          |
+| `ClassSectionsModule` | Class-section management.                                                     | `ClassSectionsService`                                                                                    |
+| `CurriculumModule`    | Global course/module/lesson lifecycle, ordering, status transitions, outline. | `CoursesService`, `CourseModulesService`, `LessonsService`, `CourseOutlineService`                        |
+| `StorageModule`       | S3 boundary: presigned URLs, object metadata, prefix deletion.                | `StorageService`                                                                                          |
+| `TenancyModule`       | Resolves a required active school for workflows.                              | `ActiveSchoolService`                                                                                     |
+| `PrismaModule`        | Configured Prisma client.                                                     | `PrismaService`                                                                                           |
+| `HealthModule`        | Liveness + database readiness checks.                                         | —                                                                                                         |
+| `LoggingModule`       | Pino request logging, request IDs, redaction.                                 | —                                                                                                         |
+| Global `ConfigModule` | Validated environment config.                                                 | Global Nest provider                                                                                      |
 
 > **Note:** Delivery, enrollment, and assignment tables exist in the schema but have no API modules yet.
 

@@ -29,12 +29,12 @@ Region: CDK context `region` → `AWS_REGION` → defaults to `ap-south-1`.
 
 ### Commands
 
-| Command | What it does |
-| --- | --- |
-| `pnpm infra:synth` | Synthesize stack template |
-| `pnpm infra:diff` | Preview changes |
-| `pnpm infra:deploy` | Deploy (requires approval for permission broadening) |
-| `pnpm infra:test` | Run infrastructure assertions |
+| Command              | What it does                                                               |
+| -------------------- | -------------------------------------------------------------------------- |
+| `pnpm infra:synth`   | Synthesize stack template                                                  |
+| `pnpm infra:diff`    | Preview changes                                                            |
+| `pnpm infra:deploy`  | Deploy (requires approval for permission broadening)                       |
+| `pnpm infra:test`    | Run infrastructure assertions                                              |
 | `pnpm infra:destroy` | Delete `SteamxStagingStack` only — **deletes the bucket and all contents** |
 
 CDK context `env` defaults to `staging`. Staging allows stack deletion; other environments retain the bucket with termination protection.

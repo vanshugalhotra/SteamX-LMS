@@ -4,38 +4,38 @@ The Prisma schema defines all tables. API modules currently cover identity, scho
 
 ## Tables
 
-| Area | Table | Purpose |
-| --- | --- | --- |
-| School | `schools` | School identity, contact, status. |
-| Auth | `roles` | Role key + user type. |
-| Auth | `permissions` | Named capabilities. |
-| Auth | `role_permissions` | Role → permission grants. |
-| Users | `users` | Account identity, credentials, status, school. |
-| Users | `student_profiles` | Student-specific details + class section. |
-| Users | `teacher_profiles` | Teacher-specific details. |
-| Class sections | `class_sections` | School-owned class + section names. |
-| Curriculum | `courses` | Central course records. |
-| Curriculum | `modules` | Ordered modules within a course. |
-| Curriculum | `lessons` | Ordered lessons within a module. |
-| Curriculum | `lesson_blocks` | Structured content blocks within lessons. |
-| Assets | `assets` | Central media asset metadata. |
-| Assets | `asset_files` | File upload + processing state. |
-| Subscriptions | `subscriptions` | School access period + delivery limit per course. |
-| Delivery | `deliveries` | Course delivery to a class section + academic year. |
-| Delivery | `delivery_teachers` | Teacher assignment stints. |
-| Delivery | `delivery_lesson_releases` | Released lessons in a delivery. |
-| Enrollment | `delivery_enrollments` | Student membership + status. |
-| Progress | `lesson_completions` | Student lesson completion state. |
-| Assignments | `assignment_templates` | Reusable assignment blueprint. |
-| Assignments | `assignments` | Assignment instance for a delivery. |
-| Assignments | `assignment_items` | Questions/tasks within an assignment. |
-| Assignments | `assignment_item_options` | Choices for single-choice items. |
-| Assignments | `assignment_rubric_criteria` | Scoring criteria. |
-| Submissions | `submissions` | Student submission + grading state. |
-| Submissions | `submission_answers` | Answers attached to a submission. |
-| Submissions | `submission_files` | Files attached to a submission. |
-| Submissions | `submission_criterion_scores` | Per-criterion scores. |
-| Storage | `storage_cleanup_queue` | Storage keys queued for deletion. |
+| Area           | Table                         | Purpose                                             |
+| -------------- | ----------------------------- | --------------------------------------------------- |
+| School         | `schools`                     | School identity, contact, status.                   |
+| Auth           | `roles`                       | Role key + user type.                               |
+| Auth           | `permissions`                 | Named capabilities.                                 |
+| Auth           | `role_permissions`            | Role → permission grants.                           |
+| Users          | `users`                       | Account identity, credentials, status, school.      |
+| Users          | `student_profiles`            | Student-specific details + class section.           |
+| Users          | `teacher_profiles`            | Teacher-specific details.                           |
+| Class sections | `class_sections`              | School-owned class + section names.                 |
+| Curriculum     | `courses`                     | Central course records.                             |
+| Curriculum     | `modules`                     | Ordered modules within a course.                    |
+| Curriculum     | `lessons`                     | Ordered lessons within a module.                    |
+| Curriculum     | `lesson_blocks`               | Structured content blocks within lessons.           |
+| Assets         | `assets`                      | Central media asset metadata.                       |
+| Assets         | `asset_files`                 | File upload + processing state.                     |
+| Subscriptions  | `subscriptions`               | School access period + delivery limit per course.   |
+| Delivery       | `deliveries`                  | Course delivery to a class section + academic year. |
+| Delivery       | `delivery_teachers`           | Teacher assignment stints.                          |
+| Delivery       | `delivery_lesson_releases`    | Released lessons in a delivery.                     |
+| Enrollment     | `delivery_enrollments`        | Student membership + status.                        |
+| Progress       | `lesson_completions`          | Student lesson completion state.                    |
+| Assignments    | `assignment_templates`        | Reusable assignment blueprint.                      |
+| Assignments    | `assignments`                 | Assignment instance for a delivery.                 |
+| Assignments    | `assignment_items`            | Questions/tasks within an assignment.               |
+| Assignments    | `assignment_item_options`     | Choices for single-choice items.                    |
+| Assignments    | `assignment_rubric_criteria`  | Scoring criteria.                                   |
+| Submissions    | `submissions`                 | Student submission + grading state.                 |
+| Submissions    | `submission_answers`          | Answers attached to a submission.                   |
+| Submissions    | `submission_files`            | Files attached to a submission.                     |
+| Submissions    | `submission_criterion_scores` | Per-criterion scores.                               |
+| Storage        | `storage_cleanup_queue`       | Storage keys queued for deletion.                   |
 
 ## Database-enforced rules
 
@@ -84,9 +84,11 @@ pnpm --filter @steamx/backend migrate:status
 > **Rules:** Never edit an applied migration. Never use `synchronize: true` outside local dev.
 
 After migrations, create the first admin:
+
 ```powershell
 pnpm --filter @steamx/backend admin:create
 ```
+
 (Reads `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD` from env.)
 
 ## Reset a dev database

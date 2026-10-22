@@ -2,14 +2,14 @@
 
 ## Glossary
 
-| Term | Meaning |
-| --- | --- |
-| User type | `PLATFORM_STAFF`, `SCHOOL_STAFF`, or `STUDENT`. |
-| Role | Database role (`admin`, `teacher`, `student`); one per user. |
-| Permission | Named capability (e.g. `user.read`) granted to a role via `role_permissions`. |
-| School scope | Which school's records a caller can query. |
-| Platform staff | No `school_id`; may act across schools when authorized. |
-| School staff | Bound to one school. Current role: `teacher`. |
+| Term           | Meaning                                                                       |
+| -------------- | ----------------------------------------------------------------------------- |
+| User type      | `PLATFORM_STAFF`, `SCHOOL_STAFF`, or `STUDENT`.                               |
+| Role           | Database role (`admin`, `teacher`, `student`); one per user.                  |
+| Permission     | Named capability (e.g. `user.read`) granted to a role via `role_permissions`. |
+| School scope   | Which school's records a caller can query.                                    |
+| Platform staff | No `school_id`; may act across schools when authorized.                       |
+| School staff   | Bound to one school. Current role: `teacher`.                                 |
 
 ## Sessions
 
@@ -32,12 +32,12 @@
 
 Two separate filters:
 
-| Helper | Question it answers |
-| --- | --- |
-| `resolveSchoolScope` | Which school's records can this caller query? |
-| `schoolFilter` | Turns resolved scope into a Prisma `where` predicate. |
-| `ActiveSchoolService.resolveSchool` | Loads + validates one specific school for workflows. |
-| `userVisibility` | Which user records can this caller see? |
+| Helper                              | Question it answers                                   |
+| ----------------------------------- | ----------------------------------------------------- |
+| `resolveSchoolScope`                | Which school's records can this caller query?         |
+| `schoolFilter`                      | Turns resolved scope into a Prisma `where` predicate. |
+| `ActiveSchoolService.resolveSchool` | Loads + validates one specific school for workflows.  |
+| `userVisibility`                    | Which user records can this caller see?               |
 
 Key rules:
 
