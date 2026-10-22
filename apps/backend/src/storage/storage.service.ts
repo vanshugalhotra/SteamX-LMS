@@ -51,6 +51,12 @@ export interface StorageHeadResult {
  * than a particular provider, so production can use S3 and tests can use an in-memory fake.
  */
 export abstract class StorageService {
+  /**
+   * Creates a one-shot presigned PUT URL. The URL includes `If-None-Match: *`, so S3
+   * rejects the upload with 412 if an object already exists at the key. Callers must
+   * generate a new key for each retry — reusing the same key after a successful upload
+   * will always fail.
+   */
   abstract createUploadUrl(input: CreateUploadUrlInput): Promise<CreateUploadUrlResult>;
 
   /**

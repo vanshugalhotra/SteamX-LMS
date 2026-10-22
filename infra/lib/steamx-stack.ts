@@ -22,7 +22,8 @@ export class SteamxStack extends Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
-      versioned: false, // Revisit for production backups.
+      // TODO(prod): enable versioning and add a lifecycle rule to expire non-current versions.
+      versioned: false,
       removalPolicy: config.bucketRemovalPolicy,
       autoDeleteObjects: config.autoDeleteObjects,
       lifecycleRules: [{ abortIncompleteMultipartUploadAfter: Duration.days(1) }],
@@ -30,7 +31,7 @@ export class SteamxStack extends Stack {
         {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET, s3.HttpMethods.HEAD],
           allowedOrigins: config.corsOrigins,
-          allowedHeaders: ['*'],
+          allowedHeaders: ['Content-Type', 'Content-Length', 'If-None-Match', 'Range'],
           exposedHeaders: ['ETag', 'Content-Disposition'],
           maxAge: 3000,
         },
