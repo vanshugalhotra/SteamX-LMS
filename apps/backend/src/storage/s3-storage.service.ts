@@ -60,6 +60,10 @@ function isMissingObject(error: unknown): boolean {
     $metadata?: { httpStatusCode?: number };
   };
 
+  if (candidate.name === 'NoSuchBucket' || candidate.Code === 'NoSuchBucket') {
+    return false;
+  }
+
   return (
     candidate.name === 'NotFound' ||
     candidate.name === 'NoSuchKey' ||
@@ -123,19 +127,20 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
       Key: key,
       ContentType: contentType,
       ContentLength: sizeBytes,
+      IfNoneMatch: '*',
     });
     const expiresIn = this.uploadUrlTtlSeconds;
     const url = await getSignedUrl(this.client, command, {
       expiresIn,
       // Force both browser-supplied values into the signature.
-      signableHeaders: new Set(['content-type', 'content-length']),
+      signableHeaders: new Set(['content-type', 'content-length', 'if-none-match']),
     });
 
     this.logger.debug({ operation: 'createUploadUrl', key, size: sizeBytes }, 'Created upload URL');
     return {
       url,
       method: 'PUT' as const,
-      headers: { 'Content-Type': contentType },
+      headers: { 'Content-Type': contentType, 'If-None-Match': '*' as const },
       expiresAt: new Date(Date.now() + expiresIn * 1_000),
     };
   }

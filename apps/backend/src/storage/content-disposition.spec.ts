@@ -25,6 +25,22 @@ describe('buildContentDisposition', () => {
     expect(fallback).toHaveLength(150);
   });
 
+  it('limits the Unicode filename as well as the ASCII fallback', () => {
+    const disposition = buildContentDisposition(`${'😀'.repeat(200)}.pdf`);
+    const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]*)/)?.[1];
+    expect(encodedFilename).toBe(encodeURIComponent('😀'.repeat(150)));
+  });
+
+  it('uses file for both filename forms when sanitizing removes the whole name', () => {
+    expect(buildContentDisposition('\u0000\u001f\u007f')).toBe(
+      `inline; filename="file"; filename*=UTF-8''file`,
+    );
+  });
+
+  it('replaces percent in the ASCII fallback to prevent browser percent-decoding', () => {
+    expect(buildContentDisposition('a%41.pdf')).toContain('filename="a_41.pdf"');
+  });
+
   it.each(['नमस्ते.pdf', 'தமிழ்.pdf', '📘😀.pdf'])(
     'preserves Unicode names in filename* (%s)',
     (filename) => {

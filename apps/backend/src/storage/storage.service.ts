@@ -23,7 +23,7 @@ export interface CreateUploadUrlInput {
 export interface CreateUploadUrlResult {
   url: string;
   method: 'PUT';
-  headers: { 'Content-Type': string };
+  headers: { 'Content-Type': string; 'If-None-Match': '*' };
   expiresAt: Date;
 }
 

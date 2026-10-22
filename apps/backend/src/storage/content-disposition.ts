@@ -20,12 +20,16 @@ export function buildContentDisposition(filename?: string): string {
     return 'inline';
   }
 
-  const cleaned = cleanFilename(filename);
+  const cleaned = Array.from(cleanFilename(filename)).slice(0, 150).join('');
+  if (cleaned.length === 0) {
+    return `inline; filename="file"; filename*=UTF-8''file`;
+  }
+
   // The quoted fallback is printable ASCII only and bounded for broad client compatibility.
   const asciiFallback =
     cleaned
       .trim()
-      .replace(/[^\x20-\x7e]|["\\ ;]/g, '_')
+      .replace(/[^\x20-\x7e]|["\\ ;%]/g, '_')
       .trim()
       .slice(0, 150)
       .trim() || 'file';

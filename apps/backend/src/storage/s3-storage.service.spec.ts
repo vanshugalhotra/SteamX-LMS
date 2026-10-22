@@ -78,11 +78,15 @@ describe('S3StorageService presigned URLs', () => {
     const url = new URL(result.url);
 
     expect(result.method).toBe('PUT');
-    expect(result.headers).toEqual({ 'Content-Type': 'application/pdf' });
+    expect(result.headers).toEqual({
+      'Content-Type': 'application/pdf',
+      'If-None-Match': '*',
+    });
     expect(url.pathname).toContain(KEY);
     expect(url.searchParams.get('X-Amz-Expires')).toBe('321');
     expect(url.searchParams.get('X-Amz-SignedHeaders')).toContain('content-type');
     expect(url.searchParams.get('X-Amz-SignedHeaders')).toContain('content-length');
+    expect(url.searchParams.get('X-Amz-SignedHeaders')).toContain('if-none-match');
     expect(
       [...url.searchParams.keys()].some((name) =>
         /x-amz-checksum|x-amz-sdk-checksum-algorithm/i.test(name),
@@ -134,6 +138,22 @@ describe('S3StorageService object operations', () => {
     send.mockRejectedValueOnce(failure);
     await expect(service.head(KEY)).rejects.toBe(failure);
     expect(send.mock.calls[0]?.[0]).toBeInstanceOf(HeadObjectCommand);
+  });
+
+  it('does not mistake a missing bucket for a missing object', async () => {
+    const { service, send } = createService();
+    const missingBucket = makeS3Error('NoSuchBucket', 404);
+    send.mockRejectedValueOnce(missingBucket);
+
+    await expect(service.head(KEY)).rejects.toBe(missingBucket);
+  });
+
+  it('does not translate a missing bucket during byte reads to a missing object', async () => {
+    const { service, send } = createService();
+    const missingBucket = makeS3Error('NoSuchBucket', 404);
+    send.mockRejectedValueOnce(missingBucket);
+
+    await expect(service.readFirstBytes(KEY, 1)).rejects.toBe(missingBucket);
   });
 
   it('reads only the requested byte range', async () => {

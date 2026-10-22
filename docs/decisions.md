@@ -127,8 +127,9 @@ wrapper.
 
 S3 clients use `requestChecksumCalculation` and `responseChecksumValidation` set to
 `WHEN_REQUIRED`: the SDK's default checksum behavior breaks presigned browser uploads. Presigned
-PUT signing explicitly includes `content-type` and `content-length` through the presigner's
-`signableHeaders` option.
+PUT signing explicitly includes `content-type`, `content-length`, and `if-none-match` through the
+presigner's `signableHeaders` option. `If-None-Match: *` makes S3 reject a second upload to an
+existing key, so a presigned upload link cannot overwrite an object after validation.
 
 Storage keys use resource IDs and fixed names only; user-supplied filenames are stored in the
 database and never form key segments. `deleteByPrefix` accepts only resource-level prefixes with a

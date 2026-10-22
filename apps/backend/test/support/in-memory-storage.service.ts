@@ -53,7 +53,7 @@ export class InMemoryStorageService extends StorageService {
     return {
       url: `memory://upload/${key}`,
       method: 'PUT',
-      headers: { 'Content-Type': contentType },
+      headers: { 'Content-Type': contentType, 'If-None-Match': '*' },
       expiresAt: new Date(Date.now() + this.uploadUrlTtlSeconds * 1_000),
     };
   }
