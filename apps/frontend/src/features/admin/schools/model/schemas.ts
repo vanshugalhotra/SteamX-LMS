@@ -28,6 +28,8 @@ const shared = {
   }),
 };
 
+const statusSchema = z.enum(['ACTIVE', 'INACTIVE']);
+
 export const createSchoolSchema = z.object({
   code: z
     .string()
@@ -38,9 +40,14 @@ export const createSchoolSchema = z.object({
       'Use 2 to 12 letters, numbers, "-" or "_", starting with a letter or number',
     ),
   ...shared,
+  status: statusSchema,
 });
 
 // The code is read-only on edit, so it is not validated.
-export const editSchoolSchema = z.object({ code: z.string(), ...shared });
+export const editSchoolSchema = z.object({
+  code: z.string(),
+  ...shared,
+  status: statusSchema,
+});
 
 export type SchoolFormValues = z.infer<typeof createSchoolSchema>;

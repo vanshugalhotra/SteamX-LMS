@@ -5,6 +5,6 @@ export function SchoolStatusBadge({ status }: { status: SchoolStatus }) {
   return status === 'ACTIVE' ? (
     <Badge variant="success">Active</Badge>
   ) : (
-    <Badge variant="neutral">Inactive</Badge>
+    <Badge variant="danger">Inactive</Badge>
   );
 }

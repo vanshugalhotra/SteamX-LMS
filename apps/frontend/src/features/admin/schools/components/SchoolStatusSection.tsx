@@ -1,50 +1,29 @@
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import type { School } from '../model/types';
-import { getErrorMessage } from '@/lib/api-errors';
-import { useUpdateSchoolStatus } from '../queries';
-import { SchoolStatusBadge } from './SchoolStatusBadge';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import type { SchoolStatus } from '../model/types';
 
-export function SchoolStatusSection({ school, onDone }: { school: School; onDone?: () => void }) {
-  const mutation = useUpdateSchoolStatus();
-  const isActive = school.status === 'ACTIVE';
+const STATUS_OPTIONS = [
+  { value: 'ACTIVE', label: 'Active', dotClass: 'bg-teal-500' },
+  { value: 'INACTIVE', label: 'Inactive', dotClass: 'bg-magenta-500' },
+] satisfies { value: SchoolStatus; label: string; dotClass: string }[];
 
-  const change = () => {
-    mutation.mutate(
-      { id: school.id, status: isActive ? 'INACTIVE' : 'ACTIVE' },
-      {
-        onSuccess: () => {
-          toast.success(isActive ? 'School deactivated' : 'School activated');
-          onDone?.();
-        },
-        onError: (error) => {
-          toast.error(getErrorMessage(error), { id: 'school-status-failed' });
-        },
-      },
-    );
-  };
+interface SchoolStatusSectionProps {
+  value: SchoolStatus;
+  onChange: (status: SchoolStatus) => void;
+  disabled?: boolean;
+}
 
+/** Status control for the edit form. Saved together with the form's Save button. */
+export function SchoolStatusSection({ value, onChange, disabled }: SchoolStatusSectionProps) {
   return (
-    <div className="mb-4.5 rounded-2xl bg-gray-50 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold">Status</p>
-        <SchoolStatusBadge status={school.status} />
-      </div>
-      <p className="mt-1 text-[11px] text-gray-600">
-        {isActive
-          ? 'Deactivating a school stops its users from signing in.'
-          : 'Activating a school lets its users sign in again.'}
-      </p>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="mt-3"
-        disabled={mutation.isPending}
-        onClick={change}
-      >
-        {mutation.isPending ? 'Saving…' : isActive ? 'Deactivate school' : 'Activate school'}
-      </Button>
+    <div className="mb-4.5 sm:w-1/2 sm:pr-2">
+      <SegmentedControl
+        label="School status"
+        options={STATUS_OPTIONS}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+      />
+      <p className="mt-1.5 text-xs text-gray-600">Users of an inactive school cannot sign in.</p>
     </div>
   );
 }

@@ -10,7 +10,11 @@ export function SchoolCreatePage() {
   };
 
   return (
-    <SchoolFormLayout title="Add school">
+    <SchoolFormLayout
+      title="Add new school"
+      subtitle="Register a new school on the platform."
+      tag="New"
+    >
       <SchoolForm onDone={backToList} onCancel={backToList} />
     </SchoolFormLayout>
   );
