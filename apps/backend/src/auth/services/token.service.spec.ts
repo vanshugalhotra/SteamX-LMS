@@ -13,6 +13,8 @@ const TOKEN_TTL_SECONDS = 300;
 function createTokenService(nodeEnv: Env['NODE_ENV'] = 'test', secret = JWT_SECRET): TokenService {
   const env = validateEnv({
     DATABASE_URL,
+    AWS_REGION: 'ap-south-1',
+    S3_BUCKET: 'test-bucket',
     NODE_ENV: nodeEnv,
     AUTH_JWT_SECRET: secret,
     AUTH_TOKEN_TTL_SECONDS: TOKEN_TTL_SECONDS,
