@@ -2,12 +2,11 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { ContentStatus, UserType } from '../../generated/prisma/client.js';
+import { ContentStatus } from '../../generated/prisma/client.js';
 import {
   getPostgresCode,
   isForeignKeyViolation,
@@ -17,6 +16,7 @@ import { API_ERROR } from '../../common/errors/api-errors.js';
 import { paginate } from '../../common/pagination/paginate.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import type { PaginationResponseDto } from '../../common/pagination/pagination-response.dto.js';
+import { assertPlatformStaff } from '../assert-platform-staff.js';
 import { canTransitionContentStatus } from '../content-status.js';
 import type { CourseListQueryDto } from './dto/course-list-query.dto.js';
 import type { CourseResponseDto } from './dto/course-response.dto.js';
@@ -40,7 +40,7 @@ export class CoursesService {
 
   /** Creates global curriculum content in DRAFT status. */
   async create(actor: AuthContext, body: CreateCourseDto): Promise<CourseResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const course = await this.courses.create(body);
     this.logger.info({ actorId: actor.userId, courseId: course.id }, 'Course created');
     return toCourseResponse(course);
@@ -55,7 +55,7 @@ export class CoursesService {
     actor: AuthContext,
     query: CourseListQueryDto,
   ): Promise<PaginationResponseDto<CourseResponseDto>> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const { items, total } = await this.courses.findMany(query);
     return paginate(
       items.map((course) => toCourseResponse(course)),
@@ -71,7 +71,7 @@ export class CoursesService {
 
   /** Returns a global course; malformed IDs are rejected by the controller's UUID pipe. */
   async findById(actor: AuthContext, id: string): Promise<CourseResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const course = await this.courses.findById(id);
     if (!course) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -85,7 +85,7 @@ export class CoursesService {
 
   /** Updates a non-empty course patch and logs the actor and target. */
   async update(actor: AuthContext, id: string, body: UpdateCourseDto): Promise<CourseResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     if (Object.values(body).every((value) => value === undefined)) {
       throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
@@ -108,7 +108,7 @@ export class CoursesService {
     id: string,
     status: ContentStatus,
   ): Promise<CourseResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const current = await this.courses.findById(id);
     if (!current) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -160,7 +160,7 @@ export class CoursesService {
 
   /** Deletes a course only when no database records reference it. */
   async delete(actor: AuthContext, id: string): Promise<void> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     try {
       const course = await this.courses.delete(id);
       this.logger.info({ actorId: actor.userId, courseId: course.id }, 'Course deleted');
@@ -172,12 +172,6 @@ export class CoursesService {
         throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
       throw error;
-    }
-  }
-
-  private assertAdmin(actor: AuthContext): void {
-    if (actor.userType !== UserType.PLATFORM_STAFF) {
-      throw new ForbiddenException(API_ERROR.FORBIDDEN);
     }
   }
 }

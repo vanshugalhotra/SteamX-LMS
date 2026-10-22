@@ -25,6 +25,8 @@ Use `pnpm test` to run every backend test suite in order. To run one suite:
 Database-backed suites require `apps/backend/.env.test`, a reachable PostgreSQL test database, and
 Prisma migrations. Test setup deploys migrations and clears test-created rows before each file.
 The database URL must target a PostgreSQL database whose name ends in `_test`; tests stop otherwise.
+The test environment also requires `AWS_REGION` and `S3_BUCKET`; use non-production values such as
+`ap-south-1` and `test-bucket`. AWS credentials are optional and should be omitted in tests.
 The `roles`, `permissions`, `role_permissions`, and `_prisma_migrations` tables are kept during reset.
 
 ## Test rules

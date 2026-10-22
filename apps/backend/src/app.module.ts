@@ -13,6 +13,7 @@ import { SchoolsModule } from './schools/schools.module.js';
 import { ClassSectionsModule } from './class-sections/class-sections.module.js';
 import { CurriculumModule } from './curriculum/curriculum.module.js';
 import { UsersModule } from './users/users.module.js';
+import { StorageModule } from './storage/storage.module.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { UsersModule } from './users/users.module.js';
     ClassSectionsModule,
     CurriculumModule,
     UsersModule,
+    StorageModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OriginGuard },

@@ -33,7 +33,7 @@ import { CreateLessonDto } from './dto/create-lesson.dto.js';
 import { LessonResponseDto } from './dto/lesson-response.dto.js';
 import { ReorderLessonsDto } from './dto/reorder-lessons.dto.js';
 import { UpdateLessonDto } from './dto/update-lesson.dto.js';
-import { UpdateLessonStatusDto } from './dto/update-lesson-status.dto.js';
+import { UpdateContentStatusDto } from '../dto/update-content-status.dto.js';
 import { LessonsService } from './lessons.service.js';
 
 @ApiTags('Lessons')
@@ -154,7 +154,7 @@ export class LessonsController {
   updateStatus(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: UpdateLessonStatusDto,
+    @Body() body: UpdateContentStatusDto,
   ): Promise<LessonResponseDto> {
     return this.lessons.updateStatus(actor, id, body.status);
   }

@@ -31,7 +31,7 @@ export class SteamxStack extends Stack {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET, s3.HttpMethods.HEAD],
           allowedOrigins: config.corsOrigins,
           allowedHeaders: ['*'],
-          exposedHeaders: ['ETag'],
+          exposedHeaders: ['ETag', 'Content-Disposition'],
           maxAge: 3000,
         },
       ],
