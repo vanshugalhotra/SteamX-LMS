@@ -5,7 +5,6 @@ import { ApiError } from '@/lib/api-client';
 import { PATHS } from '@/lib/paths';
 import { SchoolForm } from '../components/SchoolForm';
 import { SchoolFormLayout } from '../components/SchoolFormLayout';
-import { SchoolStatusSection } from '../components/SchoolStatusSection';
 import { useSchool } from '../queries';
 
 export function SchoolEditPage() {
@@ -41,12 +40,18 @@ export function SchoolEditPage() {
     );
   } else {
     content = (
-      <>
-        <SchoolStatusSection school={school} />
-        <SchoolForm school={school} onDone={backToList} onCancel={backToList} />
-      </>
+      <SchoolForm key={school.id} school={school} onDone={backToList} onCancel={backToList} />
     );
   }
 
-  return <SchoolFormLayout title="Edit school">{content}</SchoolFormLayout>;
+  return (
+    <SchoolFormLayout
+      title="Edit school"
+      subtitle="Update the school's information and contact details."
+      tag={school?.code}
+      tagVariant="warning"
+    >
+      {content}
+    </SchoolFormLayout>
+  );
 }

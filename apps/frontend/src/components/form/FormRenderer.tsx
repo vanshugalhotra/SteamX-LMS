@@ -12,9 +12,16 @@ export interface FieldConfig<T extends FieldValues> {
   readOnly?: boolean;
   autoComplete?: string;
   autoCapitalize?: string;
-  /** 'half' puts two fields side by side from the sm breakpoint. Default 'full'. */
-  width?: 'full' | 'half';
+  /** Column span from the sm breakpoint (6-column grid). Default 'full'. */
+  width?: 'full' | 'half' | 'third';
 }
+
+// Full class names so Tailwind can see them.
+const SPAN = {
+  full: 'sm:col-span-6',
+  half: 'sm:col-span-3',
+  third: 'sm:col-span-2',
+} as const;
 
 interface FormRendererProps<T extends FieldValues> {
   fields: FieldConfig<T>[];
@@ -32,11 +39,11 @@ export function FormRenderer<T extends FieldValues>({
   const errorMap = errors as Record<string, { message?: unknown } | undefined>;
 
   return (
-    <div className="grid gap-x-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-6">
       {fields.map((field) => {
         const message = errorMap[field.name]?.message;
         return (
-          <div key={field.name} className={cn(field.width === 'half' ? '' : 'sm:col-span-2')}>
+          <div key={field.name} className={SPAN[field.width ?? 'full']}>
             <FormField
               label={field.required ? `${field.label} *` : field.label}
               error={typeof message === 'string' ? message : undefined}
@@ -48,6 +55,10 @@ export function FormRenderer<T extends FieldValues>({
                   type={field.type ?? 'text'}
                   placeholder={field.placeholder}
                   readOnly={field.readOnly}
+                  className={cn(
+                    'h-10.5',
+                    field.readOnly && 'border-dashed bg-gray-50 text-gray-600',
+                  )}
                   autoComplete={field.autoComplete ?? 'off'}
                   autoCapitalize={field.autoCapitalize}
                   disabled={disabled}
