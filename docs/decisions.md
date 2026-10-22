@@ -131,6 +131,10 @@ PUT signing explicitly includes `content-type`, `content-length`, and `if-none-m
 presigner's `signableHeaders` option. `If-None-Match: *` makes S3 reject a second upload to an
 existing key, so a presigned upload link cannot overwrite an object after validation.
 
+Presigned PUT URLs keep `content-length` signed. Browser verification on 2026-10-22 in Chrome and
+Firefox confirmed that correctly sized uploads succeed and an upload with one extra byte is rejected
+with 403 `SignatureDoesNotMatch`. Safari was unavailable for testing.
+
 Storage keys use resource IDs and fixed names only; user-supplied filenames are stored in the
 database and never form key segments. `deleteByPrefix` accepts only resource-level prefixes with a
 UUID second segment. Presigned URLs are bearer secrets and are never logged. One helper builds all

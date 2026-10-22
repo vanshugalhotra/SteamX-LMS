@@ -50,7 +50,7 @@ describe('SteamxStack', () => {
     });
   });
 
-  it('configures the expected CORS methods and ETag header', () => {
+  it('configures browser CORS methods and exposes object response headers', () => {
     createStagingTemplate().hasResourceProperties('AWS::S3::Bucket', {
       CorsConfiguration: {
         CorsRules: Match.arrayWith([
@@ -58,7 +58,7 @@ describe('SteamxStack', () => {
             AllowedMethods: ['PUT', 'GET', 'HEAD'],
             AllowedOrigins: ['http://localhost:3000', 'http://localhost:5173'],
             AllowedHeaders: ['*'],
-            ExposedHeaders: ['ETag'],
+            ExposedHeaders: ['ETag', 'Content-Disposition'],
             MaxAge: 3000,
           }),
         ]),

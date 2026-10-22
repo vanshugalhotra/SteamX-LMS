@@ -1,52 +1,85 @@
-# Staging infrastructure
+# AWS infrastructure
 
-The `infra/` CDK app currently creates one private S3 bucket, a narrowly scoped backend IAM user,
-and a monthly AWS cost budget. Staging bucket deletion removes its objects. No application
-resources are deployed yet.
+The CDK application in `infra/` currently deploys three things: a private S3 bucket for assets,
+a backend IAM user scoped to the `assets/*` and `submissions/*` object prefixes, and a monthly
+cost budget. The application, database, and web hosting are not deployed to AWS yet.
 
-## One-time AWS account setup
+The bucket blocks public access, encrypts objects, requires HTTPS, and allows browser `PUT`, `GET`,
+and `HEAD` requests from the configured CORS origins. It allows all request headers and exposes
+`ETag` and `Content-Disposition`. It is not versioned. In staging, destroying the stack empties
+and deletes the bucket, so all its data is permanently lost. Incomplete multipart uploads are
+removed after one day. The $25 monthly budget sends alerts at 80% actual spend and 100% forecast;
+it does not cap spending.
 
-Create or select an AWS account, enable MFA for administrators, and create a dedicated deployer
-identity with permission to deploy CDK resources and bootstrap the account. Configure AWS CLI
-credentials for that identity, then bootstrap the CDK environment once with
-`pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/ap-south-1`. Replace the account ID and region
-as appropriate. Set `STEAMX_BUDGET_EMAIL` to an address that can receive budget alerts.
+## Deploy
 
-## Deploy and destroy
+Run commands from the repository root. Configure AWS CLI credentials for an identity that can
+deploy the CDK stack, then install the isolated infrastructure dependencies and bootstrap the
+account/region once:
 
-Run commands from the repository root. Install the isolated infra dependencies with
-`pnpm infra:install`. Set `STEAMX_BUDGET_EMAIL` before synth, diff, deploy, or destroy. Optionally
-set `STEAMX_CORS_ORIGINS` to a comma-separated list of browser origins and `AWS_REGION` (or CDK
-context `region`) to override `ap-south-1`.
+```powershell
+pnpm infra:install
+pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/ap-south-1
+```
 
-- `pnpm infra:synth` synthesizes the staging stack.
+Replace `ACCOUNT_ID` and `ap-south-1` with the target account and region. Set the required budget
+email in the shell before running CDK commands. CDK reads shell variables, not `.env.example`:
+
+```powershell
+$env:STEAMX_BUDGET_EMAIL = "alerts@example.com"
+```
+
+The deployment region is selected from CDK context `region`, then `AWS_REGION`, and defaults to
+`ap-south-1`. The default browser origins are `http://localhost:3000` and
+`http://localhost:5173`. Override them with `STEAMX_CORS_ORIGINS`, a comma-separated list of full
+origins.
+
+- `pnpm infra:synth` synthesizes the stack template.
 - `pnpm infra:diff` previews changes.
-- `pnpm infra:deploy` deploys with approval required for permission broadening.
-- `pnpm infra:destroy` destroys only `SteamxStagingStack`; staging bucket data is deleted.
-- `pnpm infra:test` runs the CDK assertions separately from backend tests.
+- `pnpm infra:deploy` deploys and requires approval for permission broadening.
+- `pnpm infra:test` runs infrastructure assertions.
+- `pnpm infra:destroy` deletes only `SteamxStagingStack` in the staging environment. It deletes
+  the staging bucket and its contents; it does not remove CDK bootstrap resources or reset the
+  AWS account.
 
-The environment is selected using CDK context `env` and defaults to `staging`. Non-staging stacks
-retain the bucket and enable termination protection.
+The CDK context `env` defaults to `staging`. Staging allows stack deletion; other environments
+retain the bucket and enable termination protection. The root `infra:destroy` command explicitly
+targets staging.
 
-## Cost, credentials, and handover
+The stack outputs `BucketName`, `Region`, and `BackendUserName`. For local/staging backend access,
+create an access key for that IAM user and put the output bucket name, region, and both key values
+in `apps/backend/.env` as `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and
+`AWS_SECRET_ACCESS_KEY`. The stack creates the user, but not its access key. The backend can omit
+both keys when using an AWS credential provider such as an ECS task role.
 
-S3 is pay-per-use; an empty, idle bucket has negligible cost. The monthly budget emails an alert at
-80% actual spend and at 100% forecasted spend. Destroying staging removes all bucket data.
-The backend requires `AWS_REGION` and `S3_BUCKET`. AWS access keys are
-optional as a pair; when absent, the SDK default credential chain is used (including the ECS task
-role in production).
+Before destroying staging, delete any manually created access key for the backend IAM user; an IAM
+user with access keys cannot be deleted by CloudFormation. Check the planned stack operation and
+confirm that the target is staging before approving deletion.
 
-The root `.env.example` is for CDK/infrastructure settings, not a second backend configuration.
-CDK uses `AWS_REGION` to choose the deployment region and creates the bucket. Optional backend settings
-`UPLOAD_URL_TTL_SECONDS`, `ASSET_MAX_BYTES_IMAGE`, `ASSET_MAX_BYTES_PDF`, and
-`ASSET_MAX_BYTES_VIDEO` default to 900 seconds, 10 MiB, 50 MiB, and 1 GiB respectively.
+## Browser storage smoke test
 
-When handing the AWS account over, remove the temporary deployer user and its access keys after
-confirming the replacement account administrators can deploy and operate the stack.
+The manual test uploads to the real bucket from a local browser and checks metadata, signed size and
+content type, downloads, range requests, and unsigned access. It creates objects under a unique
+`assets/<id>/` prefix and deletes that prefix with the page's **Clean up** button or on Ctrl+C.
 
-## Later work
+The test page's exact origin must be present in the bucket's deployed CORS configuration, and its
+port must be free. If the origin needs changing, set the budget email and CORS origins in the shell
+and redeploy. For example:
 
-RDS/ECS/ALB are deferred until a domain exists; without a domain there is no HTTPS endpoint, so
-there is no reason to run ECS or RDS yet. CloudFront comes later for frontend distribution. The
-stop/start scripts are placeholders while staging is S3-only. The `pending/` prefix lifecycle rule
-will be added with Module 3.
+```powershell
+$env:STEAMX_BUDGET_EMAIL = "alerts@example.com"
+$env:STEAMX_CORS_ORIGINS = "http://localhost:5173"
+pnpm infra:deploy
+```
+
+Put `AWS_REGION`, `S3_BUCKET`, and the backend access-key pair in `apps/backend/.env`, then run:
+
+```powershell
+pnpm storage:smoke --port 5173
+```
+
+Use a port that is both free and listed in the deployed CORS origins. The results show HTTP status
+and S3 error code; successful upload is 200, signed request mismatches should be 403
+`SignatureDoesNotMatch`, unsigned GET should be 403, and the range check should be 206. Run the
+test in each target browser, click **Clean up**, and confirm the run's prefix is gone in S3. If the
+process is force-stopped or cleanup fails, delete that prefix manually.

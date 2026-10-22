@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STEAMX storage smoke test</title>
+    <style>
+      body {
+        font:
+          16px system-ui,
+          sans-serif;
+        margin: 2rem auto;
+        max-width: 900px;
+        padding: 0 1rem;
+      }
+      button,
+      input {
+        font: inherit;
+        margin: 0.35rem 0;
+        padding: 0.45rem;
+      }
+      table {
+        border-collapse: collapse;
+        margin-top: 1rem;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid #bbb;
+        padding: 0.5rem;
+        text-align: left;
+        overflow-wrap: anywhere;
+      }
+      .pass {
+        color: #08752b;
+      }
+      .fail {
+        color: #b42318;
+      }
+      #summary {
+        font-weight: 700;
+      }
+      iframe {
+        border: 1px solid #aaa;
+        height: 320px;
+        width: 100%;
+      }
+    </style>
+    <script src="/browser.js" defer></script>
+  </head>
+  <body>
+    <h1>STEAMX storage smoke test</h1>
+    <p>Uploads go directly to S3 using short-lived signed URLs. Do not share those URLs.</p>
+    <label>Choose a file <input id="file" type="file" /></label><br />
+    <label
+      >Upload Content-Type <input id="type" type="text" value="application/octet-stream" /></label
+    ><br />
+    <button id="run">Run all cases</button>
+    <button id="cleanup">Clean up this run</button>
+    <p id="summary">signed content-length enforced from browser: no</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Case</th>
+          <th>Result</th>
+          <th>HTTP status</th>
+          <th>S3 error code</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody id="results"></tbody>
+    </table>
+    <h2>Download preview</h2>
+    <iframe id="preview" title="S3 download preview" hidden></iframe>
+  </body>
+</html>
