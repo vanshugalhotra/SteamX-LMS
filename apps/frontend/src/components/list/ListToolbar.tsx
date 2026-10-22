@@ -48,11 +48,14 @@ export function ListToolbar<T extends string>({
   filterLabel,
   variant,
 }: ListToolbarProps<T>) {
-
   const segmented = variant === 'segmented';
 
   return (
-    <div role="group" aria-label={filterLabel} className={cn('flex flex-wrap gap-2', segmented && 'gap-0.5 rounded-full bg-gray-100 p-1')}>
+    <div
+      role="group"
+      aria-label={filterLabel}
+      className={cn('flex flex-wrap gap-2', segmented && 'gap-0.5 rounded-full bg-gray-100 p-1')}
+    >
       {filters.map((f) => (
         <button
           key={f.value}
@@ -64,8 +67,12 @@ export function ListToolbar<T extends string>({
           className={cn(
             'rounded-full px-4 py-2 text-[11px] font-medium outline-none focus-visible:ring-4 focus-visible:ring-ring/40',
             segmented
-              ? filter === f.value ? 'bg-white text-foreground shadow-sm' : 'text-gray-600'
-              : filter === f.value ? 'bg-gray-900 text-white' : 'bg-gray-100',
+              ? filter === f.value
+                ? 'bg-white text-foreground shadow-sm'
+                : 'text-gray-600'
+              : filter === f.value
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-100',
           )}
         >
           {f.label}

@@ -64,8 +64,8 @@ export function SchoolDirectoryList({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13.5px] font-semibold">{school.name}</p>
               <p className="truncate text-xs text-gray-600">
-                <span className="font-semibold text-foreground">{school.code}</span> · {school.city},{' '}
-                {school.state}
+                <span className="font-semibold text-foreground">{school.code}</span> · {school.city}
+                , {school.state}
               </p>
             </div>
             <SchoolStatusBadge status={school.status} />

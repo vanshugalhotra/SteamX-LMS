@@ -61,7 +61,12 @@ export function SchoolDirectory({ currentId }: { currentId?: string }) {
           currentId={currentId}
         />
         {data && data.total > 0 && (
-          <Pagination page={data.page} limit={data.limit} total={data.total} onPageChange={setPage} />
+          <Pagination
+            page={data.page}
+            limit={data.limit}
+            total={data.total}
+            onPageChange={setPage}
+          />
         )}
       </div>
     </section>
