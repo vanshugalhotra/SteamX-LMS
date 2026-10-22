@@ -159,13 +159,15 @@ document.querySelector('#run').addEventListener('click', async () => {
     });
     const rangeCode = await responseErrorCode(range.clone());
     const rangeBytes = await range.arrayBuffer();
+    // The range test requests bytes 0-99, so the test file must be at least 100 bytes.
+    const expectedRangeBytes = Math.min(100, file.size);
     const passed =
       response.status === 200 &&
       dispositionValid &&
       range.status === 206 &&
-      rangeBytes.byteLength === 100;
+      rangeBytes.byteLength === expectedRangeBytes;
     addResult(
-      'e. Download, disposition, and 100-byte range',
+      `e. Download, disposition, and ${expectedRangeBytes}-byte range${file.size < 100 ? ' (file < 100 B)' : ''}`,
       passed,
       `${response.status} / range ${range.status}`,
       downloadCode !== '-' ? downloadCode : rangeCode,

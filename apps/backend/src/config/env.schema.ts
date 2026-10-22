@@ -4,6 +4,7 @@ import { z } from 'zod';
 const AUTH_TOKEN_TTL_MIN_SECONDS = 60;
 const AUTH_TOKEN_TTL_DEFAULT_SECONDS = 86_400;
 const DEFAULT_UPLOAD_URL_TTL_SECONDS = 900;
+const MAX_UPLOAD_URL_TTL_SECONDS = 3600;
 const DEFAULT_ASSET_MAX_BYTES_IMAGE = 10 * 1024 * 1024;
 const DEFAULT_ASSET_MAX_BYTES_PDF = 50 * 1024 * 1024;
 const DEFAULT_ASSET_MAX_BYTES_VIDEO = 1024 * 1024 * 1024;
@@ -56,6 +57,9 @@ const envSchema = z
       .number()
       .int()
       .positive()
+      .max(MAX_UPLOAD_URL_TTL_SECONDS, {
+        error: `must not exceed ${MAX_UPLOAD_URL_TTL_SECONDS} seconds`,
+      })
       .default(DEFAULT_UPLOAD_URL_TTL_SECONDS),
     ASSET_MAX_BYTES_IMAGE: z.coerce
       .number()

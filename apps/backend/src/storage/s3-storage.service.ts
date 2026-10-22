@@ -182,6 +182,9 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
         new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
       );
       const sizeBytes = result.ContentLength ?? 0;
+      if (result.ContentLength === undefined) {
+        this.logger.warn({ operation: 'head', key }, 'S3 returned no ContentLength');
+      }
       this.logger.debug({ operation: 'head', key, size: sizeBytes }, 'Read storage metadata');
       return {
         sizeBytes,

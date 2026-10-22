@@ -57,7 +57,7 @@ describe('SteamxStack', () => {
           Match.objectLike({
             AllowedMethods: ['PUT', 'GET', 'HEAD'],
             AllowedOrigins: ['http://localhost:3000', 'http://localhost:5173'],
-            AllowedHeaders: ['*'],
+            AllowedHeaders: ['Content-Type', 'Content-Length', 'If-None-Match', 'Range'],
             ExposedHeaders: ['ETag', 'Content-Disposition'],
             MaxAge: 3000,
           }),

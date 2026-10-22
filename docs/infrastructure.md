@@ -2,8 +2,8 @@
 
 The CDK app in `infra/` deploys:
 
-- **Private S3 bucket** — blocks public access, encrypts objects, requires HTTPS. Browser `PUT`/`GET`/`HEAD` allowed from configured CORS origins. Not versioned. Incomplete multipart uploads cleaned after 1 day.
-- **Backend IAM user** — scoped to `assets/*` and `submissions/*` object prefixes.
+- **Private S3 bucket** — blocks public access, encrypts objects, requires HTTPS. Browser `PUT`/`GET`/`HEAD` allowed from configured CORS origins. Not versioned. Incomplete multipart uploads cleaned after 1 day. Presigned upload URLs include `If-None-Match: *`, so each key accepts exactly one upload — retries must use a new key.
+- **Backend IAM user** — scoped to `assets/*` and `submissions/*` object prefixes with `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, and prefix-conditioned `s3:ListBucket`.
 - **Monthly $25 budget** — alerts at 80% actual + 100% forecast. Does not cap spending.
 
 > **Staging only:** destroying the stack empties and deletes the bucket (all data lost).

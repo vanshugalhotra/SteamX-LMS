@@ -113,7 +113,7 @@ async function main(): Promise<void> {
           filename: downloadFilename,
         });
         const objectPath = key.split('/').map(encodeURIComponent).join('/');
-        const plainUrl = `https://${env.storage.bucket}.s3.${env.storage.region}.amazonaws.com/${objectPath}`;
+        const plainUrl = `https://s3.${env.storage.region}.amazonaws.com/${env.storage.bucket}/${objectPath}`;
         sendJson(response, 200, { ...download, plainUrl });
         return;
       }
