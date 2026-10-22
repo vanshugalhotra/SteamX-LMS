@@ -1,12 +1,7 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { Trim } from '../../../common/decorators/trim.decorator.js';
+/** Makes module creation fields optional while still validating explicitly supplied values. */
+import { PartialType } from '@nestjs/swagger';
+import { CreateCourseModuleDto } from './create-course-module.dto.js';
 
-export class UpdateCourseModuleDto {
-  @ApiProperty({ minLength: 1, maxLength: 200 })
-  @Trim()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
-  title!: string;
-}
+export class UpdateCourseModuleDto extends PartialType(CreateCourseModuleDto, {
+  skipNullProperties: false,
+}) {}
