@@ -1,7 +1,10 @@
 /**
  * Shared API error codes and messages used by services, guards, and filters.
+ *
+ * Grouped by domain area so related errors stay together as the file grows.
  */
 export const API_ERROR = {
+  // ── General ────────────────────────────────────────────
   VALIDATION_ERROR: { code: 'VALIDATION_ERROR', message: 'Validation failed' },
   EMPTY_UPDATE: {
     code: 'VALIDATION_ERROR',
@@ -9,11 +12,24 @@ export const API_ERROR = {
     details: [{ field: 'body', errors: ['At least one field must be provided'] }],
   },
   NOT_FOUND: { code: 'NOT_FOUND', message: 'Resource not found' },
+  FORBIDDEN: { code: 'FORBIDDEN', message: 'Forbidden' },
+  CONFLICT: { code: 'CONFLICT', message: 'Resource already exists' },
+  RELATED_DATA_CONFLICT: {
+    code: 'CONFLICT',
+    message: 'Operation conflicts with related data',
+  },
+  RESOURCE_IN_USE: {
+    code: 'RESOURCE_IN_USE',
+    message: 'Resource has dependent records and cannot be deleted',
+  },
+  INTERNAL_ERROR: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
+  HTTP_ERROR: { code: 'HTTP_ERROR', message: 'Request failed' },
+
+  // ── Auth & Permissions ─────────────────────────────────
   AUTHENTICATION_FAILED: {
     code: 'UNAUTHORIZED',
     message: 'Invalid or expired authentication token',
   },
-  FORBIDDEN: { code: 'FORBIDDEN', message: 'Forbidden' },
   PERMISSION_REQUIRED: {
     code: 'FORBIDDEN',
     message: 'Your account does not have the permission required for this action.',
@@ -23,54 +39,6 @@ export const API_ERROR = {
     message: 'Password change required',
   },
   ORIGIN_NOT_ALLOWED: { code: 'ORIGIN_NOT_ALLOWED', message: 'Origin not allowed' },
-  CONFLICT: { code: 'CONFLICT', message: 'Resource already exists' },
-  RELATED_DATA_CONFLICT: {
-    code: 'CONFLICT',
-    message: 'Operation conflicts with related data',
-  },
-  SCHOOL_REQUIRED: { code: 'SCHOOL_REQUIRED', message: 'A school is required' },
-  SCHOOL_INACTIVE: { code: 'SCHOOL_INACTIVE', message: 'School is inactive' },
-  SCHOOL_CODE_EXISTS: { code: 'SCHOOL_CODE_EXISTS', message: 'School code already exists' },
-  STEAMX_ID_UNAVAILABLE: {
-    code: 'STEAMX_ID_UNAVAILABLE',
-    message: "Couldn't allocate a SteamX ID. Please try again.",
-  },
-  SCHOOL_FORBIDDEN: {
-    code: 'FORBIDDEN',
-    message: 'Only platform staff can create schools.',
-  },
-  STEAMX_ID_NOT_RENAMABLE: {
-    code: 'STEAMX_ID_NOT_RENAMABLE',
-    message: 'Platform staff SteamX IDs cannot be renamed.',
-  },
-  INVALID_STEAMX_ID: {
-    code: 'INVALID_STEAMX_ID',
-    message: 'SteamX ID does not match the target school format.',
-  },
-  STEAMX_ID_TAKEN: {
-    code: 'STEAMX_ID_TAKEN',
-    message: 'SteamX ID is already in use.',
-  },
-  CLASS_SECTION_EXISTS: {
-    code: 'CLASS_SECTION_EXISTS',
-    message: 'Class section already exists',
-  },
-  RESOURCE_IN_USE: {
-    code: 'RESOURCE_IN_USE',
-    message: 'Resource has dependent records and cannot be deleted',
-  },
-  INVALID_ORDER: {
-    code: 'INVALID_ORDER',
-    message: 'The supplied IDs must include every item in the parent exactly once',
-  },
-  PARENT_NOT_ACTIVE: {
-    code: 'PARENT_NOT_ACTIVE',
-    message: 'The parent course must be active',
-  },
-  INVALID_STATUS_TRANSITION: {
-    code: 'INVALID_STATUS_TRANSITION',
-    message: 'The requested content status transition is not allowed',
-  },
   ROLE_CONFIGURATION_ERROR: {
     code: 'ROLE_CONFIGURATION_ERROR',
     message: 'User role is not configured correctly',
@@ -91,6 +59,33 @@ export const API_ERROR = {
     code: 'CANNOT_RESET_OWN_PASSWORD',
     message: 'Use change-password to update your own password',
   },
+
+  // ── Schools ────────────────────────────────────────────
+  SCHOOL_REQUIRED: { code: 'SCHOOL_REQUIRED', message: 'A school is required' },
+  SCHOOL_INACTIVE: { code: 'SCHOOL_INACTIVE', message: 'School is inactive' },
+  SCHOOL_CODE_EXISTS: { code: 'SCHOOL_CODE_EXISTS', message: 'School code already exists' },
+  SCHOOL_FORBIDDEN: {
+    code: 'FORBIDDEN',
+    message: 'Only platform staff can create schools.',
+  },
+
+  // ── Users & SteamX IDs ─────────────────────────────────
+  STEAMX_ID_UNAVAILABLE: {
+    code: 'STEAMX_ID_UNAVAILABLE',
+    message: "Couldn't allocate a SteamX ID. Please try again.",
+  },
+  STEAMX_ID_NOT_RENAMABLE: {
+    code: 'STEAMX_ID_NOT_RENAMABLE',
+    message: 'Platform staff SteamX IDs cannot be renamed.',
+  },
+  INVALID_STEAMX_ID: {
+    code: 'INVALID_STEAMX_ID',
+    message: 'SteamX ID does not match the target school format.',
+  },
+  STEAMX_ID_TAKEN: {
+    code: 'STEAMX_ID_TAKEN',
+    message: 'SteamX ID is already in use.',
+  },
   USER_NOT_MANAGEABLE: {
     code: 'USER_NOT_MANAGEABLE',
     message: 'Platform staff accounts cannot be managed here.',
@@ -103,8 +98,26 @@ export const API_ERROR = {
     code: 'CANNOT_DEACTIVATE_SELF',
     message: 'You cannot change your own status.',
   },
-  INTERNAL_ERROR: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
-  HTTP_ERROR: { code: 'HTTP_ERROR', message: 'Request failed' },
+
+  // ── Class Sections ─────────────────────────────────────
+  CLASS_SECTION_EXISTS: {
+    code: 'CLASS_SECTION_EXISTS',
+    message: 'Class section already exists',
+  },
+
+  // ── Curriculum ─────────────────────────────────────────
+  INVALID_ORDER: {
+    code: 'INVALID_ORDER',
+    message: 'The supplied IDs must include every item in the parent exactly once',
+  },
+  PARENT_NOT_ACTIVE: {
+    code: 'PARENT_NOT_ACTIVE',
+    message: 'The parent course must be active',
+  },
+  INVALID_STATUS_TRANSITION: {
+    code: 'INVALID_STATUS_TRANSITION',
+    message: 'The requested content status transition is not allowed',
+  },
 } as const;
 
 export const HTTP_ERROR_CODES: Partial<Record<number, string>> = {

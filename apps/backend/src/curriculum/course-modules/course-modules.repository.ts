@@ -3,12 +3,9 @@ import { Injectable } from '@nestjs/common';
 import { ContentStatus, Prisma } from '../../generated/prisma/client.js';
 import type { Module as CourseModuleRecord } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { isValidModuleOrder } from './module-order.js';
+import { isValidReorder, PARK_OFFSET } from '../reorder.js';
 import type { CreateCourseModuleDto } from './dto/create-course-module.dto.js';
 import type { UpdateCourseModuleDto } from './dto/update-course-module.dto.js';
-
-// Move positions beyond the final order before writing under the immediate unique constraint.
-const PARK_OFFSET = 1_000_000;
 
 type CourseModuleWithCourse = Prisma.ModuleGetPayload<{
   include: { course: { select: { status: true } } };
@@ -69,7 +66,7 @@ export class CourseModulesRepository {
         select: { id: true, position: true },
       });
       const currentIds = currentModules.map((module) => module.id);
-      if (!isValidModuleOrder(moduleIds, currentIds)) {
+      if (!isValidReorder(moduleIds, currentIds)) {
         return { kind: 'invalid-order' };
       }
 

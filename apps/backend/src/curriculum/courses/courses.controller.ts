@@ -34,7 +34,7 @@ import { CourseListResponseDto } from './dto/course-list-response.dto.js';
 import { CourseResponseDto } from './dto/course-response.dto.js';
 import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
-import { UpdateCourseStatusDto } from './dto/update-course-status.dto.js';
+import { UpdateContentStatusDto } from '../dto/update-content-status.dto.js';
 import { CoursesService } from './courses.service.js';
 
 @ApiTags('Courses')
@@ -130,7 +130,7 @@ export class CoursesController {
   updateStatus(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: UpdateCourseStatusDto,
+    @Body() body: UpdateContentStatusDto,
   ): Promise<CourseResponseDto> {
     return this.courses.updateStatus(actor, id, body.status);
   }

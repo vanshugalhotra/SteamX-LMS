@@ -1,75 +1,55 @@
-# Access control
+# Access Control
 
 ## Glossary
 
-| Term           | Meaning                                                                                   |
-| -------------- | ----------------------------------------------------------------------------------------- |
-| User type      | Broad account category stored as `PLATFORM_STAFF`, `SCHOOL_STAFF`, or `STUDENT`.          |
-| Role           | A database role such as `admin`, `teacher`, or `student`; each user has one role.         |
-| Permission     | A named capability, such as `user.read`, granted to a role in `role_permissions`.         |
-| School scope   | The school ID a service is allowed to use when querying school-owned records.             |
-| Visibility     | The additional rule for which user records a caller may see, independent of school scope. |
-| Platform staff | A platform-level user with no `school_id`; may act across schools when authorized.        |
-| School staff   | A school-level user whose records are bound to one school. The current role is `teacher`. |
+| Term | Meaning |
+| --- | --- |
+| User type | `PLATFORM_STAFF`, `SCHOOL_STAFF`, or `STUDENT`. |
+| Role | Database role (`admin`, `teacher`, `student`); one per user. |
+| Permission | Named capability (e.g. `user.read`) granted to a role via `role_permissions`. |
+| School scope | Which school's records a caller can query. |
+| Platform staff | No `school_id`; may act across schools when authorized. |
+| School staff | Bound to one school. Current role: `teacher`. |
 
-## Login and sessions
+## Sessions
 
-- Login normalizes the SteamX ID, checks the password and active user/school status, then issues a
-  signed JWT in the `steamx_session` cookie.
-- The cookie is `httpOnly`, `SameSite=Lax`, and `Secure` in production. Its lifetime comes from
-  `AUTH_TOKEN_TTL_SECONDS` (default: one day).
-- The JWT contains the user ID, issue time, and expiry. Each protected request loads current user,
-  role, and school state from PostgreSQL; deactivation takes effect without waiting for token expiry.
-- The guard compares the token issue time with `passwordChangedAt`. A password change or reset
-  invalidates earlier tokens; changing the password also issues a fresh cookie.
-- Cookie-authenticated state changes require an allowed `Origin`. The backend does not currently
-  configure a request rate limiter.
+- Login normalizes the SteamX ID, verifies the password, checks active user/school status, then sets a JWT in the `steamx_session` cookie.
+- Cookie: `httpOnly`, `SameSite=Lax`, `Secure` in production. TTL from `AUTH_TOKEN_TTL_SECONDS` (default: 1 day).
+- Each protected request loads current user, role, and school from PostgreSQL — deactivation takes effect immediately.
+- Password changes invalidate earlier tokens (compares `passwordChangedAt` with token issue time) and issue a fresh cookie.
+- State-changing requests require an allowed `Origin`.
 
 ## Permission checks
 
-`PermissionGuard` runs after authentication. A route must be explicitly public, declare a permission,
-or be marked authenticated-only. Missing policy metadata is denied. A declared permission requires
-an authenticated caller and a matching role grant; otherwise the guard returns 403.
+`PermissionGuard` runs after authentication:
 
-Permission keys are defined in `src/auth/permissions.ts`. The migration-managed reference data grants the permissions.
-At startup, `PermissionsService` loads role grants from the database and caches them in memory; restart the
-backend after changing grants. Route definitions and API details are documented in Swagger.
+- Routes must declare `@RequirePermission`, `@AuthenticatedOnly`, or `@Public`. Missing metadata → 403.
+- A declared permission requires auth + a matching role grant.
+- Permission keys: `src/auth/permissions.ts`. Grants loaded at startup and cached in memory — **restart after changing grants**.
+- **Curriculum** is global (no school scope). Routes need `curriculum.read`/`curriculum.write` and services also require platform-staff user type. School staff/students are denied even with permissions.
 
-Curriculum is global content with no school ownership or school-scope filtering. Course routes
-require `curriculum.read` or `curriculum.write`, and services additionally require a platform-staff
-account. Reference data grants both permissions to the `admin` role only; a mistakenly granted
-permission does not give curriculum access to school staff or students.
+## School scope vs. user visibility
 
-## School scope and user visibility
+Two separate filters:
 
-These are separate filters:
+| Helper | Question it answers |
+| --- | --- |
+| `resolveSchoolScope` | Which school's records can this caller query? |
+| `schoolFilter` | Turns resolved scope into a Prisma `where` predicate. |
+| `ActiveSchoolService.resolveSchool` | Loads + validates one specific school for workflows. |
+| `userVisibility` | Which user records can this caller see? |
 
-- `resolveSchoolScope` answers **which school's records can this caller query?** Platform staff may
-  request a school or use an unscoped query. School staff and students are fixed to their own
-  `schoolId`; requesting another school returns 404.
-- `schoolFilter` turns that resolved scope into a Prisma filter. For example, resolving
-  `school-a` produces a `schoolId: school-a` predicate in the database query. An undefined scope
-  produces an empty predicate for platform-wide queries; only use it after resolving the caller's
-  scope.
-- `ActiveSchoolService.resolveSchool` is for workflows that need one specific school. It uses the
-  scope rules, loads the school, and rejects missing or inactive schools. It does not replace the
-  scope helper used for list and by-ID queries.
-- `userVisibility` answers **which user records may this caller see?** Platform staff can see all
-  users; school staff and students currently see only themselves. Teacher access to assigned users
-  is not implemented.
+Key rules:
 
-Repositories receive filters that combine the target ID with scope and visibility before querying.
-They do not fetch a foreign record and check ownership afterward. A foreign or invisible ID returns
-the same 404 as a nonexistent ID, so callers cannot use responses to discover another school's data.
-An authorization failure is still 403; the 404 rule applies to records the caller is otherwise
-allowed to access but cannot see in scope.
+- Platform staff may request any school or go unscoped. School users are fixed to their own `schoolId`.
+- Repositories combine target ID + scope + visibility in a single query — never fetch-then-check.
+- Foreign or invisible IDs return 404 (same as nonexistent) to prevent cross-school discovery.
 
-## Protecting a new route or module
+## Adding a new protected route
 
-- Declare the route policy explicitly: `@RequirePermission`, `@AuthenticatedOnly`, or `@Public`.
-- Resolve caller school scope in the service; never trust a request-supplied school ID without
-  applying the scope rules.
-- Put the ID, school-scope, and visibility predicates together in the database query.
-- Return the same 404 for foreign and nonexistent resources.
-- Add a cross-school test proving that a caller from school A cannot access a school B ID.
-- If user records are involved, apply `userVisibility` in addition to school scope.
+1. Declare route policy: `@RequirePermission`, `@AuthenticatedOnly`, or `@Public`.
+2. Resolve caller school scope in the service — never trust a request-supplied school ID.
+3. Combine ID + scope + visibility predicates in the query.
+4. Return 404 for foreign and nonexistent resources alike.
+5. Add a cross-school e2e test (school A user → school B resource → 404).
+6. Apply `userVisibility` if user records are involved.

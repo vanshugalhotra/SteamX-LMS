@@ -3,11 +3,9 @@ import { Injectable } from '@nestjs/common';
 import { ContentStatus, LessonAudience, Prisma } from '../../generated/prisma/client.js';
 import type { Lesson } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { isValidLessonOrder } from './lesson-order.js';
+import { isValidReorder, PARK_OFFSET } from '../reorder.js';
 import type { CreateLessonDto } from './dto/create-lesson.dto.js';
 import type { UpdateLessonDto } from './dto/update-lesson.dto.js';
-
-const PARK_OFFSET = 1_000_000;
 
 type LessonWithModule = Prisma.LessonGetPayload<{
   include: { module: { select: { status: true } } };
@@ -71,7 +69,7 @@ export class LessonsRepository {
         select: { id: true },
       });
       const currentIds = currentLessons.map((lesson) => lesson.id);
-      if (!isValidLessonOrder(lessonIds, currentIds)) {
+      if (!isValidReorder(lessonIds, currentIds)) {
         return { kind: 'invalid-order' };
       }
 

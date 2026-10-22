@@ -2,12 +2,11 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { ContentStatus, UserType } from '../../generated/prisma/client.js';
+import { ContentStatus } from '../../generated/prisma/client.js';
 import {
   getPostgresCode,
   isForeignKeyViolation,
@@ -15,6 +14,7 @@ import {
 } from '../../common/errors/prisma-error.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
+import { assertPlatformStaff } from '../assert-platform-staff.js';
 import { canTransitionContentStatus } from '../content-status.js';
 import type { CreateLessonDto } from './dto/create-lesson.dto.js';
 import type { LessonResponseDto } from './dto/lesson-response.dto.js';
@@ -42,7 +42,7 @@ export class LessonsService {
     moduleId: string,
     body: CreateLessonDto,
   ): Promise<LessonResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const lesson = await this.lessons.create(moduleId, body);
     if (!lesson) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -60,7 +60,7 @@ export class LessonsService {
 
   /** Lists every lesson in position order without pagination. */
   async findMany(actor: AuthContext, moduleId: string): Promise<LessonResponseDto[]> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const lessons = await this.lessons.findManyForModule(moduleId);
     if (!lessons) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -78,7 +78,7 @@ export class LessonsService {
     moduleId: string,
     body: ReorderLessonsDto,
   ): Promise<LessonResponseDto[]> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const result = await this.lessons.reorder(moduleId, body.lessonIds);
     if (result.kind === 'not-found') {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -95,7 +95,7 @@ export class LessonsService {
 
   /** Returns a lesson; malformed IDs are rejected by the controller's UUID pipe. */
   async findById(actor: AuthContext, id: string): Promise<LessonResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const lesson = await this.lessons.findById(id);
     if (!lesson) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -109,7 +109,7 @@ export class LessonsService {
 
   /** Updates title and/or audience on a lesson. */
   async update(actor: AuthContext, id: string, body: UpdateLessonDto): Promise<LessonResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     if (Object.values(body).every((value) => value === undefined)) {
       throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
@@ -132,7 +132,7 @@ export class LessonsService {
     id: string,
     status: ContentStatus,
   ): Promise<LessonResponseDto> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     const current = await this.lessons.findById(id);
     if (!current) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -196,7 +196,7 @@ export class LessonsService {
 
   /** Deletes a lesson only when database foreign keys allow it. */
   async delete(actor: AuthContext, id: string): Promise<void> {
-    this.assertAdmin(actor);
+    assertPlatformStaff(actor);
     try {
       const lesson = await this.lessons.delete(id);
       this.logger.info(
@@ -214,12 +214,6 @@ export class LessonsService {
         throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
       throw error;
-    }
-  }
-
-  private assertAdmin(actor: AuthContext): void {
-    if (actor.userType !== UserType.PLATFORM_STAFF) {
-      throw new ForbiddenException(API_ERROR.FORBIDDEN);
     }
   }
 }
