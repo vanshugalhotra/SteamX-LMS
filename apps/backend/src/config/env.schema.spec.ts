@@ -1,10 +1,15 @@
 import { validateEnv } from './env.schema.js';
 
 const VALID_SECRET = 'test-auth-secret-with-at-least-thirty-two-characters';
+const STORAGE_CONFIG = {
+  AWS_REGION: 'ap-south-1',
+  S3_BUCKET: 'test-bucket',
+};
 
 describe('validateEnv', () => {
   it('applies defaults and transforms environment values', () => {
     const env = validateEnv({
+      ...STORAGE_CONFIG,
       AUTH_JWT_SECRET: VALID_SECRET,
       DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
       PORT: '4300',
@@ -22,11 +27,24 @@ describe('validateEnv', () => {
       AUTH_TOKEN_TTL_SECONDS: 86_400,
       CORS_ORIGINS: ['http://localhost:5173', 'https://steamx.example'],
       SWAGGER_ENABLED: true,
+      storage: {
+        region: 'ap-south-1',
+        bucket: 'test-bucket',
+        accessKeyId: undefined,
+        secretAccessKey: undefined,
+        uploadUrlTtlSeconds: 900,
+      },
+      assetLimits: {
+        image: 10 * 1024 * 1024,
+        pdf: 50 * 1024 * 1024,
+        video: 1024 * 1024 * 1024,
+      },
     });
   });
 
   it('parses configured database pool values', () => {
     const env = validateEnv({
+      ...STORAGE_CONFIG,
       AUTH_JWT_SECRET: VALID_SECRET,
       DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
       DB_POOL_MAX: '25',
@@ -40,6 +58,7 @@ describe('validateEnv', () => {
   it('parses false as false and disables Swagger outside development', () => {
     expect(
       validateEnv({
+        ...STORAGE_CONFIG,
         AUTH_JWT_SECRET: VALID_SECRET,
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
@@ -50,6 +69,7 @@ describe('validateEnv', () => {
 
     expect(
       validateEnv({
+        ...STORAGE_CONFIG,
         AUTH_JWT_SECRET: VALID_SECRET,
         NODE_ENV: 'test',
         DATABASE_URL: 'postgresql://user:password@localhost:5432/steamx_lms',
@@ -60,6 +80,7 @@ describe('validateEnv', () => {
   it('requires at least one CORS origin in production', () => {
     expect(() =>
       validateEnv({
+        ...STORAGE_CONFIG,
         AUTH_JWT_SECRET: VALID_SECRET,
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://localhost/steamx_lms',
@@ -68,6 +89,7 @@ describe('validateEnv', () => {
 
     expect(
       validateEnv({
+        ...STORAGE_CONFIG,
         AUTH_JWT_SECRET: VALID_SECRET,
         DATABASE_URL: 'postgresql://localhost/steamx_lms',
       }).CORS_ORIGINS,
@@ -77,6 +99,7 @@ describe('validateEnv', () => {
   it('accepts silent logging', () => {
     expect(
       validateEnv({
+        ...STORAGE_CONFIG,
         AUTH_JWT_SECRET: VALID_SECRET,
         DATABASE_URL: '******localhost:5432/steamx_lms',
         LOG_LEVEL: 'silent',
@@ -90,6 +113,7 @@ describe('validateEnv', () => {
 
     try {
       validateEnv({
+        ...STORAGE_CONFIG,
         NODE_ENV: 'invalid',
         PORT: 'not-a-number',
         LOG_LEVEL: 'verbose',
@@ -118,6 +142,7 @@ describe('validateEnv', () => {
   it('rejects a missing auth secret', () => {
     expect(() =>
       validateEnv({
+        ...STORAGE_CONFIG,
         DATABASE_URL: 'postgresql://localhost/steamx_test',
       }),
     ).toThrow('- AUTH_JWT_SECRET: is required');
@@ -129,6 +154,7 @@ describe('validateEnv', () => {
 
     try {
       validateEnv({
+        ...STORAGE_CONFIG,
         AUTH_JWT_SECRET: shortSecret,
         DATABASE_URL: 'postgresql://localhost/steamx_test',
       });
@@ -143,9 +169,44 @@ describe('validateEnv', () => {
   it('defaults auth token lifetime to one day', () => {
     expect(
       validateEnv({
+        ...STORAGE_CONFIG,
         AUTH_JWT_SECRET: VALID_SECRET,
         DATABASE_URL: 'postgresql://localhost/steamx_test',
       }).AUTH_TOKEN_TTL_SECONDS,
     ).toBe(86_400);
+  });
+
+  it('requires an S3 bucket and AWS region', () => {
+    expect(() =>
+      validateEnv({
+        AUTH_JWT_SECRET: VALID_SECRET,
+        DATABASE_URL: 'postgresql://localhost/steamx_test',
+        AWS_REGION: 'ap-south-1',
+      }),
+    ).toThrow('- S3_BUCKET: is required');
+
+    expect(() =>
+      validateEnv({
+        AUTH_JWT_SECRET: VALID_SECRET,
+        DATABASE_URL: 'postgresql://localhost/steamx_test',
+        S3_BUCKET: 'test-bucket',
+      }),
+    ).toThrow('- AWS_REGION: is required');
+  });
+
+  it('requires AWS credentials to be supplied together', () => {
+    for (const credentials of [
+      { AWS_ACCESS_KEY_ID: 'test-access-key' },
+      { AWS_SECRET_ACCESS_KEY: 'test-secret-key' },
+    ]) {
+      expect(() =>
+        validateEnv({
+          ...STORAGE_CONFIG,
+          ...credentials,
+          AUTH_JWT_SECRET: VALID_SECRET,
+          DATABASE_URL: 'postgresql://localhost/steamx_test',
+        }),
+      ).toThrow('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must both be set or both be omitted');
+    }
   });
 });

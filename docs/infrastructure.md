@@ -32,9 +32,14 @@ retain the bucket and enable termination protection.
 
 S3 is pay-per-use; an empty, idle bucket has negligible cost. The monthly budget emails an alert at
 80% actual spend and at 100% forecasted spend. Destroying staging removes all bucket data.
+The backend requires `AWS_REGION` and `S3_BUCKET`. AWS access keys are
+optional as a pair; when absent, the SDK default credential chain is used (including the ECS task
+role in production).
 
-The backend will need `AWS_REGION`, `S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and
-`AWS_SECRET_ACCESS_KEY` when S3 integration is added.
+The root `.env.example` is for CDK/infrastructure settings, not a second backend configuration.
+CDK uses `AWS_REGION` to choose the deployment region and creates the bucket. Optional backend settings
+`UPLOAD_URL_TTL_SECONDS`, `ASSET_MAX_BYTES_IMAGE`, `ASSET_MAX_BYTES_PDF`, and
+`ASSET_MAX_BYTES_VIDEO` default to 900 seconds, 10 MiB, 50 MiB, and 1 GiB respectively.
 
 When handing the AWS account over, remove the temporary deployer user and its access keys after
 confirming the replacement account administrators can deploy and operate the stack.

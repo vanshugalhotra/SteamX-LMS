@@ -3,6 +3,10 @@ import { z } from 'zod';
 
 const AUTH_TOKEN_TTL_MIN_SECONDS = 60;
 const AUTH_TOKEN_TTL_DEFAULT_SECONDS = 86_400;
+const DEFAULT_UPLOAD_URL_TTL_SECONDS = 900;
+const DEFAULT_ASSET_MAX_BYTES_IMAGE = 10 * 1024 * 1024;
+const DEFAULT_ASSET_MAX_BYTES_PDF = 50 * 1024 * 1024;
+const DEFAULT_ASSET_MAX_BYTES_VIDEO = 1024 * 1024 * 1024;
 
 const envSchema = z
   .object({
@@ -38,6 +42,32 @@ const envSchema = z
       .enum(['true', 'false'])
       .transform((value) => value === 'true')
       .optional(),
+    AWS_REGION: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
+    S3_BUCKET: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
+    AWS_ACCESS_KEY_ID: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(1).optional(),
+    ),
+    AWS_SECRET_ACCESS_KEY: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(1).optional(),
+    ),
+    UPLOAD_URL_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(DEFAULT_UPLOAD_URL_TTL_SECONDS),
+    ASSET_MAX_BYTES_IMAGE: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(DEFAULT_ASSET_MAX_BYTES_IMAGE),
+    ASSET_MAX_BYTES_PDF: z.coerce.number().int().positive().default(DEFAULT_ASSET_MAX_BYTES_PDF),
+    ASSET_MAX_BYTES_VIDEO: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(DEFAULT_ASSET_MAX_BYTES_VIDEO),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV === 'production' && env.CORS_ORIGINS.length === 0) {
@@ -47,10 +77,38 @@ const envSchema = z
         message: 'must contain at least one allowed origin in production',
       });
     }
+
+    if (Boolean(env.AWS_ACCESS_KEY_ID) !== Boolean(env.AWS_SECRET_ACCESS_KEY)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['AWS_ACCESS_KEY_ID'],
+        message: 'AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must both be set or both be omitted',
+      });
+    }
   })
   .transform((env) => ({
-    ...env,
+    NODE_ENV: env.NODE_ENV,
+    PORT: env.PORT,
+    LOG_LEVEL: env.LOG_LEVEL,
+    DATABASE_URL: env.DATABASE_URL,
+    DB_POOL_MAX: env.DB_POOL_MAX,
+    DB_CONNECTION_TIMEOUT_MS: env.DB_CONNECTION_TIMEOUT_MS,
+    AUTH_JWT_SECRET: env.AUTH_JWT_SECRET,
+    AUTH_TOKEN_TTL_SECONDS: env.AUTH_TOKEN_TTL_SECONDS,
+    CORS_ORIGINS: env.CORS_ORIGINS,
     SWAGGER_ENABLED: env.SWAGGER_ENABLED ?? env.NODE_ENV === 'development',
+    storage: {
+      region: env.AWS_REGION,
+      bucket: env.S3_BUCKET,
+      accessKeyId: env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+      uploadUrlTtlSeconds: env.UPLOAD_URL_TTL_SECONDS,
+    },
+    assetLimits: {
+      image: env.ASSET_MAX_BYTES_IMAGE,
+      pdf: env.ASSET_MAX_BYTES_PDF,
+      video: env.ASSET_MAX_BYTES_VIDEO,
+    },
   }));
 
 export type Env = z.output<typeof envSchema>;

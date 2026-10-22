@@ -37,6 +37,8 @@ jobs:
       DB_CONNECTION_TIMEOUT_MS: 5000
       CORS_ORIGINS: http://localhost:5173
       AUTH_JWT_SECRET: steamx-ci-only-test-signing-key-not-for-production-00000000
+      AWS_REGION: ap-south-1
+      S3_BUCKET: test-bucket
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
