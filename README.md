@@ -86,7 +86,7 @@ script across workspace packages.
 - `apps/frontend/src/` — React application, features, and shared UI.
 - `docs/` — architecture, access-control, database, decision, and testing guides.
 - `docs/runbooks/` — operational procedures, including [admin recovery](./docs/runbooks/admin-recovery.md).
-- `infra/` — infrastructure workspace (currently no tracked files).
+- `infra/` — standalone AWS CDK app for staging infrastructure.
 - `packages/` — shared-package workspace (currently no package directories).
 
 ## Documentation
@@ -100,3 +100,4 @@ script across workspace packages.
 - [Backend setup reference](./apps/backend/README.md)
 - [API testing checklist](./docs/api-testing.md)
 - [Workflow testing](./docs/workflows-testing.md)
+- [Infrastructure](./docs/infrastructure.md)

@@ -2,6 +2,17 @@
 
 Each item records the current design and the reason it is used.
 
+## Staging infrastructure is S3-only until a domain exists
+
+Staging starts with S3 only. Without a domain there is no HTTPS endpoint, so running ECS and RDS
+now would add cost without providing a usable application environment. Add RDS/ECS/ALB once the
+domain exists.
+
+## Backend uses IAM user keys in staging only
+
+Use manually created IAM user keys for the staging backend because it is not yet running on ECS.
+Production will use an ECS task role instead of long-lived user keys.
+
 ## One name field
 
 Store a single `name` value for a user rather than separate first and last names. Current user
