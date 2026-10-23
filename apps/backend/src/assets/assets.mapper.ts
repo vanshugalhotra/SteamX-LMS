@@ -6,6 +6,10 @@ import {
   CreateAssetResponseDto,
   UploadInstructionsDto,
 } from './dto/asset-response.dto.js';
+import type { AssetFileSelection } from './dto/asset-file-selection.js';
+import type { AssetLibraryDetailDto, AssetListItemDto } from './dto/asset-library-response.dto.js';
+import type { AssetDetailRecord, AssetLibraryRecord } from './assets.repository.js';
+import { pickCurrentFile } from './asset-library.js';
 
 /** Exposes only the asset fields intended for API clients. */
 export function toAssetDto(asset: Asset): AssetDto {
@@ -20,7 +24,7 @@ export function toAssetDto(asset: Asset): AssetDto {
 }
 
 /** Shapes file state for JSON responses without exposing storage internals. */
-export function toAssetFileDto(file: AssetFile): AssetFileDto {
+export function toAssetFileDto(file: AssetFileSelection): AssetFileDto {
   return {
     id: file.id,
     assetId: file.assetId,
@@ -32,6 +36,43 @@ export function toAssetFileDto(file: AssetFile): AssetFileDto {
     lastError: file.lastError,
     createdAt: file.createdAt,
     updatedAt: file.updatedAt,
+  };
+}
+
+export function toAssetListItemDto(asset: AssetLibraryRecord): AssetListItemDto {
+  const [file] = asset.files;
+  if (!file) {
+    throw new Error('Asset library query returned an asset without a READY file.');
+  }
+  return {
+    id: asset.id,
+    type: asset.type,
+    title: asset.title,
+    status: asset.status,
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt,
+    file: {
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes === null ? null : Number(file.sizeBytes),
+      originalFilename: file.originalFilename,
+    },
+  };
+}
+
+export function toAssetLibraryDetailDto(
+  asset: AssetDetailRecord,
+  usedIn: AssetLibraryDetailDto['usedIn'],
+): AssetLibraryDetailDto {
+  const file = pickCurrentFile(asset.files);
+  return {
+    id: asset.id,
+    type: asset.type,
+    title: asset.title,
+    status: asset.status,
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt,
+    file: file ? toAssetFileDto(file) : null,
+    usedIn,
   };
 }
 

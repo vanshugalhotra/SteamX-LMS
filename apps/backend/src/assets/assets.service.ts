@@ -10,6 +10,8 @@ import { z } from 'zod';
 import { PinoLogger } from 'nestjs-pino';
 import { AssetFileStatus } from '../generated/prisma/client.js';
 import type { AssetFile } from '../generated/prisma/client.js';
+import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
+import { paginate } from '../common/pagination/paginate.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import type { Env } from '../config/env.schema.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
@@ -27,8 +29,16 @@ import {
 import type { SupportedAssetType } from './asset-rules.js';
 import type { CreateAssetDto } from './dto/create-asset.dto.js';
 import type { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
-import { toAssetFileDto, toCreateAssetResponse } from './assets.mapper.js';
+import type { AssetListQueryDto } from './dto/asset-list-query.dto.js';
+import type { AssetLibraryDetailDto, AssetListItemDto } from './dto/asset-library-response.dto.js';
+import {
+  toAssetFileDto,
+  toAssetLibraryDetailDto,
+  toAssetListItemDto,
+  toCreateAssetResponse,
+} from './assets.mapper.js';
 import { AssetsRepository } from './assets.repository.js';
+import { AssetUsageRepository } from './asset-usage.repository.js';
 import { AssetProcessorRegistry } from './processing/asset-processor.registry.js';
 import type { MakeReadyInput } from './assets.repository.js';
 
@@ -39,12 +49,54 @@ const UUID_SCHEMA = z.uuid();
 export class AssetsService {
   constructor(
     private readonly assets: AssetsRepository,
+    private readonly assetUsage: AssetUsageRepository,
     private readonly storage: StorageService,
     private readonly config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
     private readonly processors: AssetProcessorRegistry,
   ) {
     this.logger.setContext(AssetsService.name);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /assets — List library assets
+  // ─────────────────────────────────────────
+
+  /** Lists only ACTIVE or ARCHIVED assets with a READY file. */
+  async findLibraryItems(
+    query: AssetListQueryDto,
+  ): Promise<PaginationResponseDto<AssetListItemDto>> {
+    const { items, total } = await this.assets.findLibraryItems(query);
+    return paginate(items.map(toAssetListItemDto), query.page, query.limit, total);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /assets/:id — Get a library asset
+  // ─────────────────────────────────────────
+
+  /** Reads a specific asset and current file state, including assets without READY files. */
+  async findLibraryAsset(assetId: string): Promise<AssetLibraryDetailDto> {
+    const normalizedAssetId = this.normalizeUuid(assetId);
+    if (!normalizedAssetId) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    const asset = await this.assets.findLibraryAssetById(normalizedAssetId);
+    if (!asset) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    const { items, total } = await this.assetUsage.findByAssetId(normalizedAssetId);
+    return toAssetLibraryDetailDto(asset, {
+      total,
+      items: items.map((lesson) => ({
+        lessonId: lesson.id,
+        lessonTitle: lesson.title,
+        lessonStatus: lesson.status,
+        moduleId: lesson.module.id,
+        moduleTitle: lesson.module.title,
+        courseId: lesson.courseId,
+        courseTitle: lesson.module.course.title,
+      })),
+    });
   }
 
   // ─────────────────────────────────────────
