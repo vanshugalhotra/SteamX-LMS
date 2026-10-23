@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STEAMX asset upload smoke test</title>
+    <style>
+      body {
+        font:
+          16px system-ui,
+          sans-serif;
+        margin: 2rem auto;
+        max-width: 850px;
+        padding: 0 1rem;
+      }
+      label {
+        display: block;
+        margin: 0.8rem 0;
+      }
+      input,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+        padding: 0.45rem;
+      }
+      input[type='text'],
+      input[type='password'],
+      input[type='file'] {
+        display: block;
+        max-width: 100%;
+        width: 34rem;
+      }
+      button {
+        cursor: pointer;
+      }
+      #results {
+        padding-left: 1.5rem;
+      }
+      #results li {
+        margin: 0.65rem 0;
+        overflow-wrap: anywhere;
+      }
+      .pass {
+        color: #08752b;
+      }
+      .fail {
+        color: #b42318;
+      }
+      pre {
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+      .notice {
+        background: #fff7d6;
+        border-left: 4px solid #d99b00;
+        padding: 0.8rem;
+      }
+    </style>
+    <script>
+      window.assetSmokeToken = '__SMOKE_TOKEN__';
+    </script>
+    <script src="/browser.js" defer></script>
+  </head>
+  <body>
+    <h1>STEAMX asset upload smoke test</h1>
+    <p class="notice">
+      This local page calls the running backend and uploads directly to S3. Use staging test data.
+      It creates asset rows and S3 objects; it does not delete either automatically.
+    </p>
+    <form id="settings">
+      <label>
+        Backend URL
+        <input id="backend-url" type="text" value="http://localhost:3333" required />
+      </label>
+      <label>
+        Seeded admin SteamX ID
+        <input id="steamx-id" type="text" autocomplete="username" required />
+      </label>
+      <label>
+        Seeded admin password
+        <input id="password" type="password" autocomplete="current-password" required />
+      </label>
+      <label>
+        Small real PNG
+        <input id="png-file" type="file" accept="image/png,.png" required />
+      </label>
+      <label>
+        Short MP4
+        <input id="mp4-file" type="file" accept="video/mp4,.mp4" required />
+      </label>
+      <button id="run" type="submit">Run asset upload checks</button>
+    </form>
+    <h2>Results</h2>
+    <ol id="results" aria-live="polite"></ol>
+    <h2>S3 cleanup commands</h2>
+    <p>
+      After verifying the results, replace &lt;bucket&gt; with the staging bucket and run these.
+    </p>
+    <pre id="cleanup">No assets created yet.</pre>
+  </body>
+</html>

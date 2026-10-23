@@ -35,7 +35,8 @@
     "infra:test": "pnpm --dir infra exec vitest run",
     "infra:stop": "node -e \"console.log('Nothing to stop/start yet: staging is S3 only')\"",
     "infra:start": "node -e \"console.log('Nothing to stop/start yet: staging is S3 only')\"",
-    "storage:smoke": "pnpm --dir infra exec tsx --tsconfig ../apps/backend/tsconfig.json --env-file ../apps/backend/.env ../apps/backend/test/manual/storage-smoke/storage-smoke.ts"
+    "storage:smoke": "pnpm --dir infra exec tsx --tsconfig ../apps/backend/tsconfig.json --env-file ../apps/backend/.env ../apps/backend/test/manual/storage-smoke/storage-smoke.ts",
+    "asset:smoke": "pnpm --dir infra exec tsx --tsconfig ../apps/backend/tsconfig.json --env-file ../apps/backend/.env ../apps/backend/test/manual/asset-upload-smoke/asset-upload-smoke.ts"
   },
   "devDependencies": {
     "prettier": "^3.9.9",

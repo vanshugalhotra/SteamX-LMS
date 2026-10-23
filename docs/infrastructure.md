@@ -63,3 +63,25 @@ Requirements:
 - `AWS_REGION`, `S3_BUCKET`, and backend access keys in `apps/backend/.env`.
 
 Expected results: upload → 200, size mismatch → 403, unsigned GET → 403, range → 206. Click **Clean up** after testing.
+
+## Asset upload API smoke test
+
+With the backend running against the staging bucket and database, run this from the repository root:
+
+```powershell
+pnpm asset:smoke --port 5173
+```
+
+Open `http://localhost:5173` in a browser. The browser origin must be allowed by both the backend's
+`CORS_ORIGINS` and the staging bucket CORS policy. The page asks for the backend URL, seeded admin
+credentials, and a small PNG and short MP4. It exercises authenticated asset creation, direct
+presigned uploads, file-state reads, completion (including retrying before the PNG upload),
+idempotent completion, wrong-size upload enforcement, an invalid-signature failure, and the MP4
+playback-key value via a narrow read-only database query. It does not display session cookies or
+presigned URLs.
+
+The local smoke server binds only to `127.0.0.1` and needs `DATABASE_URL` from
+`apps/backend/.env` for the playback-key check. After the run, the page prints S3 cleanup commands
+for each created asset prefix. Replace `<bucket>` with the staging bucket and run those commands
+with the `steamx-backend` AWS profile. The smoke test does not remove database rows; use an isolated
+staging account/database for this manual test.
