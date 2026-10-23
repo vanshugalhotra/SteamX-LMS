@@ -6,10 +6,10 @@ import {
   CreateAssetResponseDto,
   UploadInstructionsDto,
 } from './dto/asset-response.dto.js';
-import type { AssetFileSelection } from './dto/asset-file-selection.js';
+import type { AssetFileSelection } from './library/asset-file-selection.js';
 import type { AssetLibraryDetailDto, AssetListItemDto } from './dto/asset-library-response.dto.js';
 import type { AssetDetailRecord, AssetLibraryRecord } from './assets.repository.js';
-import { pickCurrentFile } from './asset-library.js';
+import { pickCurrentFile } from './library/asset-library.js';
 
 /** Exposes only the asset fields intended for API clients. */
 export function toAssetDto(asset: Asset): AssetDto {

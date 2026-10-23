@@ -1,5 +1,5 @@
-import { AssetFileStatus } from '../generated/prisma/client.js';
-import type { AssetFileSelection } from './dto/asset-file-selection.js';
+import { AssetFileStatus } from '../../generated/prisma/client.js';
+import type { AssetFileSelection } from './asset-file-selection.js';
 
 /** READY is the serving file; before one exists, the newest upload attempt is current. */
 export function pickCurrentFile(files: AssetFileSelection[]): AssetFileSelection | null {

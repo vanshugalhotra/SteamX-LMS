@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AssetFileStatus } from '../generated/prisma/client.js';
-import type { AssetFileSelection } from './dto/asset-file-selection.js';
+import { AssetFileStatus } from '../../generated/prisma/client.js';
+import type { AssetFileSelection } from './asset-file-selection.js';
 import { pickCurrentFile } from './asset-library.js';
 
 function file(id: string, status: AssetFileStatus, createdAt: string): AssetFileSelection {

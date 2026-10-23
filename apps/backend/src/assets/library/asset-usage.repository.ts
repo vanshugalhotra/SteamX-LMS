@@ -3,8 +3,8 @@
  * (same exception as the course outline).
  */
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { Prisma } from '../../generated/prisma/client.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
 
 // The library view is not a report; total always holds the real count.
 const USAGE_LIMIT = 50;

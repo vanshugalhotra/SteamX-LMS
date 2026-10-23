@@ -38,7 +38,7 @@ import {
   toCreateAssetResponse,
 } from './assets.mapper.js';
 import { AssetsRepository } from './assets.repository.js';
-import { AssetUsageRepository } from './asset-usage.repository.js';
+import { AssetUsageRepository } from './library/asset-usage.repository.js';
 import { AssetProcessorRegistry } from './processing/asset-processor.registry.js';
 import type { MakeReadyInput } from './assets.repository.js';
 
