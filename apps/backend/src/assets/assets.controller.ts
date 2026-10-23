@@ -1,0 +1,65 @@
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
+import type { AuthContext } from '../auth/types/auth-context.js';
+import { PERMISSION } from '../auth/permissions.js';
+import { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
+import { CreateAssetDto } from './dto/create-asset.dto.js';
+import { AssetsService } from './assets.service.js';
+
+/** HTTP and permission boundary for asset creation and file-state reads. */
+@ApiTags('Assets')
+@ApiCookieAuth('cookieAuth')
+@ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
+@ApiForbiddenResponse({ description: 'The required asset permission is missing.' })
+@ApiInternalServerErrorResponse({ description: 'An unexpected server error occurred.' })
+@Controller({ path: 'assets' })
+export class AssetsController {
+  constructor(private readonly assets: AssetsService) {}
+
+  // ─────────────────────────────────────────
+  // POST /assets — Create an asset and upload file
+  // ─────────────────────────────────────────
+
+  /** Requires write permission; the service handles rules and upload setup. */
+  @RequirePermission(PERMISSION.ASSET_WRITE)
+  @Post()
+  @ApiOperation({ summary: 'Create an asset and prepare a file upload' })
+  @ApiCreatedResponse({
+    description: 'Asset, file, and upload instructions.',
+    type: CreateAssetResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Asset type, MIME type, size, or metadata is invalid.' })
+  create(
+    @CurrentAuth() actor: AuthContext,
+    @Body() body: CreateAssetDto,
+  ): Promise<CreateAssetResponseDto> {
+    return this.assets.create(actor, body);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /assets/:id/files/:fileId — Get file state
+  // ─────────────────────────────────────────
+
+  /** Requires read permission; IDs are checked together by the service/repository. */
+  @RequirePermission(PERMISSION.ASSET_READ)
+  @Get(':id/files/:fileId')
+  @ApiOperation({ summary: 'Get asset file upload and processing state' })
+  @ApiOkResponse({ description: 'Asset file state.', type: AssetFileDto })
+  @ApiNotFoundResponse({ description: 'Asset file not found.' })
+  findFile(@Param('id') assetId: string, @Param('fileId') fileId: string): Promise<AssetFileDto> {
+    return this.assets.findFile(assetId, fileId);
+  }
+}

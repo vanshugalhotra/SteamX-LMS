@@ -266,6 +266,31 @@ Caller: platform `admin` with `curriculum.write`; deletes a lesson with no depen
 - [auto] When lesson ID is malformed -> expect `400 BAD_REQUEST`; when valid but unknown -> expect `404 NOT_FOUND`.
 - [auto] When teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
+## Assets
+
+### `POST /assets`
+
+Caller: authenticated admin with `asset.write`; creates an ACTIVE asset and UPLOADING file in one database transaction, then returns upload instructions.
+
+- [auto] When type is IMAGE with `image/jpeg`, `image/png`, or `image/webp`; PDF with `application/pdf`; or VIDEO with `video/mp4` -> expect `201`, persisted asset/file rows, and a PUT URL with required headers.
+- [auto] When title has surrounding whitespace -> expect it trimmed; when filename includes control characters -> expect them removed before storing as `originalFilename`.
+- [auto] When MIME is padded or uppercase -> expect normalized lowercase MIME to be stored.
+- [auto] When type is PPTX or otherwise unsupported -> expect `400 ASSET_TYPE_NOT_SUPPORTED`.
+- [auto] When MIME is not allowed for the type or includes parameters -> expect `400 MIME_NOT_ALLOWED`.
+- [auto] When declared size exceeds the configured type limit -> expect `400 FILE_TOO_LARGE`; exactly the limit is allowed by unit tests.
+- [auto] When size is zero, negative, fractional, or title/filename is empty or whitespace -> expect `400`.
+- [auto] When the body includes an unknown field -> expect `400 VALIDATION_ERROR`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
+- [manual] Upload using the returned URL, method, and headers; confirm the object uses the exact declared content type and size.
+
+### `GET /assets/:id/files/:fileId`
+
+Caller: authenticated admin with `asset.read`; returns the state of a file belonging to that asset.
+
+- [auto] When asset and file IDs match a row -> expect `200` with status, original filename, MIME, numeric size, error code, and timestamps.
+- [auto] When file belongs to another asset, either ID is unknown, or either ID is malformed -> expect `404 NOT_FOUND`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
+
 ## Schools
 
 ### `POST /schools`

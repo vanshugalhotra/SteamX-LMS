@@ -27,6 +27,7 @@
 - A declared permission requires auth + a matching role grant.
 - Permission keys: `src/auth/permissions.ts`. Grants loaded at startup and cached in memory — **restart after changing grants**.
 - **Curriculum** is global (no school scope). Routes need `curriculum.read`/`curriculum.write` and services also require platform-staff user type. School staff/students are denied even with permissions.
+- **Assets** are global (no school scope). Routes need `asset.read` or `asset.write`; both permissions are granted to `admin` only. Teachers and students are denied.
 
 ## School scope vs. user visibility
 

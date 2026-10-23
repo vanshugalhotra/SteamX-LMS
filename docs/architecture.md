@@ -20,6 +20,8 @@ Response mappers convert database records → response DTOs. Shared helpers live
 | `SchoolsModule`       | School management.                                                            | `SchoolsService`                                                                                          |
 | `ClassSectionsModule` | Class-section management.                                                     | `ClassSectionsService`                                                                                    |
 | `CurriculumModule`    | Global course/module/lesson lifecycle, ordering, status transitions, outline. | `CoursesService`, `CourseModulesService`, `LessonsService`, `CourseOutlineService`                        |
+| `AssetsModule`        | Global asset/file creation, upload instructions, and file-state reads.          | —                                                                                                         |
+| `AssetProcessingModule` | Per-type processing seam; passthrough processors currently retain uploaded files. | `AssetProcessorRegistry`                                                                              |
 | `StorageModule`       | S3 boundary: presigned URLs, object metadata, prefix deletion.                | `StorageService`                                                                                          |
 | `TenancyModule`       | Resolves a required active school for workflows.                              | `ActiveSchoolService`                                                                                     |
 | `PrismaModule`        | Configured Prisma client.                                                     | `PrismaService`                                                                                           |
@@ -47,5 +49,6 @@ Response mappers convert database records → response DTOs. Shared helpers live
 - **Pagination:** `{ items, page, limit, total }`. Defaults: page 1, limit 20, max 100.
 - **DTOs:** class-validator input DTOs via global pipe. Response DTOs via explicit mappers (never raw Prisma entities).
 - **Config:** Zod validates env vars at startup. Services use typed Nest config.
+- **Asset processing:** `AssetProcessorRegistry` selects the processor by asset type. VIDEO currently serves its MP4 original as playback; HLS can replace that processor and report asynchronous work through `processing_job_id` without a schema change.
 - **Logging:** Pino structured logs with request ID. Sensitive fields redacted.
 - **API contract:** `/api/v1` prefix. Swagger at `/api/docs` (when enabled).

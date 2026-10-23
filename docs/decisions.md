@@ -36,6 +36,11 @@ Each entry records the current design choice and why.
 ## Storage
 
 - **Prefix-based asset keys** — `assets/<asset_id>/<asset_file_id>/`. DB checks protect this layout because row deletion queues the whole prefix for cleanup. Key construction is centralized in the application.
+- **Asset upload types and MIME allow-list** — IMAGE accepts JPEG/PNG/WEBP, PDF accepts PDF, and VIDEO accepts MP4. PPTX remains in the database enum for existing curriculum content but is rejected during upload validation.
+- **Asset keys use IDs only** — original object keys are `assets/<asset_id>/<asset_file_id>/original`; client filenames are retained only as `original_filename`.
+- **Asset processor seam** — image/PDF passthrough produces no playback key, and MP4 video is served from its original key. HLS can replace the video processor with asynchronous work tracked by the existing `processing_job_id`.
+- **Asset sizes in API responses** — Prisma BigInt `size_bytes` is converted to a JSON number by the asset mapper.
+- **Asset processing errors** — `last_error` stores a short stable error code, never provider error text or stack traces.
 - **`StorageService` is abstract** — thin S3 boundary with an in-memory test implementation. Not a generic wrapper.
 - **Presigned PUT URLs** — sign `content-type`, `content-length`, and `if-none-match` via `signableHeaders`. `If-None-Match: *` prevents overwrites. `content-length` signing prevents size mismatches (verified in Chrome and Firefox).
 - **S3 checksum config** — `requestChecksumCalculation` and `responseChecksumValidation` set to `WHEN_REQUIRED` (SDK defaults break presigned browser uploads).
