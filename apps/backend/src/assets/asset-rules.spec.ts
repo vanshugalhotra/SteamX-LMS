@@ -21,7 +21,7 @@ describe('asset rules', () => {
     [AssetType.PDF, 'application/pdf', 'PDF'],
     [AssetType.VIDEO, 'video/mp4', 'MP4'],
   ] as const)('allows %s with %s and maps its signature', (type, mimeType, kind) => {
-    expect(validateAssetUpload(type, mimeType, 1, limits)).toBe(type);
+    expect(validateAssetUpload(type, mimeType, 16, limits)).toBe(type);
     expect(expectedFileKindForMime(mimeType)).toBe(kind);
   });
 
@@ -54,6 +54,12 @@ describe('asset rules', () => {
     );
   });
 
+  it.each([1, 15])('rejects files shorter than the signature sample: %s bytes', (sizeBytes) => {
+    expect(() => validateAssetUpload(AssetType.IMAGE, 'image/png', sizeBytes, limits)).toThrow(
+      expect.objectContaining({ code: 'FILE_TOO_SMALL' }),
+    );
+  });
+
   it.each(['PPTX', 'OTHER'])('rejects unsupported type %s', (type) => {
     expect(() => validateAssetUpload(type, 'application/pdf', 1, limits)).toThrow(
       expect.objectContaining({ code: 'ASSET_TYPE_NOT_SUPPORTED' }),
@@ -73,7 +79,7 @@ describe('asset rules', () => {
 
   it('normalizes MIME by trimming and lowercasing', () => {
     expect(normalizeMimeType('  IMAGE/PNG  ')).toBe('image/png');
-    expect(validateAssetUpload(AssetType.IMAGE, ' IMAGE/PNG ', 1, limits)).toBe(AssetType.IMAGE);
+    expect(validateAssetUpload(AssetType.IMAGE, ' IMAGE/PNG ', 16, limits)).toBe(AssetType.IMAGE);
   });
 
   it('builds an original key exclusively from IDs and accepts it as a storage key', () => {

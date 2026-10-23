@@ -40,6 +40,7 @@ Each entry records the current design choice and why.
 - **Asset keys use IDs only** — original object keys are `assets/<asset_id>/<asset_file_id>/original`; client filenames are retained only as `original_filename`.
 - **Asset processor seam** — image/PDF passthrough produces no playback key, and MP4 video is served from its original key. HLS can replace the video processor with asynchronous work tracked by the existing `processing_job_id`.
 - **Asset sizes in API responses** — Prisma BigInt `size_bytes` is converted to a JSON number by the asset mapper.
+- **Minimum upload size** — initialization rejects files smaller than 16 bytes (`FILE_TOO_SMALL`) because signature detection needs the first 16 bytes; these files could never complete successfully.
 - **Asset processing errors** — `last_error` stores a short stable error code, never provider error text or stack traces.
 - **One processing path for each asset type** — every uploaded file moves `UPLOADING → UPLOADED → PROCESSING → READY`; passthrough processors still use PROCESSING so real video transcoding can replace only the processing step.
 - **Conditional file transitions provide idempotency** — callers transition only from an expected status. The caller that wins `UPLOADING → UPLOADED` continues; other completion calls re-read the current state. A crash after winning can leave a PROCESSING row for CUR-15 cleanup.

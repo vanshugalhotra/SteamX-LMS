@@ -277,6 +277,7 @@ Caller: authenticated admin with `asset.write`; creates an ACTIVE asset and UPLO
 - [auto] When MIME is padded or uppercase -> expect normalized lowercase MIME to be stored.
 - [auto] When type is PPTX or otherwise unsupported -> expect `400 ASSET_TYPE_NOT_SUPPORTED`.
 - [auto] When MIME is not allowed for the type or includes parameters -> expect `400 MIME_NOT_ALLOWED`.
+- [auto] When declared size is 1-15 bytes -> expect `400 FILE_TOO_SMALL`; signature verification requires a 16-byte sample.
 - [auto] When declared size exceeds the configured type limit -> expect `400 FILE_TOO_LARGE`; exactly the limit is allowed by unit tests.
 - [auto] When size is zero, negative, fractional, or title/filename is empty or whitespace -> expect `400`.
 - [auto] When the body includes an unknown field -> expect `400 VALIDATION_ERROR`.

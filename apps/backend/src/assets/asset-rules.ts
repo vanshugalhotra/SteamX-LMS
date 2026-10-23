@@ -11,8 +11,13 @@ export type AssetLimits = {
   pdf: number;
   video: number;
 };
+export const MIN_UPLOAD_BYTES = 16;
 export type AssetRuleErrorCode =
-  'ASSET_TYPE_NOT_SUPPORTED' | 'MIME_NOT_ALLOWED' | 'FILE_TOO_LARGE' | 'FILE_SIZE_INVALID';
+  | 'ASSET_TYPE_NOT_SUPPORTED'
+  | 'MIME_NOT_ALLOWED'
+  | 'FILE_TOO_SMALL'
+  | 'FILE_TOO_LARGE'
+  | 'FILE_SIZE_INVALID';
 export type UploadVerificationFailureCode =
   'SIZE_MISMATCH' | 'FILE_TOO_LARGE' | 'TYPE_MISMATCH' | 'CONTENT_NOT_RECOGNIZED';
 
@@ -68,6 +73,12 @@ export function validateAssetUpload(
 
   if (!Number.isInteger(sizeBytes) || sizeBytes <= 0) {
     throw new AssetRuleError('FILE_SIZE_INVALID', 'File size must be a positive integer.');
+  }
+  if (sizeBytes < MIN_UPLOAD_BYTES) {
+    throw new AssetRuleError(
+      'FILE_TOO_SMALL',
+      `File must be at least ${MIN_UPLOAD_BYTES} bytes for signature verification.`,
+    );
   }
 
   const limit = {

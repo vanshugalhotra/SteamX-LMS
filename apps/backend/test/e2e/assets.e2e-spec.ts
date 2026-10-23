@@ -225,7 +225,7 @@ describe('Assets endpoints (e2e)', () => {
       title: 'Asset title',
       filename: 'original.jpg',
       mimeType,
-      sizeBytes: 12,
+      sizeBytes: 16,
     };
   }
 
@@ -260,11 +260,11 @@ describe('Assets endpoints (e2e)', () => {
         assetId: asset.id,
         status: AssetFileStatus.UPLOADING,
         mimeType: mimeType.trim().toLowerCase(),
-        sizeBytes: 12,
+        sizeBytes: 16,
       });
       expect(typeof created.file.sizeBytes).toBe('number');
       expect(file.mimeType).toBe(mimeType.trim().toLowerCase());
-      expect(file.sizeBytes).toBe(12n);
+      expect(file.sizeBytes).toBe(16n);
       expect(file.originalFilename).toBe(filename);
       expect(file.storageKey).toBe(`assets/${asset.id}/${file.id}/original`);
       expect(Object.keys(created).sort()).toEqual(['asset', 'file', 'upload']);
@@ -349,6 +349,17 @@ describe('Assets endpoints (e2e)', () => {
     }).expect(400);
   });
 
+  it.each([1, 15])(
+    'rejects uploads too small for signature checks: %s bytes',
+    async (sizeBytes) => {
+      const response = await postAsset(adminCookie, {
+        ...standardBody(AssetType.IMAGE, 'image/png'),
+        sizeBytes,
+      }).expect(400);
+      expect(response.body.code).toBe('FILE_TOO_SMALL');
+    },
+  );
+
   it('rejects blank metadata and unknown fields', async () => {
     const base = standardBody(AssetType.IMAGE, 'image/jpeg');
     for (const title of ['', '   ']) {
@@ -395,7 +406,7 @@ describe('Assets endpoints (e2e)', () => {
       status: AssetFileStatus.UPLOADING,
       originalFilename: 'original.jpg',
       mimeType: 'image/jpeg',
-      sizeBytes: 12,
+      sizeBytes: 16,
       lastError: null,
     });
     expect(typeof response.body.sizeBytes).toBe('number');
