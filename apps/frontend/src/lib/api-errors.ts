@@ -29,6 +29,13 @@ export const API_ERROR_CODE = {
   BAD_REQUEST: 'BAD_REQUEST',
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
+  FIELD_NOT_APPLICABLE: 'FIELD_NOT_APPLICABLE',
+  CANNOT_DEACTIVATE_SELF: 'CANNOT_DEACTIVATE_SELF',
+  USER_NOT_MANAGEABLE: 'USER_NOT_MANAGEABLE',
+  RESOURCE_IN_USE: 'RESOURCE_IN_USE',
+  INVALID_ORDER: 'INVALID_ORDER',
+  PARENT_NOT_ACTIVE: 'PARENT_NOT_ACTIVE',
+  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODE)[keyof typeof API_ERROR_CODE];
@@ -61,6 +68,13 @@ const DEFAULT_MESSAGES: Record<ApiErrorCode, string> = {
   BAD_REQUEST: 'The request was not valid. Please check your input.',
   PAYLOAD_TOO_LARGE: 'The data you sent is too large.',
   TOO_MANY_REQUESTS: 'Too many attempts. Please wait a minute and try again.',
+  FIELD_NOT_APPLICABLE: "This field doesn't apply to this type of user.",
+  CANNOT_DEACTIVATE_SELF: "You can't deactivate your own account.",
+  USER_NOT_MANAGEABLE: "This account can't be managed here.",
+  RESOURCE_IN_USE: 'This item is in use and cannot be deleted.',
+  INVALID_ORDER: 'The order is not valid. Please refresh and try again.',
+  PARENT_NOT_ACTIVE: 'The parent item must be active.',
+  INVALID_STATUS_TRANSITION: 'This status change is not allowed.',
 };
 
 // Mirrors PASSWORD_POLICY_VIOLATION in apps/backend/src/auth/validators/password-policy.ts.
