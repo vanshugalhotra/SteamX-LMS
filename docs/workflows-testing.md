@@ -28,6 +28,21 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
    through the user APIs. New users have `mustChangePassword`; create a separate password-ready
    admin or complete its forced password change before normal testing.
 
+## Asset upload
+
+**Goal:** Create an asset, upload its bytes directly to storage, and verify the completed file becomes READY.
+
+**Preconditions:** Admin session with `asset.write`; `asset.read` for checking state; test storage available. For staging, use the guided real-S3 procedure requested for CUR-10b and a small test object.
+
+1. Call `POST /api/v1/assets` with type, title, filename, MIME, and exact byte size. Save the returned asset ID, file ID, URL, method, and headers.
+2. Upload the bytes directly to the returned URL using the returned method and headers. Do not change the signed `Content-Type` or content length.
+3. Call `GET /api/v1/assets/:id/files/:fileId`; before completion the state is `UPLOADING`.
+4. Call `POST /api/v1/assets/:id/files/:fileId/complete`. For matching size, content type, and file signature, expect `200 READY`; repeat and expect the same state.
+5. For VIDEO, verify the playback key is the original storage key. For IMAGE and PDF, playback key is null.
+6. Call complete before uploading on a fresh file; expect retryable `409 UPLOAD_NOT_COMPLETE` and `UPLOADING`. Upload, retry complete, and expect `READY`.
+7. To check verification failures, upload (a) a text payload declared as an allowed image/PDF MIME, (b) bytes with a mismatched content type, and (c) a body whose actual size differs if the storage signer permits it. Completion returns `200 FAILED` with a stable `lastError` (`CONTENT_NOT_RECOGNIZED`, `TYPE_MISMATCH`, or `SIZE_MISMATCH`). Repeating completion leaves FAILED unchanged.
+8. If replacing an existing file, do not delete the serving READY file until the new file has processed. `makeReady` performs the swap under an asset-row lock; the database queues the old file prefix for cleanup.
+
 ## First admin login and password change
 
 **Goal:** Confirm first-admin provisioning, forced password update, and session replacement.

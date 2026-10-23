@@ -89,6 +89,8 @@ describe('Authentication foundation reference data', () => {
       { key: 'teacher', userType: UserType.SCHOOL_STAFF },
     ]);
     expect(snapshot.permissions).toEqual([
+      'asset.read',
+      'asset.write',
       'classsection.manage',
       'classsection.read',
       'curriculum.read',
@@ -104,6 +106,8 @@ describe('Authentication foundation reference data', () => {
       'user.update',
     ]);
     expect(snapshot.rolePermissions).toEqual([
+      { role: 'admin', permission: 'asset.read' },
+      { role: 'admin', permission: 'asset.write' },
       { role: 'admin', permission: 'classsection.manage' },
       { role: 'admin', permission: 'classsection.read' },
       { role: 'admin', permission: 'curriculum.read' },

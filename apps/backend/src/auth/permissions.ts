@@ -10,6 +10,8 @@ export const PERMISSION = {
   SCHOOL_MANAGE: 'school.manage',
   CURRICULUM_READ: 'curriculum.read',
   CURRICULUM_WRITE: 'curriculum.write',
+  ASSET_READ: 'asset.read',
+  ASSET_WRITE: 'asset.write',
   CLASSSECTION_READ: 'classsection.read',
   CLASSSECTION_MANAGE: 'classsection.manage',
 } as const;

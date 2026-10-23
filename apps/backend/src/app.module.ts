@@ -14,6 +14,7 @@ import { ClassSectionsModule } from './class-sections/class-sections.module.js';
 import { CurriculumModule } from './curriculum/curriculum.module.js';
 import { UsersModule } from './users/users.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { AssetsModule } from './assets/assets.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { StorageModule } from './storage/storage.module.js';
     CurriculumModule,
     UsersModule,
     StorageModule,
+    AssetsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OriginGuard },
