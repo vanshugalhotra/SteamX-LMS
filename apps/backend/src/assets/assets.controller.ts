@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
@@ -61,5 +62,21 @@ export class AssetsController {
   @ApiNotFoundResponse({ description: 'Asset file not found.' })
   findFile(@Param('id') assetId: string, @Param('fileId') fileId: string): Promise<AssetFileDto> {
     return this.assets.findFile(assetId, fileId);
+  }
+
+  // ─────────────────────────────────────────
+  // POST /assets/:id/files/:fileId/complete — Complete upload
+  // ─────────────────────────────────────────
+
+  /** Verifies an uploaded object and returns its current lifecycle state. */
+  @RequirePermission(PERMISSION.ASSET_WRITE)
+  @Post(':id/files/:fileId/complete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify and complete an asset file upload' })
+  @ApiOkResponse({ description: 'Current asset file state.', type: AssetFileDto })
+  @ApiConflictResponse({ description: 'The object is not available in storage yet; retry later.' })
+  @ApiNotFoundResponse({ description: 'Asset file not found.' })
+  complete(@Param('id') assetId: string, @Param('fileId') fileId: string): Promise<AssetFileDto> {
+    return this.assets.complete(assetId, fileId);
   }
 }

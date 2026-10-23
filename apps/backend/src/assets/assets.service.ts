@@ -1,8 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { PinoLogger } from 'nestjs-pino';
+import { AssetFileStatus } from '../generated/prisma/client.js';
+import type { AssetFile } from '../generated/prisma/client.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import type { Env } from '../config/env.schema.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
@@ -10,14 +17,20 @@ import { StorageService } from '../storage/storage.service.js';
 import {
   AssetRuleError,
   buildOriginalKey,
+  isSupportedAssetType,
   normalizeMimeType,
+  normalizeStoredContentType,
   validateAssetUpload,
+  verifyUploadHead,
+  verifyUploadSignature,
 } from './asset-rules.js';
 import type { SupportedAssetType } from './asset-rules.js';
 import type { CreateAssetDto } from './dto/create-asset.dto.js';
 import type { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import { toAssetFileDto, toCreateAssetResponse } from './assets.mapper.js';
 import { AssetsRepository } from './assets.repository.js';
+import { AssetProcessorRegistry } from './processing/asset-processor.registry.js';
+import type { MakeReadyInput } from './assets.repository.js';
 
 const UUID_SCHEMA = z.uuid();
 
@@ -29,6 +42,7 @@ export class AssetsService {
     private readonly storage: StorageService,
     private readonly config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
+    private readonly processors: AssetProcessorRegistry,
   ) {
     this.logger.setContext(AssetsService.name);
   }
@@ -102,6 +116,131 @@ export class AssetsService {
     }
 
     const file = await this.assets.findFileByAssetId(normalizedAssetId, normalizedFileId);
+    if (!file) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    return toAssetFileDto(file);
+  }
+
+  // ─────────────────────────────────────────
+  // POST /assets/:id/files/:fileId/complete — Verify and process upload
+  // ─────────────────────────────────────────
+
+  /** Idempotently verifies an uploaded object and advances its file through processing. */
+  async complete(assetId: string, fileId: string): Promise<AssetFileDto> {
+    const normalizedAssetId = this.normalizeUuid(assetId);
+    const normalizedFileId = this.normalizeUuid(fileId);
+    if (!normalizedAssetId || !normalizedFileId) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+
+    const file = await this.assets.findFileForCompletion(normalizedAssetId, normalizedFileId);
+    if (!file) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    if (file.status !== AssetFileStatus.UPLOADING) {
+      return toAssetFileDto(file);
+    }
+    if (!isSupportedAssetType(file.asset.type)) {
+      return this.failUpload(file.id, AssetFileStatus.UPLOADING, 'ASSET_TYPE_NOT_SUPPORTED');
+    }
+
+    const head = await this.storage.head(file.storageKey);
+    if (!head) {
+      this.logger.debug(
+        { assetId: normalizedAssetId, fileId: normalizedFileId },
+        'Asset upload has not reached storage yet',
+      );
+      throw new ConflictException({
+        code: 'UPLOAD_NOT_COMPLETE',
+        message: 'The uploaded file is not available yet. Retry completion after upload.',
+      });
+    }
+
+    const limits = this.config.get('assetLimits', { infer: true });
+    const headFailure = verifyUploadHead({
+      assetType: file.asset.type,
+      declaredSizeBytes: Number(file.sizeBytes),
+      declaredMimeType: file.mimeType ?? '',
+      actualSizeBytes: head.sizeBytes,
+      actualContentType: head.contentType,
+      limits,
+    });
+    if (headFailure) {
+      return this.failUpload(file.id, AssetFileStatus.UPLOADING, headFailure);
+    }
+
+    const bytes = await this.storage.readFirstBytes(file.storageKey, 16);
+    const signatureFailure = verifyUploadSignature(file.mimeType ?? '', bytes);
+    if (signatureFailure) {
+      return this.failUpload(file.id, AssetFileStatus.UPLOADING, signatureFailure);
+    }
+
+    const normalizedHeadMimeType = normalizeStoredContentType(head.contentType);
+    const uploaded = await this.assets.transition(
+      file.id,
+      AssetFileStatus.UPLOADING,
+      AssetFileStatus.UPLOADED,
+      { sizeBytes: BigInt(head.sizeBytes), mimeType: normalizedHeadMimeType },
+    );
+    if (!uploaded) {
+      return this.getCurrentFileState(file.id);
+    }
+
+    const processing = await this.assets.transition(
+      file.id,
+      AssetFileStatus.UPLOADED,
+      AssetFileStatus.PROCESSING,
+    );
+    if (!processing) {
+      return this.getCurrentFileState(file.id);
+    }
+
+    const processingFile = await this.assets.findFileForCompletion(normalizedAssetId, file.id);
+    if (!processingFile) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+
+    let playbackKey: string | null;
+    try {
+      const processor = this.processors.get(processingFile.asset.type);
+      ({ playbackKey } = await processor.process(processingFile));
+    } catch (error) {
+      this.logger.error(
+        { err: error, assetId: normalizedAssetId, fileId: file.id },
+        'Asset processing failed',
+      );
+      return this.failUpload(file.id, AssetFileStatus.PROCESSING, 'PROCESSING_FAILED');
+    }
+
+    return toAssetFileDto(
+      await this.makeReady(file.id, {
+        sizeBytes: head.sizeBytes,
+        mimeType: normalizedHeadMimeType,
+        playbackKey,
+      }),
+    );
+  }
+
+  /**
+   * Makes one processed file the asset's current serving file.
+   * The repository transaction locks the asset and rolls back a failed conditional update.
+   */
+  makeReady(fileId: string, input: MakeReadyInput): Promise<AssetFile> {
+    return this.assets.makeReady(fileId, input);
+  }
+
+  private async failUpload(
+    fileId: string,
+    from: AssetFileStatus,
+    errorCode: string,
+  ): Promise<AssetFileDto> {
+    await this.assets.transition(fileId, from, AssetFileStatus.FAILED, { lastError: errorCode });
+    return this.getCurrentFileState(fileId);
+  }
+
+  private async getCurrentFileState(fileId: string): Promise<AssetFileDto> {
+    const file = await this.assets.findFileById(fileId);
     if (!file) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }

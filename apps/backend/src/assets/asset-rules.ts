@@ -1,5 +1,6 @@
 import { AssetType } from '../generated/prisma/client.js';
 import type { FileKind } from './file-signatures.js';
+import { detectFileKind } from './file-signatures.js';
 
 /** Upload types supported now; the database enum intentionally also contains legacy PPTX. */
 export const SUPPORTED_ASSET_TYPES = [AssetType.IMAGE, AssetType.PDF, AssetType.VIDEO] as const;
@@ -12,6 +13,8 @@ export type AssetLimits = {
 };
 export type AssetRuleErrorCode =
   'ASSET_TYPE_NOT_SUPPORTED' | 'MIME_NOT_ALLOWED' | 'FILE_TOO_LARGE' | 'FILE_SIZE_INVALID';
+export type UploadVerificationFailureCode =
+  'SIZE_MISMATCH' | 'FILE_TOO_LARGE' | 'TYPE_MISMATCH' | 'CONTENT_NOT_RECOGNIZED';
 
 const ALLOWED_MIME_TYPES: Record<SupportedAssetType, readonly string[]> = {
   [AssetType.IMAGE]: ['image/jpeg', 'image/png', 'image/webp'],
@@ -81,6 +84,53 @@ export function validateAssetUpload(
 /** Returns the signature expected for an allowed MIME, or null for an unknown MIME. */
 export function expectedFileKindForMime(mimeType: string): FileKind | null {
   return MIME_SIGNATURE_KIND[normalizeMimeType(mimeType)] ?? null;
+}
+
+/** Strips optional MIME parameters returned by object storage before comparing content types. */
+export function normalizeStoredContentType(contentType: string): string {
+  return normalizeMimeType(contentType.split(';', 1)[0] ?? '');
+}
+
+/** Verifies HEAD metadata before the caller spends an extra storage request reading file bytes. */
+export function verifyUploadHead(input: {
+  assetType: SupportedAssetType;
+  declaredSizeBytes: number;
+  declaredMimeType: string;
+  actualSizeBytes: number;
+  actualContentType: string;
+  limits: AssetLimits;
+}): UploadVerificationFailureCode | null {
+  if (input.actualSizeBytes !== input.declaredSizeBytes) {
+    return 'SIZE_MISMATCH';
+  }
+
+  const limit = {
+    [AssetType.IMAGE]: input.limits.image,
+    [AssetType.PDF]: input.limits.pdf,
+    [AssetType.VIDEO]: input.limits.video,
+  }[input.assetType];
+  if (input.actualSizeBytes <= 0 || input.actualSizeBytes > limit) {
+    return 'FILE_TOO_LARGE';
+  }
+
+  if (
+    normalizeStoredContentType(input.actualContentType) !==
+    normalizeMimeType(input.declaredMimeType)
+  ) {
+    return 'TYPE_MISMATCH';
+  }
+  return null;
+}
+
+/** Confirms the bytes match the signature expected for the MIME declared at upload creation. */
+export function verifyUploadSignature(
+  declaredMimeType: string,
+  bytes: Buffer,
+): UploadVerificationFailureCode | null {
+  const expectedKind = expectedFileKindForMime(declaredMimeType);
+  return expectedKind !== null && detectFileKind(bytes) === expectedKind
+    ? null
+    : 'CONTENT_NOT_RECOGNIZED';
 }
 
 /** Keeps storage keys independent of client-controlled filenames. */

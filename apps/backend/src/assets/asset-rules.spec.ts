@@ -5,7 +5,10 @@ import {
   buildOriginalKey,
   expectedFileKindForMime,
   normalizeMimeType,
+  normalizeStoredContentType,
   validateAssetUpload,
+  verifyUploadHead,
+  verifyUploadSignature,
 } from './asset-rules.js';
 
 const limits = { image: 100, pdf: 200, video: 300 };
@@ -82,6 +85,70 @@ describe('asset rules', () => {
       'assets/550e8400-e29b-41d4-a716-446655440000/550e8400-e29b-41d4-a716-446655440001/original',
     );
     expect(() => assertValidKey(key)).not.toThrow();
+  });
+
+  describe('upload completion verification', () => {
+    const validHead = {
+      assetType: AssetType.IMAGE,
+      declaredSizeBytes: 16,
+      declaredMimeType: 'image/png',
+      actualSizeBytes: 16,
+      actualContentType: ' IMAGE/PNG; charset=binary ',
+      limits,
+    };
+
+    it('checks size mismatch before size limits and content type', () => {
+      expect(
+        verifyUploadHead({
+          ...validHead,
+          declaredSizeBytes: 15,
+          actualSizeBytes: 16,
+          actualContentType: 'text/plain',
+        }),
+      ).toBe('SIZE_MISMATCH');
+    });
+
+    it('checks size limit before content type', () => {
+      expect(
+        verifyUploadHead({
+          ...validHead,
+          declaredSizeBytes: 101,
+          actualSizeBytes: 101,
+          actualContentType: 'text/plain',
+        }),
+      ).toBe('FILE_TOO_LARGE');
+    });
+
+    it('rejects empty objects and then checks the normalized content type', () => {
+      expect(verifyUploadHead({ ...validHead, actualSizeBytes: 0, declaredSizeBytes: 0 })).toBe(
+        'FILE_TOO_LARGE',
+      );
+      expect(verifyUploadHead({ ...validHead, actualContentType: 'text/plain' })).toBe(
+        'TYPE_MISMATCH',
+      );
+    });
+
+    it('strips optional parameters when normalizing a storage content type', () => {
+      expect(normalizeStoredContentType(' IMAGE/PNG; charset=binary ')).toBe('image/png');
+      expect(verifyUploadHead(validHead)).toBeNull();
+    });
+
+    it('requires the file signature to match the declared MIME type', () => {
+      const png = Buffer.from([
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        0x0d,
+        0x0a,
+        0x1a,
+        0x0a,
+        ...Array(8).fill(0),
+      ]);
+      expect(verifyUploadSignature('image/png', png)).toBeNull();
+      expect(verifyUploadSignature('image/jpeg', png)).toBe('CONTENT_NOT_RECOGNIZED');
+      expect(verifyUploadSignature('application/unknown', png)).toBe('CONTENT_NOT_RECOGNIZED');
+    });
   });
 
   it('exposes rule errors with stable public codes', () => {

@@ -291,6 +291,21 @@ Caller: authenticated admin with `asset.read`; returns the state of a file belon
 - [auto] When file belongs to another asset, either ID is unknown, or either ID is malformed -> expect `404 NOT_FOUND`.
 - [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
 
+### `POST /assets/:id/files/:fileId/complete`
+
+Caller: authenticated admin with `asset.write`; verifies the object uploaded to the previously returned storage key.
+
+- [auto] When called while the object is not in storage -> expect `409 UPLOAD_NOT_COMPLETE`, leave status `UPLOADING`, then succeed after the upload is present.
+- [auto] When HEAD size differs from the declared size -> expect `200` with status `FAILED` and `lastError: SIZE_MISMATCH`.
+- [auto] When HEAD content type does not match the declared MIME (ignoring case, whitespace, and parameters) -> expect `200 FAILED` with `lastError: TYPE_MISMATCH`.
+- [auto] When file signature does not match the declared MIME, including PNG-as-JPEG, text-as-PDF, MOV, or HEIC -> expect `200 FAILED` with `lastError: CONTENT_NOT_RECOGNIZED`.
+- [auto] When image, PDF, or MP4 signature and HEAD metadata match -> expect `200 READY`; video playback key equals its original storage key, while image/PDF playback keys are null.
+- [auto] When a supported processor throws -> expect `200 FAILED` with `lastError: PROCESSING_FAILED`; response and stored error contain no provider error text.
+- [auto] When completion is repeated for READY or FAILED files -> expect `200` and the unchanged file state.
+- [auto] When two completion requests race -> expect both `200`, one processor execution, and one final READY file.
+- [auto] When file does not belong to the supplied asset, either ID is unknown, or an ID is malformed -> expect `404 NOT_FOUND`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
+
 ## Schools
 
 ### `POST /schools`
