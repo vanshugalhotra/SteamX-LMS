@@ -32,7 +32,7 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 
 **Goal:** Create an asset, upload its bytes directly to storage, and verify the completed file becomes READY.
 
-**Preconditions:** Admin session with `asset.write`; `asset.read` for checking state; test storage available. For staging, use the guided real-S3 procedure requested for CUR-10b and a small test object.
+**Preconditions:** Admin session with `asset.write`; `asset.read` for checking state; test storage available. For staging, use the browser-based asset upload smoke test in [infrastructure.md](./infrastructure.md) with small test files.
 
 1. Call `POST /api/v1/assets` with type, title, filename, MIME, and exact byte size. Save the returned asset ID, file ID, URL, method, and headers.
 2. Upload the bytes directly to the returned URL using the returned method and headers. Do not change the signed `Content-Type` or content length.
@@ -43,7 +43,7 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 7. To check verification failures, upload (a) a text payload declared as an allowed image/PDF MIME, (b) bytes with a mismatched content type, and (c) a body whose actual size differs if the storage signer permits it. Completion returns `200 FAILED` with a stable `lastError` (`CONTENT_NOT_RECOGNIZED`, `TYPE_MISMATCH`, or `SIZE_MISMATCH`). Repeating completion leaves FAILED unchanged.
 8. If replacing an existing file, do not delete the serving READY file until the new file has processed. `makeReady` performs the swap under an asset-row lock; the database queues the old file prefix for cleanup.
 9. Call `GET /api/v1/assets/:id/access` to preview the READY file. Expect a short-lived URL and `Cache-Control: no-store`; use it inline for the image, PDF, or video. Request a fresh URL if a fetch returns `403`, since viewers may continue making byte-range requests until the configured TTL expires.
-10. For a minimal browser-based access check using an existing READY asset, run `pnpm asset:access:smoke --port 5174`, open `http://localhost:5174`, and enter the admin credentials and asset ID. Confirm the `206` byte-range result and media preview; the page does not print the signed URL.
+10. For a minimal browser-based access check using an existing READY asset, run `pnpm --dir apps/backend asset:access:smoke --port 5174`, open `http://localhost:5174`, and enter the admin credentials and asset ID. Confirm the `206` byte-range result and media preview; the page does not print the signed URL.
 
 ## First admin login and password change
 

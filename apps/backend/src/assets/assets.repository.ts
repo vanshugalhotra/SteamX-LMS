@@ -193,7 +193,7 @@ export class AssetsRepository {
         return { status: 'not_found' };
       }
 
-      // UPLOADED and PROCESSING belong to complete's conditional transitions; CUR-15 removes stuck rows.
+      // UPLOADED and PROCESSING belong to complete's conditional transitions;
       const inFlightCount = await tx.assetFile.count({
         where: {
           assetId: input.assetId,
