@@ -21,7 +21,7 @@ describe('AuthService', () => {
     const findLoginUser = vi.fn().mockResolvedValue(null);
     const verify = vi.fn().mockResolvedValue(false);
     const sign = vi.fn();
-    const logger = { info: vi.fn(), warn: vi.fn() };
+    const logger = { setContext: vi.fn(), info: vi.fn(), warn: vi.fn() };
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -60,7 +60,7 @@ describe('AuthService', () => {
       role: { key: 'admin' },
       school: null,
     };
-    const logger = { info: vi.fn(), warn: vi.fn() };
+    const logger = { setContext: vi.fn(), info: vi.fn(), warn: vi.fn() };
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -105,7 +105,7 @@ describe('AuthService', () => {
       passwordHash: 'stored-hash',
     });
     const updatePassword = vi.fn();
-    const logger = { info: vi.fn(), warn: vi.fn() };
+    const logger = { setContext: vi.fn(), info: vi.fn(), warn: vi.fn() };
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -159,7 +159,7 @@ describe('AuthService', () => {
         },
         { provide: PasswordService, useValue: { verify: vi.fn(), hash: vi.fn() } },
         { provide: TokenService, useValue: { sign: vi.fn() } },
-        { provide: PinoLogger, useValue: { info: vi.fn(), warn: vi.fn() } },
+        { provide: PinoLogger, useValue: { setContext: vi.fn(), info: vi.fn(), warn: vi.fn() } },
       ],
     }).compile();
     const service = moduleRef.get(AuthService);

@@ -1,118 +1,60 @@
+-- ── Roles ────────────────────────────────────────────────
 INSERT INTO roles (key, name, user_type)
 VALUES
-  ('admin', 'Admin', 'PLATFORM_STAFF'),
+  ('admin',   'Admin',   'PLATFORM_STAFF'),
   ('teacher', 'Teacher', 'SCHOOL_STAFF'),
   ('student', 'Student', 'STUDENT')
 ON CONFLICT (key) DO UPDATE
-SET name = EXCLUDED.name,
+SET name      = EXCLUDED.name,
     user_type = EXCLUDED.user_type;
 
+-- ── Permissions ─────────────────────────────────────────
 INSERT INTO permissions (key, description)
-VALUES ('user.password.reset', 'Reset a user password')
+VALUES
+  -- Assets
+  ('asset.read',             'Read asset file state'),
+  ('asset.write',            'Create assets and upload asset files'),
+  -- Class sections
+  ('classsection.manage',    'Create, update, and delete class sections'),
+  ('classsection.read',      'View class sections'),
+  -- Curriculum
+  ('curriculum.read',        'View global curriculum content'),
+  ('curriculum.write',       'Create and manage global curriculum content'),
+  -- Schools
+  ('school.manage',          'Create and manage schools'),
+  ('school.read',            'View schools'),
+  -- Users
+  ('user.create.student',    'Create student users'),
+  ('user.create.teacher',    'Create teacher users'),
+  ('user.deactivate',        'Change school user status'),
+  ('user.password.reset',    'Reset a user password'),
+  ('user.read',              'View users'),
+  ('user.steamx-id.update',  'Rename a user SteamX ID'),
+  ('user.update',            'Update school user details')
 ON CONFLICT (key) DO UPDATE
 SET description = EXCLUDED.description;
 
+-- ── Admin grants (all current permissions) ──────────────
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT roles.id, permissions.id
 FROM roles
 CROSS JOIN permissions
 WHERE roles.key = 'admin'
-  AND permissions.key = 'user.password.reset'
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-INSERT INTO permissions (key, description)
-VALUES
-  ('school.read', 'View schools'),
-  ('school.manage', 'Create and manage schools')
-ON CONFLICT (key) DO NOTHING;
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id
-FROM roles
-CROSS JOIN permissions
-WHERE roles.key = 'admin'
-  AND permissions.key IN ('school.read', 'school.manage')
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-INSERT INTO permissions (key, description)
-VALUES
-  ('classsection.read', 'View class sections'),
-  ('classsection.manage', 'Create, update, and delete class sections')
-ON CONFLICT (key) DO NOTHING;
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id
-FROM roles
-CROSS JOIN permissions
-WHERE roles.key = 'admin'
-  AND permissions.key IN ('classsection.read', 'classsection.manage')
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-INSERT INTO permissions (key, description)
-VALUES
-  ('user.read', 'View users'),
-  ('user.create.teacher', 'Create teacher users'),
-  ('user.create.student', 'Create student users')
-ON CONFLICT (key) DO NOTHING;
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id
-FROM roles
-CROSS JOIN permissions
-WHERE roles.key = 'admin'
-  AND permissions.key IN ('user.read', 'user.create.teacher', 'user.create.student')
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-INSERT INTO permissions (key, description)
-VALUES ('user.steamx-id.update', 'Rename a user SteamX ID')
-ON CONFLICT (key) DO NOTHING;
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id
-FROM roles
-CROSS JOIN permissions
-WHERE roles.key = 'admin'
-  AND permissions.key = 'user.steamx-id.update'
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-INSERT INTO permissions (key, description)
-VALUES
-  ('user.update', 'Update school user details'),
-  ('user.deactivate', 'Change school user status')
-ON CONFLICT (key) DO NOTHING;
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id
-FROM roles
-CROSS JOIN permissions
-WHERE roles.key = 'admin'
-  AND permissions.key IN ('user.update', 'user.deactivate')
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-INSERT INTO permissions (key, description)
-VALUES
-  ('curriculum.read', 'View global curriculum content'),
-  ('curriculum.write', 'Create and manage global curriculum content')
-ON CONFLICT (key) DO NOTHING;
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id
-FROM roles
-CROSS JOIN permissions
-WHERE roles.key = 'admin'
-  AND permissions.key IN ('curriculum.read', 'curriculum.write')
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-INSERT INTO permissions (key, description)
-VALUES
-  ('asset.read', 'Read asset file state'),
-  ('asset.write', 'Create assets and upload asset files')
-ON CONFLICT (key) DO NOTHING;
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT roles.id, permissions.id
-FROM roles
-CROSS JOIN permissions
-WHERE roles.key = 'admin'
-  AND permissions.key IN ('asset.read', 'asset.write')
+  AND permissions.key IN (
+    'asset.read',
+    'asset.write',
+    'classsection.manage',
+    'classsection.read',
+    'curriculum.read',
+    'curriculum.write',
+    'school.manage',
+    'school.read',
+    'user.create.student',
+    'user.create.teacher',
+    'user.deactivate',
+    'user.password.reset',
+    'user.read',
+    'user.steamx-id.update',
+    'user.update'
+  )
 ON CONFLICT (role_id, permission_id) DO NOTHING;

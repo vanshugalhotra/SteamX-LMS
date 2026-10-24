@@ -1,4 +1,3 @@
-/** Installs shared Nest HTTP middleware, request validation, and API versioning. */
 import {
   BadRequestException,
   INestApplication,
@@ -16,7 +15,6 @@ import { AUTH_COOKIE_NAME } from './auth/auth.constants.js';
 import type { Env } from './config/env.schema.js';
 import { API_ERROR } from './common/errors/api-errors.js';
 
-/** Installs the shared HTTP security, validation, versioning, and API-documentation settings. */
 type FieldErrors = { field: string; errors: string[] };
 
 /** Preserves nested DTO field paths so clients can identify the invalid input. */

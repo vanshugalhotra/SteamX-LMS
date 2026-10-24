@@ -11,6 +11,7 @@ import {
   getPostgresCode,
   isForeignKeyViolation,
   isPrismaKnownError,
+  throwNotFoundOnMissing,
 } from '../../common/errors/prisma-error.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
@@ -211,9 +212,7 @@ export class CourseModulesService {
       if (isForeignKeyViolation(error)) {
         throw new ConflictException(API_ERROR.RESOURCE_IN_USE);
       }
-      if (isPrismaKnownError(error) && error.code === 'P2025') {
-        throw new NotFoundException(API_ERROR.NOT_FOUND);
-      }
+      throwNotFoundOnMissing(error);
       throw error;
     }
   }
