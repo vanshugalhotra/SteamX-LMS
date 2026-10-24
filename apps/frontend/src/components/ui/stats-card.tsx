@@ -4,6 +4,7 @@ const TONES = {
   teal: 'bg-teal-500 text-white',
   yellow: 'bg-yellow-500 text-white',
   coral: 'bg-coral-500 text-white',
+  rose: 'bg-magenta-500 text-gray-900',
   plain: 'bg-gray-50 text-foreground',
 } as const;
 

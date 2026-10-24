@@ -64,7 +64,7 @@
   --font-sans: 'Poppins', system-ui, sans-serif;
   --color-background: var(--color-gray-50);
   --color-foreground: var(--color-gray-900);
-  --color-primary: var(--color-coral-600);
+  --color-primary: var(--color-coral-500);
   --color-primary-foreground: var(--color-white);
   --color-secondary: var(--color-teal-200);
   --color-secondary-foreground: var(--color-teal-900);

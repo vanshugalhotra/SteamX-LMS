@@ -63,6 +63,29 @@ export const router = createBrowserRouter([
               return { Component: SchoolEditPage };
             },
           },
+          {
+            path: PATHS.admin.teachers,
+            lazy: async () => {
+              const { TeachersPage } = await import('@/features/admin/teachers/pages/TeachersPage');
+              return { Component: TeachersPage };
+            },
+          },
+          {
+            path: PATHS.admin.teacherNew,
+            lazy: async () => {
+              const { TeacherCreatePage } =
+                await import('@/features/admin/teachers/pages/TeacherCreatePage');
+              return { Component: TeacherCreatePage };
+            },
+          },
+          {
+            path: PATHS.admin.teacherEdit(':id'),
+            lazy: async () => {
+              const { TeacherEditPage } =
+                await import('@/features/admin/teachers/pages/TeacherEditPage');
+              return { Component: TeacherEditPage };
+            },
+          },
           { path: PATHS.admin.base, loader: () => redirect(PATHS.admin.dashboard) },
         ],
       },

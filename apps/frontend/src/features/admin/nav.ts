@@ -31,7 +31,7 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'People',
     items: [
       { label: 'Schools', icon: School, to: PATHS.admin.schools },
-      { label: 'Teachers', icon: GraduationCap },
+      { label: 'Teachers', icon: GraduationCap, to: PATHS.admin.teachers },
       { label: 'Students', icon: User },
       { label: 'Credential Resets', icon: Lock },
     ],
