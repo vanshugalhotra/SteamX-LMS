@@ -31,6 +31,7 @@ import type { Response } from 'express';
 import { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import { AssetAccessResponseDto } from './dto/asset-access-response.dto.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
+import { CreateAssetFileDto } from './dto/create-asset-file.dto.js';
 import { AssetListQueryDto } from './dto/asset-list-query.dto.js';
 import { AssetLibraryDetailDto, AssetListResponseDto } from './dto/asset-library-response.dto.js';
 import { AssetsService } from './assets.service.js';
@@ -131,6 +132,36 @@ export class AssetsController {
     @Body() body: CreateAssetDto,
   ): Promise<CreateAssetResponseDto> {
     return this.assets.create(actor, body);
+  }
+
+  // ─────────────────────────────────────────
+  // POST /assets/:id/files — Replace or retry a file
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.ASSET_WRITE)
+  @Post(':id/files')
+  @ApiOperation({ summary: 'Replace or retry an asset file upload' })
+  @ApiCreatedResponse({
+    description: 'Asset, new file, and upload instructions.',
+    type: CreateAssetResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'MIME type or size is invalid for the asset type.' })
+  @ApiConflictResponse({
+    description: 'An UPLOADED or PROCESSING file is already in progress.',
+  })
+  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  replaceFile(
+    @CurrentAuth() actor: AuthContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+    @Body() body: CreateAssetFileDto,
+  ): Promise<CreateAssetResponseDto> {
+    return this.assets.replaceFile(actor, id, body);
   }
 
   // ─────────────────────────────────────────

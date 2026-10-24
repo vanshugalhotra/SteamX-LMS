@@ -149,6 +149,16 @@ describe('Assets endpoints (e2e)', () => {
     return call.send(body);
   }
 
+  function postAssetFile(cookie: string | undefined, assetId: string, body: object) {
+    const call = request(app.getHttpServer())
+      .post(`/api/v1/assets/${assetId}/files`)
+      .set('Origin', origin);
+    if (cookie) {
+      call.set('Cookie', cookie);
+    }
+    return call.send(body);
+  }
+
   function getAssetFile(cookie: string, assetId: string, fileId: string) {
     return request(app.getHttpServer())
       .get(`/api/v1/assets/${assetId}/files/${fileId}`)
@@ -577,6 +587,310 @@ describe('Assets endpoints (e2e)', () => {
     await postAsset(teacherCookie, standardBody(AssetType.IMAGE, 'image/jpeg')).expect(403);
     await postAsset(studentCookie, standardBody(AssetType.IMAGE, 'image/jpeg')).expect(403);
     await postAsset(schoolStaffCookie, standardBody(AssetType.IMAGE, 'image/jpeg')).expect(403);
+  });
+
+  it.each([
+    [AssetType.IMAGE, 'image/png', PNG_BYTES],
+    [AssetType.PDF, 'application/pdf', PDF_BYTES],
+    [AssetType.VIDEO, 'video/mp4', MP4_BYTES],
+  ] as const)(
+    'replaces a READY %s file and preserves it until completion',
+    async (type, mime, bytes) => {
+      const original = await createAndUpload(type, mime, bytes);
+      await completeAssetFile(adminCookie, original.asset.id, original.file.id).expect(200);
+      const oldKey = `assets/${original.asset.id}/${original.file.id}/original`;
+
+      const replacementResponse = await postAssetFile(adminCookie, original.asset.id, {
+        filename: `replacement.${type.toLowerCase()}`,
+        mimeType: mime,
+        sizeBytes: bytes.length,
+      }).expect(201);
+      const replacement = replacementResponse.body as CreatedAssetResponse;
+      expect(replacement.asset.id).toBe(original.asset.id);
+      expect(replacement.file.status).toBe(AssetFileStatus.UPLOADING);
+      expect(Object.keys(replacement).sort()).toEqual(['asset', 'file', 'upload']);
+      expect(replacement.file.id).not.toBe(original.file.id);
+      createdAssetIds.push(replacement.asset.id);
+
+      getTestStorageService(app).simulateUpload(
+        `assets/${replacement.asset.id}/${replacement.file.id}/original`,
+        { bytes, contentType: mime },
+      );
+      expect((await getAsset(adminCookie, original.asset.id).expect(200)).body.file.id).toBe(
+        original.file.id,
+      );
+      const storage = getTestStorageService(app);
+      await getAssetAccess(adminCookie, original.asset.id).expect(200);
+      expect(storage.downloadRequests.at(-1)?.key).toBe(oldKey);
+
+      await completeAssetFile(adminCookie, replacement.asset.id, replacement.file.id).expect(200);
+      if (type === AssetType.VIDEO) {
+        await expect(
+          prisma.assetFile.findUniqueOrThrow({ where: { id: replacement.file.id } }),
+        ).resolves.toMatchObject({
+          playbackKey: `assets/${replacement.asset.id}/${replacement.file.id}/original`,
+        });
+      }
+      await expect(
+        prisma.assetFile.findUnique({ where: { id: original.file.id } }),
+      ).resolves.toBeNull();
+      const detail = await getAsset(adminCookie, original.asset.id).expect(200);
+      expect(detail.body.file).toMatchObject({
+        id: replacement.file.id,
+        status: AssetFileStatus.READY,
+      });
+      const queueRows = await prisma.$queryRaw<Array<{ object_key: string; is_prefix: boolean }>>`
+      SELECT "object_key", "is_prefix" FROM "storage_cleanup_queue"
+      WHERE "object_key" = ${`assets/${original.asset.id}/${original.file.id}/`}
+    `;
+      expect(queueRows).toEqual([
+        { object_key: `assets/${original.asset.id}/${original.file.id}/`, is_prefix: true },
+      ]);
+      await getAssetAccess(adminCookie, original.asset.id).expect(200);
+      expect(storage.downloadRequests.at(-1)?.key).toBe(
+        `assets/${replacement.asset.id}/${replacement.file.id}/original`,
+      );
+    },
+  );
+
+  it('keeps the old READY file and its storage prefix when a replacement fails verification', async () => {
+    const original = await createAndUpload(AssetType.IMAGE, 'image/png', PNG_BYTES);
+    await completeAssetFile(adminCookie, original.asset.id, original.file.id).expect(200);
+    const replacementResponse = await postAssetFile(adminCookie, original.asset.id, {
+      filename: 'bad.png',
+      mimeType: 'image/png',
+      sizeBytes: PNG_BYTES.length,
+    }).expect(201);
+    const replacement = replacementResponse.body as CreatedAssetResponse;
+    getTestStorageService(app).simulateUpload(
+      `assets/${replacement.asset.id}/${replacement.file.id}/original`,
+      { bytes: Buffer.from('not a valid PNG!', 'ascii'), contentType: 'image/png' },
+    );
+
+    const completed = await completeAssetFile(
+      adminCookie,
+      replacement.asset.id,
+      replacement.file.id,
+    ).expect(200);
+    expect(completed.body).toMatchObject({
+      status: AssetFileStatus.FAILED,
+      lastError: 'CONTENT_NOT_RECOGNIZED',
+    });
+    await expect(
+      prisma.assetFile.findUnique({ where: { id: original.file.id } }),
+    ).resolves.toMatchObject({ status: AssetFileStatus.READY });
+    expect((await getAsset(adminCookie, original.asset.id).expect(200)).body.file.id).toBe(
+      original.file.id,
+    );
+    const storage = getTestStorageService(app);
+    await getAssetAccess(adminCookie, original.asset.id).expect(200);
+    expect(storage.downloadRequests.at(-1)?.key).toBe(
+      `assets/${original.asset.id}/${original.file.id}/original`,
+    );
+    await expect(
+      prisma.storageCleanupQueue.findMany({
+        where: { objectKey: `assets/${original.asset.id}/${original.file.id}/` },
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it.each([AssetFileStatus.UPLOADED, AssetFileStatus.PROCESSING])(
+    'does not replace or delete rows while an existing file is %s',
+    async (status) => {
+      const assetId = await createDatabaseAsset();
+      const ready = await createDatabaseFile(assetId, AssetFileStatus.READY);
+      const inFlight = await createDatabaseFile(assetId, status);
+      const beforeCount = await prisma.assetFile.count({ where: { assetId } });
+
+      const response = await postAssetFile(adminCookie, assetId, {
+        filename: 'replacement.png',
+        mimeType: 'image/png',
+        sizeBytes: 16,
+      }).expect(409);
+      expect(response.body.code).toBe('REPLACEMENT_IN_PROGRESS');
+      expect(await prisma.assetFile.count({ where: { assetId } })).toBe(beforeCount);
+      await expect(
+        prisma.assetFile.findMany({ where: { assetId }, orderBy: { id: 'asc' } }),
+      ).resolves.toHaveLength(2);
+      await expect(prisma.assetFile.findUnique({ where: { id: ready.id } })).resolves.toMatchObject(
+        { status: AssetFileStatus.READY },
+      );
+      await expect(
+        prisma.assetFile.findUnique({ where: { id: inFlight.id } }),
+      ).resolves.toMatchObject({ status });
+      await expect(
+        prisma.storageCleanupQueue.findMany({
+          where: { objectKey: { startsWith: `assets/${assetId}/` } },
+        }),
+      ).resolves.toEqual([]);
+    },
+  );
+
+  it.each([AssetFileStatus.UPLOADING, AssetFileStatus.FAILED])(
+    'supersedes an older %s attempt and makes its completion ID unavailable',
+    async (status) => {
+      const assetId = await createDatabaseAsset();
+      await createDatabaseFile(assetId, AssetFileStatus.READY);
+      const oldAttempt = await createDatabaseFile(assetId, status);
+
+      const response = await postAssetFile(adminCookie, assetId, {
+        filename: 'new.png',
+        mimeType: 'image/png',
+        sizeBytes: 16,
+      }).expect(201);
+      createdAssetIds.push(assetId);
+
+      await expect(
+        prisma.assetFile.findUnique({ where: { id: oldAttempt.id } }),
+      ).resolves.toBeNull();
+      await expect(
+        prisma.assetFile.count({
+          where: { assetId, status: { not: AssetFileStatus.READY } },
+        }),
+      ).resolves.toBe(1);
+      await completeAssetFile(adminCookie, assetId, oldAttempt.id).expect(404);
+      const queueRows = await prisma.$queryRaw<Array<{ object_key: string; is_prefix: boolean }>>`
+        SELECT "object_key", "is_prefix" FROM "storage_cleanup_queue"
+        WHERE "object_key" = ${`assets/${assetId}/${oldAttempt.id}/`}
+      `;
+      expect(queueRows).toEqual([
+        { object_key: `assets/${assetId}/${oldAttempt.id}/`, is_prefix: true },
+      ]);
+      expect(response.body.file.status).toBe(AssetFileStatus.UPLOADING);
+    },
+  );
+
+  it.each([AssetFileStatus.FAILED, AssetFileStatus.UPLOADING])(
+    'retries an asset with no READY file after an older %s attempt',
+    async (oldStatus) => {
+      const assetId = await createDatabaseAsset();
+      await createDatabaseFile(assetId, oldStatus);
+      const response = await postAssetFile(adminCookie, assetId, {
+        filename: 'retry.png',
+        mimeType: 'image/png',
+        sizeBytes: PNG_BYTES.length,
+      }).expect(201);
+      const created = response.body as CreatedAssetResponse;
+      createdAssetIds.push(assetId);
+      getTestStorageService(app).simulateUpload(`assets/${assetId}/${created.file.id}/original`, {
+        bytes: PNG_BYTES,
+        contentType: 'image/png',
+      });
+      await completeAssetFile(adminCookie, assetId, created.file.id).expect(200);
+
+      const list = await getAssets(adminCookie).expect(200);
+      expect(list.body.items.some((item: { id: string }) => item.id === assetId)).toBe(true);
+    },
+  );
+
+  it('serializes concurrent replacement requests and supersedes the first attempt', async () => {
+    const assetId = await createDatabaseAsset();
+    const ready = await createDatabaseFile(assetId, AssetFileStatus.READY);
+    const body = { filename: 'concurrent.png', mimeType: 'image/png', sizeBytes: 16 };
+    const responses = await Promise.all([
+      postAssetFile(adminCookie, assetId, body),
+      postAssetFile(adminCookie, assetId, body),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    createdAssetIds.push(assetId);
+    const fileRows = await prisma.assetFile.findMany({ where: { assetId } });
+    expect(fileRows.filter((file) => file.status !== AssetFileStatus.READY)).toHaveLength(1);
+    expect(fileRows.find((file) => file.status === AssetFileStatus.READY)?.id).toBe(ready.id);
+    const attempts = responses.map((response) => response.body.file.id as string);
+    const surviving = fileRows.find((file) => file.status !== AssetFileStatus.READY);
+    expect(surviving).toBeDefined();
+    const queuedAttempts = attempts.filter((id) => id !== surviving?.id);
+    expect(queuedAttempts).toHaveLength(1);
+    const cleanupRows = await prisma.$queryRaw<
+      Array<{ object_key: string; is_prefix: boolean }>
+    >`SELECT "object_key", "is_prefix" FROM "storage_cleanup_queue"
+      WHERE "object_key" LIKE ${`assets/${assetId}/%`}`;
+    expect(cleanupRows).toEqual([
+      { object_key: `assets/${assetId}/${queuedAttempts[0]}/`, is_prefix: true },
+    ]);
+  });
+
+  it('validates replacement metadata and asset IDs, and allows archived assets', async () => {
+    const assetId = await createDatabaseAsset();
+    const base = { filename: 'replace.png', mimeType: 'image/png', sizeBytes: 16 };
+    const wrongMime = await postAssetFile(adminCookie, assetId, {
+      ...base,
+      mimeType: 'application/pdf',
+    }).expect(400);
+    expect(wrongMime.body.code).toBe('MIME_NOT_ALLOWED');
+    const tooLarge = await postAssetFile(adminCookie, assetId, {
+      ...base,
+      sizeBytes: limits.image + 1,
+    }).expect(400);
+    expect(tooLarge.body.code).toBe('FILE_TOO_LARGE');
+    for (const sizeBytes of [0, -1, 1.5]) {
+      await postAssetFile(adminCookie, assetId, { ...base, sizeBytes }).expect(400);
+    }
+    for (const filename of ['', '   ']) {
+      await postAssetFile(adminCookie, assetId, { ...base, filename }).expect(400);
+    }
+    await postAssetFile(adminCookie, assetId, { ...base, unexpected: true }).expect(400);
+    await postAssetFile(adminCookie, assetId, {
+      ...base,
+      filename: ' clean\u0000\nname.png ',
+    })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.file.originalFilename).toBe('cleanname.png');
+        createdAssetIds.push(assetId);
+      });
+    await postAssetFile(adminCookie, randomUUID(), base).expect(404);
+    await postAssetFile(adminCookie, 'invalid-id', base).expect(404);
+
+    const archivedId = await createDatabaseAsset(AssetType.IMAGE, {
+      status: ContentStatus.ARCHIVED,
+    });
+    await postAssetFile(adminCookie, archivedId, base).expect(201);
+  });
+
+  it('requires asset.write permission for replacement uploads', async () => {
+    const assetId = await createDatabaseAsset();
+    const body = { filename: 'replace.png', mimeType: 'image/png', sizeBytes: 16 };
+    await postAssetFile(undefined, assetId, body).expect(401);
+    await postAssetFile(teacherCookie, assetId, body).expect(403);
+    await postAssetFile(studentCookie, assetId, body).expect(403);
+    await postAssetFile(schoolStaffCookie, assetId, body).expect(403);
+  });
+
+  it('keeps lesson block references and where-used data unchanged after replacement', async () => {
+    const assetId = await createDatabaseAsset();
+    const course = await createDatabaseCourse(`Replacement ${randomUUID()}`);
+    const module = await createDatabaseModule(course.id, 'Replacement module');
+    const lesson = await createDatabaseLesson(course.id, module.id, 'Replacement lesson');
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: lesson.id,
+        type: BlockType.IMAGE,
+        content: {},
+        assetId,
+        position: 1,
+      },
+    });
+    const before = (await getAsset(adminCookie, assetId).expect(200)).body.usedIn;
+    const response = await postAssetFile(adminCookie, assetId, {
+      filename: 'replacement.png',
+      mimeType: 'image/png',
+      sizeBytes: PNG_BYTES.length,
+    }).expect(201);
+    createdAssetIds.push(assetId);
+    getTestStorageService(app).simulateUpload(
+      `assets/${assetId}/${response.body.file.id}/original`,
+      { bytes: PNG_BYTES, contentType: 'image/png' },
+    );
+    await completeAssetFile(adminCookie, assetId, response.body.file.id).expect(200);
+
+    await expect(
+      prisma.lessonBlock.findFirst({ where: { lessonId: lesson.id } }),
+    ).resolves.toMatchObject({
+      assetId,
+    });
+    expect((await getAsset(adminCookie, assetId).expect(200)).body.usedIn).toEqual(before);
   });
 
   it('lists only assets with READY files and applies status, type, and literal search filters', async () => {

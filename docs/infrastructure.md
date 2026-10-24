@@ -67,7 +67,7 @@ should request a new URL when a fetch returns `403`.
 Uploads to the real bucket from a local browser and checks metadata, signed URLs, downloads, range requests, and unsigned access.
 
 ```powershell
-pnpm storage:smoke --port 5173
+pnpm --dir apps/backend storage:smoke --port 5173
 ```
 
 Requirements:
@@ -82,16 +82,17 @@ Expected results: upload → 200, size mismatch → 403, unsigned GET → 403, r
 With the backend running against the staging bucket and database, run this from the repository root:
 
 ```powershell
-pnpm asset:smoke --port 5173
+pnpm --dir apps/backend asset:smoke --port 5173
 ```
 
 Open `http://localhost:5173` in a browser. The browser origin must be allowed by both the backend's
-`CORS_ORIGINS` and the staging bucket CORS policy. The page asks for the backend URL, seeded admin
-credentials, and a small PNG and short MP4. It exercises authenticated asset creation, direct
-presigned uploads, file-state reads, completion (including retrying before the PNG upload),
-idempotent completion, wrong-size upload enforcement, an invalid-signature failure, and the MP4
-playback-key value via a narrow read-only database query. It does not display session cookies or
-presigned URLs.
+`CORS_ORIGINS` and the staging bucket CORS policy. The page asks for the backend URL, seeded admin credentials, an initial PNG, a different
+replacement PNG, and a short MP4. It exercises authenticated asset creation, direct presigned
+uploads, file-state reads, completion (including retrying before the first PNG upload), successful
+replacement while the old file remains available, cleanup-queue insertion, and a failed replacement
+that preserves the current READY file. It also checks idempotent completion, wrong-size upload
+enforcement, and the MP4 playback-key value through narrow read-only database queries. It does not
+display session cookies or presigned URLs.
 
 The local smoke server binds only to `127.0.0.1` and needs `DATABASE_URL` from
 `apps/backend/.env` for the playback-key check. After the run, the page prints S3 cleanup commands
@@ -104,7 +105,7 @@ staging account/database for this manual test.
 For a READY asset already in the database and S3, run:
 
 ```powershell
-pnpm asset:access:smoke --port 5173
+pnpm --dir apps/backend asset:access:smoke --port 5173
 ```
 
 Open `http://localhost:5173`, enter the local backend URL, seeded admin credentials, and asset ID.
