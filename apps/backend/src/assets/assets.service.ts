@@ -161,10 +161,7 @@ export class AssetsService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     if (result.status === 'in_progress') {
-      throw new ConflictException({
-        code: 'REPLACEMENT_IN_PROGRESS',
-        message: 'An asset file is already being processed.',
-      });
+      throw new ConflictException(API_ERROR.REPLACEMENT_IN_PROGRESS);
     }
     return this.createUploadResponse(
       actor,

@@ -22,6 +22,10 @@ export const API_ERROR = {
     code: 'ASSET_NOT_READY',
     message: 'Asset does not have a READY file',
   },
+  REPLACEMENT_IN_PROGRESS: {
+    code: 'REPLACEMENT_IN_PROGRESS',
+    message: 'An asset file is already being processed.',
+  },
   RESOURCE_IN_USE: {
     code: 'RESOURCE_IN_USE',
     message: 'Resource has dependent records and cannot be deleted',
