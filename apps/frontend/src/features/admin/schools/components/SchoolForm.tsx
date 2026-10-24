@@ -128,7 +128,13 @@ export function SchoolForm({ school, onDone, onCancel }: SchoolFormProps) {
 
       {getSchoolFieldGroups(Boolean(school)).map((group, index) => (
         <FormSection key={group.id} title={group.title} accent={group.accent}>
-          <FormRenderer fields={group.fields} register={register} errors={errors} disabled={busy} />
+          <FormRenderer
+            fields={group.fields}
+            register={register}
+            errors={errors}
+            disabled={busy}
+            control={control}
+          />
           {index === 0 && school && (
             <Controller
               control={control}

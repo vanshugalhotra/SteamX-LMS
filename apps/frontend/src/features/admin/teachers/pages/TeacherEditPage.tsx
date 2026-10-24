@@ -8,6 +8,7 @@ import { PATHS } from '@/lib/paths';
 import { useSchoolNames } from '../../schools/queries';
 import { useUser } from '../../users/queries';
 import { TeacherForm } from '../components/TeacherForm';
+import { TeacherDirectory } from '../components/TeacherDirectory';
 
 export function TeacherEditPage() {
   const { id = '' } = useParams();
@@ -65,6 +66,7 @@ export function TeacherEditPage() {
       backLabel="Teachers"
       tag={user?.steamxId}
       tagVariant="warning"
+      below={<TeacherDirectory currentId={user?.id} />}
     >
       {content}
     </FormPageLayout>

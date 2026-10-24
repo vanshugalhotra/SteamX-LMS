@@ -14,6 +14,8 @@ import {
   fetchSchool,
 } from './api/api';
 import { type SchoolInput, type SchoolListParams, type SchoolStatus } from './model/types';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
+import type { AsyncSearchResult } from '@/components/ui/async-select';
 
 export const schoolKeys = {
   all: ['schools'] as const,
@@ -70,7 +72,13 @@ export function useSchoolNames() {
   return useMemo(() => new Map((data?.items ?? []).map((s) => [s.id, s.name])), [data]);
 }
 
-export function useSchoolOptions() {
-  const { data } = useSchools({ page: 1, limit: 100, q: '', status: 'ACTIVE' });
-  return useMemo(() => (data?.items ?? []).map((s) => ({ value: s.id, label: s.name })), [data]);
+/** Debounced school search for async selects (active schools only). */
+export function useSchoolSearch(search: string): AsyncSearchResult {
+  const q = useDebouncedValue(search.trim());
+  const { data, isPending, isError } = useSchools({ page: 1, limit: 20, q, status: 'ACTIVE' });
+  const options = useMemo(
+    () => (data?.items ?? []).map((s) => ({ value: s.id, label: s.name, description: s.code })),
+    [data],
+  );
+  return { options, isPending, isError };
 }

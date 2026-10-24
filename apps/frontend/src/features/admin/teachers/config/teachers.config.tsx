@@ -5,9 +5,10 @@ import type { DataTableColumn } from '@/components/ui/data-table';
 import { PATHS } from '@/lib/paths';
 import { UserStatusBadge } from '../../users/components/UserStatusBadge';
 import type { UserListItem, UserStatusFilter } from '../../users/model/types';
-import type { FieldConfig, FieldOption } from '@/components/form/FormRenderer';
+import type { FieldConfig } from '@/components/form/FormRenderer';
 import type { FormSectionAccent } from '@/components/form/FormSection';
 import type { TeacherFormValues } from '../model/schemas';
+import { useSchoolSearch } from '../../schools/queries';
 
 export const TEACHERS_PAGE_SIZE = 10;
 
@@ -44,6 +45,13 @@ export function getTeacherColumns(
           </div>
         </div>
       ),
+    },
+    {
+      key: 'steamxId',
+      header: 'SteamX ID',
+      width: '1.5fr',
+      mobileLabel: true,
+      cell: (t) => <span className="truncate">{t.steamxId}</span>,
     },
     {
       key: 'school',
@@ -94,10 +102,7 @@ export function getTeacherColumns(
   ];
 }
 
-export function getTeacherFieldGroups(
-  isEdit: boolean,
-  schoolOptions: FieldOption[],
-): TeacherFieldGroup[] {
+export function getTeacherFieldGroups(isEdit: boolean): TeacherFieldGroup[] {
   return [
     {
       id: 'basic',
@@ -142,10 +147,10 @@ export function getTeacherFieldGroups(
             {
               name: 'schoolId',
               label: 'School',
-              type: 'select',
+              type: 'async-select',
               required: true,
-              options: schoolOptions,
-              placeholder: 'Select school',
+              placeholder: 'Search schools by name or code',
+              useSearch: useSchoolSearch,
             },
           ],
     },

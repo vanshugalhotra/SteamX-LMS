@@ -14,7 +14,6 @@ import {
   getFieldErrors,
   hasErrorCode,
 } from '@/lib/api-errors';
-import { useSchoolOptions } from '../../schools/queries';
 import type { User, UserStatus } from '../../users/model/types';
 import { useCreateTeacher, useUpdateUser, useUpdateUserStatus } from '../../users/queries';
 import { getTeacherFieldGroups } from '../config/teachers.config';
@@ -52,7 +51,6 @@ export function TeacherForm({ teacher, schoolName, onDone, onCancel }: TeacherFo
   const create = useCreateTeacher();
   const update = useUpdateUser();
   const updateStatus = useUpdateUserStatus();
-  const schoolOptions = useSchoolOptions();
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
   const {
@@ -151,7 +149,7 @@ export function TeacherForm({ teacher, schoolName, onDone, onCancel }: TeacherFo
         </Alert>
       )}
 
-      {getTeacherFieldGroups(Boolean(teacher), schoolOptions)
+      {getTeacherFieldGroups(Boolean(teacher))
         .filter((group) => group.fields.length > 0 || (teacher && group.id === 'account'))
         .map((group) => (
           <FormSection key={group.id} title={group.title} accent={group.accent}>
@@ -161,6 +159,7 @@ export function TeacherForm({ teacher, schoolName, onDone, onCancel }: TeacherFo
                 register={register}
                 errors={errors}
                 disabled={busy}
+                control={control}
               />
             )}
             {teacher && group.id === 'account' && (

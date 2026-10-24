@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router';
 import { FormPageLayout } from '@/components/form/FormPageLayout';
 import { PATHS } from '@/lib/paths';
 import { TeacherForm } from '../components/TeacherForm';
+import { TeacherDirectory } from '../components/TeacherDirectory';
 
 export function TeacherCreatePage() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export function TeacherCreatePage() {
       backTo={PATHS.admin.teachers}
       backLabel="Teachers"
       tag="New"
+      below={<TeacherDirectory />}
     >
       <TeacherForm onDone={backToList} onCancel={backToList} />
     </FormPageLayout>

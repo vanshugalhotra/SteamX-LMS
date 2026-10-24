@@ -6,9 +6,11 @@ import {
   SCHOOLS_PAGE_SIZE,
   SCHOOLS_SEARCH_MAX_LENGTH,
 } from '../config/schools.config';
-import type { SchoolStatusFilter } from '../model/types';
+import type { School, SchoolStatusFilter } from '../model/types';
 import { useSchools } from '../queries';
-import { SchoolDirectoryList } from './SchoolDirectoryList';
+import { DirectoryList } from '@/components/list/DirectoryList';
+import { SchoolStatusBadge } from './SchoolStatusBadge';
+import { PATHS } from '@/lib/paths';
 
 /** Browse registered schools below the add/edit form (Edit opens that school). */
 export function SchoolDirectory({ currentId }: { currentId?: string }) {
@@ -19,6 +21,18 @@ export function SchoolDirectory({ currentId }: { currentId?: string }) {
     limit: SCHOOLS_PAGE_SIZE,
     q,
     status: filter,
+  });
+
+  const toCard = (s: School) => ({
+    id: s.id,
+    title: s.name,
+    subtitle: (
+      <>
+        <span className="font-semibold text-foreground">{s.code}</span> · {s.city}, {s.state}
+      </>
+    ),
+    badge: <SchoolStatusBadge status={s.status} />,
+    to: PATHS.admin.schoolEdit(s.id),
   });
 
   return (
@@ -53,11 +67,15 @@ export function SchoolDirectory({ currentId }: { currentId?: string }) {
       </div>
 
       <div className="mt-4 rounded-2xl bg-gray-50 p-3">
-        <SchoolDirectoryList
-          schools={data?.items}
+        <DirectoryList
+          rows={data?.items}
+          toCard={toCard}
           isPending={isPending}
           isError={isError}
           onRetry={() => void refetch()}
+          emptyMessage="No schools match your filters."
+          errorMessage="We couldn't load the schools. Please try again."
+          loadingLabel="Loading schools"
           currentId={currentId}
         />
         {data && data.total > 0 && (

@@ -4,10 +4,10 @@ import { ListToolbar, SearchBox } from '@/components/list/ListToolbar';
 import { ButtonLink } from '@/components/ui/button-link';
 import { DataTable } from '@/components/ui/data-table';
 import { Pagination } from '@/components/ui/pagination';
-import { Select } from '@/components/ui/select';
+import { AsyncSelect } from '@/components/ui/async-select';
 import { PATHS } from '@/lib/paths';
 import { useListParams } from '@/lib/use-list-params';
-import { useSchools, useSchoolNames } from '../../schools/queries';
+import { useSchoolSearch, useSchoolNames } from '../../schools/queries';
 import type { UserStatusFilter } from '../../users/model/types';
 import { useUsers } from '../../users/queries';
 import {
@@ -38,7 +38,6 @@ export function TeachersPage() {
     status: filter,
     schoolId: schoolId || undefined,
   });
-  const schoolList = useSchools({ page: 1, limit: 100, q: '', status: 'ALL' });
   const schoolNames = useSchoolNames();
   const columns = getTeacherColumns((id) => (id ? (schoolNames.get(id) ?? '-') : '-'));
 
@@ -77,21 +76,15 @@ export function TeachersPage() {
           onFilterChange={setFilter}
           filterLabel="Filter by status"
         />
-        <Select
-          aria-label="Filter by school"
-          value={schoolId}
-          onChange={(e) => {
-            setSchoolId(e.target.value);
-          }}
-          className="flex-1 sm:max-w-64 sm:flex-none"
-        >
-          <option value="">All schools</option>
-          {schoolList.data?.items.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </Select>
+        <div className="w-full sm:max-w-64">
+          <AsyncSelect
+            aria-label="Filter by school"
+            value={schoolId}
+            onChange={setSchoolId}
+            useSearch={useSchoolSearch}
+            placeholder="All schools"
+          />
+        </div>
       </div>
 
       <section className="rounded-2xl bg-gray-50 p-2">
