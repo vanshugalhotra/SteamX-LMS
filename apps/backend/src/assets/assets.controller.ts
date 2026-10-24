@@ -114,7 +114,7 @@ export class AssetsController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<AssetAccessResponseDto> {
     response.setHeader('Cache-Control', 'no-store');
-    return this.assetAccess.issueForAuthor(id, actor.userId);
+    return this.assetAccess.issueForAuthor(id, actor);
   }
 
   // ─────────────────────────────────────────

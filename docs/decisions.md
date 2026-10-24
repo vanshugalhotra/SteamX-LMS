@@ -60,3 +60,4 @@ Each entry records the current design choice and why.
 - **No-store access responses** — `GET /assets/:id/access` sends `Cache-Control: no-store`; clients request another URL after a fetch returns 403.
 - **Archived assets remain previewable** — author access requires a READY file, not ACTIVE content status.
 - **Signed asset URLs are never logged** — structured access logs contain only asset, file, and user IDs.
+- **Consider checking object existence before signing** — a HEAD request adds S3 latency to each URL issuance and cannot prevent a later deletion; defer unless missing-object reports justify the cost.

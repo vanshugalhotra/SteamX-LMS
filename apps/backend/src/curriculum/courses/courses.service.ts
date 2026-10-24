@@ -16,7 +16,7 @@ import { API_ERROR } from '../../common/errors/api-errors.js';
 import { paginate } from '../../common/pagination/paginate.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import type { PaginationResponseDto } from '../../common/pagination/pagination-response.dto.js';
-import { assertPlatformStaff } from '../assert-platform-staff.js';
+import { assertPlatformStaff } from '../../auth/assert-platform-staff.js';
 import { canTransitionContentStatus } from '../content-status.js';
 import type { CourseListQueryDto } from './dto/course-list-query.dto.js';
 import type { CourseResponseDto } from './dto/course-response.dto.js';

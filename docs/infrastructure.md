@@ -98,3 +98,16 @@ The local smoke server binds only to `127.0.0.1` and needs `DATABASE_URL` from
 for each created asset prefix. Replace `<bucket>` with the staging bucket and run those commands
 with the `steamx-backend` AWS profile. The smoke test does not remove database rows; use an isolated
 staging account/database for this manual test.
+
+## Asset access URL smoke test
+
+For a READY asset already in the database and S3, run:
+
+```powershell
+pnpm asset:access:smoke --port 5173
+```
+
+Open `http://localhost:5173`, enter the local backend URL, seeded admin credentials, and asset ID.
+The page checks login, the `GET /assets/:id/access` response fields and `Cache-Control: no-store`,
+checks a byte-range request returns `206`, then previews the image, PDF, or video without printing
+the signed URL.

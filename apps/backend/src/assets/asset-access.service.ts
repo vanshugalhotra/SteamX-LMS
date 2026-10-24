@@ -4,6 +4,8 @@ import { PinoLogger } from 'nestjs-pino';
 import { AssetType } from '../generated/prisma/client.js';
 import type { AssetFile } from '../generated/prisma/client.js';
 import type { Env } from '../config/env.schema.js';
+import { assertPlatformStaff } from '../auth/assert-platform-staff.js';
+import type { AuthContext } from '../auth/types/auth-context.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AssetAccessResponseDto } from './dto/asset-access-response.dto.js';
@@ -39,11 +41,12 @@ export class AssetAccessService {
   }
 
   /**
-   * Authorization/lookup for author previews. The asset id alone is never a grant for
-   * non-admin users; Module 3's student path must do lesson, delivery, and subscription
-   * checks in its caller before calling issueForFile.
+   * Author previews are platform-staff-only, even when another role has asset.read.
+   * Module 3's student path must do lesson, delivery, and subscription checks in its caller
+   * before calling issueForFile.
    */
-  async issueForAuthor(assetId: string, userId: string): Promise<AssetAccessResponseDto> {
+  async issueForAuthor(assetId: string, actor: AuthContext): Promise<AssetAccessResponseDto> {
+    assertPlatformStaff(actor);
     // This lookup filters files to READY and takes the newest one, excluding in-progress replacements.
     const asset = await this.assets.findAssetForAccess(assetId);
     if (!asset) {
@@ -56,7 +59,10 @@ export class AssetAccessService {
     }
 
     const access = await this.issueForFile(file, asset.type);
-    this.logger.debug({ assetId, fileId: file.id, userId }, 'Issued author asset access URL');
+    this.logger.debug(
+      { assetId, fileId: file.id, userId: actor.userId },
+      'Issued author asset access URL',
+    );
     return access;
   }
 

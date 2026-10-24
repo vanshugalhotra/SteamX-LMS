@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STEAMX asset access smoke test</title>
+    <style>
+      body {
+        font:
+          16px system-ui,
+          sans-serif;
+        margin: 2rem auto;
+        max-width: 760px;
+        padding: 0 1rem;
+      }
+      label {
+        display: block;
+        margin: 0.8rem 0;
+      }
+      input,
+      button {
+        font: inherit;
+        margin-top: 0.25rem;
+        padding: 0.45rem;
+      }
+      input {
+        display: block;
+        max-width: 100%;
+        width: 34rem;
+      }
+      button,
+      a {
+        cursor: pointer;
+      }
+      #preview img,
+      #preview video,
+      #preview iframe {
+        border: 1px solid #bbb;
+        display: block;
+        margin-top: 1rem;
+        max-width: 100%;
+        width: 100%;
+      }
+      #preview iframe {
+        height: 70vh;
+      }
+      .notice {
+        background: #fff7d6;
+        border-left: 4px solid #d99b00;
+        padding: 0.8rem;
+      }
+      .pass {
+        color: #08752b;
+      }
+      .fail {
+        color: #b42318;
+      }
+    </style>
+    <script src="/browser.js" defer></script>
+  </head>
+  <body>
+    <h1>Asset access smoke test</h1>
+    <p class="notice">
+      Use a READY asset in a staging/test environment. Credentials stay in this browser page; the
+      signed URL is used for preview but is never printed.
+    </p>
+    <form id="settings">
+      <label>
+        Backend URL
+        <input id="backend-url" type="url" value="http://localhost:3333" required />
+      </label>
+      <label>
+        Seeded admin SteamX ID
+        <input id="steamx-id" type="text" autocomplete="username" required />
+      </label>
+      <label>
+        Seeded admin password
+        <input id="password" type="password" autocomplete="current-password" required />
+      </label>
+      <label>
+        READY asset ID
+        <input id="asset-id" type="text" autocomplete="off" required />
+      </label>
+      <button id="run" type="submit">Request and preview</button>
+    </form>
+    <p id="result" aria-live="polite"></p>
+    <div id="preview"></div>
+  </body>
+</html>

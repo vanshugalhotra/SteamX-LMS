@@ -1,7 +1,9 @@
 import { ConfigService } from '@nestjs/config';
+import { ForbiddenException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { AssetType } from '../generated/prisma/client.js';
+import { AssetType, UserType } from '../generated/prisma/client.js';
 import type { AssetFile } from '../generated/prisma/client.js';
+import type { AuthContext } from '../auth/types/auth-context.js';
 import { validateEnv } from '../config/env.schema.js';
 import type { Env } from '../config/env.schema.js';
 import { InMemoryStorageService } from '../../test/support/in-memory-storage.service.js';
@@ -19,6 +21,18 @@ const file: Pick<
   originalFilename: 'clean-name.pdf',
   mimeType: 'application/pdf',
 };
+
+function actor(userType: UserType): AuthContext {
+  return {
+    userId: '550e8400-e29b-41d4-a716-446655440010',
+    steamxId: userType === UserType.PLATFORM_STAFF ? 'ADMIN001' : 'TEACHER001',
+    name: 'Smoke User',
+    roleKey: userType === UserType.PLATFORM_STAFF ? 'admin' : 'teacher',
+    userType,
+    schoolId: userType === UserType.PLATFORM_STAFF ? null : '550e8400-e29b-41d4-a716-446655440020',
+    mustChangePassword: false,
+  };
+}
 
 function createService(
   storage: InMemoryStorageService,
@@ -120,10 +134,40 @@ describe('AssetAccessService', () => {
       debug: vi.fn(),
     } as unknown as PinoLogger);
 
-    await expect(service.issueForAuthor(file.assetId, 'user-id')).rejects.toMatchObject({
+    await expect(
+      service.issueForAuthor(file.assetId, actor(UserType.PLATFORM_STAFF)),
+    ).rejects.toMatchObject({
       response: { code: 'ASSET_NOT_READY' },
       status: 409,
     });
     expect(storage.downloadRequests).toEqual([]);
   });
+
+  it.each([UserType.SCHOOL_STAFF, UserType.STUDENT])(
+    'rejects %s before looking up or signing an asset',
+    async (userType) => {
+      const storage = new InMemoryStorageService();
+      const findAssetForAccess = vi.fn();
+      const repository = { findAssetForAccess } as unknown as AssetsRepository;
+      const config = new ConfigService<Env, true>(
+        validateEnv({
+          NODE_ENV: 'test',
+          AUTH_JWT_SECRET: 'test-auth-secret-with-at-least-thirty-two-characters',
+          DATABASE_URL: 'postgresql://localhost/steamx_test',
+          AWS_REGION: 'ap-south-1',
+          S3_BUCKET: 'test-bucket',
+        }),
+      );
+      const service = new AssetAccessService(repository, storage, config, {
+        setContext: vi.fn(),
+        debug: vi.fn(),
+      } as unknown as PinoLogger);
+
+      await expect(service.issueForAuthor(file.assetId, actor(userType))).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(findAssetForAccess).not.toHaveBeenCalled();
+      expect(storage.downloadRequests).toEqual([]);
+    },
+  );
 });
