@@ -8,7 +8,12 @@ import type { App } from 'supertest/types.js';
 import { vi } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
 import type { Env } from '../../src/config/env.schema.js';
-import { AssetFileStatus, AssetType, ContentStatus } from '../../src/generated/prisma/client.js';
+import {
+  AssetFileStatus,
+  AssetType,
+  BlockType,
+  ContentStatus,
+} from '../../src/generated/prisma/client.js';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { buildOriginalKey } from '../../src/assets/asset-rules.js';
@@ -65,6 +70,9 @@ describe('Assets endpoints (e2e)', () => {
   let schoolStaffCookie: string;
   let limits: Env['assetLimits'];
   const createdAssetIds: string[] = [];
+  const createdCourseIds: string[] = [];
+  const createdModuleIds: string[] = [];
+  const createdLessonIds: string[] = [];
 
   beforeAll(async () => {
     const databaseUrl = process.env.DATABASE_URL;
@@ -91,6 +99,16 @@ describe('Assets endpoints (e2e)', () => {
   });
 
   afterAll(async () => {
+    if (createdLessonIds.length > 0) {
+      await prisma.lessonBlock.deleteMany({ where: { lessonId: { in: createdLessonIds } } });
+      await prisma.lesson.deleteMany({ where: { id: { in: createdLessonIds } } });
+    }
+    if (createdModuleIds.length > 0) {
+      await prisma.module.deleteMany({ where: { id: { in: createdModuleIds } } });
+    }
+    if (createdCourseIds.length > 0) {
+      await prisma.course.deleteMany({ where: { id: { in: createdCourseIds } } });
+    }
     if (createdAssetIds.length > 0) {
       await prisma.assetFile.deleteMany({ where: { assetId: { in: createdAssetIds } } });
       await prisma.storageCleanupQueue.deleteMany({
@@ -135,6 +153,22 @@ describe('Assets endpoints (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  function getAssets(cookie: string | undefined, query: Record<string, string | number> = {}) {
+    const call = request(app.getHttpServer()).get('/api/v1/assets').query(query);
+    if (cookie) {
+      call.set('Cookie', cookie);
+    }
+    return call;
+  }
+
+  function getAsset(cookie: string | undefined, assetId: string) {
+    const call = request(app.getHttpServer()).get(`/api/v1/assets/${assetId}`);
+    if (cookie) {
+      call.set('Cookie', cookie);
+    }
+    return call;
+  }
+
   function completeAssetFile(cookie: string | undefined, assetId: string, fileId: string) {
     const call = request(app.getHttpServer())
       .post(`/api/v1/assets/${assetId}/files/${fileId}/complete`)
@@ -145,10 +179,19 @@ describe('Assets endpoints (e2e)', () => {
     return call.send();
   }
 
-  async function createDatabaseAsset(type: AssetType = AssetType.IMAGE): Promise<string> {
+  async function createDatabaseAsset(
+    type: AssetType = AssetType.IMAGE,
+    options: { title?: string; status?: ContentStatus; createdAt?: Date } = {},
+  ): Promise<string> {
     const assetId = randomUUID().toLowerCase();
     await prisma.asset.create({
-      data: { id: assetId, type, title: `Database asset ${assetId}` },
+      data: {
+        id: assetId,
+        type,
+        title: options.title ?? `Database asset ${assetId}`,
+        status: options.status,
+        createdAt: options.createdAt,
+      },
     });
     createdAssetIds.push(assetId);
     return assetId;
@@ -158,6 +201,7 @@ describe('Assets endpoints (e2e)', () => {
     assetId: string,
     status: AssetFileStatus,
     mimeType = 'image/png',
+    options: { createdAt?: Date; lastError?: string } = {},
   ) {
     const fileId = randomUUID().toLowerCase();
     const storageKey = buildOriginalKey(assetId, fileId);
@@ -169,6 +213,7 @@ describe('Assets endpoints (e2e)', () => {
         originalFilename: 'direct-test.png',
         mimeType,
         sizeBytes: 16n,
+        createdAt: options.createdAt,
       },
     });
 
@@ -188,7 +233,7 @@ describe('Assets endpoints (e2e)', () => {
       status === AssetFileStatus.FAILED ? AssetFileStatus.FAILED : AssetFileStatus.PROCESSING;
     const progressed = await prisma.assetFile.update({
       where: { id: fileId },
-      data: { status: nextStatus },
+      data: { status: nextStatus, lastError: options.lastError },
     });
     if (status === AssetFileStatus.READY) {
       const ready = await prisma.assetFile.update({
@@ -198,6 +243,34 @@ describe('Assets endpoints (e2e)', () => {
       return { id: ready.id, storageKey };
     }
     return { id: progressed.id, storageKey };
+  }
+
+  async function createDatabaseCourse(title: string) {
+    const course = await prisma.course.create({ data: { title } });
+    createdCourseIds.push(course.id);
+    return course;
+  }
+
+  async function createDatabaseModule(courseId: string, title: string, position = 1) {
+    const module = await prisma.module.create({
+      data: { courseId, title, position },
+    });
+    createdModuleIds.push(module.id);
+    return module;
+  }
+
+  async function createDatabaseLesson(
+    courseId: string,
+    moduleId: string,
+    title: string,
+    position = 1,
+    status: ContentStatus = ContentStatus.DRAFT,
+  ) {
+    const lesson = await prisma.lesson.create({
+      data: { courseId, moduleId, title, position, status },
+    });
+    createdLessonIds.push(lesson.id);
+    return lesson;
   }
 
   async function createAndUpload(
@@ -376,6 +449,378 @@ describe('Assets endpoints (e2e)', () => {
     await postAsset(teacherCookie, standardBody(AssetType.IMAGE, 'image/jpeg')).expect(403);
     await postAsset(studentCookie, standardBody(AssetType.IMAGE, 'image/jpeg')).expect(403);
     await postAsset(schoolStaffCookie, standardBody(AssetType.IMAGE, 'image/jpeg')).expect(403);
+  });
+
+  it('lists only assets with READY files and applies status, type, and literal search filters', async () => {
+    const marker = `library-${randomUUID()}`;
+    const readyImageId = await createDatabaseAsset(AssetType.IMAGE, {
+      title: `${marker} 100%_match`,
+    });
+    await createDatabaseFile(readyImageId, AssetFileStatus.READY);
+    await createDatabaseFile(readyImageId, AssetFileStatus.UPLOADING);
+
+    const readyPdfId = await createDatabaseAsset(AssetType.PDF, { title: `${marker} PDF` });
+    await createDatabaseFile(readyPdfId, AssetFileStatus.READY, 'application/pdf');
+
+    const hiddenStatuses = [
+      AssetFileStatus.FAILED,
+      AssetFileStatus.UPLOADING,
+      AssetFileStatus.UPLOADED,
+    ];
+    const hiddenAssetIds: string[] = [];
+    for (const status of hiddenStatuses) {
+      const hiddenId = await createDatabaseAsset(AssetType.IMAGE, {
+        title: `${marker} hidden ${status}`,
+      });
+      hiddenAssetIds.push(hiddenId);
+      await createDatabaseFile(hiddenId, status);
+    }
+    const hiddenWithoutFile = await createDatabaseAsset(AssetType.IMAGE, {
+      title: `${marker} no file`,
+    });
+
+    const archivedId = await createDatabaseAsset(AssetType.IMAGE, {
+      title: `${marker} archived`,
+      status: ContentStatus.ARCHIVED,
+    });
+    await createDatabaseFile(archivedId, AssetFileStatus.READY);
+    const decoyId = await createDatabaseAsset(AssetType.IMAGE, {
+      title: `${marker} 100XXmatch`,
+    });
+    await createDatabaseFile(decoyId, AssetFileStatus.READY);
+    const percentDecoyId = await createDatabaseAsset(AssetType.IMAGE, {
+      title: `${marker} 100%Xmatch`,
+    });
+    await createDatabaseFile(percentDecoyId, AssetFileStatus.READY);
+    const underscoreDecoyId = await createDatabaseAsset(AssetType.IMAGE, {
+      title: `${marker} 100X_match`,
+    });
+    await createDatabaseFile(underscoreDecoyId, AssetFileStatus.READY);
+
+    const defaultList = await getAssets(adminCookie, { search: marker }).expect(200);
+    expect(defaultList.body.items.map((item: { id: string }) => item.id)).toContain(readyImageId);
+    expect(defaultList.body.items.map((item: { id: string }) => item.id)).toContain(readyPdfId);
+    expect(defaultList.body.items.map((item: { id: string }) => item.id)).not.toContain(archivedId);
+    for (const hiddenId of [...hiddenAssetIds, hiddenWithoutFile]) {
+      expect(defaultList.body.items.map((item: { id: string }) => item.id)).not.toContain(hiddenId);
+    }
+    for (const item of defaultList.body.items) {
+      expect(Object.keys(item).sort()).toEqual(
+        ['id', 'type', 'title', 'status', 'createdAt', 'updatedAt', 'file'].sort(),
+      );
+      expect(Object.keys(item.file).sort()).toEqual(
+        ['mimeType', 'sizeBytes', 'originalFilename'].sort(),
+      );
+    }
+    const readyItem = defaultList.body.items.find(
+      (item: { id: string }) => item.id === readyImageId,
+    );
+    expect(readyItem.file).toEqual({
+      mimeType: 'image/png',
+      sizeBytes: 16,
+      originalFilename: 'direct-test.png',
+    });
+    expect(defaultList.body.page).toBe(1);
+    expect(defaultList.body.limit).toBe(20);
+
+    const literalSearch = await getAssets(adminCookie, {
+      search: `${marker} 100%_`,
+    }).expect(200);
+    expect(literalSearch.body.items.map((item: { id: string }) => item.id)).toEqual([readyImageId]);
+    const percentSearch = await getAssets(adminCookie, { search: `${marker} 100%` }).expect(200);
+    expect(percentSearch.body.items.map((item: { id: string }) => item.id).sort()).toEqual(
+      [readyImageId, percentDecoyId].sort(),
+    );
+    const underscoreSearch = await getAssets(adminCookie, { search: '_match' }).expect(200);
+    expect(underscoreSearch.body.items.map((item: { id: string }) => item.id).sort()).toEqual(
+      [readyImageId, underscoreDecoyId].sort(),
+    );
+
+    const typeFilter = await getAssets(adminCookie, {
+      search: marker,
+      type: AssetType.PDF,
+    }).expect(200);
+    expect(typeFilter.body.items.map((item: { id: string }) => item.id)).toEqual([readyPdfId]);
+
+    const archivedList = await getAssets(adminCookie, {
+      search: marker,
+      status: ContentStatus.ARCHIVED,
+    }).expect(200);
+    expect(archivedList.body.items.map((item: { id: string }) => item.id)).toEqual([archivedId]);
+    const combinedFilters = await getAssets(adminCookie, {
+      search: marker,
+      status: ContentStatus.ARCHIVED,
+      type: AssetType.IMAGE,
+    }).expect(200);
+    expect(combinedFilters.body.total).toBe(1);
+    expect(combinedFilters.body.items.map((item: { id: string }) => item.id)).toEqual([archivedId]);
+    const trimmedSearch = await getAssets(adminCookie, { search: `  ${marker} PDF  ` }).expect(200);
+    expect(trimmedSearch.body.items.map((item: { id: string }) => item.id)).toEqual([readyPdfId]);
+
+    const caseInsensitiveSearch = await getAssets(adminCookie, {
+      search: `${marker.toUpperCase()} PDF`,
+    }).expect(200);
+    expect(caseInsensitiveSearch.body.items.map((item: { id: string }) => item.id)).toEqual([
+      readyPdfId,
+    ]);
+  });
+
+  it('validates list filters and paginates with stable createdAt/id ordering', async () => {
+    const marker = `page-${randomUUID()}`;
+    const timestamp = new Date('2026-01-01T00:00:00.000Z');
+    const ids: string[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      const assetId = await createDatabaseAsset(AssetType.IMAGE, {
+        title: `${marker} ${index}`,
+        createdAt: timestamp,
+      });
+      ids.push(assetId);
+      await createDatabaseFile(assetId, AssetFileStatus.READY);
+    }
+
+    const firstPage = await getAssets(adminCookie, { search: marker, limit: 2 }).expect(200);
+    expect(firstPage.body.page).toBe(1);
+    expect(firstPage.body.limit).toBe(2);
+    expect(firstPage.body.total).toBe(4);
+    expect(firstPage.body.items.map((item: { id: string }) => item.id)).toEqual(
+      [...ids].sort().reverse().slice(0, 2),
+    );
+    const secondPage = await getAssets(adminCookie, { search: marker, page: 2, limit: 2 }).expect(
+      200,
+    );
+    expect(secondPage.body.items.map((item: { id: string }) => item.id)).toEqual(
+      [...ids].sort().reverse().slice(2),
+    );
+    const pastLastPage = await getAssets(adminCookie, {
+      search: marker,
+      page: 3,
+      limit: 2,
+    }).expect(200);
+    expect(pastLastPage.body).toMatchObject({ items: [], total: 4, page: 3, limit: 2 });
+    await getAssets(adminCookie, { search: marker, limit: 100 }).expect(200);
+
+    await getAssets(adminCookie, { search: marker, status: ContentStatus.DRAFT }).expect(400);
+    await getAssets(adminCookie, { search: marker, status: 'junk' }).expect(400);
+    await getAssets(adminCookie, { search: marker, type: 'junk' }).expect(400);
+    await getAssets(adminCookie, { search: marker, searchExtra: 'unknown' }).expect(400);
+    await getAssets(adminCookie, { search: 'x'.repeat(101) }).expect(400);
+    await getAssets(adminCookie, { limit: 101 }).expect(400);
+
+    const dateMarker = `date-order-${randomUUID()}`;
+    const olderAssetId = await createDatabaseAsset(AssetType.IMAGE, {
+      title: dateMarker,
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+    });
+    const newerAssetId = await createDatabaseAsset(AssetType.IMAGE, {
+      title: dateMarker,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    await createDatabaseFile(olderAssetId, AssetFileStatus.READY);
+    await createDatabaseFile(newerAssetId, AssetFileStatus.READY);
+    const dateOrdered = await getAssets(adminCookie, { search: dateMarker }).expect(200);
+    expect(dateOrdered.body.items.map((item: { id: string }) => item.id)).toEqual([
+      newerAssetId,
+      olderAssetId,
+    ]);
+  });
+
+  it('requires asset.read for library list and detail routes', async () => {
+    await getAssets(undefined).expect(401);
+    await getAssets(teacherCookie).expect(403);
+    await getAssets(studentCookie).expect(403);
+    await getAssets(schoolStaffCookie).expect(403);
+
+    await getAsset(undefined, randomUUID()).expect(401);
+    await getAsset(teacherCookie, randomUUID()).expect(403);
+    await getAsset(studentCookie, randomUUID()).expect(403);
+    await getAsset(schoolStaffCookie, randomUUID()).expect(403);
+  });
+
+  it('returns the current file state for READY, failed, replacement, empty, and archived assets', async () => {
+    const readyAssetId = await createDatabaseAsset();
+    const readyFile = await createDatabaseFile(readyAssetId, AssetFileStatus.READY);
+    const failedAssetId = await createDatabaseAsset();
+    const failedFile = await createDatabaseFile(
+      failedAssetId,
+      AssetFileStatus.FAILED,
+      'image/png',
+      {
+        lastError: 'PROCESSING_FAILED',
+      },
+    );
+    const replacementAssetId = await createDatabaseAsset();
+    const replacementReady = await createDatabaseFile(replacementAssetId, AssetFileStatus.READY);
+    await createDatabaseFile(replacementAssetId, AssetFileStatus.UPLOADING);
+    const emptyAssetId = await createDatabaseAsset();
+    const archivedAssetId = await createDatabaseAsset(AssetType.IMAGE, {
+      status: ContentStatus.ARCHIVED,
+    });
+
+    const readyResponse = await getAsset(adminCookie, readyAssetId).expect(200);
+    expect(readyResponse.body.file).toMatchObject({
+      id: readyFile.id,
+      status: AssetFileStatus.READY,
+    });
+    const failedResponse = await getAsset(adminCookie, failedAssetId).expect(200);
+    expect(failedResponse.body.file).toMatchObject({
+      id: failedFile.id,
+      status: AssetFileStatus.FAILED,
+      lastError: 'PROCESSING_FAILED',
+    });
+    const replacementResponse = await getAsset(adminCookie, replacementAssetId).expect(200);
+    expect(replacementResponse.body.file).toMatchObject({
+      id: replacementReady.id,
+      status: AssetFileStatus.READY,
+    });
+    expect(
+      await getAsset(adminCookie, emptyAssetId)
+        .expect(200)
+        .then((res) => res.body.file),
+    ).toBeNull();
+    expect((await getAsset(adminCookie, archivedAssetId).expect(200)).body.status).toBe(
+      ContentStatus.ARCHIVED,
+    );
+
+    const detail = readyResponse.body;
+    expect(Object.keys(detail).sort()).toEqual(
+      ['id', 'type', 'title', 'status', 'createdAt', 'updatedAt', 'file', 'usedIn'].sort(),
+    );
+    expect(Object.keys(detail.file).sort()).toEqual(
+      [
+        'id',
+        'assetId',
+        'status',
+        'originalFilename',
+        'mimeType',
+        'sizeBytes',
+        'lastError',
+        'createdAt',
+        'updatedAt',
+      ].sort(),
+    );
+    expect(JSON.stringify(detail)).not.toMatch(
+      /storageKey|playbackKey|uploadId|processingJobId|storage_key|playback_key|upload_id|processing_job_id/i,
+    );
+    await getAsset(adminCookie, '550e8400-e29b-41d4-a716-446655440099').expect(404);
+    await getAsset(adminCookie, 'invalid-id').expect(404);
+  });
+
+  it('lists distinct asset usage across top-level and nested blocks, ordered with a capped total', async () => {
+    const assetId = await createDatabaseAsset();
+    const alphaCourse = await createDatabaseCourse(`A ${randomUUID()}`);
+    const alphaFirstModule = await createDatabaseModule(alphaCourse.id, 'First module', 1);
+    const alphaSecondModule = await createDatabaseModule(alphaCourse.id, 'Second module', 2);
+    const firstLesson = await createDatabaseLesson(
+      alphaCourse.id,
+      alphaFirstModule.id,
+      'First lesson',
+      1,
+      ContentStatus.ARCHIVED,
+    );
+    const secondLesson = await createDatabaseLesson(
+      alphaCourse.id,
+      alphaSecondModule.id,
+      'Second lesson',
+    );
+    const betaCourse = await createDatabaseCourse(`B ${randomUUID()}`);
+    const betaModule = await createDatabaseModule(betaCourse.id, 'Beta module');
+    const thirdLesson = await createDatabaseLesson(betaCourse.id, betaModule.id, 'Third lesson');
+
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: firstLesson.id,
+        type: BlockType.IMAGE,
+        content: {},
+        assetId,
+        position: 1,
+      },
+    });
+    const twoColumnBlock = await prisma.lessonBlock.create({
+      data: {
+        lessonId: firstLesson.id,
+        type: BlockType.TWO_COLUMN,
+        content: {},
+        position: 2,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: firstLesson.id,
+        type: BlockType.IMAGE,
+        content: {},
+        assetId,
+        parentBlockId: twoColumnBlock.id,
+        columnIndex: 0,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: secondLesson.id,
+        type: BlockType.IMAGE,
+        content: {},
+        assetId,
+        position: 1,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: thirdLesson.id,
+        type: BlockType.IMAGE,
+        content: {},
+        assetId,
+        position: 1,
+      },
+    });
+
+    const usage = (await getAsset(adminCookie, assetId).expect(200)).body.usedIn;
+    expect(usage.total).toBe(3);
+    expect(usage.items.map((item: { lessonId: string }) => item.lessonId)).toEqual([
+      firstLesson.id,
+      secondLesson.id,
+      thirdLesson.id,
+    ]);
+    expect(usage.items[0]).toMatchObject({
+      lessonId: firstLesson.id,
+      lessonTitle: 'First lesson',
+      lessonStatus: ContentStatus.ARCHIVED,
+      moduleId: alphaFirstModule.id,
+      moduleTitle: alphaFirstModule.title,
+      courseId: alphaCourse.id,
+      courseTitle: alphaCourse.title,
+    });
+    expect(usage.items).toHaveLength(3);
+
+    const cappedAssetId = await createDatabaseAsset();
+    const capCourse = await createDatabaseCourse(`Cap ${randomUUID()}`);
+    const capModule = await createDatabaseModule(capCourse.id, 'Cap module');
+    const manyLessons = Array.from({ length: 51 }, (_, index) => ({
+      id: randomUUID().toLowerCase(),
+      moduleId: capModule.id,
+      courseId: capCourse.id,
+      title: `Lesson ${index + 1}`,
+      position: index + 1,
+      status: ContentStatus.DRAFT,
+    }));
+    await prisma.lesson.createMany({ data: manyLessons });
+    createdLessonIds.push(...manyLessons.map((lesson) => lesson.id));
+    await prisma.lessonBlock.createMany({
+      data: manyLessons.map((lesson) => ({
+        lessonId: lesson.id,
+        type: BlockType.IMAGE,
+        content: {},
+        assetId: cappedAssetId,
+        position: 1,
+      })),
+    });
+    const cappedUsage = (await getAsset(adminCookie, cappedAssetId).expect(200)).body.usedIn;
+    expect(cappedUsage.total).toBe(51);
+    expect(cappedUsage.items).toHaveLength(50);
+
+    const unusedAssetId = await createDatabaseAsset();
+    expect((await getAsset(adminCookie, unusedAssetId).expect(200)).body.usedIn).toEqual({
+      total: 0,
+      items: [],
+    });
   });
 
   it('returns file state and rejects foreign, unknown, and invalid IDs', async () => {

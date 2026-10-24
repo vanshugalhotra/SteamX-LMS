@@ -274,7 +274,7 @@ email, names, and creation times.
   lessons only; draft descendants stay draft and reactivation does not revive archived descendants.
 - Delete an empty lesson, module, and course; verify deletion is blocked with `RESOURCE_IN_USE` when dependent records remain.
 - Verify lesson audiences, including teacher-only lessons and lessons visible to students.
-- Private asset upload, processing failure, replacement, signed access, and queued storage cleanup.
+- Private asset upload, processing failure, replacement, signed access, and queued storage cleanup. Verify `GET /assets` lists the asset only after a file reaches READY (a failed or in-progress replacement does not hide an existing READY file); `GET /assets/:id` shows the current file lifecycle state and distinct lessons where the asset is used.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.
 - Student promotion that completes old-class enrollments and validates cross-school moves.

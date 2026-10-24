@@ -32,6 +32,9 @@ Each entry records the current design choice and why.
 - **Delete = FK-restricted only** — deletion blocked by foreign keys, using shared `RESOURCE_IN_USE` error code.
 - **Outline read model** — `GET /courses/:id/outline` reads across course/module/lesson in one query. Writes stay in their feature folders. Admin-only and unfiltered; teacher/student outlines need separate filtered endpoints.
 - **No content version history** — replacements aren't archived versions. Add when revision browsing becomes a requirement.
+- **Asset library list visibility** — `GET /assets` hides assets without a READY file and defaults to ACTIVE status; ARCHIVED assets are opt-in.
+- **Asset detail current file** — prefer the READY file; if none exists, use the newest file by `created_at`, breaking ties by ID; return null when no file rows exist.
+- **Asset where-used read model** — usage is distinct lessons read across lessons/modules/courses/blocks, ordered by course/module/lesson and capped at 50 items with the real total; repeated block references count a lesson once.
 
 ## Storage
 

@@ -268,6 +268,36 @@ Caller: platform `admin` with `curriculum.write`; deletes a lesson with no depen
 
 ## Assets
 
+### `GET /assets`
+
+Caller: authenticated role with `asset.read`; lists ACTIVE assets by default and ARCHIVED assets on request, but only when the asset has a READY file.
+
+- [auto] When no query is supplied -> expect page 1, limit 20, ACTIVE assets with a READY file only.
+- [auto] When an asset has no files or only FAILED, UPLOADING, UPLOADED, or PROCESSING files -> omit it; when a READY file has a newer UPLOADING replacement -> include the asset using the READY file.
+- [auto] When `status=ARCHIVED` -> return archived assets with READY files; DRAFT and unknown status values -> expect `400`.
+- [auto] When type is supplied -> return only matching asset types; invalid types -> expect `400`.
+- [auto] When search has surrounding spaces, partial text, or different casing -> trim and match asset titles case-insensitively.
+- [auto] When search contains `%` or `_` -> treat those characters literally.
+- [auto] When status, type, and search are combined -> apply all filters to both returned items and `total`.
+- [auto] When pagination is omitted -> expect page 1 and limit 20; when page is beyond the last page -> expect empty items and matching total; limits above 100 and search longer than 100 characters -> expect `400`.
+- [auto] When assets share a `createdAt` value -> order by descending ID after descending creation time.
+- [auto] Each item has only asset identity/type/title/status/timestamps and READY-file MIME, numeric size, and original filename; no usage or internal storage fields.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+
+### `GET /assets/:id`
+
+Caller: authenticated role with `asset.read`; returns any asset by ID and its current file plus distinct lesson usage.
+
+- [auto] When a READY file exists -> return it even when a newer replacement is UPLOADING.
+- [auto] When no READY file exists -> return the most recently created file (ID descending breaks timestamp ties), including FAILED status and its stable `lastError` code; when the asset has no files -> return `file: null`.
+- [auto] When an archived asset is requested -> return it; assets without READY files remain directly inspectable.
+- [auto] When one lesson references the asset in multiple top-level or nested two-column blocks -> list that lesson once.
+- [auto] When usage spans courses -> order by course title, module position, then lesson position; include DRAFT and ARCHIVED lesson statuses.
+- [auto] When the asset is used by more than 50 lessons -> return 50 ordered items and the real total; unused assets have total zero and an empty items list.
+- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] File response contains lifecycle details and stable error code only; no storage, playback, upload, or processing-job keys/IDs.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+
 ### `POST /assets`
 
 Caller: authenticated admin with `asset.write`; creates an ACTIVE asset and UPLOADING file in one database transaction, then returns upload instructions.

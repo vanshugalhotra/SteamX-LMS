@@ -2,7 +2,54 @@ import { Injectable } from '@nestjs/common';
 import { AssetFileStatus, ContentStatus, Prisma } from '../generated/prisma/client.js';
 import type { Asset, AssetFile } from '../generated/prisma/client.js';
 import type { SupportedAssetType } from './asset-rules.js';
+import type { AssetListQueryDto } from './dto/asset-list-query.dto.js';
+import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+
+const ASSET_LIBRARY_SELECT = {
+  id: true,
+  type: true,
+  title: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  files: {
+    where: { status: AssetFileStatus.READY },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 1,
+    select: {
+      mimeType: true,
+      sizeBytes: true,
+      originalFilename: true,
+    },
+  },
+} satisfies Prisma.AssetSelect;
+
+const ASSET_DETAIL_SELECT = {
+  id: true,
+  type: true,
+  title: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  files: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true,
+      assetId: true,
+      status: true,
+      originalFilename: true,
+      mimeType: true,
+      sizeBytes: true,
+      lastError: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+} satisfies Prisma.AssetSelect;
+
+export type AssetLibraryRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_LIBRARY_SELECT }>;
+export type AssetDetailRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_DETAIL_SELECT }>;
 
 export type AssetFileForCompletion = Prisma.AssetFileGetPayload<{
   include: { asset: { select: { type: true } } };
@@ -27,6 +74,42 @@ export interface MakeReadyInput {
 @Injectable()
 export class AssetsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  findLibraryItems(
+    query: AssetListQueryDto,
+  ): Promise<{ items: AssetLibraryRecord[]; total: number }> {
+    const where: Prisma.AssetWhereInput = {
+      status: query.status,
+      ...(query.type === undefined ? {} : { type: query.type }),
+      ...(query.search === undefined
+        ? {}
+        : {
+            title: {
+              contains: query.search.replace(/[\\%_]/g, '\\$&'),
+              mode: 'insensitive',
+            },
+          }),
+      files: { some: { status: AssetFileStatus.READY } },
+    };
+    const orderBy = [
+      { createdAt: 'desc' },
+      { id: 'desc' },
+    ] satisfies Prisma.AssetOrderByWithRelationInput[];
+
+    // The library is small; no additional index is needed for this list query.
+    return paginatedSearch({
+      where,
+      orderBy,
+      page: query.page,
+      limit: query.limit,
+      findMany: (args) => this.prisma.asset.findMany({ ...args, select: ASSET_LIBRARY_SELECT }),
+      count: (filter) => this.prisma.asset.count({ where: filter }),
+    });
+  }
+
+  findLibraryAssetById(id: string): Promise<AssetDetailRecord | null> {
+    return this.prisma.asset.findUnique({ where: { id }, select: ASSET_DETAIL_SELECT });
+  }
 
   /** Creates the stable asset identity and its first upload attempt atomically. */
   createAssetWithFile(input: {

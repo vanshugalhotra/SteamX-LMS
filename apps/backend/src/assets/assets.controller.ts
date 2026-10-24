@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
@@ -16,8 +27,11 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { PERMISSION } from '../auth/permissions.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
+import { AssetListQueryDto } from './dto/asset-list-query.dto.js';
+import { AssetLibraryDetailDto, AssetListResponseDto } from './dto/asset-library-response.dto.js';
 import { AssetsService } from './assets.service.js';
 
 /** HTTP and permission boundary for asset creation and file-state reads. */
@@ -29,6 +43,43 @@ import { AssetsService } from './assets.service.js';
 @Controller({ path: 'assets' })
 export class AssetsController {
   constructor(private readonly assets: AssetsService) {}
+
+  // ─────────────────────────────────────────
+  // GET /assets — List library assets
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.ASSET_READ)
+  @Get()
+  @ApiOperation({ summary: 'List assets available in the library' })
+  @ApiOkResponse({ description: 'Paginated assets with READY files.', type: AssetListResponseDto })
+  @ApiBadRequestResponse({ description: 'Query parameters are invalid.' })
+  findLibraryItems(@Query() query: AssetListQueryDto): Promise<AssetListResponseDto> {
+    return this.assets.findLibraryItems(query);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /assets/:id — Get library asset
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.ASSET_READ)
+  @Get(':id')
+  @ApiOperation({ summary: 'Get an asset and its lesson usage' })
+  @ApiOkResponse({
+    description: 'Asset file state and where-used lessons.',
+    type: AssetLibraryDetailDto,
+  })
+  @ApiNotFoundResponse({ description: 'Asset not found.' })
+  findLibraryAsset(
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+  ): Promise<AssetLibraryDetailDto> {
+    return this.assets.findLibraryAsset(id);
+  }
 
   // ─────────────────────────────────────────
   // POST /assets — Create an asset and upload file
