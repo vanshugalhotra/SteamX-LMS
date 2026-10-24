@@ -8,8 +8,8 @@ import {
 import { PinoLogger } from 'nestjs-pino';
 import {
   isForeignKeyViolation,
-  isPrismaKnownError,
   throwConflictOnDuplicate,
+  throwNotFoundOnMissing,
 } from '../common/errors/prisma-error.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { paginate } from '../common/pagination/paginate.js';
@@ -31,7 +31,9 @@ export class ClassSectionsService {
     private readonly sections: ClassSectionsRepository,
     private readonly activeSchool: ActiveSchoolService,
     private readonly logger: PinoLogger,
-  ) {}
+  ) {
+    this.logger.setContext(ClassSectionsService.name);
+  }
 
   // ─────────────────────────────────────────
   // POST /class-sections — Create a class section
@@ -49,9 +51,7 @@ export class ClassSectionsService {
       );
       return toClassSectionResponse(section);
     } catch (error) {
-      throwConflictOnDuplicate(error, {
-        ...API_ERROR.CLASS_SECTION_EXISTS,
-      });
+      throwConflictOnDuplicate(error, API_ERROR.CLASS_SECTION_EXISTS);
       throw error;
     }
   }
@@ -123,9 +123,7 @@ export class ClassSectionsService {
       );
       return toClassSectionResponse(section);
     } catch (error) {
-      throwConflictOnDuplicate(error, {
-        ...API_ERROR.CLASS_SECTION_EXISTS,
-      });
+      throwConflictOnDuplicate(error, API_ERROR.CLASS_SECTION_EXISTS);
       throw error;
     }
   }
@@ -147,9 +145,7 @@ export class ClassSectionsService {
       if (isForeignKeyViolation(error)) {
         throw new ConflictException(API_ERROR.RESOURCE_IN_USE);
       }
-      if (isPrismaKnownError(error) && error.code === 'P2025') {
-        throw new NotFoundException(API_ERROR.NOT_FOUND);
-      }
+      throwNotFoundOnMissing(error);
       throw error;
     }
   }

@@ -87,7 +87,7 @@ function createService(options: { section?: ClassSection | null } = {}) {
   const activeSchool = {
     resolveSchool: vi.fn().mockResolvedValue({ id: 'school-1', code: 'GVS' }),
   };
-  const logger = { info: vi.fn() };
+  const logger = { setContext: vi.fn(), info: vi.fn() };
 
   return {
     service: new ClassSectionsService(

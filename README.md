@@ -1,7 +1,6 @@
 # SteamX LMS
 
-SteamX LMS is a multi-school learning management system with a browser frontend and a REST API.
-The backend currently implements authentication, user, school, and class-section workflows.
+STEAMX is a company-owned curriculum platform with school-specific access, teacher-controlled course delivery, and student-specific learning records.
 
 ## Stack
 
