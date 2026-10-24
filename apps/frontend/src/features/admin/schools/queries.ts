@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   keepPreviousData,
   queryOptions,
@@ -60,4 +61,16 @@ export function useUpdateSchoolStatus() {
       updateSchoolStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: schoolKeys.all }),
   });
+}
+
+/** id -> name for all schools (the backend caps `limit` at 100). */
+// TODO: replace with a lookup endpoint or an expanded `school` field in the users list.
+export function useSchoolNames() {
+  const { data } = useSchools({ page: 1, limit: 100, q: '', status: 'ALL' });
+  return useMemo(() => new Map((data?.items ?? []).map((s) => [s.id, s.name])), [data]);
+}
+
+export function useSchoolOptions() {
+  const { data } = useSchools({ page: 1, limit: 100, q: '', status: 'ACTIVE' });
+  return useMemo(() => (data?.items ?? []).map((s) => ({ value: s.id, label: s.name })), [data]);
 }
