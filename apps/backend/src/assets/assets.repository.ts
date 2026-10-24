@@ -95,6 +95,16 @@ export type ReplaceAssetFileResult =
   | { status: 'in_progress' }
   | { status: 'created'; asset: Asset; file: AssetFile; removedCount: number };
 
+export type UpdateAssetStatusResult = {
+  asset: Asset;
+  oldStatus: ContentStatus;
+  changed: boolean;
+};
+
+export type DeleteAssetResult = Pick<Asset, 'id' | 'title' | 'type'> & {
+  removedFileCount: number;
+};
+
 @Injectable()
 export class AssetsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -141,6 +151,61 @@ export class AssetsRepository {
 
   findAssetTypeById(id: string): Promise<Pick<Asset, 'id' | 'type'> | null> {
     return this.prisma.asset.findUnique({ where: { id }, select: { id: true, type: true } });
+  }
+
+  async updateTitle(id: string, title: string): Promise<Asset | null> {
+    const updated = await this.prisma.asset.updateMany({ where: { id }, data: { title } });
+    return updated.count === 0 ? null : this.prisma.asset.findUnique({ where: { id } });
+  }
+
+  updateStatus(id: string, status: ContentStatus): Promise<UpdateAssetStatusResult | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const lockedAssets = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "assets" WHERE "id" = ${id}::uuid FOR UPDATE
+      `;
+      if (lockedAssets.length === 0) {
+        return null;
+      }
+
+      const current = await tx.asset.findUniqueOrThrow({ where: { id } });
+      if (current.status === status) {
+        return { asset: current, oldStatus: current.status, changed: false };
+      }
+
+      const asset = await tx.asset.update({ where: { id }, data: { status } });
+      return { asset, oldStatus: current.status, changed: true };
+    });
+  }
+
+  /** Removes an asset and all its file rows under the lock shared with replacement and makeReady. */
+  deleteAsset(id: string): Promise<DeleteAssetResult | null | 'in_progress'> {
+    return this.prisma.$transaction(async (tx) => {
+      const lockedAssets = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "assets" WHERE "id" = ${id}::uuid FOR UPDATE
+      `;
+      if (lockedAssets.length === 0) {
+        return null;
+      }
+
+      // UPLOADED and PROCESSING are in-flight work of complete, matching replacement's rule.
+      const inFlightCount = await tx.assetFile.count({
+        where: {
+          assetId: id,
+          status: { in: [AssetFileStatus.UPLOADED, AssetFileStatus.PROCESSING] },
+        },
+      });
+      if (inFlightCount > 0) {
+        return 'in_progress';
+      }
+
+      const asset = await tx.asset.findUniqueOrThrow({
+        where: { id },
+        select: { id: true, title: true, type: true },
+      });
+      const removed = await tx.assetFile.deleteMany({ where: { assetId: id } });
+      await tx.asset.delete({ where: { id } });
+      return { ...asset, removedFileCount: removed.count };
+    });
   }
 
   /** Creates the stable asset identity and its first upload attempt atomically. */

@@ -159,6 +159,36 @@ describe('Assets endpoints (e2e)', () => {
     return call.send(body);
   }
 
+  function patchAsset(cookie: string | undefined, assetId: string, body: object) {
+    const call = request(app.getHttpServer())
+      .patch(`/api/v1/assets/${assetId}`)
+      .set('Origin', origin);
+    if (cookie) {
+      call.set('Cookie', cookie);
+    }
+    return call.send(body);
+  }
+
+  function patchAssetStatus(cookie: string | undefined, assetId: string, body: object) {
+    const call = request(app.getHttpServer())
+      .patch(`/api/v1/assets/${assetId}/status`)
+      .set('Origin', origin);
+    if (cookie) {
+      call.set('Cookie', cookie);
+    }
+    return call.send(body);
+  }
+
+  function deleteAsset(cookie: string | undefined, assetId: string) {
+    const call = request(app.getHttpServer())
+      .delete(`/api/v1/assets/${assetId}`)
+      .set('Origin', origin);
+    if (cookie) {
+      call.set('Cookie', cookie);
+    }
+    return call;
+  }
+
   function getAssetFile(cookie: string, assetId: string, fileId: string) {
     return request(app.getHttpServer())
       .get(`/api/v1/assets/${assetId}/files/${fileId}`)
@@ -1597,5 +1627,229 @@ describe('Assets endpoints (e2e)', () => {
         where: { assetId, status: AssetFileStatus.READY },
       }),
     ).resolves.toHaveLength(1);
+  });
+
+  it('renames assets with trimmed titles, including archived assets, and validates inputs', async () => {
+    const assetId = await createDatabaseAsset(AssetType.IMAGE, {
+      status: ContentStatus.ARCHIVED,
+      title: 'Original title',
+    });
+    await createDatabaseFile(assetId, AssetFileStatus.READY);
+
+    const renamed = await patchAsset(adminCookie, assetId, { title: '  New title  ' }).expect(200);
+    expect(renamed.body).toMatchObject({ id: assetId, title: 'New title', status: 'ARCHIVED' });
+    await expect(getAsset(adminCookie, assetId).then(({ body }) => body.title)).resolves.toBe(
+      'New title',
+    );
+    const archivedLibrary = await getAssets(adminCookie, { status: 'ARCHIVED' }).expect(200);
+    expect(
+      archivedLibrary.body.items.find((item: { id: string }) => item.id === assetId)?.title,
+    ).toBe('New title');
+
+    for (const title of ['', '   ', 't'.repeat(201)]) {
+      await patchAsset(adminCookie, assetId, { title }).expect(400);
+    }
+    await patchAsset(adminCookie, assetId, { title: 'Valid', extra: true }).expect(400);
+    await patchAsset(adminCookie, randomUUID(), { title: 'Valid' }).expect(404);
+    await patchAsset(adminCookie, 'invalid-id', { title: 'Valid' }).expect(404);
+  });
+
+  it('archives and restores assets without changing updatedAt for a repeated status', async () => {
+    const assetId = await createDatabaseAsset();
+    await createDatabaseFile(assetId, AssetFileStatus.READY);
+
+    const archived = await patchAssetStatus(adminCookie, assetId, { status: 'ARCHIVED' }).expect(
+      200,
+    );
+    expect(archived.body).toMatchObject({ id: assetId, status: 'ARCHIVED' });
+    const afterArchive = await prisma.asset.findUniqueOrThrow({ where: { id: assetId } });
+    await getAssets(adminCookie)
+      .expect(200)
+      .then((response) => {
+        expect(response.body.items.some((item: { id: string }) => item.id === assetId)).toBe(false);
+      });
+    const archivedItems = await getAssets(adminCookie, { status: 'ARCHIVED' }).expect(200);
+    expect(archivedItems.body.items.some((item: { id: string }) => item.id === assetId)).toBe(true);
+    await getAsset(adminCookie, assetId).expect(200);
+    await getAssetAccess(adminCookie, assetId).expect(200);
+
+    const repeated = await patchAssetStatus(adminCookie, assetId, { status: 'ARCHIVED' }).expect(
+      200,
+    );
+    expect(repeated.body.updatedAt).toBe(archived.body.updatedAt);
+    await expect(prisma.asset.findUniqueOrThrow({ where: { id: assetId } })).resolves.toMatchObject(
+      {
+        updatedAt: afterArchive.updatedAt,
+      },
+    );
+
+    await patchAssetStatus(adminCookie, assetId, { status: 'ACTIVE' }).expect(200);
+    const activeItems = await getAssets(adminCookie).expect(200);
+    expect(activeItems.body.items.some((item: { id: string }) => item.id === assetId)).toBe(true);
+    await patchAssetStatus(adminCookie, assetId, { status: 'DRAFT' }).expect(400);
+    await patchAssetStatus(adminCookie, assetId, { status: 'junk' }).expect(400);
+    await patchAssetStatus(adminCookie, assetId, { status: 'ACTIVE', extra: true }).expect(400);
+    await patchAssetStatus(adminCookie, randomUUID(), { status: 'ARCHIVED' }).expect(404);
+    await patchAssetStatus(adminCookie, 'invalid-id', { status: 'ARCHIVED' }).expect(404);
+  });
+
+  it('deletes eligible files and the asset atomically, queuing each file prefix', async () => {
+    const assetId = await createDatabaseAsset();
+    const fileStatuses = [AssetFileStatus.READY, AssetFileStatus.UPLOADING, AssetFileStatus.FAILED];
+    const files = [];
+    for (const status of fileStatuses) {
+      files.push(await createDatabaseFile(assetId, status));
+    }
+
+    await deleteAsset(adminCookie, assetId).expect(204);
+    await expect(prisma.asset.findUnique({ where: { id: assetId } })).resolves.toBeNull();
+    await expect(prisma.assetFile.findMany({ where: { assetId } })).resolves.toEqual([]);
+    const cleanup = await prisma.$queryRaw<Array<{ object_key: string; is_prefix: boolean }>>`
+      SELECT "object_key", "is_prefix"
+      FROM "storage_cleanup_queue"
+      WHERE "object_key" LIKE ${`assets/${assetId}/%`}
+      ORDER BY "object_key" ASC
+    `;
+    expect(cleanup).toEqual(
+      files
+        .map(({ id }) => ({
+          object_key: `assets/${assetId}/${id}/`,
+          is_prefix: true,
+        }))
+        .sort((a, b) => a.object_key.localeCompare(b.object_key)),
+    );
+
+    const emptyAssetId = await createDatabaseAsset();
+    await deleteAsset(adminCookie, emptyAssetId).expect(204);
+    const archivedAssetId = await createDatabaseAsset(AssetType.IMAGE, {
+      status: ContentStatus.ARCHIVED,
+    });
+    await deleteAsset(adminCookie, archivedAssetId).expect(204);
+
+    await deleteAsset(adminCookie, assetId).expect(404);
+    await getAsset(adminCookie, assetId).expect(404);
+    await getAssetAccess(adminCookie, assetId).expect(404);
+    const library = await getAssets(adminCookie).expect(200);
+    expect(library.body.items.some((item: { id: string }) => item.id === assetId)).toBe(false);
+    await deleteAsset(adminCookie, randomUUID()).expect(404);
+    await deleteAsset(adminCookie, 'invalid-id').expect(404);
+  });
+
+  it('rolls back file deletion and cleanup when top-level or child blocks reference an asset', async () => {
+    const course = await createDatabaseCourse(`Delete guard ${randomUUID()}`);
+    const module = await createDatabaseModule(course.id, 'Delete guard module');
+    const lesson = await createDatabaseLesson(course.id, module.id, 'Delete guard lesson');
+    const assetIds: string[] = [];
+
+    for (const nested of [false, true]) {
+      const assetId = await createDatabaseAsset();
+      assetIds.push(assetId);
+      const file = await createDatabaseFile(assetId, AssetFileStatus.READY);
+      let parentBlockId: string | undefined;
+      if (nested) {
+        const parent = await prisma.lessonBlock.create({
+          data: {
+            lessonId: lesson.id,
+            type: BlockType.TWO_COLUMN,
+            content: {},
+            position: 1,
+          },
+        });
+        parentBlockId = parent.id;
+      }
+      const block = await prisma.lessonBlock.create({
+        data: {
+          lessonId: lesson.id,
+          type: BlockType.IMAGE,
+          content: {},
+          assetId,
+          ...(parentBlockId === undefined ? { position: 2 } : { parentBlockId, columnIndex: 0 }),
+        },
+      });
+      const beforeQueue = await prisma.storageCleanupQueue.findMany({
+        where: { objectKey: { startsWith: `assets/${assetId}/` } },
+      });
+
+      const response = await deleteAsset(adminCookie, assetId).expect(409);
+      expect(response.body).toMatchObject({
+        code: 'RESOURCE_IN_USE',
+        message: 'asset is used in lessons; remove it from them first',
+      });
+      await expect(prisma.assetFile.findUnique({ where: { id: file.id } })).resolves.not.toBeNull();
+      await expect(
+        prisma.storageCleanupQueue.findMany({
+          where: { objectKey: { startsWith: `assets/${assetId}/` } },
+        }),
+      ).resolves.toEqual(beforeQueue);
+      await prisma.lessonBlock.delete({ where: { id: block.id } });
+      if (parentBlockId) {
+        await prisma.lessonBlock.delete({ where: { id: parentBlockId } });
+      }
+      await deleteAsset(adminCookie, assetId).expect(204);
+    }
+    expect(assetIds).toHaveLength(2);
+  });
+
+  it.each([AssetFileStatus.UPLOADED, AssetFileStatus.PROCESSING])(
+    'blocks deletion while a file is %s without changing rows or cleanup queue',
+    async (status) => {
+      const assetId = await createDatabaseAsset();
+      const file = await createDatabaseFile(assetId, status);
+      const beforeQueue = await prisma.storageCleanupQueue.findMany({
+        where: { objectKey: { startsWith: `assets/${assetId}/` } },
+      });
+
+      const response = await deleteAsset(adminCookie, assetId).expect(409);
+      expect(response.body.code).toBe('REPLACEMENT_IN_PROGRESS');
+      await expect(prisma.asset.findUnique({ where: { id: assetId } })).resolves.not.toBeNull();
+      await expect(prisma.assetFile.findUnique({ where: { id: file.id } })).resolves.not.toBeNull();
+      await expect(
+        prisma.storageCleanupQueue.findMany({
+          where: { objectKey: { startsWith: `assets/${assetId}/` } },
+        }),
+      ).resolves.toEqual(beforeQueue);
+    },
+  );
+
+  it('serializes delete against starting a replacement without leaving partial state', async () => {
+    const assetId = await createDatabaseAsset();
+    await createDatabaseFile(assetId, AssetFileStatus.UPLOADING);
+    const replacementBody = {
+      filename: 'replacement.png',
+      mimeType: 'image/png',
+      sizeBytes: 16,
+    };
+
+    const [deleted, replacement] = await Promise.all([
+      deleteAsset(adminCookie, assetId),
+      postAssetFile(adminCookie, assetId, replacementBody),
+    ]);
+    expect([204, 404]).toContain(deleted.status);
+    expect([201, 404]).toContain(replacement.status);
+    expect(deleted.status).not.toBeGreaterThanOrEqual(500);
+    expect(replacement.status).not.toBeGreaterThanOrEqual(500);
+    const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+    const files = await prisma.assetFile.findMany({ where: { assetId } });
+    if (!asset) {
+      expect(files).toEqual([]);
+    } else {
+      expect(files).toHaveLength(1);
+      expect(files[0]?.status).toBe(AssetFileStatus.UPLOADING);
+    }
+  });
+
+  it('requires asset.write for rename, status changes, and deletion', async () => {
+    const assetId = await createDatabaseAsset();
+    const actions = [
+      (cookie: string | undefined) => patchAsset(cookie, assetId, { title: 'Updated' }),
+      (cookie: string | undefined) => patchAssetStatus(cookie, assetId, { status: 'ARCHIVED' }),
+      (cookie: string | undefined) => deleteAsset(cookie, assetId),
+    ];
+    for (const action of actions) {
+      await action(undefined).expect(401);
+      await action(teacherCookie).expect(403);
+      await action(studentCookie).expect(403);
+      await action(schoolStaffCookie).expect(403);
+    }
   });
 });

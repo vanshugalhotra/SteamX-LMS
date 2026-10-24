@@ -33,6 +33,10 @@ Each entry records the current design choice and why.
 - **Outline read model** — `GET /courses/:id/outline` reads across course/module/lesson in one query. Writes stay in their feature folders. Admin-only and unfiltered; teacher/student outlines need separate filtered endpoints.
 - **No content version history** — replacements aren't archived versions. Add when revision browsing becomes a requirement.
 - **Asset library list visibility** — `GET /assets` hides assets without a READY file and defaults to ACTIVE status; ARCHIVED assets are opt-in.
+- **Archived asset library behavior** — archived assets disappear from the default library, remain usable where already referenced, and stay previewable; the block service will refuse to attach archived assets.
+- **Asset deletion is FK-guarded and atomic** — delete only when unused; file rows are deleted before the asset in one transaction so a blocked delete rolls back all rows and cleanup entries.
+- **Asset deletion respects in-flight uploads** — UPLOADED and PROCESSING files block deletion under the same rule as replacement.
+- **Asset storage deletion is asynchronous** — deleting file rows queues their storage prefixes; objects are removed later through the cleanup worker.
 - **Asset detail current file** — prefer the READY file; if none exists, use the newest file by `created_at`, breaking ties by ID; return null when no file rows exist.
 - **Asset where-used read model** — usage is distinct lessons read across lessons/modules/courses/blocks, ordered by course/module/lesson and capped at 50 items with the real total; repeated block references count a lesson once.
 

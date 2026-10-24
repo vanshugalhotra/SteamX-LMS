@@ -44,6 +44,9 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 8. If replacing an existing file, do not delete the serving READY file until the new file has processed. `makeReady` performs the swap under an asset-row lock; the database queues the old file prefix for cleanup.
 9. Call `GET /api/v1/assets/:id/access` to preview the READY file. Expect a short-lived URL and `Cache-Control: no-store`; use it inline for the image, PDF, or video. Request a fresh URL if a fetch returns `403`, since viewers may continue making byte-range requests until the configured TTL expires.
 10. For a minimal browser-based access check using an existing READY asset, run `pnpm --dir apps/backend asset:access:smoke --port 5174`, open `http://localhost:5174`, and enter the admin credentials and asset ID. Confirm the `206` byte-range result and media preview; the page does not print the signed URL.
+11. Rename the asset with `PATCH /api/v1/assets/:id`, including surrounding title whitespace, and verify the trimmed title in its detail and library responses.
+12. Archive it with `PATCH /api/v1/assets/:id/status`; verify it disappears from the default library but remains inspectable and previewable. Unarchive it and verify it returns to the default library.
+13. Reference the asset from a lesson block, then call `DELETE /api/v1/assets/:id`; expect `409 RESOURCE_IN_USE` and verify its file rows remain. Remove the block, retry deletion, and expect `204`. Storage objects are deleted later by the cleanup worker.
 
 ## First admin login and password change
 

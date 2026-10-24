@@ -16,6 +16,7 @@ import { paginate } from '../common/pagination/paginate.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import type { Env } from '../config/env.schema.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
+import { isForeignKeyViolation } from '../common/errors/prisma-error.js';
 import { StorageService } from '../storage/storage.service.js';
 import {
   AssetRuleError,
@@ -30,11 +31,14 @@ import {
 import type { SupportedAssetType } from './asset-rules.js';
 import type { CreateAssetDto } from './dto/create-asset.dto.js';
 import type { CreateAssetFileDto } from './dto/create-asset-file.dto.js';
+import type { UpdateAssetDto } from './dto/update-asset.dto.js';
 import type { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import type { AssetListQueryDto } from './dto/asset-list-query.dto.js';
 import type { AssetLibraryDetailDto, AssetListItemDto } from './dto/asset-library-response.dto.js';
+import type { UpdateAssetStatusDto } from './dto/update-asset-status.dto.js';
 import {
   toAssetFileDto,
+  toAssetDto,
   toAssetLibraryDetailDto,
   toAssetListItemDto,
   toCreateAssetResponse,
@@ -95,6 +99,83 @@ export class AssetsService {
         courseTitle: lesson.module.course.title,
       })),
     });
+  }
+
+  // ─────────────────────────────────────────
+  // PATCH /assets/:id — Rename an asset
+  // ─────────────────────────────────────────
+
+  async update(actor: AuthContext, assetId: string, body: UpdateAssetDto) {
+    const id = this.normalizeAssetId(assetId);
+    const asset = await this.assets.updateTitle(id, body.title);
+    if (!asset) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    this.logger.info(
+      { actorId: actor.userId, assetId: asset.id, title: asset.title, type: asset.type },
+      'Asset renamed',
+    );
+    return toAssetDto(asset);
+  }
+
+  // ─────────────────────────────────────────
+  // PATCH /assets/:id/status — Archive or unarchive an asset
+  // ─────────────────────────────────────────
+
+  async updateStatus(actor: AuthContext, assetId: string, body: UpdateAssetStatusDto) {
+    const id = this.normalizeAssetId(assetId);
+    const result = await this.assets.updateStatus(id, body.status);
+    if (!result) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    if (result.changed) {
+      this.logger.info(
+        {
+          actorId: actor.userId,
+          assetId: result.asset.id,
+          oldStatus: result.oldStatus,
+          newStatus: result.asset.status,
+        },
+        'Asset status changed',
+      );
+    }
+    // TODO(blocks): the block service must reject archived assets when attaching
+    return toAssetDto(result.asset);
+  }
+
+  // ─────────────────────────────────────────
+  // DELETE /assets/:id — Delete an unused asset
+  // ─────────────────────────────────────────
+
+  async delete(actor: AuthContext, assetId: string): Promise<void> {
+    const id = this.normalizeAssetId(assetId);
+    try {
+      const result = await this.assets.deleteAsset(id);
+      if (result === null) {
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
+      }
+      if (result === 'in_progress') {
+        throw new ConflictException(API_ERROR.REPLACEMENT_IN_PROGRESS);
+      }
+      this.logger.info(
+        {
+          actorId: actor.userId,
+          assetId: result.id,
+          title: result.title,
+          type: result.type,
+          removedFileCount: result.removedFileCount,
+        },
+        'Asset deleted',
+      );
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictException({
+          ...API_ERROR.RESOURCE_IN_USE,
+          message: 'asset is used in lessons; remove it from them first',
+        });
+      }
+      throw error;
+    }
   }
 
   // ─────────────────────────────────────────
@@ -363,5 +444,13 @@ export class AssetsService {
   /** Normalizes accepted UUID casing; malformed IDs deliberately share the 404 response. */
   private normalizeUuid(value: string): string | null {
     return UUID_SCHEMA.safeParse(value).success ? value.toLowerCase() : null;
+  }
+
+  private normalizeAssetId(value: string): string {
+    const id = this.normalizeUuid(value);
+    if (!id) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    return id;
   }
 }
