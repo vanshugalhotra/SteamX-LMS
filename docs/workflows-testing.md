@@ -42,6 +42,7 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 6. Call complete before uploading on a fresh file; expect retryable `409 UPLOAD_NOT_COMPLETE` and `UPLOADING`. Upload, retry complete, and expect `READY`.
 7. To check verification failures, upload (a) a text payload declared as an allowed image/PDF MIME, (b) bytes with a mismatched content type, and (c) a body whose actual size differs if the storage signer permits it. Completion returns `200 FAILED` with a stable `lastError` (`CONTENT_NOT_RECOGNIZED`, `TYPE_MISMATCH`, or `SIZE_MISMATCH`). Repeating completion leaves FAILED unchanged.
 8. If replacing an existing file, do not delete the serving READY file until the new file has processed. `makeReady` performs the swap under an asset-row lock; the database queues the old file prefix for cleanup.
+9. Call `GET /api/v1/assets/:id/access` to preview the READY file. Expect a short-lived URL and `Cache-Control: no-store`; use it inline for the image, PDF, or video. Request a fresh URL if a fetch returns `403`, since viewers may continue making byte-range requests until the configured TTL expires.
 
 ## First admin login and password change
 

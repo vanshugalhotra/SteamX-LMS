@@ -18,6 +18,10 @@ export const API_ERROR = {
     code: 'CONFLICT',
     message: 'Operation conflicts with related data',
   },
+  ASSET_NOT_READY: {
+    code: 'ASSET_NOT_READY',
+    message: 'Asset does not have a READY file',
+  },
   RESOURCE_IN_USE: {
     code: 'RESOURCE_IN_USE',
     message: 'Resource has dependent records and cannot be deleted',

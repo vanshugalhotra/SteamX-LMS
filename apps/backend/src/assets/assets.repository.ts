@@ -48,8 +48,27 @@ const ASSET_DETAIL_SELECT = {
   },
 } satisfies Prisma.AssetSelect;
 
+const ASSET_ACCESS_SELECT = {
+  id: true,
+  type: true,
+  files: {
+    where: { status: AssetFileStatus.READY },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 1,
+    select: {
+      id: true,
+      assetId: true,
+      storageKey: true,
+      playbackKey: true,
+      originalFilename: true,
+      mimeType: true,
+    },
+  },
+} satisfies Prisma.AssetSelect;
+
 export type AssetLibraryRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_LIBRARY_SELECT }>;
 export type AssetDetailRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_DETAIL_SELECT }>;
+export type AssetAccessRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_ACCESS_SELECT }>;
 
 export type AssetFileForCompletion = Prisma.AssetFileGetPayload<{
   include: { asset: { select: { type: true } } };
@@ -109,6 +128,10 @@ export class AssetsRepository {
 
   findLibraryAssetById(id: string): Promise<AssetDetailRecord | null> {
     return this.prisma.asset.findUnique({ where: { id }, select: ASSET_DETAIL_SELECT });
+  }
+
+  findAssetForAccess(id: string): Promise<AssetAccessRecord | null> {
+    return this.prisma.asset.findUnique({ where: { id }, select: ASSET_ACCESS_SELECT });
   }
 
   /** Creates the stable asset identity and its first upload attempt atomically. */

@@ -49,6 +49,19 @@ Stack outputs `BucketName`, `Region`, and `BackendUserName`. For local/staging b
 
 > Before destroying staging: delete any manually created access key for the backend IAM user (CloudFormation can't delete users with active keys).
 
+### Asset access URL TTLs
+
+Set these optional backend environment variables in `apps/backend/.env` to override the defaults.
+Values must be positive integers no greater than 43,200 seconds. S3 checks expiry on every request;
+players and PDF viewers make repeated range requests, so TTLs must cover normal viewing. Clients
+should request a new URL when a fetch returns `403`.
+
+| Variable                         | Default |
+| -------------------------------- | ------: |
+| `ASSET_ACCESS_TTL_IMAGE_SECONDS` |     600 |
+| `ASSET_ACCESS_TTL_PDF_SECONDS`   |    1800 |
+| `ASSET_ACCESS_TTL_VIDEO_SECONDS` |    7200 |
+
 ## Browser storage smoke test
 
 Uploads to the real bucket from a local browser and checks metadata, signed URLs, downloads, range requests, and unsigned access.

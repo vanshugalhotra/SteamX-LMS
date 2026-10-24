@@ -39,6 +39,11 @@ describe('validateEnv', () => {
         pdf: 50 * 1024 * 1024,
         video: 1024 * 1024 * 1024,
       },
+      assetAccess: {
+        imageTtlSeconds: 600,
+        pdfTtlSeconds: 1800,
+        videoTtlSeconds: 7200,
+      },
     });
   });
 
@@ -208,5 +213,46 @@ describe('validateEnv', () => {
         }),
       ).toThrow('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must both be set or both be omitted');
     }
+  });
+
+  it.each([
+    ['ASSET_ACCESS_TTL_IMAGE_SECONDS', '0'],
+    ['ASSET_ACCESS_TTL_IMAGE_SECONDS', '-1'],
+    ['ASSET_ACCESS_TTL_IMAGE_SECONDS', '1.5'],
+    ['ASSET_ACCESS_TTL_IMAGE_SECONDS', '43201'],
+    ['ASSET_ACCESS_TTL_PDF_SECONDS', '0'],
+    ['ASSET_ACCESS_TTL_PDF_SECONDS', '-1'],
+    ['ASSET_ACCESS_TTL_PDF_SECONDS', '1.5'],
+    ['ASSET_ACCESS_TTL_PDF_SECONDS', '43201'],
+    ['ASSET_ACCESS_TTL_VIDEO_SECONDS', '0'],
+    ['ASSET_ACCESS_TTL_VIDEO_SECONDS', '-1'],
+    ['ASSET_ACCESS_TTL_VIDEO_SECONDS', '1.5'],
+    ['ASSET_ACCESS_TTL_VIDEO_SECONDS', '43201'],
+  ])('rejects invalid %s value %s', (variable, value) => {
+    expect(() =>
+      validateEnv({
+        ...STORAGE_CONFIG,
+        AUTH_JWT_SECRET: VALID_SECRET,
+        DATABASE_URL: 'postgresql://localhost/steamx_test',
+        [variable]: value,
+      }),
+    ).toThrow(`- ${variable}:`);
+  });
+
+  it('accepts the maximum asset access URL TTL', () => {
+    const env = validateEnv({
+      ...STORAGE_CONFIG,
+      AUTH_JWT_SECRET: VALID_SECRET,
+      DATABASE_URL: 'postgresql://localhost/steamx_test',
+      ASSET_ACCESS_TTL_IMAGE_SECONDS: '43200',
+      ASSET_ACCESS_TTL_PDF_SECONDS: '43200',
+      ASSET_ACCESS_TTL_VIDEO_SECONDS: '43200',
+    });
+
+    expect(env.assetAccess).toEqual({
+      imageTtlSeconds: 43_200,
+      pdfTtlSeconds: 43_200,
+      videoTtlSeconds: 43_200,
+    });
   });
 });
