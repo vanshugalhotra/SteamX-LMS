@@ -54,3 +54,10 @@ Each entry records the current design choice and why.
 - **Presigned PUT URLs** — sign `content-type`, `content-length`, and `if-none-match` via `signableHeaders`. `If-None-Match: *` prevents overwrites. `content-length` signing prevents size mismatches (verified in Chrome and Firefox).
 - **S3 checksum config** — `requestChecksumCalculation` and `responseChecksumValidation` set to `WHEN_REQUIRED` (SDK defaults break presigned browser uploads).
 - **No user filenames in keys** — stored in DB only. `deleteByPrefix` requires a UUID second segment. Presigned URLs are never logged.
+- **Two-method asset access seam** — author lookup and authorization stay in `issueForAuthor`; signing is centralized in `issueForFile`. Future student callers must complete lesson, delivery, and subscription checks before calling `issueForFile`.
+- **Asset access key selection** — sign `playbackKey ?? storageKey`. MP4 uses the same key today; HLS can point `playbackKey` at its manifest without changing the signing method.
+- **Asset access URL TTLs** — image defaults to 600 seconds, PDF to 1800, and video to 7200 (maximum 43,200). S3 checks expiry on every request, and viewers/players continue byte-range requests during normal viewing.
+- **No-store access responses** — `GET /assets/:id/access` sends `Cache-Control: no-store`; clients request another URL after a fetch returns 403.
+- **Archived assets remain previewable** — author access requires a READY file, not ACTIVE content status.
+- **Signed asset URLs are never logged** — structured access logs contain only asset, file, and user IDs.
+- **Consider checking object existence before signing** — a HEAD request adds S3 latency to each URL issuance and cannot prevent a later deletion; defer unless missing-object reports justify the cost.

@@ -69,6 +69,7 @@ describe('Assets endpoints (e2e)', () => {
   let studentCookie: string;
   let schoolStaffCookie: string;
   let limits: Env['assetLimits'];
+  let accessTtls: Env['assetAccess'];
   const createdAssetIds: string[] = [];
   const createdCourseIds: string[] = [];
   const createdModuleIds: string[] = [];
@@ -88,6 +89,7 @@ describe('Assets endpoints (e2e)', () => {
     const config = app.get<ConfigService<Env, true>>(ConfigService);
     origin = config.get('CORS_ORIGINS', { infer: true })[0] ?? '';
     limits = config.get('assetLimits', { infer: true });
+    accessTtls = config.get('assetAccess', { infer: true });
     if (!origin) {
       throw new Error('Assets e2e tests require a configured CORS_ORIGINS entry.');
     }
@@ -169,6 +171,14 @@ describe('Assets endpoints (e2e)', () => {
     return call;
   }
 
+  function getAssetAccess(cookie: string | undefined, assetId: string) {
+    const call = request(app.getHttpServer()).get(`/api/v1/assets/${assetId}/access`);
+    if (cookie) {
+      call.set('Cookie', cookie);
+    }
+    return call;
+  }
+
   function completeAssetFile(cookie: string | undefined, assetId: string, fileId: string) {
     const call = request(app.getHttpServer())
       .post(`/api/v1/assets/${assetId}/files/${fileId}/complete`)
@@ -201,16 +211,22 @@ describe('Assets endpoints (e2e)', () => {
     assetId: string,
     status: AssetFileStatus,
     mimeType = 'image/png',
-    options: { createdAt?: Date; lastError?: string } = {},
+    options: {
+      createdAt?: Date;
+      lastError?: string;
+      originalFilename?: string;
+      fileId?: string;
+      playbackKey?: string | null;
+    } = {},
   ) {
-    const fileId = randomUUID().toLowerCase();
+    const fileId = options.fileId ?? randomUUID().toLowerCase();
     const storageKey = buildOriginalKey(assetId, fileId);
     await prisma.assetFile.create({
       data: {
         id: fileId,
         assetId,
         storageKey,
-        originalFilename: 'direct-test.png',
+        originalFilename: options.originalFilename ?? 'direct-test.png',
         mimeType,
         sizeBytes: 16n,
         createdAt: options.createdAt,
@@ -236,9 +252,14 @@ describe('Assets endpoints (e2e)', () => {
       data: { status: nextStatus, lastError: options.lastError },
     });
     if (status === AssetFileStatus.READY) {
+      const playbackKey =
+        options.playbackKey ?? (mimeType === 'video/mp4' ? storageKey : undefined);
       const ready = await prisma.assetFile.update({
         where: { id: progressed.id },
-        data: { status: AssetFileStatus.READY },
+        data: {
+          status: AssetFileStatus.READY,
+          ...(playbackKey !== undefined && { playbackKey }),
+        },
       });
       return { id: ready.id, storageKey };
     }
@@ -306,6 +327,113 @@ describe('Assets endpoints (e2e)', () => {
     createdAssetIds.push(response.body.asset.id);
     return response.body;
   }
+
+  it.each([
+    [AssetType.IMAGE, 'image/png', 'image.png', 'imageTtlSeconds'],
+    [AssetType.PDF, 'application/pdf', 'notes.pdf', 'pdfTtlSeconds'],
+    [AssetType.VIDEO, 'video/mp4', 'lesson.mp4', 'videoTtlSeconds'],
+  ] as const)(
+    'issues a no-store access URL for a READY %s asset',
+    async (type, mimeType, filename, ttlKey) => {
+      const assetId = await createDatabaseAsset(type);
+      await createDatabaseFile(assetId, AssetFileStatus.READY, mimeType, {
+        originalFilename: filename,
+      });
+      const before = Date.now();
+
+      const response = await getAssetAccess(adminCookie, assetId).expect(200);
+      const expiresAt = Date.parse(response.body.expiresAt);
+      const ttlSeconds = accessTtls[ttlKey];
+
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(Object.keys(response.body).sort()).toEqual(
+        ['url', 'expiresAt', 'type', 'mimeType'].sort(),
+      );
+      expect(response.body).toMatchObject({
+        url: expect.stringMatching(/^memory:\/\/download\/assets\//),
+        type,
+        mimeType,
+      });
+      expect(Number.isNaN(expiresAt)).toBe(false);
+      expect(expiresAt).toBeGreaterThanOrEqual(before + ttlSeconds * 1_000);
+      expect(expiresAt).toBeLessThanOrEqual(Date.now() + ttlSeconds * 1_000);
+    },
+  );
+
+  it('signs a video playbackKey when it differs from storageKey', async () => {
+    const assetId = await createDatabaseAsset(AssetType.VIDEO);
+    const fileId = randomUUID().toLowerCase();
+    const playbackKey = `assets/${assetId}/${fileId}/hls/index.m3u8`;
+    const file = await createDatabaseFile(assetId, AssetFileStatus.READY, 'video/mp4', {
+      fileId,
+      playbackKey,
+    });
+    const storage = getTestStorageService(app);
+    const requestCount = storage.downloadRequests.length;
+
+    await getAssetAccess(adminCookie, assetId).expect(200);
+
+    expect(storage.downloadRequests).toHaveLength(requestCount + 1);
+    expect(storage.downloadRequests.at(-1)?.key).toBe(playbackKey);
+    expect(storage.downloadRequests.at(-1)?.key).not.toBe(file.storageKey);
+  });
+
+  it('returns ASSET_NOT_READY when the asset has no files', async () => {
+    const assetId = await createDatabaseAsset();
+    const response = await getAssetAccess(adminCookie, assetId).expect(409);
+    expect(response.body.code).toBe('ASSET_NOT_READY');
+  });
+
+  it.each([
+    AssetFileStatus.FAILED,
+    AssetFileStatus.UPLOADING,
+    AssetFileStatus.UPLOADED,
+    AssetFileStatus.PROCESSING,
+  ])('returns ASSET_NOT_READY when the only file is %s', async (status) => {
+    const assetId = await createDatabaseAsset();
+    await createDatabaseFile(assetId, status);
+    const response = await getAssetAccess(adminCookie, assetId).expect(409);
+    expect(response.body.code).toBe('ASSET_NOT_READY');
+  });
+
+  it('serves the READY file while a newer replacement is UPLOADING', async () => {
+    const assetId = await createDatabaseAsset();
+    const readyFile = await createDatabaseFile(assetId, AssetFileStatus.READY);
+    await createDatabaseFile(assetId, AssetFileStatus.UPLOADING, 'image/png', {
+      createdAt: new Date(Date.now() + 1_000),
+    });
+    const storage = getTestStorageService(app);
+    const requestCount = storage.downloadRequests.length;
+
+    await getAssetAccess(adminCookie, assetId).expect(200);
+
+    expect(storage.downloadRequests).toHaveLength(requestCount + 1);
+    expect(storage.downloadRequests.at(-1)?.key).toBe(readyFile.storageKey);
+  });
+
+  it('allows access to READY files on archived assets', async () => {
+    const assetId = await createDatabaseAsset(AssetType.IMAGE, {
+      status: ContentStatus.ARCHIVED,
+    });
+    await createDatabaseFile(assetId, AssetFileStatus.READY);
+
+    await getAssetAccess(adminCookie, assetId).expect(200);
+  });
+
+  it('returns 404 for unknown and malformed asset IDs', async () => {
+    await getAssetAccess(adminCookie, randomUUID()).expect(404);
+    await getAssetAccess(adminCookie, 'not-a-uuid').expect(404);
+  });
+
+  it('requires authentication and asset.read permission for access URLs', async () => {
+    const assetId = await createDatabaseAsset();
+    await createDatabaseFile(assetId, AssetFileStatus.READY);
+
+    await getAssetAccess(undefined, assetId).expect(401);
+    await getAssetAccess(teacherCookie, assetId).expect(403);
+    await getAssetAccess(studentCookie, assetId).expect(403);
+    await getAssetAccess(schoolStaffCookie, assetId).expect(403);
+  });
 
   it.each([
     [AssetType.IMAGE, 'IMAGE.PNG', ' IMAGE/PNG '],

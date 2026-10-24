@@ -49,6 +49,19 @@ Stack outputs `BucketName`, `Region`, and `BackendUserName`. For local/staging b
 
 > Before destroying staging: delete any manually created access key for the backend IAM user (CloudFormation can't delete users with active keys).
 
+### Asset access URL TTLs
+
+Set these optional backend environment variables in `apps/backend/.env` to override the defaults.
+Values must be positive integers no greater than 43,200 seconds. S3 checks expiry on every request;
+players and PDF viewers make repeated range requests, so TTLs must cover normal viewing. Clients
+should request a new URL when a fetch returns `403`.
+
+| Variable                         | Default |
+| -------------------------------- | ------: |
+| `ASSET_ACCESS_TTL_IMAGE_SECONDS` |     600 |
+| `ASSET_ACCESS_TTL_PDF_SECONDS`   |    1800 |
+| `ASSET_ACCESS_TTL_VIDEO_SECONDS` |    7200 |
+
 ## Browser storage smoke test
 
 Uploads to the real bucket from a local browser and checks metadata, signed URLs, downloads, range requests, and unsigned access.
@@ -85,3 +98,16 @@ The local smoke server binds only to `127.0.0.1` and needs `DATABASE_URL` from
 for each created asset prefix. Replace `<bucket>` with the staging bucket and run those commands
 with the `steamx-backend` AWS profile. The smoke test does not remove database rows; use an isolated
 staging account/database for this manual test.
+
+## Asset access URL smoke test
+
+For a READY asset already in the database and S3, run:
+
+```powershell
+pnpm asset:access:smoke --port 5173
+```
+
+Open `http://localhost:5173`, enter the local backend URL, seeded admin credentials, and asset ID.
+The page checks login, the `GET /assets/:id/access` response fields and `Cache-Control: no-store`,
+checks a byte-range request returns `206`, then previews the image, PDF, or video without printing
+the signed URL.

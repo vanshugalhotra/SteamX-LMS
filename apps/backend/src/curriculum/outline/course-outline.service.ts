@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
-import { assertPlatformStaff } from '../assert-platform-staff.js';
+import { assertPlatformStaff } from '../../auth/assert-platform-staff.js';
 import type { CourseOutlineResponseDto } from './dto/course-outline-response.dto.js';
 import { toCourseOutlineResponse } from './course-outline.mapper.js';
 import { CourseOutlineRepository } from './course-outline.repository.js';

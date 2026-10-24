@@ -2,7 +2,8 @@
 
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
 health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; path UUIDs rejected by
-`ParseUUIDPipe` use the default `BAD_REQUEST` code. Error responses include a request ID.
+`ParseUUIDPipe` usually use `BAD_REQUEST`, while asset IDs deliberately return `404 NOT_FOUND`.
+Error responses include a request ID.
 
 ## Before testing
 
@@ -297,6 +298,21 @@ Caller: authenticated role with `asset.read`; returns any asset by ID and its cu
 - [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
 - [auto] File response contains lifecycle details and stable error code only; no storage, playback, upload, or processing-job keys/IDs.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+
+### `GET /assets/:id/access`
+
+Caller: authenticated platform staff with `asset.read`; the service also requires `PLATFORM_STAFF`
+identity even if another role is later granted the permission. Returns a short-lived inline URL for
+the asset's READY file.
+
+- [auto] When the READY file is IMAGE, PDF, or VIDEO -> expect `200` with only `url`, `expiresAt`, `type`, and `mimeType`; `Cache-Control` is `no-store`.
+- [auto] Expiry is approximately the configured type TTL from the current time (defaults: image 600 seconds, PDF 1800 seconds, video 7200 seconds; maximum 43,200 seconds).
+- [auto] When a VIDEO file has a `playbackKey` -> sign it; otherwise sign `storageKey`.
+- [auto] When no files exist or only FAILED, UPLOADING, UPLOADED, or PROCESSING files exist -> expect `409 ASSET_NOT_READY`; a READY file remains served while a newer UPLOADING replacement exists.
+- [auto] When the asset is ARCHIVED and has a READY file -> expect `200`.
+- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`, including at the service boundary if they are granted `asset.read`.
+- [manual] Request a fresh access URL when a fetch returns `403`; verify the signed object returns the expected content type, inline filename, and supports byte ranges for images, PDFs, and video.
 
 ### `POST /assets`
 

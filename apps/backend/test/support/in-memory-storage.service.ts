@@ -34,6 +34,7 @@ interface SimulatedUpload {
 /** S3-free StorageService test double; tests populate objects with simulateUpload. */
 export class InMemoryStorageService extends StorageService {
   private readonly objects = new Map<string, StoredObject>();
+  readonly downloadRequests: CreateDownloadUrlInput[] = [];
 
   constructor(private readonly uploadUrlTtlSeconds = 900) {
     super();
@@ -58,16 +59,14 @@ export class InMemoryStorageService extends StorageService {
     };
   }
 
-  async createDownloadUrl({
-    key,
-    expiresInSeconds,
-  }: CreateDownloadUrlInput): Promise<CreateDownloadUrlResult> {
+  async createDownloadUrl(input: CreateDownloadUrlInput): Promise<CreateDownloadUrlResult> {
+    this.downloadRequests.push({ ...input });
+    const { key, expiresInSeconds } = input;
     assertValidKey(key);
     assertPositiveInteger(expiresInSeconds, 'expiresInSeconds');
     if (expiresInSeconds > MAX_DOWNLOAD_URL_TTL_SECONDS) {
       throw new StorageInvalidArgumentError('expiresInSeconds must not exceed 12 hours');
     }
-
     return {
       url: `memory://download/${key}`,
       expiresAt: new Date(Date.now() + expiresInSeconds * 1_000),

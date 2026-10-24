@@ -5,6 +5,10 @@ if (testEnv.error || !testEnv.parsed) {
   throw new Error('Could not load the required .env.test file.');
 }
 
+process.env.ASSET_ACCESS_TTL_IMAGE_SECONDS ??= '600';
+process.env.ASSET_ACCESS_TTL_PDF_SECONDS ??= '1800';
+process.env.ASSET_ACCESS_TTL_VIDEO_SECONDS ??= '7200';
+
 export function getTestDatabaseUrl(): string {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {

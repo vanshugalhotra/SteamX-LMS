@@ -14,7 +14,7 @@ import {
 } from '../../common/errors/prisma-error.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
-import { assertPlatformStaff } from '../assert-platform-staff.js';
+import { assertPlatformStaff } from '../../auth/assert-platform-staff.js';
 import { canTransitionContentStatus } from '../content-status.js';
 import type { CreateCourseModuleDto } from './dto/create-course-module.dto.js';
 import type { CourseModuleResponseDto } from './dto/course-module-response.dto.js';

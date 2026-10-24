@@ -8,6 +8,7 @@ const MAX_UPLOAD_URL_TTL_SECONDS = 3600;
 const DEFAULT_ASSET_MAX_BYTES_IMAGE = 10 * 1024 * 1024;
 const DEFAULT_ASSET_MAX_BYTES_PDF = 50 * 1024 * 1024;
 const DEFAULT_ASSET_MAX_BYTES_VIDEO = 1024 * 1024 * 1024;
+const MAX_ASSET_ACCESS_TTL_SECONDS = 12 * 60 * 60;
 
 const envSchema = z
   .object({
@@ -72,6 +73,30 @@ const envSchema = z
       .int()
       .positive()
       .default(DEFAULT_ASSET_MAX_BYTES_VIDEO),
+    ASSET_ACCESS_TTL_IMAGE_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(MAX_ASSET_ACCESS_TTL_SECONDS, {
+        error: `must not exceed ${MAX_ASSET_ACCESS_TTL_SECONDS} seconds`,
+      })
+      .default(600),
+    ASSET_ACCESS_TTL_PDF_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(MAX_ASSET_ACCESS_TTL_SECONDS, {
+        error: `must not exceed ${MAX_ASSET_ACCESS_TTL_SECONDS} seconds`,
+      })
+      .default(1800),
+    ASSET_ACCESS_TTL_VIDEO_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(MAX_ASSET_ACCESS_TTL_SECONDS, {
+        error: `must not exceed ${MAX_ASSET_ACCESS_TTL_SECONDS} seconds`,
+      })
+      .default(7200),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV === 'production' && env.CORS_ORIGINS.length === 0) {
@@ -112,6 +137,11 @@ const envSchema = z
       image: env.ASSET_MAX_BYTES_IMAGE,
       pdf: env.ASSET_MAX_BYTES_PDF,
       video: env.ASSET_MAX_BYTES_VIDEO,
+    },
+    assetAccess: {
+      imageTtlSeconds: env.ASSET_ACCESS_TTL_IMAGE_SECONDS,
+      pdfTtlSeconds: env.ASSET_ACCESS_TTL_PDF_SECONDS,
+      videoTtlSeconds: env.ASSET_ACCESS_TTL_VIDEO_SECONDS,
     },
   }));
 

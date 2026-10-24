@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -28,11 +29,14 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { PERMISSION } from '../auth/permissions.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
+import type { Response } from 'express';
 import { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
+import { AssetAccessResponseDto } from './dto/asset-access-response.dto.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { AssetListQueryDto } from './dto/asset-list-query.dto.js';
 import { AssetLibraryDetailDto, AssetListResponseDto } from './dto/asset-library-response.dto.js';
 import { AssetsService } from './assets.service.js';
+import { AssetAccessService } from './asset-access.service.js';
 
 /** HTTP and permission boundary for asset creation and file-state reads. */
 @ApiTags('Assets')
@@ -42,7 +46,10 @@ import { AssetsService } from './assets.service.js';
 @ApiInternalServerErrorResponse({ description: 'An unexpected server error occurred.' })
 @Controller({ path: 'assets' })
 export class AssetsController {
-  constructor(private readonly assets: AssetsService) {}
+  constructor(
+    private readonly assets: AssetsService,
+    private readonly assetAccess: AssetAccessService,
+  ) {}
 
   // ─────────────────────────────────────────
   // GET /assets — List library assets
@@ -79,6 +86,35 @@ export class AssetsController {
     id: string,
   ): Promise<AssetLibraryDetailDto> {
     return this.assets.findLibraryAsset(id);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /assets/:id/access — Issue an author preview URL
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.ASSET_READ)
+  @Get(':id/access')
+  @ApiOperation({
+    summary: 'Issue a short-lived URL for an asset preview',
+    description:
+      'The URL TTL is selected by asset type. Clients should request a new URL after a fetch returns 403; the configured TTL should cover normal viewing and byte-range requests.',
+  })
+  @ApiOkResponse({ description: 'Short-lived asset access URL.', type: AssetAccessResponseDto })
+  @ApiConflictResponse({ description: 'Asset has no READY file (ASSET_NOT_READY).' })
+  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  issueAccess(
+    @CurrentAuth() actor: AuthContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AssetAccessResponseDto> {
+    response.setHeader('Cache-Control', 'no-store');
+    return this.assetAccess.issueForAuthor(id, actor);
   }
 
   // ─────────────────────────────────────────
