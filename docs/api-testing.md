@@ -330,6 +330,25 @@ Caller: authenticated admin with `asset.write`; creates an ACTIVE asset and UPLO
 - [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
 - [manual] Upload using the returned URL, method, and headers; confirm the object uses the exact declared content type and size.
 
+### `POST /assets/:id/files`
+
+Caller: authenticated admin with `asset.write`; prepares a replacement or retry upload for the
+existing asset, retaining the asset ID. The body contains `filename`, `mimeType`, and `sizeBytes`;
+the asset's existing type selects the MIME allow-list and size limit.
+
+- [auto] When the asset is IMAGE, PDF, or VIDEO and the MIME/size fit that type -> expect `201` with the same `{ asset, file, upload }` shape as `POST /assets`.
+- [auto] When a READY file exists -> keep it serving during upload; completing a valid replacement deletes its row and queues exactly its prefix for asynchronous cleanup.
+- [auto] When a replacement fails verification -> keep the old READY row serving and do not queue its prefix.
+- [auto] When any file is UPLOADED or PROCESSING -> expect `409 REPLACEMENT_IN_PROGRESS` without deleting or creating file rows.
+- [auto] When older UPLOADING or FAILED attempts exist -> delete them, queue their prefixes, and retain only the new non-READY attempt; completing a superseded file ID returns `404`.
+- [auto] When no READY file exists after a failed or abandoned first upload -> allow the same route as a retry; a successful completion makes the asset appear in `GET /assets`.
+- [auto] When two replacement requests race -> expect both `201`, no server error, one remaining non-READY row, and one cleanup entry for the superseded attempt.
+- [auto] When MIME is disallowed or size exceeds the asset-type limit -> expect `400 MIME_NOT_ALLOWED` or `400 FILE_TOO_LARGE`; zero, negative, fractional, empty filename, or unknown fields -> expect `400`.
+- [auto] When filename contains control characters -> expect them removed before persistence; MIME is trimmed and lowercased.
+- [auto] When the asset ID is unknown or malformed -> expect `404`; archived assets remain replaceable.
+- [auto] Replacing and completing a file does not alter lesson-block asset IDs or where-used results.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+
 ### `GET /assets/:id/files/:fileId`
 
 Caller: authenticated admin with `asset.read`; returns the state of a file belonging to that asset.

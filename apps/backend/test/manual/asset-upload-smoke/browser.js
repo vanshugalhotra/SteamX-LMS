@@ -115,6 +115,56 @@ async function inspectVideo(assetId, fileId) {
   return body;
 }
 
+async function inspectReplacement(assetId, oldFileId, newFileId) {
+  const response = await fetch('/inspect-replacement', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Smoke-Token': window.assetSmokeToken,
+    },
+    body: JSON.stringify({ assetId, oldFileId, newFileId }),
+  });
+  const body = await readJson(response);
+  expect(
+    response.status === 200,
+    body.error || `Database inspection returned HTTP ${response.status}.`,
+  );
+  return body;
+}
+
+async function replaceUpload(baseUrl, assetId, file) {
+  const { response, body } = await apiRequest(baseUrl, `/api/v1/assets/${assetId}/files`, {
+    method: 'POST',
+    body: JSON.stringify({
+      filename: file.name,
+      mimeType: 'image/png',
+      sizeBytes: file.size,
+    }),
+  });
+  expect(response.status === 201, `Replacement creation returned HTTP ${response.status}.`);
+  expect(body.asset?.id === assetId, 'Replacement changed the asset ID.');
+  expect(body.file?.id && body.upload?.url, 'Replacement response is incomplete.');
+  expect(body.file.status === 'UPLOADING', 'Replacement did not start in UPLOADING.');
+  return { fileId: body.file.id, upload: body.upload };
+}
+
+async function expectAccessContent(baseUrl, assetId, expectedFile) {
+  const { response, body } = await apiRequest(baseUrl, `/api/v1/assets/${assetId}/access`);
+  expect(response.status === 200 && body.url, 'Asset access did not return a signed URL.');
+  expect(
+    response.headers.get('cache-control') === 'no-store',
+    'Asset access response did not set Cache-Control: no-store.',
+  );
+  const fileResponse = await fetch(body.url);
+  expect(fileResponse.ok, `Signed file request returned HTTP ${fileResponse.status}.`);
+  const actual = new Uint8Array(await fileResponse.arrayBuffer());
+  const expected = new Uint8Array(await expectedFile.arrayBuffer());
+  expect(
+    actual.length === expected.length && actual.every((byte, index) => byte === expected[index]),
+    'Signed URL did not return the expected file contents.',
+  );
+}
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   results.replaceChildren();
@@ -126,12 +176,13 @@ form.addEventListener('submit', async (event) => {
   const passwordInput = document.querySelector('#password');
   const password = passwordInput.value;
   const pngFile = document.querySelector('#png-file').files[0];
+  const replacementPngFile = document.querySelector('#replacement-png-file').files[0];
   const mp4File = document.querySelector('#mp4-file').files[0];
   const runButton = document.querySelector('#run');
   runButton.disabled = true;
 
   try {
-    expect(pngFile && mp4File, 'Select both a PNG and an MP4 file.');
+    expect(pngFile && replacementPngFile && mp4File, 'Select both PNGs and an MP4 file.');
     expect(
       window.location.protocol === 'http:' || window.location.protocol === 'https:',
       'Unsupported page protocol.',
@@ -197,6 +248,79 @@ form.addEventListener('submit', async (event) => {
       'direct S3 upload completed to READY; repeat completion stayed READY.',
     );
 
+    const replacement = await replaceUpload(backend, png.assetId, replacementPngFile);
+    const whileUploading = await apiRequest(backend, `/api/v1/assets/${png.assetId}`);
+    expect(
+      whileUploading.response.status === 200 &&
+        whileUploading.body.file?.id === png.fileId &&
+        whileUploading.body.file?.status === 'READY',
+      'The previous READY PNG stopped serving during replacement upload.',
+    );
+    await expectAccessContent(backend, png.assetId, pngFile);
+    await uploadToStorage(replacement.upload, replacementPngFile, 'image/png');
+    const replacementComplete = await complete(backend, png.assetId, replacement.fileId);
+    expect(
+      replacementComplete.response.status === 200 && replacementComplete.body.status === 'READY',
+      'PNG replacement did not complete as READY.',
+    );
+    const replacementDetail = await apiRequest(backend, `/api/v1/assets/${png.assetId}`);
+    expect(
+      replacementDetail.response.status === 200 &&
+        replacementDetail.body.file?.id === replacement.fileId &&
+        replacementDetail.body.file?.status === 'READY',
+      'GET asset did not return the replacement READY file.',
+    );
+    const replacementState = await inspectReplacement(png.assetId, png.fileId, replacement.fileId);
+    expect(
+      replacementState.newStatus === 'READY' &&
+        replacementState.oldFileRemoved &&
+        replacementState.oldPrefixQueued &&
+        replacementState.oldPrefixIsPrefix,
+      'Database did not show the old row removed and its prefix queued.',
+    );
+    await expectAccessContent(backend, png.assetId, replacementPngFile);
+    report(
+      'PNG replacement',
+      true,
+      'old READY file served until completion; replacement is now READY and the old prefix is queued.',
+    );
+
+    const invalidBytes = new Blob(['This is not a PNG file.'], { type: 'image/png' });
+    const invalidFile = new File([invalidBytes], 'not-a-png.png', { type: 'image/png' });
+    const failedReplacement = await replaceUpload(backend, png.assetId, invalidFile);
+    await uploadToStorage(failedReplacement.upload, invalidFile, 'image/png');
+    const failedComplete = await complete(backend, png.assetId, failedReplacement.fileId);
+    expect(
+      failedComplete.response.status === 200 &&
+        failedComplete.body.status === 'FAILED' &&
+        failedComplete.body.lastError === 'CONTENT_NOT_RECOGNIZED',
+      'Invalid replacement signature did not fail with CONTENT_NOT_RECOGNIZED.',
+    );
+    const stillCurrent = await apiRequest(backend, `/api/v1/assets/${png.assetId}`);
+    expect(
+      stillCurrent.response.status === 200 &&
+        stillCurrent.body.file?.id === replacement.fileId &&
+        stillCurrent.body.file?.status === 'READY',
+      'A failed replacement displaced the current READY file.',
+    );
+    await expectAccessContent(backend, png.assetId, replacementPngFile);
+    const failedState = await inspectReplacement(
+      png.assetId,
+      replacement.fileId,
+      failedReplacement.fileId,
+    );
+    expect(
+      failedState.newStatus === 'FAILED' &&
+        failedState.oldFileStillExists &&
+        !failedState.oldPrefixQueued,
+      'Failed replacement removed or queued the current READY file.',
+    );
+    report(
+      'Failed replacement',
+      true,
+      'invalid signature became FAILED; previous READY file remains current and unqueued.',
+    );
+
     const mp4 = await createUpload(
       backend,
       'VIDEO',
@@ -254,25 +378,6 @@ form.addEventListener('submit', async (event) => {
         `S3 rejected it with HTTP ${wrongSizeUpload.status}; no object was created and completion remained retryable.`,
       );
     }
-
-    const invalidBytes = new Blob(['This is not a PNG file.'], { type: 'image/png' });
-    const invalidFile = new File([invalidBytes], 'not-a-png.png', { type: 'image/png' });
-    const invalid = await createUpload(
-      backend,
-      'IMAGE',
-      'image/png',
-      invalidFile,
-      'Asset upload smoke invalid signature',
-    );
-    await uploadToStorage(invalid.upload, invalidFile, 'image/png');
-    const invalidComplete = await complete(backend, invalid.assetId, invalid.fileId);
-    expect(
-      invalidComplete.response.status === 200 &&
-        invalidComplete.body.status === 'FAILED' &&
-        invalidComplete.body.lastError === 'CONTENT_NOT_RECOGNIZED',
-      `Invalid signature did not fail safely: HTTP ${invalidComplete.response.status}, status ${invalidComplete.body.status}, code ${invalidComplete.body.lastError}.`,
-    );
-    report('Invalid signature rejection', true, 'returned FAILED with CONTENT_NOT_RECOGNIZED.');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected smoke-test error.';
     report('Smoke run', false, message);

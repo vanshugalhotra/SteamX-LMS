@@ -114,6 +114,64 @@ async function main(): Promise<void> {
         });
         return;
       }
+      if (request.method === 'POST' && url.pathname === '/inspect-replacement') {
+        if (request.headers['x-smoke-token'] !== smokeToken) {
+          sendJson(response, 403, { error: 'Forbidden' });
+          return;
+        }
+        const body: unknown = await readRequestJson(request);
+        if (
+          typeof body !== 'object' ||
+          body === null ||
+          !('assetId' in body) ||
+          !('oldFileId' in body) ||
+          !('newFileId' in body) ||
+          typeof body.assetId !== 'string' ||
+          typeof body.oldFileId !== 'string' ||
+          typeof body.newFileId !== 'string' ||
+          !UUID_PATTERN.test(body.assetId) ||
+          !UUID_PATTERN.test(body.oldFileId) ||
+          !UUID_PATTERN.test(body.newFileId)
+        ) {
+          sendJson(response, 400, { error: 'Invalid asset or file ID' });
+          return;
+        }
+
+        const result = await database.query<{
+          new_status: string | null;
+          old_file_exists: boolean;
+          old_prefix_queued: boolean;
+          old_prefix_is_prefix: boolean;
+        }>(
+          `SELECT new_file.status::text AS new_status,
+                  old_file.id IS NOT NULL AS old_file_exists,
+                  cleanup.id IS NOT NULL AS old_prefix_queued,
+                  COALESCE(cleanup.is_prefix, false) AS old_prefix_is_prefix
+           FROM (SELECT 1) AS anchor
+           LEFT JOIN asset_files AS new_file
+             ON new_file.asset_id = $1::uuid AND new_file.id = $3::uuid
+           LEFT JOIN asset_files AS old_file
+             ON old_file.asset_id = $1::uuid AND old_file.id = $2::uuid
+           LEFT JOIN storage_cleanup_queue AS cleanup
+             ON cleanup.object_key = 'assets/' || $1::text || '/' || $2::text || '/'
+           WHERE EXISTS (SELECT 1 FROM assets WHERE id = $1::uuid)`,
+          [body.assetId, body.oldFileId, body.newFileId],
+        );
+        const row = result.rows[0];
+        if (!row) {
+          sendJson(response, 404, { error: 'Asset not found in configured database' });
+          return;
+        }
+        sendJson(response, 200, {
+          newStatus: row.new_status,
+          oldFileExists: row.old_file_exists,
+          oldFileRemoved: !row.old_file_exists,
+          oldPrefixQueued: row.old_prefix_queued,
+          oldPrefixIsPrefix: row.old_prefix_is_prefix,
+          oldFileStillExists: row.old_file_exists,
+        });
+        return;
+      }
       sendJson(response, 404, { error: 'Not found' });
     } catch (error) {
       process.stderr.write(
