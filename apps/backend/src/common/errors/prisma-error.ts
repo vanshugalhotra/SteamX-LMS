@@ -81,6 +81,13 @@ export function throwConflictOnDuplicate(
   }
 }
 
+/** Translates a missing-record Prisma error while leaving unrelated failures untouched. */
+export function throwNotFoundOnMissing(error: unknown): void {
+  if (isPrismaKnownError(error) && error.code === 'P2025') {
+    throw new NotFoundException(API_ERROR.NOT_FOUND);
+  }
+}
+
 /** Maps common Prisma constraint failures to safe API exceptions. */
 export function mapPrismaError(error: unknown): HttpException | undefined {
   if (!isPrismaKnownError(error)) {

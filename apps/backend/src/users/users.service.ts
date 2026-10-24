@@ -44,7 +44,9 @@ export class UsersService {
     private readonly schools: SchoolsService,
     private readonly activeSchool: ActiveSchoolService,
     private readonly logger: PinoLogger,
-  ) {}
+  ) {
+    this.logger.setContext(UsersService.name);
+  }
 
   // ─────────────────────────────────────────
   // POST /users/teachers — Create a teacher

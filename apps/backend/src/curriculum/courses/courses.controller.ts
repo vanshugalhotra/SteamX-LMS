@@ -13,22 +13,20 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiCookieAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiForbiddenResponse,
-  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../../auth/decorators/require-permission.decorator.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import { PERMISSION } from '../../auth/permissions.js';
+import { ApiProtectedController } from '../../common/decorators/api-protected-controller.decorator.js';
 import { CourseListQueryDto } from './dto/course-list-query.dto.js';
 import { CourseListResponseDto } from './dto/course-list-response.dto.js';
 import { CourseResponseDto } from './dto/course-response.dto.js';
@@ -38,13 +36,11 @@ import { UpdateContentStatusDto } from '../dto/update-content-status.dto.js';
 import { CoursesService } from './courses.service.js';
 
 @ApiTags('Courses')
-@ApiCookieAuth('cookieAuth')
-@ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
+@ApiProtectedController()
 @ApiForbiddenResponse({
   description:
     'The required curriculum permission is missing, the caller is not an admin, or Origin is invalid.',
 })
-@ApiInternalServerErrorResponse({ description: 'An unexpected server error occurred.' })
 @Controller({ path: 'courses' })
 export class CoursesController {
   constructor(private readonly courses: CoursesService) {}

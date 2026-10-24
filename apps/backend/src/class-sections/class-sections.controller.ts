@@ -14,21 +14,19 @@ import {
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
-  ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
-  ApiInternalServerErrorResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
 import { PERMISSION } from '../auth/permissions.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
+import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
 import { ClassSectionListQueryDto } from './dto/class-section-list-query.dto.js';
 import { ClassSectionListResponseDto } from './dto/class-section-list-response.dto.js';
 import { ClassSectionResponseDto } from './dto/class-section-response.dto.js';
@@ -37,15 +35,9 @@ import { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
 import { ClassSectionsService } from './class-sections.service.js';
 
 @ApiTags('Class sections')
-@ApiCookieAuth('cookieAuth')
-@ApiUnauthorizedResponse({
-  description: 'Session is invalid or missing.',
-})
+@ApiProtectedController()
 @ApiForbiddenResponse({
-  description: 'Permission is missing or this action is blocked by Origin protection.',
-})
-@ApiInternalServerErrorResponse({
-  description: 'An unexpected server error occurred.',
+  description: 'The required permission is missing, or Origin is invalid.',
 })
 @Controller({ path: 'class-sections' })
 export class ClassSectionsController {

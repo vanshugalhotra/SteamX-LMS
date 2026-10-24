@@ -81,7 +81,7 @@ function createService() {
     findById: vi.fn().mockResolvedValue(schoolRecord),
     update: vi.fn(),
   };
-  const logger = { info: vi.fn() };
+  const logger = { setContext: vi.fn(), info: vi.fn() };
 
   return {
     service: new SchoolsService(repository as unknown as SchoolsRepository, logger as never),

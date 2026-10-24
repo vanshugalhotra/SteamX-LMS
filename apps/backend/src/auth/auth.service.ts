@@ -23,7 +23,9 @@ export class AuthService {
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly logger: PinoLogger,
-  ) {}
+  ) {
+    this.logger.setContext(AuthService.name);
+  }
 
   // ─────────────────────────────────────────
   // Login

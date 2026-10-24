@@ -13,42 +13,34 @@ import {
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
-  ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
-  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
+import { ResetPasswordDto } from '../auth/dto/reset-password.dto.js';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
 import { PERMISSION } from '../auth/permissions.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
+import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
 import { CreateStudentDto } from './dto/create-student.dto.js';
 import { CreateTeacherDto } from './dto/create-teacher.dto.js';
 import { UserListQueryDto } from './dto/user-list-query.dto.js';
 import { UserListResponseDto } from './dto/user-list-response.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { UsersService } from './users.service.js';
-import { ResetPasswordDto } from '../auth/dto/reset-password.dto.js';
 import { RenameSteamxIdDto } from './dto/rename-steamx-id.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto.js';
 
 @ApiTags('Users')
-@ApiCookieAuth('cookieAuth')
-@ApiUnauthorizedResponse({
-  description: 'Session is invalid or missing.',
-})
+@ApiProtectedController()
 @ApiForbiddenResponse({
-  description: 'Permission is missing or this action is blocked by Origin protection.',
-})
-@ApiInternalServerErrorResponse({
-  description: 'An unexpected server error occurred.',
+  description: 'The required permission is missing, or Origin is invalid.',
 })
 @Controller({ path: 'users' })
 export class UsersController {

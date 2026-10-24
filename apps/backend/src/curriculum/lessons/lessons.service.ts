@@ -11,6 +11,7 @@ import {
   getPostgresCode,
   isForeignKeyViolation,
   isPrismaKnownError,
+  throwNotFoundOnMissing,
 } from '../../common/errors/prisma-error.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
@@ -113,7 +114,6 @@ export class LessonsService {
     if (Object.values(body).every((value) => value === undefined)) {
       throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
-    // Add release-aware audience validation when delivery release APIs are implemented.
     const lesson = await this.lessons.update(id, body);
     if (!lesson) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
@@ -210,9 +210,7 @@ export class LessonsService {
           message: 'A lesson with content blocks must have its blocks removed first.',
         });
       }
-      if (isPrismaKnownError(error) && error.code === 'P2025') {
-        throw new NotFoundException(API_ERROR.NOT_FOUND);
-      }
+      throwNotFoundOnMissing(error);
       throw error;
     }
   }
