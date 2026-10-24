@@ -90,6 +90,11 @@ export interface MakeReadyInput {
   playbackKey: string | null;
 }
 
+export type ReplaceAssetFileResult =
+  | { status: 'not_found' }
+  | { status: 'in_progress' }
+  | { status: 'created'; asset: Asset; file: AssetFile; removedCount: number };
+
 @Injectable()
 export class AssetsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -134,6 +139,10 @@ export class AssetsRepository {
     return this.prisma.asset.findUnique({ where: { id }, select: ASSET_ACCESS_SELECT });
   }
 
+  findAssetTypeById(id: string): Promise<Pick<Asset, 'id' | 'type'> | null> {
+    return this.prisma.asset.findUnique({ where: { id }, select: { id: true, type: true } });
+  }
+
   /** Creates the stable asset identity and its first upload attempt atomically. */
   createAssetWithFile(input: {
     assetId: string;
@@ -171,6 +180,39 @@ export class AssetsRepository {
         mimeType: input.mimeType,
         sizeBytes: BigInt(input.sizeBytes),
       },
+    });
+  }
+
+  /** Replaces unfinished attempts while holding the same asset lock used by makeReady. */
+  replaceAssetFile(input: CreateAssetFileRecordInput): Promise<ReplaceAssetFileResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const lockedAssets = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "assets" WHERE "id" = ${input.assetId}::uuid FOR UPDATE
+      `;
+      if (lockedAssets.length === 0) {
+        return { status: 'not_found' };
+      }
+
+      // UPLOADED and PROCESSING belong to complete's conditional transitions; CUR-15 removes stuck rows.
+      const inFlightCount = await tx.assetFile.count({
+        where: {
+          assetId: input.assetId,
+          status: { in: [AssetFileStatus.UPLOADED, AssetFileStatus.PROCESSING] },
+        },
+      });
+      if (inFlightCount > 0) {
+        return { status: 'in_progress' };
+      }
+
+      const removed = await tx.assetFile.deleteMany({
+        where: {
+          assetId: input.assetId,
+          status: { in: [AssetFileStatus.UPLOADING, AssetFileStatus.FAILED] },
+        },
+      });
+      const file = await this.createFile(tx, input);
+      const asset = await tx.asset.findUniqueOrThrow({ where: { id: input.assetId } });
+      return { status: 'created', asset, file, removedCount: removed.count };
     });
   }
 

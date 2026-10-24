@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { PinoLogger } from 'nestjs-pino';
 import { AssetFileStatus } from '../generated/prisma/client.js';
+import type { Asset } from '../generated/prisma/client.js';
 import type { AssetFile } from '../generated/prisma/client.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { paginate } from '../common/pagination/paginate.js';
@@ -28,6 +29,7 @@ import {
 } from './asset-rules.js';
 import type { SupportedAssetType } from './asset-rules.js';
 import type { CreateAssetDto } from './dto/create-asset.dto.js';
+import type { CreateAssetFileDto } from './dto/create-asset-file.dto.js';
 import type { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import type { AssetListQueryDto } from './dto/asset-list-query.dto.js';
 import type { AssetLibraryDetailDto, AssetListItemDto } from './dto/asset-library-response.dto.js';
@@ -102,21 +104,7 @@ export class AssetsService {
   /** Persists the upload intent first, then asks storage for a short-lived PUT URL. */
   async create(actor: AuthContext, body: CreateAssetDto): Promise<CreateAssetResponseDto> {
     const mimeType = normalizeMimeType(body.mimeType);
-    let type: SupportedAssetType;
-    try {
-      type = validateAssetUpload(
-        body.type,
-        mimeType,
-        body.sizeBytes,
-        this.config.get('assetLimits', { infer: true }),
-      );
-    } catch (error) {
-      // Keep rule failures in the public API error envelope with their stable asset-specific code.
-      if (error instanceof AssetRuleError) {
-        throw new BadRequestException({ code: error.code, message: error.message });
-      }
-      throw error;
-    }
+    const type = this.validateUpload(body.type, mimeType, body.sizeBytes);
 
     const assetId = randomUUID().toLowerCase();
     const fileId = randomUUID().toLowerCase();
@@ -135,20 +123,57 @@ export class AssetsService {
         sizeBytes: body.sizeBytes,
       },
     });
+    return this.createUploadResponse(actor, asset, file, mimeType, body.sizeBytes, 0);
+  }
 
-    // The DB transaction has committed before requesting the URL, as storage is outside that transaction.
-    const upload = await this.storage.createUploadUrl({
-      key: storageKey,
-      contentType: mimeType,
+  // ─────────────────────────────────────────
+  // POST /assets/:id/files — Replace or retry an asset file
+  // ─────────────────────────────────────────
+
+  /** Reuses the asset's existing identity while replacing only unfinished file attempts. */
+  async replaceFile(
+    actor: AuthContext,
+    assetId: string,
+    body: CreateAssetFileDto,
+  ): Promise<CreateAssetResponseDto> {
+    const normalizedAssetId = this.normalizeUuid(assetId);
+    if (!normalizedAssetId) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    const existingAsset = await this.assets.findAssetTypeById(normalizedAssetId);
+    if (!existingAsset) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+
+    const mimeType = normalizeMimeType(body.mimeType);
+    this.validateUpload(existingAsset.type, mimeType, body.sizeBytes);
+
+    const fileId = randomUUID().toLowerCase();
+    const result = await this.assets.replaceAssetFile({
+      id: fileId,
+      assetId: normalizedAssetId,
+      storageKey: buildOriginalKey(normalizedAssetId, fileId),
+      originalFilename: body.filename,
+      mimeType,
       sizeBytes: body.sizeBytes,
     });
-    // This endpoint only prepares the upload; it does not receive the bytes or start processing.
-    this.logger.info(
-      { actorId: actor.userId, assetId, fileId, type: asset.type, sizeBytes: body.sizeBytes },
-      'Asset file upload created',
+    if (result.status === 'not_found') {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    if (result.status === 'in_progress') {
+      throw new ConflictException({
+        code: 'REPLACEMENT_IN_PROGRESS',
+        message: 'An asset file is already being processed.',
+      });
+    }
+    return this.createUploadResponse(
+      actor,
+      result.asset,
+      result.file,
+      mimeType,
+      body.sizeBytes,
+      result.removedCount,
     );
-
-    return toCreateAssetResponse(asset, file, upload);
   }
 
   // ─────────────────────────────────────────
@@ -293,6 +318,49 @@ export class AssetsService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toAssetFileDto(file);
+  }
+
+  private validateUpload(type: string, mimeType: string, sizeBytes: number): SupportedAssetType {
+    try {
+      return validateAssetUpload(
+        type,
+        mimeType,
+        sizeBytes,
+        this.config.get('assetLimits', { infer: true }),
+      );
+    } catch (error) {
+      if (error instanceof AssetRuleError) {
+        throw new BadRequestException({ code: error.code, message: error.message });
+      }
+      throw error;
+    }
+  }
+
+  private async createUploadResponse(
+    actor: AuthContext,
+    asset: Asset,
+    file: AssetFile,
+    mimeType: string,
+    sizeBytes: number,
+    removedCount: number,
+  ): Promise<CreateAssetResponseDto> {
+    const upload = await this.storage.createUploadUrl({
+      key: file.storageKey,
+      contentType: mimeType,
+      sizeBytes,
+    });
+    this.logger.info(
+      {
+        actorId: actor.userId,
+        assetId: asset.id,
+        fileId: file.id,
+        type: asset.type,
+        sizeBytes,
+        removedCount,
+      },
+      'Asset file upload created',
+    );
+    return toCreateAssetResponse(asset, file, upload);
   }
 
   /** Normalizes accepted UUID casing; malformed IDs deliberately share the 404 response. */

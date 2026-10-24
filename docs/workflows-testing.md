@@ -276,7 +276,13 @@ email, names, and creation times.
   lessons only; draft descendants stay draft and reactivation does not revive archived descendants.
 - Delete an empty lesson, module, and course; verify deletion is blocked with `RESOURCE_IN_USE` when dependent records remain.
 - Verify lesson audiences, including teacher-only lessons and lessons visible to students.
-- Private asset upload, processing failure, replacement, signed access, and queued storage cleanup. Verify `GET /assets` lists the asset only after a file reaches READY (a failed or in-progress replacement does not hide an existing READY file); `GET /assets/:id` shows the current file lifecycle state and distinct lessons where the asset is used.
+- Private asset upload, processing failure, replacement, signed access, and queued storage cleanup:
+  - Complete an image, PDF, and video upload, then replace each through `POST /api/v1/assets/:id/files`; while each replacement is UPLOADING, verify `GET /assets/:id` and `/access` still use the old READY file.
+  - Complete each replacement and verify its new file is READY, its old row is gone, and the old prefix is queued for asynchronous cleanup. Confirm video access signs the new file's playback key.
+  - Upload text bytes declared as an image and complete; verify the replacement becomes FAILED, the previous READY file remains served, and its prefix is not queued.
+  - Seed UPLOADED or PROCESSING state and verify replacement returns `409 REPLACEMENT_IN_PROGRESS` without changing rows. Seed an older UPLOADING or FAILED attempt and verify the new attempt supersedes it and completion of the old file ID returns `404`.
+  - With no READY file after a failed or abandoned first upload, use the same replacement route as a retry and verify successful completion makes the asset appear in `GET /assets`.
+  - Verify an in-progress or failed replacement does not hide an existing READY asset from `GET /assets`, and `GET /assets/:id` still shows distinct lessons where the asset is used.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.
 - Student promotion that completes old-class enrollments and validates cross-school moves.
