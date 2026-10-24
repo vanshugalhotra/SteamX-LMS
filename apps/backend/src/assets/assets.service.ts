@@ -76,15 +76,11 @@ export class AssetsService {
 
   /** Reads a specific asset and current file state, including assets without READY files. */
   async findLibraryAsset(assetId: string): Promise<AssetLibraryDetailDto> {
-    const normalizedAssetId = this.normalizeUuid(assetId);
-    if (!normalizedAssetId) {
-      throw new NotFoundException(API_ERROR.NOT_FOUND);
-    }
-    const asset = await this.assets.findLibraryAssetById(normalizedAssetId);
+    const asset = await this.assets.findLibraryAssetById(assetId);
     if (!asset) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
-    const { items, total } = await this.assetUsage.findByAssetId(normalizedAssetId);
+    const { items, total } = await this.assetUsage.findByAssetId(assetId);
     return toAssetLibraryDetailDto(asset, {
       total,
       items: items.map((lesson) => ({

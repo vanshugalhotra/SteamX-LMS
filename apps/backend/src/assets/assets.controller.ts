@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
@@ -16,6 +27,7 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { PERMISSION } from '../auth/permissions.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { AssetListQueryDto } from './dto/asset-list-query.dto.js';
@@ -57,7 +69,15 @@ export class AssetsController {
     type: AssetLibraryDetailDto,
   })
   @ApiNotFoundResponse({ description: 'Asset not found.' })
-  findLibraryAsset(@Param('id') id: string): Promise<AssetLibraryDetailDto> {
+  findLibraryAsset(
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+  ): Promise<AssetLibraryDetailDto> {
     return this.assets.findLibraryAsset(id);
   }
 
