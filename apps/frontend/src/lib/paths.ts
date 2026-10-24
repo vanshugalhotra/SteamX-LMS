@@ -10,5 +10,8 @@ export const PATHS = {
     schools: `${ADMIN_BASE}/schools`,
     schoolNew: `${ADMIN_BASE}/schools/new`,
     schoolEdit: (id: string) => `${ADMIN_BASE}/schools/${id}/edit`,
+    teachers: `${ADMIN_BASE}/teachers`,
+    teacherNew: `${ADMIN_BASE}/teachers/new`,
+    teacherEdit: (id: string) => `${ADMIN_BASE}/teachers/${id}/edit`,
   },
 } as const;
