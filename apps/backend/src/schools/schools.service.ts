@@ -1,4 +1,3 @@
-/** Applies school access rules and coordinates school persistence for API workflows. */
 import {
   BadRequestException,
   ForbiddenException,
@@ -26,7 +25,9 @@ export class SchoolsService {
   constructor(
     private readonly schools: SchoolsRepository,
     private readonly logger: PinoLogger,
-  ) {}
+  ) {
+    this.logger.setContext(SchoolsService.name);
+  }
 
   /** Exposes the school code to collaborating modules without exposing repository access. */
   findCodeById(schoolId: string): Promise<{ code: string } | null> {

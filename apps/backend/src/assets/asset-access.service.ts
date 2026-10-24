@@ -74,7 +74,6 @@ export class AssetAccessService {
     if (!file.mimeType) {
       throw new Error('READY asset file is missing its MIME type.');
     }
-    // MP4 uses the same playback and storage key today; HLS later points playbackKey at its manifest.
     const key = file.playbackKey ?? file.storageKey;
     const { url, expiresAt } = await this.storage.createDownloadUrl({
       key,
@@ -82,8 +81,6 @@ export class AssetAccessService {
       contentType: file.mimeType,
       filename: file.originalFilename ?? undefined,
     });
-
-    // A CloudFront signed-cookie implementation can replace this method's internals without changing its return shape.
     return { url, expiresAt, type: assetType, mimeType: file.mimeType };
   }
 }

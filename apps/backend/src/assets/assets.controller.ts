@@ -13,22 +13,20 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiCookieAuth,
   ApiCreatedResponse,
   ApiConflictResponse,
   ApiForbiddenResponse,
-  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { PERMISSION } from '../auth/permissions.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
+import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
 import type { Response } from 'express';
 import { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import { AssetAccessResponseDto } from './dto/asset-access-response.dto.js';
@@ -40,10 +38,8 @@ import { AssetAccessService } from './asset-access.service.js';
 
 /** HTTP and permission boundary for asset creation and file-state reads. */
 @ApiTags('Assets')
-@ApiCookieAuth('cookieAuth')
-@ApiUnauthorizedResponse({ description: 'Session is invalid or missing.' })
+@ApiProtectedController()
 @ApiForbiddenResponse({ description: 'The required asset permission is missing.' })
-@ApiInternalServerErrorResponse({ description: 'An unexpected server error occurred.' })
 @Controller({ path: 'assets' })
 export class AssetsController {
   constructor(

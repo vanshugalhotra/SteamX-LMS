@@ -196,7 +196,7 @@ function createService(options: { target?: UserDetailRecord } = {}) {
   };
   const passwords = { hash: vi.fn().mockResolvedValue('hashed-password') };
   const steamxIds = new SteamxIdService();
-  const logger = { info: vi.fn() };
+  const logger = { setContext: vi.fn(), info: vi.fn() };
   const sectionRepository = { findById: vi.fn().mockResolvedValue(null) };
   const sections = new ClassSectionsService(
     sectionRepository as unknown as ClassSectionsRepository,

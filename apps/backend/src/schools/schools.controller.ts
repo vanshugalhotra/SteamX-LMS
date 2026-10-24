@@ -1,21 +1,19 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiCookieAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
-  ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { PERMISSION } from '../auth/permissions.js';
+import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
 import { CreateSchoolDto } from './dto/create-school.dto.js';
 import { SchoolListQueryDto } from './dto/school-list-query.dto.js';
 import { SchoolListResponseDto } from './dto/school-list-response.dto.js';
@@ -25,16 +23,9 @@ import { UpdateSchoolStatusDto } from './dto/update-school-status.dto.js';
 import { SchoolsService } from './schools.service.js';
 
 @ApiTags('Schools')
-@ApiCookieAuth('cookieAuth')
-@ApiUnauthorizedResponse({
-  description: 'Session is invalid or missing.',
-})
+@ApiProtectedController()
 @ApiForbiddenResponse({
-  description:
-    'Permission is missing, this action is restricted to platform staff, or Origin is invalid.',
-})
-@ApiInternalServerErrorResponse({
-  description: 'An unexpected server error occurred.',
+  description: 'The required permission is missing, or Origin is invalid.',
 })
 @Controller({ path: 'schools' })
 export class SchoolsController {
