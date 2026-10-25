@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -8,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Patch,
   Query,
   Res,
 } from '@nestjs/common';
@@ -16,6 +18,7 @@ import {
   ApiCreatedResponse,
   ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -28,10 +31,12 @@ import { PERMISSION } from '../auth/permissions.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
 import type { Response } from 'express';
-import { AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
+import { AssetDto, AssetFileDto, CreateAssetResponseDto } from './dto/asset-response.dto.js';
 import { AssetAccessResponseDto } from './dto/asset-access-response.dto.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { CreateAssetFileDto } from './dto/create-asset-file.dto.js';
+import { UpdateAssetDto } from './dto/update-asset.dto.js';
+import { UpdateAssetStatusDto } from './dto/update-asset-status.dto.js';
 import { AssetListQueryDto } from './dto/asset-list-query.dto.js';
 import { AssetLibraryDetailDto, AssetListResponseDto } from './dto/asset-library-response.dto.js';
 import { AssetsService } from './assets.service.js';
@@ -132,6 +137,80 @@ export class AssetsController {
     @Body() body: CreateAssetDto,
   ): Promise<CreateAssetResponseDto> {
     return this.assets.create(actor, body);
+  }
+
+  // ─────────────────────────────────────────
+  // PATCH /assets/:id/status — Archive or unarchive an asset
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.ASSET_WRITE)
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Archive or unarchive an asset' })
+  @ApiOkResponse({ description: 'Asset status updated.', type: AssetDto })
+  @ApiBadRequestResponse({ description: 'Status must be ACTIVE or ARCHIVED.' })
+  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  updateStatus(
+    @CurrentAuth() actor: AuthContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+    @Body() body: UpdateAssetStatusDto,
+  ): Promise<AssetDto> {
+    return this.assets.updateStatus(actor, id, body);
+  }
+
+  // ─────────────────────────────────────────
+  // PATCH /assets/:id — Rename an asset
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.ASSET_WRITE)
+  @Patch(':id')
+  @ApiOperation({ summary: 'Rename an asset' })
+  @ApiOkResponse({ description: 'Asset renamed.', type: AssetDto })
+  @ApiBadRequestResponse({ description: 'The title is invalid.' })
+  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  update(
+    @CurrentAuth() actor: AuthContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+    @Body() body: UpdateAssetDto,
+  ): Promise<AssetDto> {
+    return this.assets.update(actor, id, body);
+  }
+
+  // ─────────────────────────────────────────
+  // DELETE /assets/:id — Delete an unused asset
+  // ─────────────────────────────────────────
+
+  @RequirePermission(PERMISSION.ASSET_WRITE)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an unused asset and queue its files for cleanup' })
+  @ApiNoContentResponse({ description: 'Asset deleted.' })
+  @ApiConflictResponse({
+    description: 'The asset is in use or an upload is still being processed.',
+  })
+  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  delete(
+    @CurrentAuth() actor: AuthContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+  ): Promise<void> {
+    return this.assets.delete(actor, id);
   }
 
   // ─────────────────────────────────────────

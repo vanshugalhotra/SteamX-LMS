@@ -349,6 +349,40 @@ the asset's existing type selects the MIME allow-list and size limit.
 - [auto] Replacing and completing a file does not alter lesson-block asset IDs or where-used results.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
+### `PATCH /assets/:id`
+
+Caller: authenticated admin with `asset.write`; renames an asset whether ACTIVE or ARCHIVED.
+
+- [auto] When title has surrounding whitespace -> expect `200` and a trimmed title in the response, detail route, and library list.
+- [auto] When title is empty, whitespace-only, or longer than 200 characters -> expect `400`.
+- [auto] When the body includes an unknown field -> expect `400 VALIDATION_ERROR`.
+- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+
+### `PATCH /assets/:id/status`
+
+Caller: authenticated admin with `asset.write`; sets status directly to ACTIVE or ARCHIVED.
+
+- [auto] When status changes to ARCHIVED -> expect `200`; the asset disappears from the default library, but remains available by detail and preview access.
+- [auto] When status changes back to ACTIVE -> expect `200` and the asset returns to the default library.
+- [auto] When status is unchanged -> expect `200` without changing `updatedAt`.
+- [auto] When status is DRAFT or any unknown value -> expect `400`; when ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+
+### `DELETE /assets/:id`
+
+Caller: authenticated admin with `asset.write`; deletes an asset only when it is not referenced by lesson blocks and has no UPLOADED or PROCESSING file.
+
+- [auto] When the asset is unused -> expect `204`; all file rows are deleted and each file prefix is queued for asynchronous storage cleanup.
+- [auto] When a lesson block references the asset, including a child block inside a TWO_COLUMN block -> expect `409 RESOURCE_IN_USE`; file rows and cleanup queue remain unchanged.
+- [auto] After removing the lesson block -> expect deletion to succeed.
+- [auto] When any file is UPLOADED or PROCESSING -> expect `409 REPLACEMENT_IN_PROGRESS` without deleting files or changing the cleanup queue.
+- [auto] READY, UPLOADING, and FAILED files are eligible for deletion; archived assets and assets without files are also deletable.
+- [auto] Repeating deletion, or using an unknown/malformed ID -> expect `404 NOT_FOUND`.
+- [auto] After deletion, detail and access return `404`, and the asset is absent from the library.
+- [auto] When deletion races with starting a replacement -> expect no 5xx and either the asset is gone with no files or exists with exactly one UPLOADING file.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+
 ### `GET /assets/:id/files/:fileId`
 
 Caller: authenticated admin with `asset.read`; returns the state of a file belonging to that asset.
