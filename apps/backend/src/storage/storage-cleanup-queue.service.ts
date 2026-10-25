@@ -5,8 +5,9 @@ import type { Env } from '../config/env.schema.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StorageService } from './storage.service.js';
 
-// Let every upload URL expire, then allow five more minutes for a late upload to finish.
+// TODO(storage-health): Reconcile orphaned objects; a fixed grace cannot guarantee a slow PUT has finished.
 const UPLOAD_URL_LATE_PUT_GRACE_SECONDS = 300;
+// TODO(storage-health): Report and quarantine or back off persistent failures; raising this cap only postpones starvation.
 // Cap queue pages per run so a large backlog cannot keep one cleanup run busy indefinitely.
 const DEFAULT_MAX_BATCHES = 20;
 
@@ -63,7 +64,8 @@ export class StorageCleanupQueueService {
     const eligibleBefore = new Date(
       Date.now() - (this.uploadUrlTtlSeconds + UPLOAD_URL_LATE_PUT_GRACE_SECONDS) * 1_000,
     );
-    // Object-only entries are intentionally left pending until the worker supports single-object deletion.
+    // TODO(submissions): When submission upload/delete flows are introduced, support single-object
+    // queue entries and test their cleanup lifecycle. Until then, these rows stay pending.
     const skipped = await this.prisma.storageCleanupQueue.count({
       where: {
         isPrefix: false,
