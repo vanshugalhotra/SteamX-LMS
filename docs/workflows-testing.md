@@ -28,25 +28,16 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
    through the user APIs. New users have `mustChangePassword`; create a separate password-ready
    admin or complete its forced password change before normal testing.
 
-## Asset upload
+## Asset library
 
-**Goal:** Create an asset, upload its bytes directly to storage, and verify the completed file becomes READY.
+**Preconditions:** Admin session with `asset.read` and `asset.write`; test storage available.
 
-**Preconditions:** Admin session with `asset.write`; `asset.read` for checking state; test storage available. For staging, use the browser-based asset upload smoke test in [infrastructure.md](./infrastructure.md) with small test files.
-
-1. Call `POST /api/v1/assets` with type, title, filename, MIME, and exact byte size. Save the returned asset ID, file ID, URL, method, and headers.
-2. Upload the bytes directly to the returned URL using the returned method and headers. Do not change the signed `Content-Type` or content length.
-3. Call `GET /api/v1/assets/:id/files/:fileId`; before completion the state is `UPLOADING`.
-4. Call `POST /api/v1/assets/:id/files/:fileId/complete`. For matching size, content type, and file signature, expect `200 READY`; repeat and expect the same state.
-5. For VIDEO, verify the playback key is the original storage key. For IMAGE and PDF, playback key is null.
-6. Call complete before uploading on a fresh file; expect retryable `409 UPLOAD_NOT_COMPLETE` and `UPLOADING`. Upload, retry complete, and expect `READY`.
-7. To check verification failures, upload (a) a text payload declared as an allowed image/PDF MIME, (b) bytes with a mismatched content type, and (c) a body whose actual size differs if the storage signer permits it. Completion returns `200 FAILED` with a stable `lastError` (`CONTENT_NOT_RECOGNIZED`, `TYPE_MISMATCH`, or `SIZE_MISMATCH`). Repeating completion leaves FAILED unchanged.
-8. If replacing an existing file, do not delete the serving READY file until the new file has processed. `makeReady` performs the swap under an asset-row lock; the database queues the old file prefix for cleanup.
-9. Call `GET /api/v1/assets/:id/access` to preview the READY file. Expect a short-lived URL and `Cache-Control: no-store`; use it inline for the image, PDF, or video. Request a fresh URL if a fetch returns `403`, since viewers may continue making byte-range requests until the configured TTL expires.
-10. For a minimal browser-based access check using an existing READY asset, run `pnpm --dir apps/backend asset:access:smoke --port 5174`, open `http://localhost:5174`, and enter the admin credentials and asset ID. Confirm the `206` byte-range result and media preview; the page does not print the signed URL.
-11. Rename the asset with `PATCH /api/v1/assets/:id`, including surrounding title whitespace, and verify the trimmed title in its detail and library responses.
-12. Archive it with `PATCH /api/v1/assets/:id/status`; verify it disappears from the default library but remains inspectable and previewable. Unarchive it and verify it returns to the default library.
-13. Reference the asset from a lesson block, then call `DELETE /api/v1/assets/:id`; expect `409 RESOURCE_IN_USE` and verify its file rows remain. Remove the block, retry deletion, and expect `204`. Storage objects are deleted later by the cleanup worker.
+- **Upload and access:** Create an asset, upload to the returned URL, complete it, and confirm `READY` through file state, detail, and library. Request access and verify the short-lived no-store URL. Repeat completion; it remains READY.
+- **Failure and retry:** Complete before upload and expect retryable `409 UPLOAD_NOT_COMPLETE`. Verify invalid stored bytes become FAILED with a stable code. Start a new attempt and confirm it can complete and appear in the library.
+- **Replacement:** Keep the old READY file serving while a replacement is UPLOADING. Successful completion swaps files and queues the old prefix; failed completion preserves the old file. UPLOADED/PROCESSING work blocks another replacement; older UPLOADING attempts are superseded.
+- **Manage:** Rename and verify the trimmed title. Archive and verify default-list hiding while detail/access remain available; unarchive and confirm the default listing returns.
+- **Delete and cleanup:** Delete an unused asset and verify file rows are removed and prefixes queued. A lesson-block reference returns `409 RESOURCE_IN_USE`; this is database-FK protection because no block service exists yet. After removing the block, deletion succeeds. Backdate stale files and queued prefixes in the isolated database, run cleanup, and verify abandoned rows and objects are removed while READY objects remain.
+- For real browser uploads and access, use the [asset upload and access smoke tests](./infrastructure.md).
 
 ## First admin login and password change
 
@@ -279,17 +270,6 @@ email, names, and creation times.
   lessons only; draft descendants stay draft and reactivation does not revive archived descendants.
 - Delete an empty lesson, module, and course; verify deletion is blocked with `RESOURCE_IN_USE` when dependent records remain.
 - Verify lesson audiences, including teacher-only lessons and lessons visible to students.
-- Private asset upload, processing failure, replacement, signed access, and queued storage cleanup:
-  - Complete an image, PDF, and video upload, then replace each through `POST /api/v1/assets/:id/files`; while each replacement is UPLOADING, verify `GET /assets/:id` and `/access` still use the old READY file.
-  - Complete each replacement and verify its new file is READY, its old row is gone, and the old prefix is queued for asynchronous cleanup. Confirm video access signs the new file's playback key.
-  - Upload text bytes declared as an image and complete; verify the replacement becomes FAILED, the previous READY file remains served, and its prefix is not queued.
-  - Seed UPLOADED or PROCESSING state and verify replacement returns `409 REPLACEMENT_IN_PROGRESS` without changing rows. Seed an older UPLOADING or FAILED attempt and verify the new attempt supersedes it and completion of the old file ID returns `404`.
-  - With no READY file after a failed or abandoned first upload, use the same replacement route as a retry and verify successful completion makes the asset appear in `GET /assets`.
-  - Verify an in-progress or failed replacement does not hide an existing READY asset from `GET /assets`, and `GET /assets/:id` still shows distinct lessons where the asset is used.
-- Cleanup workflow:
-  - Abandon an upload or delete an unused asset, then confirm its file prefix is queued and remains untouched until the upload URL TTL plus five-minute late-PUT grace has elapsed.
-  - For a local database test, backdate `storage_cleanup_queue.queued_at` (for example, to one hour ago), run `StorageCleanupQueueService.drain()`, then verify the prefix is gone and `done_at` is set.
-  - Backdate a non-READY `asset_files.updated_at` beyond `ASSET_STALE_FILE_AFTER_HOURS`, run `AssetCleanupService.run()`, and verify the file row is removed, its prefix is queued, and an empty unreferenced asset is removed. READY files and assets referenced by lesson blocks must remain.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.
 - Student promotion that completes old-class enrollments and validates cross-school moves.

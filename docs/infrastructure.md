@@ -49,38 +49,41 @@ Stack outputs `BucketName`, `Region`, and `BackendUserName`. For local/staging b
 
 > Before destroying staging: delete any manually created access key for the backend IAM user (CloudFormation can't delete users with active keys).
 
-### Asset access URL TTLs
+### Backend environment variables
 
-Set these optional backend environment variables in `apps/backend/.env` to override the defaults.
-Values must be positive integers no greater than 43,200 seconds. S3 checks expiry on every request;
-players and PDF viewers make repeated range requests, so TTLs must cover normal viewing. Clients
-should request a new URL when a fetch returns `403`.
+These names, defaults, and bounds match `apps/backend/src/config/env.schema.ts`. AWS access keys
+are optional, but must be set together. `CORS_ORIGINS` must be non-empty in production.
 
-| Variable                         | Default |
-| -------------------------------- | ------: |
-| `ASSET_ACCESS_TTL_IMAGE_SECONDS` |     600 |
-| `ASSET_ACCESS_TTL_PDF_SECONDS`   |    1800 |
-| `ASSET_ACCESS_TTL_VIDEO_SECONDS` |    7200 |
+| Variable                                     | Default / requirement                                  |
+| -------------------------------------------- | ------------------------------------------------------ |
+| `NODE_ENV`                                   | `development` (`development`, `test`, or `production`) |
+| `PORT`                                       | `3333`; integer 1–65535                                |
+| `LOG_LEVEL`                                  | `info`                                                 |
+| `DATABASE_URL`                               | Required                                               |
+| `DB_POOL_MAX`                                | `10`; integer 1–50                                     |
+| `DB_CONNECTION_TIMEOUT_MS`                   | `5000`; integer at least 1000                          |
+| `AUTH_JWT_SECRET`                            | Required; at least 32 characters                       |
+| `AUTH_TOKEN_TTL_SECONDS`                     | `86400`; integer at least 60                           |
+| `CORS_ORIGINS`                               | Empty outside production; comma-separated valid URLs   |
+| `SWAGGER_ENABLED`                            | Defaults to enabled only in development                |
+| `AWS_REGION`, `S3_BUCKET`                    | Required                                               |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional pair; omit both when using an AWS role        |
+| `UPLOAD_URL_TTL_SECONDS`                     | `900`; positive integer up to 3600                     |
+| `CLEANUP_ENABLED`                            | `true`                                                 |
+| `CLEANUP_INTERVAL_SECONDS`                   | `300`; integer at least 10                             |
+| `CLEANUP_BATCH_SIZE`                         | `50`; positive integer                                 |
+| `ASSET_STALE_FILE_AFTER_HOURS`               | `24`; integer at least 1                               |
+| `ASSET_MAX_BYTES_IMAGE`                      | 10 MiB; positive integer                               |
+| `ASSET_MAX_BYTES_PDF`                        | 50 MiB; positive integer                               |
+| `ASSET_MAX_BYTES_VIDEO`                      | 1 GiB; positive integer                                |
+| `ASSET_ACCESS_TTL_IMAGE_SECONDS`             | `600`; positive integer up to 43,200                   |
+| `ASSET_ACCESS_TTL_PDF_SECONDS`               | `1800`; positive integer up to 43,200                  |
+| `ASSET_ACCESS_TTL_VIDEO_SECONDS`             | `7200`; positive integer up to 43,200                  |
 
-### Storage and asset cleanup
-
-Cleanup runs in the API process. Each step is idempotent, so multiple API instances may run
-cleanup concurrently without locks. The worker uses a self-rescheduling, unref'd timer and does
-not delay application shutdown. Queue entries wait for the configured upload URL lifetime plus
-five minutes before a prefix can be removed, protecting against a late upload using a superseded
-or abandoned URL.
-
-| Variable                       | Default | Minimum |
-| ------------------------------ | ------: | ------: |
-| `CLEANUP_ENABLED`              |  `true` |       — |
-| `CLEANUP_INTERVAL_SECONDS`     |     300 |      10 |
-| `CLEANUP_BATCH_SIZE`           |      50 |       1 |
-| `ASSET_STALE_FILE_AFTER_HOURS` |      24 |       1 |
-
-Set `CLEANUP_ENABLED=false` in automated test environments to prevent the timer from running.
-Non-READY files older than the stale-file threshold are deleted from the database in one batch;
-the database trigger queues their storage prefixes. READY files are retained. Empty assets not
-referenced by lesson blocks are removed in a separate bounded step.
+Cleanup runs in the API process with a self-rescheduling, unref'd timer. It processes bounded
+batches; failed queue entries are retried on every run. Prefix deletion waits for the upload URL
+TTL plus five minutes to protect against late uploads. Non-READY stale files and empty, unreferenced
+assets are removed; READY files are retained. Set `CLEANUP_ENABLED=false` in automated tests.
 
 #### Storage cleanup queue smoke test
 

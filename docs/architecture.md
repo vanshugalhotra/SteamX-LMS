@@ -20,8 +20,9 @@ Response mappers convert database records → response DTOs. Shared helpers live
 | `SchoolsModule`         | School management.                                                                | `SchoolsService`                                                                                          |
 | `ClassSectionsModule`   | Class-section management.                                                         | `ClassSectionsService`                                                                                    |
 | `CurriculumModule`      | Global course/module/lesson lifecycle, ordering, status transitions, outline.     | `CoursesService`, `CourseModulesService`, `LessonsService`, `CourseOutlineService`                        |
-| `AssetsModule`          | Asset/file APIs, stale-file and ghost-asset cleanup, and cleanup scheduling.      | —                                                                                                         |
-| `AssetProcessingModule` | Per-type processing seam; passthrough processors currently retain uploaded files. | `AssetProcessorRegistry`                                                                                  |
+| `AssetsModule`          | Asset library API, file lifecycle, access URLs, and repositories.                 | —                                                                                                         |
+| `AssetProcessingModule` | Per-type processing seam; current processors retain uploaded files.               | `AssetProcessorRegistry`                                                                                  |
+| `CleanupScheduler`      | `AssetsModule` provider; runs stale-file, empty-asset, and storage-queue cleanup. | —                                                                                                         |
 | `StorageModule`         | S3 boundary and queued-prefix cleanup.                                            | `StorageService`, `StorageCleanupQueueService`                                                            |
 | `TenancyModule`         | Resolves a required active school for workflows.                                  | `ActiveSchoolService`                                                                                     |
 | `PrismaModule`          | Configured Prisma client.                                                         | `PrismaService`                                                                                           |
@@ -53,3 +54,11 @@ Response mappers convert database records → response DTOs. Shared helpers live
 - **Cleanup worker:** `StorageCleanupQueueService` pages eligible prefix entries in `StorageModule`; `AssetCleanupService` removes stale non-READY files and unreferenced empty assets in `AssetsModule`; `CleanupScheduler` runs both sequentially on a self-rescheduling timer.
 - **Logging:** Pino structured logs with request ID. Sensitive fields redacted.
 - **API contract:** `/api/v1` prefix. Swagger at `/api/docs` (when enabled).
+
+## Known limits (MVP)
+
+- Video is MP4-only and served through signed MP4 URLs; HLS is not implemented.
+- Uploads use one request per file and have configured size limits.
+- URLs are S3 presigned URLs, not CloudFront URLs.
+- Cleanup runs inside the API process. Failed queue entries are retried on every cleanup run.
+- PPTX upload is unsupported; no block service exists yet, so asset-in-use deletion protection relies on the database foreign key.
