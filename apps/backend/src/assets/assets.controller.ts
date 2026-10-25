@@ -196,7 +196,6 @@ export class AssetsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete an unused asset and queue its files for cleanup' })
   @ApiNoContentResponse({ description: 'Asset deleted.' })
-  @ApiBadRequestResponse({ description: 'The asset ID is invalid.' })
   @ApiConflictResponse({
     description: 'The asset is in use or an upload is still being processed.',
   })
