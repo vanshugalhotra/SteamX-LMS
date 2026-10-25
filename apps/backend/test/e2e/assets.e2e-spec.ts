@@ -16,10 +16,14 @@ import {
 } from '../../src/generated/prisma/client.js';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { buildOriginalKey } from '../../src/assets/asset-rules.js';
 import { AssetsService } from '../../src/assets/assets.service.js';
 import { AssetProcessorRegistry } from '../../src/assets/processing/asset-processor.registry.js';
 import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
+import {
+  createLessonWithAssetBlock,
+  createTestAsset,
+  createTestAssetFile,
+} from '../support/factories/assets.js';
 import { cleanupFixtures } from '../support/setup/cleanup.js';
 import { loginAsCookie } from '../support/login.js';
 import { createTestApp, getTestStorageService } from '../support/create-test-app.js';
@@ -233,16 +237,7 @@ describe('Assets endpoints (e2e)', () => {
     type: AssetType = AssetType.IMAGE,
     options: { title?: string; status?: ContentStatus; createdAt?: Date } = {},
   ): Promise<string> {
-    const assetId = randomUUID().toLowerCase();
-    await prisma.asset.create({
-      data: {
-        id: assetId,
-        type,
-        title: options.title ?? `Database asset ${assetId}`,
-        status: options.status,
-        createdAt: options.createdAt,
-      },
-    });
+    const assetId = await createTestAsset(prisma, { type, ...options });
     createdAssetIds.push(assetId);
     return assetId;
   }
@@ -259,51 +254,7 @@ describe('Assets endpoints (e2e)', () => {
       playbackKey?: string | null;
     } = {},
   ) {
-    const fileId = options.fileId ?? randomUUID().toLowerCase();
-    const storageKey = buildOriginalKey(assetId, fileId);
-    await prisma.assetFile.create({
-      data: {
-        id: fileId,
-        assetId,
-        storageKey,
-        originalFilename: options.originalFilename ?? 'direct-test.png',
-        mimeType,
-        sizeBytes: 16n,
-        createdAt: options.createdAt,
-      },
-    });
-
-    if (status === AssetFileStatus.UPLOADING) {
-      return { id: fileId, storageKey };
-    }
-
-    const uploaded = await prisma.assetFile.update({
-      where: { id: fileId },
-      data: { status: AssetFileStatus.UPLOADED },
-    });
-    if (status === AssetFileStatus.UPLOADED) {
-      return { id: uploaded.id, storageKey };
-    }
-
-    const nextStatus =
-      status === AssetFileStatus.FAILED ? AssetFileStatus.FAILED : AssetFileStatus.PROCESSING;
-    const progressed = await prisma.assetFile.update({
-      where: { id: fileId },
-      data: { status: nextStatus, lastError: options.lastError },
-    });
-    if (status === AssetFileStatus.READY) {
-      const playbackKey =
-        options.playbackKey ?? (mimeType === 'video/mp4' ? storageKey : undefined);
-      const ready = await prisma.assetFile.update({
-        where: { id: progressed.id },
-        data: {
-          status: AssetFileStatus.READY,
-          ...(playbackKey !== undefined && { playbackKey }),
-        },
-      });
-      return { id: ready.id, storageKey };
-    }
-    return { id: progressed.id, storageKey };
+    return createTestAssetFile(prisma, assetId, status, mimeType, options);
   }
 
   async function createDatabaseCourse(title: string) {
@@ -1339,6 +1290,7 @@ describe('Assets endpoints (e2e)', () => {
     await getAssetFile(adminCookie, first.asset.id, 'invalid-id').expect(404);
     await getAssetFile(teacherCookie, first.asset.id, first.file.id).expect(403);
     await getAssetFile(studentCookie, first.asset.id, first.file.id).expect(403);
+    await getAssetFile(schoolStaffCookie, first.asset.id, first.file.id).expect(403);
     await request(app.getHttpServer())
       .get(`/api/v1/assets/${first.asset.id}/files/${first.file.id}`)
       .expect(401);
@@ -1489,6 +1441,26 @@ describe('Assets endpoints (e2e)', () => {
     expect(
       await prisma.assetFile.findUniqueOrThrow({ where: { id: created.file.id } }),
     ).toMatchObject({ status: AssetFileStatus.FAILED, lastError: 'PROCESSING_FAILED' });
+  });
+
+  // Known gap: the processing failure logger currently receives the raw provider error.
+  it.fails('does not log internal processor error text or signed URLs', async () => {
+    const internalError = 'private error https://storage.example.test/signed?token=secret';
+    const created = await createAndUpload(AssetType.IMAGE, 'image/jpeg', JPEG_BYTES);
+    const processor = app.get(AssetProcessorRegistry).get(AssetType.IMAGE);
+    const process = vi.spyOn(processor, 'process').mockRejectedValueOnce(new Error(internalError));
+    const logger = vi.spyOn(app.get(AssetsService)['logger'], 'error');
+
+    try {
+      await completeAssetFile(adminCookie, created.asset.id, created.file.id).expect(200);
+      const loggedArguments = JSON.stringify(logger.mock.calls, (_key, value: unknown) =>
+        value instanceof Error ? { message: value.message, stack: value.stack } : value,
+      );
+      expect(loggedArguments).not.toContain(internalError);
+    } finally {
+      process.mockRestore();
+      logger.mockRestore();
+    }
   });
 
   it('handles concurrent completion requests with one processing winner', async () => {
@@ -1736,36 +1708,16 @@ describe('Assets endpoints (e2e)', () => {
   });
 
   it('rolls back file deletion and cleanup when top-level or child blocks reference an asset', async () => {
-    const course = await createDatabaseCourse(`Delete guard ${randomUUID()}`);
-    const module = await createDatabaseModule(course.id, 'Delete guard module');
-    const lesson = await createDatabaseLesson(course.id, module.id, 'Delete guard lesson');
     const assetIds: string[] = [];
 
     for (const nested of [false, true]) {
       const assetId = await createDatabaseAsset();
       assetIds.push(assetId);
       const file = await createDatabaseFile(assetId, AssetFileStatus.READY);
-      let parentBlockId: string | undefined;
-      if (nested) {
-        const parent = await prisma.lessonBlock.create({
-          data: {
-            lessonId: lesson.id,
-            type: BlockType.TWO_COLUMN,
-            content: {},
-            position: 1,
-          },
-        });
-        parentBlockId = parent.id;
-      }
-      const block = await prisma.lessonBlock.create({
-        data: {
-          lessonId: lesson.id,
-          type: BlockType.IMAGE,
-          content: {},
-          assetId,
-          ...(parentBlockId === undefined ? { position: 2 } : { parentBlockId, columnIndex: 0 }),
-        },
-      });
+      const lesson = await createLessonWithAssetBlock(prisma, assetId, { nested });
+      createdCourseIds.push(lesson.courseId);
+      createdModuleIds.push(lesson.moduleId);
+      createdLessonIds.push(lesson.lessonId);
       const beforeQueue = await prisma.storageCleanupQueue.findMany({
         where: { objectKey: { startsWith: `assets/${assetId}/` } },
       });
@@ -1781,9 +1733,9 @@ describe('Assets endpoints (e2e)', () => {
           where: { objectKey: { startsWith: `assets/${assetId}/` } },
         }),
       ).resolves.toEqual(beforeQueue);
-      await prisma.lessonBlock.delete({ where: { id: block.id } });
-      if (parentBlockId) {
-        await prisma.lessonBlock.delete({ where: { id: parentBlockId } });
+      await prisma.lessonBlock.delete({ where: { id: lesson.blockId } });
+      if (lesson.parentBlockId) {
+        await prisma.lessonBlock.delete({ where: { id: lesson.parentBlockId } });
       }
       await deleteAsset(adminCookie, assetId).expect(204);
     }

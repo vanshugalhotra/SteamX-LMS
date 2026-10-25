@@ -27,7 +27,10 @@
 - A declared permission requires auth + a matching role grant.
 - Permission keys: `src/auth/permissions.ts`. Grants loaded at startup and cached in memory — **restart after changing grants**.
 - **Curriculum** is global (no school scope). Routes need `curriculum.read`/`curriculum.write` and services also require platform-staff user type. School staff/students are denied even with permissions.
-- **Assets** are global (no school scope). Routes need `asset.read` or `asset.write`; both permissions are granted to `admin` only. The author access-URL service independently requires `PLATFORM_STAFF`, even if another role is later granted `asset.read`. An asset ID alone is never a grant for non-admins. A future student path must check lesson, delivery, and subscription access in its caller before it asks the shared delivery method to issue a URL.
+- **Assets** are global (no school scope). Every route requires `asset.read` or `asset.write`; the grants are admin-only by default. Author preview URLs also require `PLATFORM_STAFF`.
+
+An asset ID alone never grants access to non-admins. A future student path must check lesson,
+delivery, and subscription access before requesting a URL.
 
 ## School scope vs. user visibility
 

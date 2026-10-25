@@ -327,7 +327,7 @@ Caller: authenticated admin with `asset.write`; creates an ACTIVE asset and UPLO
 - [auto] When declared size exceeds the configured type limit -> expect `400 FILE_TOO_LARGE`; exactly the limit is allowed by unit tests.
 - [auto] When size is zero, negative, fractional, or title/filename is empty or whitespace -> expect `400`.
 - [auto] When the body includes an unknown field -> expect `400 VALIDATION_ERROR`.
-- [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 - [manual] Upload using the returned URL, method, and headers; confirm the object uses the exact declared content type and size.
 
 ### `POST /assets/:id/files`
@@ -389,7 +389,7 @@ Caller: authenticated admin with `asset.read`; returns the state of a file belon
 
 - [auto] When asset and file IDs match a row -> expect `200` with status, original filename, MIME, numeric size, error code, and timestamps.
 - [auto] When file belongs to another asset, either ID is unknown, or either ID is malformed -> expect `404 NOT_FOUND`.
-- [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
 ### `POST /assets/:id/files/:fileId/complete`
 
@@ -404,7 +404,7 @@ Caller: authenticated admin with `asset.write`; verifies the object uploaded to 
 - [auto] When completion is repeated for READY or FAILED files -> expect `200` and the unchanged file state.
 - [auto] When two completion requests race -> expect both `200`, one processor execution, and one final READY file.
 - [auto] When file does not belong to the supplied asset, either ID is unknown, or an ID is malformed -> expect `404 NOT_FOUND`.
-- [auto] When caller is unauthenticated -> expect `401`; teacher and student roles -> expect `403`.
+- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
 ## Schools
 

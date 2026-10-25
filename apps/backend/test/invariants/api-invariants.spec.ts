@@ -138,6 +138,7 @@ describe('Black-box API invariants', () => {
 
   it('returns 401 without a cookie for every non-public route registered by the running app', async () => {
     expect(api.routes.length).toBeGreaterThan(10);
+    expectAssetRoutesAreEnumerated(api.routes);
     for (const route of api.routes.filter(isBackendRoute)) {
       const path = concretePath(route);
       const options: { body?: object } = {};
@@ -171,6 +172,7 @@ describe('Black-box API invariants', () => {
   });
 
   it('requires an explicit permission on every non-public, non-session-only route', async () => {
+    expectAssetRoutesAreEnumerated(api.routes);
     const admin = await adminCookie();
     const school = await createSchool(admin, 'Permission sweep school');
     const section = await createSection(admin, school.id);
@@ -673,8 +675,57 @@ describe('Black-box API invariants', () => {
         'VALIDATION_ERROR',
       );
     }
+
+    expectAssetRoutesAreEnumerated(api.routes);
+    const assetsPath = '/api/v1/assets';
+    const search = `unmatched-${randomUUID()}`;
+    const assets = await api.send('GET', assetsPath, {
+      cookie: admin,
+      query: { page: 100000, limit: 100, search },
+    });
+    assertStatus(assets, 200);
+    expect(assets.body).toMatchObject({ page: 100000, limit: 100, items: [] });
+    assertStatus(
+      await api.send('GET', assetsPath, {
+        cookie: admin,
+        query: { search, limit: 101 },
+      }),
+      400,
+      'VALIDATION_ERROR',
+    );
+    assertStatus(
+      await api.send('GET', assetsPath, {
+        cookie: admin,
+        query: { search, page: 100001 },
+      }),
+      400,
+      'VALIDATION_ERROR',
+    );
   });
 });
+
+function expectAssetRoutesAreEnumerated(routes: ApiRoute[]): void {
+  const expected = [
+    'GET /api/v1/assets',
+    'GET /api/v1/assets/:id',
+    'GET /api/v1/assets/:id/access',
+    'POST /api/v1/assets',
+    'PATCH /api/v1/assets/:id/status',
+    'PATCH /api/v1/assets/:id',
+    'DELETE /api/v1/assets/:id',
+    'POST /api/v1/assets/:id/files',
+    'GET /api/v1/assets/:id/files/:fileId',
+    'POST /api/v1/assets/:id/files/:fileId/complete',
+  ];
+  const actual = new Set(
+    routes.filter((route) => route.path.startsWith('/api/v1/assets')).map(routeKey),
+  );
+  expect([...actual].sort()).toEqual(expected.sort());
+}
+
+function routeKey(route: ApiRoute): string {
+  return `${route.method} ${route.path}`;
+}
 
 function concretePath(route: ApiRoute): string {
   return route.path.replace(/:[A-Za-z0-9_]+/g, () => randomUUID()).replace(/\*[\w]+/g, 'live');

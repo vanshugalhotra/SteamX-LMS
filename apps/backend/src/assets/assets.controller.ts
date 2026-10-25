@@ -45,7 +45,9 @@ import { AssetAccessService } from './asset-access.service.js';
 /** HTTP and permission boundary for asset creation and file-state reads. */
 @ApiTags('Assets')
 @ApiProtectedController()
-@ApiForbiddenResponse({ description: 'The required asset permission is missing.' })
+@ApiForbiddenResponse({
+  description: 'The required permission is missing, or Origin is invalid.',
+})
 @Controller({ path: 'assets' })
 export class AssetsController {
   constructor(
@@ -54,12 +56,12 @@ export class AssetsController {
   ) {}
 
   // ─────────────────────────────────────────
-  // GET /assets — List library assets
+  // GET /assets — List assets
   // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get()
-  @ApiOperation({ summary: 'List assets available in the library' })
+  @ApiOperation({ summary: 'List assets' })
   @ApiOkResponse({ description: 'Paginated assets with READY files.', type: AssetListResponseDto })
   @ApiBadRequestResponse({ description: 'Query parameters are invalid.' })
   findLibraryItems(@Query() query: AssetListQueryDto): Promise<AssetListResponseDto> {
@@ -67,12 +69,12 @@ export class AssetsController {
   }
 
   // ─────────────────────────────────────────
-  // GET /assets/:id — Get library asset
+  // GET /assets/:id — Get an asset
   // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get(':id')
-  @ApiOperation({ summary: 'Get an asset and its lesson usage' })
+  @ApiOperation({ summary: 'Get an asset' })
   @ApiOkResponse({
     description: 'Asset file state and where-used lessons.',
     type: AssetLibraryDetailDto,
@@ -91,19 +93,15 @@ export class AssetsController {
   }
 
   // ─────────────────────────────────────────
-  // GET /assets/:id/access — Issue an author preview URL
+  // GET /assets/:id/access — Get an asset access URL
   // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get(':id/access')
-  @ApiOperation({
-    summary: 'Issue a short-lived URL for an asset preview',
-    description:
-      'The URL TTL is selected by asset type. Clients should request a new URL after a fetch returns 403; the configured TTL should cover normal viewing and byte-range requests.',
-  })
+  @ApiOperation({ summary: 'Get an asset access URL' })
   @ApiOkResponse({ description: 'Short-lived asset access URL.', type: AssetAccessResponseDto })
-  @ApiConflictResponse({ description: 'Asset has no READY file (ASSET_NOT_READY).' })
-  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  @ApiConflictResponse({ description: 'Asset has no READY file.' })
+  @ApiNotFoundResponse({ description: 'Asset not found.' })
   issueAccess(
     @CurrentAuth() actor: AuthContext,
     @Param(
@@ -120,18 +118,17 @@ export class AssetsController {
   }
 
   // ─────────────────────────────────────────
-  // POST /assets — Create an asset and upload file
+  // POST /assets — Create an asset
   // ─────────────────────────────────────────
 
-  /** Requires write permission; the service handles rules and upload setup. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Post()
-  @ApiOperation({ summary: 'Create an asset and prepare a file upload' })
+  @ApiOperation({ summary: 'Create an asset' })
   @ApiCreatedResponse({
     description: 'Asset, file, and upload instructions.',
     type: CreateAssetResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'Asset type, MIME type, size, or metadata is invalid.' })
+  @ApiBadRequestResponse({ description: 'Asset details or upload metadata are invalid.' })
   create(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateAssetDto,
@@ -140,15 +137,15 @@ export class AssetsController {
   }
 
   // ─────────────────────────────────────────
-  // PATCH /assets/:id/status — Archive or unarchive an asset
+  // PATCH /assets/:id/status — Update an asset status
   // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Patch(':id/status')
-  @ApiOperation({ summary: 'Archive or unarchive an asset' })
+  @ApiOperation({ summary: 'Update an asset status' })
   @ApiOkResponse({ description: 'Asset status updated.', type: AssetDto })
-  @ApiBadRequestResponse({ description: 'Status must be ACTIVE or ARCHIVED.' })
-  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  @ApiBadRequestResponse({ description: 'The asset ID or status is invalid.' })
+  @ApiNotFoundResponse({ description: 'Asset not found.' })
   updateStatus(
     @CurrentAuth() actor: AuthContext,
     @Param(
@@ -164,15 +161,15 @@ export class AssetsController {
   }
 
   // ─────────────────────────────────────────
-  // PATCH /assets/:id — Rename an asset
+  // PATCH /assets/:id — Update an asset
   // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Patch(':id')
-  @ApiOperation({ summary: 'Rename an asset' })
-  @ApiOkResponse({ description: 'Asset renamed.', type: AssetDto })
-  @ApiBadRequestResponse({ description: 'The title is invalid.' })
-  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  @ApiOperation({ summary: 'Update an asset' })
+  @ApiOkResponse({ description: 'Asset updated.', type: AssetDto })
+  @ApiBadRequestResponse({ description: 'The asset ID or title is invalid.' })
+  @ApiNotFoundResponse({ description: 'Asset not found.' })
   update(
     @CurrentAuth() actor: AuthContext,
     @Param(
@@ -188,18 +185,18 @@ export class AssetsController {
   }
 
   // ─────────────────────────────────────────
-  // DELETE /assets/:id — Delete an unused asset
+  // DELETE /assets/:id — Delete an asset
   // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete an unused asset and queue its files for cleanup' })
+  @ApiOperation({ summary: 'Delete an asset' })
   @ApiNoContentResponse({ description: 'Asset deleted.' })
   @ApiConflictResponse({
-    description: 'The asset is in use or an upload is still being processed.',
+    description: 'Asset is in use or an upload is still being processed.',
   })
-  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  @ApiNotFoundResponse({ description: 'Asset not found.' })
   delete(
     @CurrentAuth() actor: AuthContext,
     @Param(
@@ -214,21 +211,19 @@ export class AssetsController {
   }
 
   // ─────────────────────────────────────────
-  // POST /assets/:id/files — Replace or retry a file
+  // POST /assets/:id/files — Replace a file
   // ─────────────────────────────────────────
 
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Post(':id/files')
-  @ApiOperation({ summary: 'Replace or retry an asset file upload' })
+  @ApiOperation({ summary: 'Replace an asset file' })
   @ApiCreatedResponse({
     description: 'Asset, new file, and upload instructions.',
     type: CreateAssetResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'MIME type or size is invalid for the asset type.' })
-  @ApiConflictResponse({
-    description: 'An UPLOADED or PROCESSING file is already in progress.',
-  })
-  @ApiNotFoundResponse({ description: 'Asset not found or ID is malformed.' })
+  @ApiBadRequestResponse({ description: 'Upload metadata is invalid.' })
+  @ApiConflictResponse({ description: 'A file upload is already being processed.' })
+  @ApiNotFoundResponse({ description: 'Asset not found.' })
   replaceFile(
     @CurrentAuth() actor: AuthContext,
     @Param(
@@ -247,10 +242,9 @@ export class AssetsController {
   // GET /assets/:id/files/:fileId — Get file state
   // ─────────────────────────────────────────
 
-  /** Requires read permission; IDs are checked together by the service/repository. */
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get(':id/files/:fileId')
-  @ApiOperation({ summary: 'Get asset file upload and processing state' })
+  @ApiOperation({ summary: 'Get asset file status' })
   @ApiOkResponse({ description: 'Asset file state.', type: AssetFileDto })
   @ApiNotFoundResponse({ description: 'Asset file not found.' })
   findFile(@Param('id') assetId: string, @Param('fileId') fileId: string): Promise<AssetFileDto> {
@@ -261,13 +255,12 @@ export class AssetsController {
   // POST /assets/:id/files/:fileId/complete — Complete upload
   // ─────────────────────────────────────────
 
-  /** Verifies an uploaded object and returns its current lifecycle state. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Post(':id/files/:fileId/complete')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify and complete an asset file upload' })
+  @ApiOperation({ summary: 'Complete an asset file upload' })
   @ApiOkResponse({ description: 'Current asset file state.', type: AssetFileDto })
-  @ApiConflictResponse({ description: 'The object is not available in storage yet; retry later.' })
+  @ApiConflictResponse({ description: 'The uploaded file is not available yet.' })
   @ApiNotFoundResponse({ description: 'Asset file not found.' })
   complete(@Param('id') assetId: string, @Param('fileId') fileId: string): Promise<AssetFileDto> {
     return this.assets.complete(assetId, fileId);
