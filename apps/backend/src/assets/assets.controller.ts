@@ -247,7 +247,22 @@ export class AssetsController {
   @ApiOperation({ summary: 'Get asset file status' })
   @ApiOkResponse({ description: 'Asset file state.', type: AssetFileDto })
   @ApiNotFoundResponse({ description: 'Asset file not found.' })
-  findFile(@Param('id') assetId: string, @Param('fileId') fileId: string): Promise<AssetFileDto> {
+  findFile(
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    assetId: string,
+    @Param(
+      'fileId',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    fileId: string,
+  ): Promise<AssetFileDto> {
     return this.assets.findFile(assetId, fileId);
   }
 
@@ -262,7 +277,23 @@ export class AssetsController {
   @ApiOkResponse({ description: 'Current asset file state.', type: AssetFileDto })
   @ApiConflictResponse({ description: 'The uploaded file is not available yet.' })
   @ApiNotFoundResponse({ description: 'Asset file not found.' })
-  complete(@Param('id') assetId: string, @Param('fileId') fileId: string): Promise<AssetFileDto> {
-    return this.assets.complete(assetId, fileId);
+  complete(
+    @CurrentAuth() actor: AuthContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    assetId: string,
+    @Param(
+      'fileId',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    fileId: string,
+  ): Promise<AssetFileDto> {
+    return this.assets.complete(actor, assetId, fileId);
   }
 }

@@ -278,7 +278,7 @@ export class AssetsService {
   // ─────────────────────────────────────────
 
   /** Idempotently verifies an uploaded object and advances its file through processing. */
-  async complete(assetId: string, fileId: string): Promise<AssetFileDto> {
+  async complete(actor: AuthContext, assetId: string, fileId: string): Promise<AssetFileDto> {
     const normalizedAssetId = this.normalizeUuid(assetId);
     const normalizedFileId = this.normalizeUuid(fileId);
     if (!normalizedAssetId || !normalizedFileId) {
@@ -299,7 +299,7 @@ export class AssetsService {
     const head = await this.storage.head(file.storageKey);
     if (!head) {
       this.logger.debug(
-        { assetId: normalizedAssetId, fileId: normalizedFileId },
+        { actorId: actor.userId, assetId: normalizedAssetId, fileId: normalizedFileId },
         'Asset upload has not reached storage yet',
       );
       throw new ConflictException({
@@ -358,19 +358,22 @@ export class AssetsService {
       ({ playbackKey } = await processor.process(processingFile));
     } catch (error) {
       this.logger.error(
-        { err: error, assetId: normalizedAssetId, fileId: file.id },
+        { err: error, actorId: actor.userId, assetId: normalizedAssetId, fileId: file.id },
         'Asset processing failed',
       );
       return this.failUpload(file.id, AssetFileStatus.PROCESSING, 'PROCESSING_FAILED');
     }
 
-    return toAssetFileDto(
-      await this.makeReady(file.id, {
-        sizeBytes: head.sizeBytes,
-        mimeType: normalizedHeadMimeType,
-        playbackKey,
-      }),
+    const readyFile = await this.makeReady(file.id, {
+      sizeBytes: head.sizeBytes,
+      mimeType: normalizedHeadMimeType,
+      playbackKey,
+    });
+    this.logger.info(
+      { actorId: actor.userId, assetId: normalizedAssetId, fileId: file.id },
+      'Asset file completed',
     );
+    return toAssetFileDto(readyFile);
   }
 
   /**

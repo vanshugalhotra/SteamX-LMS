@@ -541,16 +541,13 @@ describe('Assets endpoints (e2e)', () => {
     }).expect(400);
   });
 
-  it.each([1, 15])(
-    'rejects uploads too small for signature checks: %s bytes',
-    async (sizeBytes) => {
-      const response = await postAsset(adminCookie, {
-        ...standardBody(AssetType.IMAGE, 'image/png'),
-        sizeBytes,
-      }).expect(400);
-      expect(response.body.code).toBe('FILE_TOO_SMALL');
-    },
-  );
+  it.each([1, 15])('rejects sizeBytes below the minimum: %s bytes', async (sizeBytes) => {
+    const response = await postAsset(adminCookie, {
+      ...standardBody(AssetType.IMAGE, 'image/png'),
+      sizeBytes,
+    }).expect(400);
+    expect(response.body.code).toBe('VALIDATION_ERROR');
+  });
 
   it('rejects blank metadata and unknown fields', async () => {
     const base = standardBody(AssetType.IMAGE, 'image/jpeg');

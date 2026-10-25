@@ -50,15 +50,55 @@ Response mappers convert database records → response DTOs. Shared helpers live
 - **Pagination:** `{ items, page, limit, total }`. Defaults: page 1, limit 20, max 100.
 - **DTOs:** class-validator input DTOs via global pipe. Response DTOs via explicit mappers (never raw Prisma entities).
 - **Config:** Zod validates env vars at startup. Services use typed Nest config.
-- **Asset processing:** `AssetProcessorRegistry` selects the processor by asset type. VIDEO currently serves its MP4 original as playback; HLS can replace that processor and report asynchronous work through `processing_job_id` without a schema change.
-- **Cleanup worker:** `StorageCleanupQueueService` pages eligible prefix entries in `StorageModule`; `AssetCleanupService` removes stale non-READY files and unreferenced empty assets in `AssetsModule`; `CleanupScheduler` runs both sequentially on a self-rescheduling timer.
+- **Asset processing:** `AssetProcessorRegistry` selects a per-type processor. IMAGE and PDF pass through; VIDEO uses its original as the playback key. HLS can replace the video processor without a schema change (`processing_job_id` is already in the model).
+- **Cleanup:** `CleanupScheduler` runs queue drain, stale-file removal, and ghost-asset removal sequentially on a self-rescheduling timer. See "Asset and storage flows" below.
 - **Logging:** Pino structured logs with request ID. Sensitive fields redacted.
 - **API contract:** `/api/v1` prefix. Swagger at `/api/docs` (when enabled).
 
+## Asset and storage flows
+
+### File states
+
+```
+UPLOADING → UPLOADED → PROCESSING → READY
+    ↓          ↓           ↓
+  FAILED     FAILED      FAILED
+```
+
+IMAGE and PDF may skip PROCESSING at the DB level; the code always goes through it. READY and FAILED are terminal — no further updates allowed.
+
+### Upload
+
+1. `POST /assets` — server creates asset + UPLOADING file row, returns a presigned S3 PUT URL (valid for `UPLOAD_URL_TTL_SECONDS`, default 15 min).
+2. Client PUTs the file to S3 using the signed URL. `If-None-Match: *` prevents overwrites; signed `Content-Type` and `Content-Length` prevent type/size mismatches.
+3. `POST /assets/:id/files/:fileId/complete` — server HEADs the S3 object, checks size and content type against declared values, reads 16 bytes for file-signature verification, then transitions UPLOADING → UPLOADED → PROCESSING → READY.
+
+Completion is idempotent: re-calling it for a non-UPLOADING file returns the current state.
+
+### Replacement
+
+`POST /assets/:id/files` replaces the file on an existing asset. The asset ID stays stable. Stale UPLOADING/FAILED files are deleted; in-flight UPLOADED/PROCESSING files block replacement. On success, one transaction deletes the old READY file (its S3 prefix is queued for cleanup by a DB trigger) and flips the new file to READY. If the new file cannot transition, the transaction rolls back and the old file keeps serving.
+
+### Access
+
+Author previews (`GET /assets/:id/access`) require `asset.read` + platform staff. The response is a signed S3 GET URL using `playbackKey` (if set) or `storageKey`, with per-type TTLs, `Cache-Control: no-store`, and `Content-Disposition: inline`. No HEAD check is made before signing. An asset ID alone grants no access.
+
+### Cleanup
+
+Three steps run in order by `CleanupScheduler` every `CLEANUP_INTERVAL_SECONDS` (default 5 min):
+
+1. **Queue drain** — an `AFTER DELETE ON asset_files` trigger inserts each deleted file's S3 prefix into `storage_cleanup_queue`. The scheduler drains entries older than `UPLOAD_URL_TTL_SECONDS` + 5 min grace, deleting S3 objects under each prefix, then marking the entry done.
+2. **Stale files** — non-READY files with `updatedAt` older than `ASSET_STALE_FILE_AFTER_HOURS` (default 24 h) are deleted (a re-check prevents deleting files that transitioned to READY between scan and delete).
+3. **Ghost assets** — assets with no files and no block references are deleted.
+
+All steps are idempotent. Multiple API instances can run cleanup without coordination. The scheduler uses `setTimeout().unref()` so it does not block process shutdown and cannot overlap with itself.
+
 ## Known limits (MVP)
 
-- Video is MP4-only and served through signed MP4 URLs; HLS is not implemented.
-- Uploads use one request per file and have configured size limits.
-- URLs are S3 presigned URLs, not CloudFront URLs.
-- Cleanup runs inside the API process. Failed queue entries are retried on every cleanup run.
-- PPTX upload is unsupported; no block service exists yet, so asset-in-use deletion protection relies on the database foreign key.
+- Video is MP4-only, served as signed MP4 URLs; no HLS.
+- PPTX is in the DB enum but uploads are rejected.
+- Uploads are single-PUT (no multipart); size limits are configurable per type.
+- Access URLs are S3 presigned URLs, not CloudFront.
+- Cleanup runs in-process. Failed queue entries retry every run with no backoff or cap.
+- Completed queue entries are never pruned from `storage_cleanup_queue`.
+- No block service yet; asset-in-use deletion relies on the database FK.

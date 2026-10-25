@@ -4,13 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../../config/env.schema.js';
 import { StorageCleanupQueueService } from '../../storage/storage-cleanup-queue.service.js';
 import { AssetCleanupService } from './asset-cleanup.service.js';
-
-function errorDetails(error: unknown): { name: string; message: string } {
-  const name = error instanceof Error ? error.name : 'UnknownError';
-  const message = error instanceof Error ? error.message : String(error);
-  // Storage provider errors can include signed URLs, which should not appear in logs.
-  return { name, message: message.replace(/https?:\/\/\S+/gi, '[redacted URL]') };
-}
+import { safeError } from '../../common/errors/safe-error.js';
 
 @Injectable()
 export class CleanupScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -106,7 +100,7 @@ export class CleanupScheduler implements OnApplicationBootstrap, OnApplicationSh
       }
     } catch (error) {
       // Keep the scheduler alive after transient failures; the next run can retry pending work.
-      this.logger.error({ error: errorDetails(error) }, 'Cleanup run failed');
+      this.logger.error({ error: safeError(error) }, 'Cleanup run failed');
     } finally {
       this.timer = undefined;
       // Schedule after the run finishes so a slow cleanup cannot overlap its next tick.
