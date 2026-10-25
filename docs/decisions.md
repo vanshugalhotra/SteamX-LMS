@@ -69,3 +69,9 @@ Each entry records the current design choice and why.
 - **Archived assets remain previewable** — author access requires a READY file, not ACTIVE content status.
 - **Signed asset URLs are never logged** — structured access logs contain only asset, file, and user IDs.
 - **Consider checking object existence before signing** — a HEAD request adds S3 latency to each URL issuance and cannot prevent a later deletion; defer unless missing-object reports justify the cost.
+- **Self-rescheduling cleanup timer** — schedule the next tick only after the current run finishes and call `unref()`; this is one in-process job, so overlap is impossible without `setInterval` or a scheduling library.
+- **No cleanup locks** — every queue and asset cleanup operation is idempotent, so multiple API instances may process entries concurrently.
+- **Queue delay protects late uploads** — wait for `UPLOAD_URL_TTL_SECONDS` plus five minutes before deleting a prefix, because a superseded or abandoned upload URL can still receive a late PUT until expiry.
+- **Cursor-paged prefix cleanup** — select only pending `is_prefix = true` entries and advance by `(queued_at, id)` cursor so failing entries cannot starve entries behind them. Failed entries retry on each run; there is no attempts column, and alerting must be added before release. `is_prefix = false` entries are skipped until submissions exist.
+- **Stale means non-READY and old by `updated_at`** — delete non-READY file rows only after 24 hours without an update; `created_at` is not the activity signal and READY files are never removed by this rule.
+- **Remove only ghost assets** — empty assets are deleted when they have no file rows and no lesson-block references; a live upload always has a file row.

@@ -29,7 +29,10 @@ function getValidationDetails(errors: ValidationError[], parent = ''): FieldErro
 }
 
 /** Configures the Nest application before it begins accepting requests. */
-export function configureApp(app: INestApplication): void {
+export function configureApp(
+  app: INestApplication,
+  options: { enableShutdownHooks?: boolean } = {},
+): void {
   app.useLogger(app.get(Logger));
   app.flushLogs();
 
@@ -93,5 +96,7 @@ export function configureApp(app: INestApplication): void {
     SwaggerModule.setup('docs', app, document, { useGlobalPrefix: true });
   }
 
-  app.enableShutdownHooks();
+  if (options.enableShutdownHooks ?? true) {
+    app.enableShutdownHooks();
+  }
 }

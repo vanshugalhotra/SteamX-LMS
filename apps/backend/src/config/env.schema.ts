@@ -3,8 +3,17 @@ import { z } from 'zod';
 
 const AUTH_TOKEN_TTL_MIN_SECONDS = 60;
 const AUTH_TOKEN_TTL_DEFAULT_SECONDS = 86_400;
+// Upload links expire after this time; cleanup waits this long plus a five-minute grace period.
 const DEFAULT_UPLOAD_URL_TTL_SECONDS = 900;
 const MAX_UPLOAD_URL_TTL_SECONDS = 3600;
+// The cleanup worker waits this long between runs.
+const DEFAULT_CLEANUP_INTERVAL_SECONDS = 300;
+const MIN_CLEANUP_INTERVAL_SECONDS = 10;
+// Maximum queue page size and ghost assets handled by one run.
+const DEFAULT_CLEANUP_BATCH_SIZE = 50;
+// Non-READY asset files older than this are treated as abandoned.
+const DEFAULT_ASSET_STALE_FILE_AFTER_HOURS = 24;
+
 const DEFAULT_ASSET_MAX_BYTES_IMAGE = 10 * 1024 * 1024;
 const DEFAULT_ASSET_MAX_BYTES_PDF = 50 * 1024 * 1024;
 const DEFAULT_ASSET_MAX_BYTES_VIDEO = 1024 * 1024 * 1024;
@@ -54,6 +63,7 @@ const envSchema = z
       (value) => (value === '' ? undefined : value),
       z.string().min(1).optional(),
     ),
+    // How long a client can use an upload link. Cleanup adds a five-minute safety buffer.
     UPLOAD_URL_TTL_SECONDS: z.coerce
       .number()
       .int()
@@ -62,6 +72,27 @@ const envSchema = z
         error: `must not exceed ${MAX_UPLOAD_URL_TTL_SECONDS} seconds`,
       })
       .default(DEFAULT_UPLOAD_URL_TTL_SECONDS),
+    // Turn the in-process cleanup timer on or off.
+    CLEANUP_ENABLED: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .default(true),
+    // Time between cleanup runs; the first run starts after this delay.
+    CLEANUP_INTERVAL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(MIN_CLEANUP_INTERVAL_SECONDS, {
+        error: `must be at least ${MIN_CLEANUP_INTERVAL_SECONDS}`,
+      })
+      .default(DEFAULT_CLEANUP_INTERVAL_SECONDS),
+    // Items per queue page and maximum ghost assets removed in one run.
+    CLEANUP_BATCH_SIZE: z.coerce.number().int().min(1).default(DEFAULT_CLEANUP_BATCH_SIZE),
+    // Age after which a non-READY file can be removed as abandoned.
+    ASSET_STALE_FILE_AFTER_HOURS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .default(DEFAULT_ASSET_STALE_FILE_AFTER_HOURS),
     ASSET_MAX_BYTES_IMAGE: z.coerce
       .number()
       .int()
@@ -132,6 +163,12 @@ const envSchema = z
       accessKeyId: env.AWS_ACCESS_KEY_ID,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
       uploadUrlTtlSeconds: env.UPLOAD_URL_TTL_SECONDS,
+    },
+    cleanup: {
+      enabled: env.CLEANUP_ENABLED,
+      intervalSeconds: env.CLEANUP_INTERVAL_SECONDS,
+      batchSize: env.CLEANUP_BATCH_SIZE,
+      assetStaleFileAfterHours: env.ASSET_STALE_FILE_AFTER_HOURS,
     },
     assetLimits: {
       image: env.ASSET_MAX_BYTES_IMAGE,

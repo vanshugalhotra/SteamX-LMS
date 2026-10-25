@@ -34,6 +34,8 @@ interface SimulatedUpload {
 /** S3-free StorageService test double; tests populate objects with simulateUpload. */
 export class InMemoryStorageService extends StorageService {
   private readonly objects = new Map<string, StoredObject>();
+  private readonly deleteCalls = new Map<string, number>();
+  private deleteFailure: Error | null = null;
   readonly downloadRequests: CreateDownloadUrlInput[] = [];
 
   constructor(private readonly uploadUrlTtlSeconds = 900) {
@@ -97,7 +99,11 @@ export class InMemoryStorageService extends StorageService {
   }
 
   async deleteByPrefix(prefix: string): Promise<number> {
+    this.deleteCalls.set(prefix, (this.deleteCalls.get(prefix) ?? 0) + 1);
     assertValidPrefix(prefix);
+    if (this.deleteFailure) {
+      throw this.deleteFailure;
+    }
     let deleted = 0;
     for (const key of this.objects.keys()) {
       if (key.startsWith(prefix)) {
@@ -129,6 +135,14 @@ export class InMemoryStorageService extends StorageService {
   has(key: string): boolean {
     assertValidKey(key);
     return this.objects.has(key);
+  }
+
+  failDeletes(error: Error | null): void {
+    this.deleteFailure = error;
+  }
+
+  deleteCallsForPrefix(prefix: string): number {
+    return this.deleteCalls.get(prefix) ?? 0;
   }
 
   keys(prefix?: string): string[] {

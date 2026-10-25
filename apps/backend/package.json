@@ -25,6 +25,7 @@
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "storage:smoke": "pnpm --dir ../../infra exec tsx --tsconfig ../apps/backend/tsconfig.json --env-file ../apps/backend/.env ../apps/backend/test/manual/storage-smoke/storage-smoke.ts",
+    "cleanup:smoke": "pnpm --dir ../../infra exec tsx --tsconfig ../apps/backend/tsconfig.json --env-file ../apps/backend/.env ../apps/backend/test/manual/cleanup-smoke/cleanup-smoke.ts",
     "asset:smoke": "pnpm --dir ../../infra exec tsx --tsconfig ../apps/backend/tsconfig.json --env-file ../apps/backend/.env ../apps/backend/test/manual/asset-upload-smoke/asset-upload-smoke.ts",
     "asset:access:smoke": "pnpm --dir ../../infra exec tsx --tsconfig ../apps/backend/tsconfig.json ../apps/backend/test/manual/asset-access-smoke/asset-access-smoke.ts",
     "admin:create": "pnpm build && node dist/scripts/admin-create.js",

@@ -6,6 +6,8 @@ import { AssetUsageRepository } from './library/asset-usage.repository.js';
 import { AssetsRepository } from './assets.repository.js';
 import { AssetsService } from './assets.service.js';
 import { AssetAccessService } from './asset-access.service.js';
+import { AssetCleanupService } from './cleanup/asset-cleanup.service.js';
+import { CleanupScheduler } from './cleanup/cleanup-scheduler.js';
 // Registered as the next lifecycle seam; these endpoints do not invoke processing yet.
 import { AssetProcessingModule } from './processing/asset-processing.module.js';
 
@@ -13,6 +15,13 @@ import { AssetProcessingModule } from './processing/asset-processing.module.js';
 @Module({
   imports: [PrismaModule, StorageModule, AssetProcessingModule],
   controllers: [AssetsController],
-  providers: [AssetsRepository, AssetUsageRepository, AssetsService, AssetAccessService],
+  providers: [
+    AssetsRepository,
+    AssetUsageRepository,
+    AssetsService,
+    AssetAccessService,
+    AssetCleanupService,
+    CleanupScheduler,
+  ],
 })
 export class AssetsModule {}

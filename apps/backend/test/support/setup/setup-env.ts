@@ -8,6 +8,7 @@ if (testEnv.error || !testEnv.parsed) {
 process.env.ASSET_ACCESS_TTL_IMAGE_SECONDS ??= '600';
 process.env.ASSET_ACCESS_TTL_PDF_SECONDS ??= '1800';
 process.env.ASSET_ACCESS_TTL_VIDEO_SECONDS ??= '7200';
+process.env.CLEANUP_ENABLED = 'false';
 
 export function getTestDatabaseUrl(): string {
   const databaseUrl = process.env.DATABASE_URL;

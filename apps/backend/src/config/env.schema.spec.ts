@@ -34,6 +34,12 @@ describe('validateEnv', () => {
         secretAccessKey: undefined,
         uploadUrlTtlSeconds: 900,
       },
+      cleanup: {
+        enabled: true,
+        intervalSeconds: 300,
+        batchSize: 50,
+        assetStaleFileAfterHours: 24,
+      },
       assetLimits: {
         image: 10 * 1024 * 1024,
         pdf: 50 * 1024 * 1024,
@@ -58,6 +64,40 @@ describe('validateEnv', () => {
 
     expect(env.DB_POOL_MAX).toBe(25);
     expect(env.DB_CONNECTION_TIMEOUT_MS).toBe(8_000);
+  });
+
+  it('parses cleanup settings and rejects values below their minimums', () => {
+    const env = validateEnv({
+      ...STORAGE_CONFIG,
+      AUTH_JWT_SECRET: VALID_SECRET,
+      DATABASE_URL: '******localhost:5432/steamx_lms',
+      CLEANUP_ENABLED: 'false',
+      CLEANUP_INTERVAL_SECONDS: '10',
+      CLEANUP_BATCH_SIZE: '1',
+      ASSET_STALE_FILE_AFTER_HOURS: '1',
+    });
+
+    expect(env.cleanup).toEqual({
+      enabled: false,
+      intervalSeconds: 10,
+      batchSize: 1,
+      assetStaleFileAfterHours: 1,
+    });
+
+    for (const invalid of [
+      { CLEANUP_INTERVAL_SECONDS: '9' },
+      { CLEANUP_BATCH_SIZE: '0' },
+      { ASSET_STALE_FILE_AFTER_HOURS: '0' },
+    ]) {
+      expect(() =>
+        validateEnv({
+          ...STORAGE_CONFIG,
+          AUTH_JWT_SECRET: VALID_SECRET,
+          DATABASE_URL: '******localhost:5432/steamx_lms',
+          ...invalid,
+        }),
+      ).toThrow('Invalid environment configuration');
+    }
   });
 
   it('parses false as false and disables Swagger outside development', () => {
