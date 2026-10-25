@@ -35,19 +35,17 @@ Each entry records the current design choice and why.
 
 ## Asset library
 
-- **Library visibility and detail** — `GET /assets` lists ACTIVE assets with a READY file by default; ARCHIVED is opt-in. Detail prefers READY, otherwise the newest file, and reports distinct where-used lessons capped at 50 with the full total.
-- **Archive and deletion** — archived assets leave the default list but stay inspectable and previewable. No block service exists yet; the database foreign key is the current in-use deletion guard.
-- **Replacement lifecycle** — the asset ID remains stable. The old READY file serves until a replacement succeeds; UPLOADED/PROCESSING work blocks new replacement/deletion, while older UPLOADING/FAILED attempts may be superseded.
-- **Atomic file swap** — the READY swap is transactional; a failed replacement preserves the serving file. Removed file prefixes are queued for asynchronous cleanup.
-- **Upload contract and keys** — IMAGE accepts JPEG/PNG/WEBP, PDF accepts PDF, VIDEO accepts MP4 only; PPTX uploads are rejected. Keys use asset/file IDs under `assets/<asset-id>/<file-id>/`; filenames remain metadata.
-- **File lifecycle** — uploads need at least 16 bytes and follow UPLOADING → UPLOADED → PROCESSING → READY. Completion verifies metadata and signatures; failures expose stable codes, not provider text.
-- **Access URLs** — author previews require platform staff and `asset.read`; an asset ID alone grants no access. URLs sign `playbackKey ?? storageKey`, use type-specific TTLs, and are not cached or logged; no HEAD check is made before signing.
-- **MVP processing** — passthrough processors retain uploads; video uses a signed MP4 URL, with no HLS yet. Prisma BigInt sizes are JSON numbers.
-- **Cleanup** — the API-process scheduler runs non-overlapping batches and retries failed entries each run. Prefixes wait for upload URL expiry plus five minutes; stale non-READY files are removed, READY files are retained, and empty unreferenced assets are deleted.
-- **Concurrent cleanup** — no distributed lock is used; queue and asset cleanup steps are idempotent across API instances.
+- **Listing** — `GET /assets` lists ACTIVE assets with a READY file; ARCHIVED is opt-in. Detail shows the READY file (or newest attempt) and up to 50 where-used lessons with the full count.
+- **Archive and delete** — archived assets leave the list but stay viewable. Deletion is blocked by the DB FK if the asset is used in blocks.
+- **Replacement** — asset ID stays stable. Old READY file serves until replacement succeeds. In-flight UPLOADED/PROCESSING files block new replacements. The swap is one transaction: delete old READY → flip new to READY. Failure rolls back and the old file keeps serving. Removed prefixes are queued for async S3 cleanup.
+- **Upload contract** — IMAGE: JPEG/PNG/WEBP. PDF: PDF. VIDEO: MP4. PPTX: rejected. Keys use `assets/<asset-id>/<file-id>/`; client filenames stay in metadata.
+- **File lifecycle** — uploads need at least 16 bytes. UPLOADING → UPLOADED → PROCESSING → READY. Completion verifies S3 HEAD metadata and file-signature bytes. Failure codes are stable strings, not provider messages.
+- **Access** — author previews need `asset.read` + platform staff; an asset ID alone grants no access. Signed URL uses `playbackKey ?? storageKey`, per-type TTL, `Cache-Control: no-store`. No HEAD check before signing.
+- **Processing** — passthrough for all types; VIDEO sets `playbackKey = storageKey`. HLS replaces the video processor later without a schema change.
+- **Cleanup** — in-process scheduler; non-overlapping, idempotent, no distributed lock. Prefixes wait upload-URL-TTL + 5 min before S3 delete. Stale non-READY files removed after 24 h (configurable). Empty unreferenced assets removed.
 
 ## Storage
 
-- **`StorageService` is abstract** — thin S3 boundary with an in-memory test implementation. Not a generic wrapper.
-- **Presigned PUT URLs** — sign `content-type`, `content-length`, and `if-none-match` via `signableHeaders`. `If-None-Match: *` prevents overwrites. `content-length` signing prevents size mismatches (verified in Chrome and Firefox).
-- **S3 checksum config** — `requestChecksumCalculation` and `responseChecksumValidation` set to `WHEN_REQUIRED` (SDK defaults break presigned browser uploads).
+- **Abstract boundary** — `StorageService` is abstract with an S3 implementation and an in-memory test double. Not a generic wrapper.
+- **Presigned PUT** — signs `Content-Type`, `Content-Length`, and `If-None-Match: *` via `signableHeaders` to prevent overwrites and mismatches.
+- **SDK checksums** — `requestChecksumCalculation` and `responseChecksumValidation` set to `WHEN_REQUIRED`; SDK defaults break presigned browser uploads.

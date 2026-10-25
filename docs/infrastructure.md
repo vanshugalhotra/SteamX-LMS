@@ -80,72 +80,68 @@ are optional, but must be set together. `CORS_ORIGINS` must be non-empty in prod
 | `ASSET_ACCESS_TTL_PDF_SECONDS`               | `1800`; positive integer up to 43,200                  |
 | `ASSET_ACCESS_TTL_VIDEO_SECONDS`             | `7200`; positive integer up to 43,200                  |
 
-Cleanup runs in the API process with a self-rescheduling, unref'd timer. It processes bounded
-batches; failed queue entries are retried on every run. Prefix deletion waits for the upload URL
-TTL plus five minutes to protect against late uploads. Non-READY stale files and empty, unreferenced
-assets are removed; READY files are retained. Set `CLEANUP_ENABLED=false` in automated tests.
+Cleanup runs in the API process on a self-rescheduling `setTimeout().unref()` timer. Steps per run:
+
+1. Drain storage cleanup queue (S3 prefix deletes for entries older than upload URL TTL + 5 min)
+2. Delete stale non-READY asset files (older than `ASSET_STALE_FILE_AFTER_HOURS`)
+3. Delete empty, unreferenced assets
+
+Each step processes a bounded batch (`CLEANUP_BATCH_SIZE`). Failed queue entries retry next run.
+READY files are never deleted. Set `CLEANUP_ENABLED=false` in automated tests.
 
 #### Storage cleanup queue smoke test
 
-Run this against an idle local database and a test bucket; it creates and deletes two temporary
-objects and queue entries:
+Validates queue drain against a real database and S3 bucket:
 
 ```powershell
 pnpm --dir apps/backend storage:cleanup:smoke
 ```
 
-It calls the queue drain directly, so it does not wait for the scheduler interval. The eligible
-entry is backdated past the upload-link lifetime and grace period; the young entry should remain
-pending. It refuses to run if other eligible prefix entries already exist and removes only its own
-objects and queue rows.
+Creates two temporary S3 objects and queue entries — one backdated (eligible), one young (pending).
+Calls drain directly (no scheduler wait). Refuses to run if other eligible entries exist. Removes
+only its own objects and rows.
 
 ## Browser storage smoke test
 
-Uploads to the real bucket from a local browser and checks metadata, signed URLs, downloads, range requests, and unsigned access.
+Tests upload, metadata, signed URLs, downloads, range requests, and unsigned access against the
+real bucket.
 
 ```powershell
 pnpm --dir apps/backend storage:smoke --port 5173
 ```
 
-Requirements:
-
-- Port must be free **and** listed in deployed CORS origins.
-- `AWS_REGION`, `S3_BUCKET`, and backend access keys in `apps/backend/.env`.
-
-Expected results: upload → 200, size mismatch → 403, unsigned GET → 403, range → 206. Click **Clean up** after testing.
+Port must be free **and** listed in deployed CORS origins. Needs `AWS_REGION`, `S3_BUCKET`, and
+access keys in `apps/backend/.env`. Expected: upload → 200, size mismatch → 403, unsigned GET →
+403, range → 206. Click **Clean up** after testing.
 
 ## Asset upload API smoke test
 
-With the backend running against the staging bucket and database, run this from the repository root:
+End-to-end test of asset creation, presigned upload, completion, replacement, and cleanup queue
+insertion. Runs against a live backend + staging bucket.
 
 ```powershell
 pnpm --dir apps/backend asset:smoke --port 5173
 ```
 
-Open `http://localhost:5173` in a browser. The browser origin must be allowed by both the backend's
-`CORS_ORIGINS` and the staging bucket CORS policy. The page asks for the backend URL, seeded admin credentials, an initial PNG, a different
-replacement PNG, and a short MP4. It exercises authenticated asset creation, direct presigned
-uploads, file-state reads, completion (including retrying before the first PNG upload), successful
-replacement while the old file remains available, cleanup-queue insertion, and a failed replacement
-that preserves the current READY file. It also checks idempotent completion, wrong-size upload
-enforcement, and the MP4 playback-key value through narrow read-only database queries. It does not
-display session cookies or presigned URLs.
+Open `http://localhost:5173`. Origin must be allowed by both backend `CORS_ORIGINS` and bucket
+CORS. Enter backend URL, seeded admin credentials, an initial PNG, a replacement PNG, and a short
+MP4. Exercises: create → upload → complete (with retry-before-upload check) → replace → cleanup
+queue entry → failed replacement preserving READY file → idempotent completion → wrong-size
+rejection → MP4 playback-key check.
 
-The local smoke server binds only to `127.0.0.1` and needs `DATABASE_URL` from
-`apps/backend/.env` for the playback-key check. After the run, the page prints S3 cleanup commands
-for each created asset prefix. Replace `<bucket>` with the staging bucket and run those commands
-with the `steamx-backend` AWS profile. The smoke test does not remove database rows; use an isolated
-staging account/database for this manual test.
+Needs `DATABASE_URL` from `apps/backend/.env` for the playback-key verification. Server binds to
+`127.0.0.1` only. Does not display cookies or signed URLs. After the run, the page prints S3
+cleanup commands — run them with the `steamx-backend` AWS profile. Does not remove DB rows; use an
+isolated staging account.
 
 ## Asset access URL smoke test
 
-For a READY asset already in the database and S3, run:
+Tests `GET /assets/:id/access` for a READY asset already in the database and S3.
 
 ```powershell
 pnpm --dir apps/backend asset:access:smoke --port 5173
 ```
 
-Open `http://localhost:5173`, enter the local backend URL, seeded admin credentials, and asset ID.
-The page checks login, the `GET /assets/:id/access` response fields and `Cache-Control: no-store`,
-checks a byte-range request returns `206`, then previews the image, PDF, or video without printing
-the signed URL.
+Open `http://localhost:5173`, enter backend URL, admin credentials, and asset ID. Checks login,
+response fields, `Cache-Control: no-store`, byte-range 206, then previews the file. Does not
+display the signed URL.

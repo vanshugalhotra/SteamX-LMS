@@ -24,6 +24,6 @@ export class CreateAssetFileDto {
     description: 'At least 16 bytes are required for upload signature verification.',
   })
   @IsInt()
-  @Min(1)
+  @Min(16)
   sizeBytes!: number;
 }

@@ -4,12 +4,15 @@ import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../config/env.schema.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { StorageService } from './storage.service.js';
+import { safeError } from '../common/errors/safe-error.js';
 
 // TODO(storage-health): Reconcile orphaned objects; a fixed grace cannot guarantee a slow PUT has finished.
 const UPLOAD_URL_LATE_PUT_GRACE_SECONDS = 300;
 // TODO(storage-health): Report and quarantine or back off persistent failures; raising this cap only postpones starvation.
 // Cap queue pages per run so a large backlog cannot keep one cleanup run busy indefinitely.
 const DEFAULT_MAX_BATCHES = 20;
+// TODO(cleanup): Periodically purge completed entries (done_at IS NOT NULL) older than a
+// configurable retention period (e.g. 30 days) to bound storage_cleanup_queue table growth.
 
 /** Optional limits for one queue drain; omitted values use the configured batch size and default page cap. */
 export interface StorageCleanupDrainOptions {
@@ -22,16 +25,6 @@ export interface StorageCleanupDrainResult {
   done: number;
   failed: number;
   skipped: number;
-}
-
-/** Keeps signed storage URLs out of logs when a provider includes one in an error message. */
-function safeError(error: unknown): { name: string; message: string } {
-  const name = error instanceof Error ? error.name : 'UnknownError';
-  const message = error instanceof Error ? error.message : String(error);
-  return {
-    name,
-    message: message.replace(/https?:\/\/\S+/gi, '[redacted URL]'),
-  };
 }
 
 @Injectable()
@@ -123,6 +116,8 @@ export class StorageCleanupQueueService {
         done += 1;
       } catch (error) {
         failed += 1;
+        // TODO(cleanup): Add retry_count column to storage_cleanup_queue; increment on each
+        // failure and skip entries past a configurable max (e.g. 10) to prevent infinite retries.
         // Leave the row pending so the next scheduled drain can retry it.
         this.logger.error(
           { entryId: entry.id, objectKey: entry.objectKey, error: safeError(error) },
