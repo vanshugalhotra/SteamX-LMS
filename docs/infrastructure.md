@@ -82,22 +82,6 @@ Non-READY files older than the stale-file threshold are deleted from the databas
 the database trigger queues their storage prefixes. READY files are retained. Empty assets not
 referenced by lesson blocks are removed in a separate bounded step.
 
-#### Cleanup smoke test
-
-The smoke page exercises the real API application, local database, and configured S3 bucket:
-
-```powershell
-pnpm --dir apps/backend cleanup:smoke -- --port 5180
-```
-
-The script binds only to `127.0.0.1`, refuses a database host other than `localhost`,
-`127.0.0.1`, or the repository's `postgres` container service, and sets the automatic worker
-disabled before boot. It tracks every created row and S3 prefix and refuses a cleanup run if
-unowned eligible work could be processed. Use an otherwise idle local database/API environment
-while testing. Open the printed local page, choose **Run all**, then use **Clean up what this
-script created** to remove only its test records and objects. The page reports PASS/FAIL and
-details for every case; do not share or copy presigned upload URLs.
-
 ## Browser storage smoke test
 
 Uploads to the real bucket from a local browser and checks metadata, signed URLs, downloads, range requests, and unsigned access.

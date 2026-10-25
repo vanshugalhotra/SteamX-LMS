@@ -290,7 +290,6 @@ email, names, and creation times.
   - Abandon an upload or delete an unused asset, then confirm its file prefix is queued and remains untouched until the upload URL TTL plus five-minute late-PUT grace has elapsed.
   - For a local database test, backdate `storage_cleanup_queue.queued_at` (for example, to one hour ago), run `StorageCleanupQueueService.drain()`, then verify the prefix is gone and `done_at` is set.
   - Backdate a non-READY `asset_files.updated_at` beyond `ASSET_STALE_FILE_AFTER_HOURS`, run `AssetCleanupService.run()`, and verify the file row is removed, its prefix is queued, and an empty unreferenced asset is removed. READY files and assets referenced by lesson blocks must remain.
-  - Run `pnpm --dir apps/backend cleanup:smoke -- --port 5180`, click **Run all**, inspect the PASS/FAIL details, then click **Clean up what this script created**. The smoke script refuses unowned eligible work and cleans only its tracked rows and prefixes.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.
 - Student promotion that completes old-class enrollments and validates cross-school moves.
