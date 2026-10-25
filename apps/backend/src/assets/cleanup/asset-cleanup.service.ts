@@ -13,7 +13,7 @@ export interface AssetCleanupResult {
 
 @Injectable()
 export class AssetCleanupService {
-  /** Maximum number of unreferenced assets removed in one run. */
+  /** Maximum stale files and empty assets processed in one run. */
   private readonly batchSize: number;
   /** Minimum age of a non-READY file before it is treated as abandoned. */
   private readonly staleAfterHours: number;
@@ -31,14 +31,27 @@ export class AssetCleanupService {
   async run(): Promise<AssetCleanupResult> {
     // READY files are live content; only remove incomplete or failed files past the age limit.
     const staleCutoff = new Date(Date.now() - this.staleAfterHours * 60 * 60 * 1_000);
-    const staleFiles = await this.prisma.assetFile.deleteMany({
+    const staleFileCandidates = await this.prisma.assetFile.findMany({
       where: {
         status: { not: AssetFileStatus.READY },
         updatedAt: { lt: staleCutoff },
       },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: this.batchSize,
+      select: { id: true },
     });
+    const staleFiles =
+      staleFileCandidates.length === 0
+        ? { count: 0 }
+        : await this.prisma.assetFile.deleteMany({
+            where: {
+              id: { in: staleFileCandidates.map(({ id }) => id) },
+              status: { not: AssetFileStatus.READY },
+              updatedAt: { lt: staleCutoff },
+            },
+          });
 
-    // Removing stale files may leave empty assets, but limit each run to avoid a large delete spike.
+    // Removing stale files may leave empty assets, so this step is also limited per run.
     const ghostAssets = await this.prisma.asset.findMany({
       where: {
         files: { none: {} },

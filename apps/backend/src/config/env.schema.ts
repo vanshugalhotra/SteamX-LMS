@@ -9,7 +9,7 @@ const MAX_UPLOAD_URL_TTL_SECONDS = 3600;
 // The cleanup worker waits this long between runs.
 const DEFAULT_CLEANUP_INTERVAL_SECONDS = 300;
 const MIN_CLEANUP_INTERVAL_SECONDS = 10;
-// Maximum queue page size and ghost assets handled by one run.
+// Maximum queue page size and stale files or empty assets handled by one run.
 const DEFAULT_CLEANUP_BATCH_SIZE = 50;
 // Non-READY asset files older than this are treated as abandoned.
 const DEFAULT_ASSET_STALE_FILE_AFTER_HOURS = 24;

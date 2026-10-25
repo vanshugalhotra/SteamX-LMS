@@ -123,7 +123,7 @@ export class StorageCleanupQueueService {
         failed += 1;
         // Leave the row pending so the next scheduled drain can retry it.
         this.logger.error(
-          { entryId: entry.id, error: safeError(error) },
+          { entryId: entry.id, objectKey: entry.objectKey, error: safeError(error) },
           'Storage cleanup entry failed and will be retried',
         );
       }

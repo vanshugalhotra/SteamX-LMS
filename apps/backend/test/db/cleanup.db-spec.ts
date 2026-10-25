@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from '../../src/app.module.js';
 import { AssetCleanupService } from '../../src/assets/cleanup/asset-cleanup.service.js';
@@ -6,6 +7,7 @@ import { buildOriginalKey } from '../../src/assets/asset-rules.js';
 import { AssetFileStatus, AssetType, BlockType } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { StorageCleanupQueueService } from '../../src/storage/storage-cleanup-queue.service.js';
+import type { Env } from '../../src/config/env.schema.js';
 import { createTestApp, getTestStorageService } from '../support/create-test-app.js';
 import { InMemoryStorageService } from '../support/in-memory-storage.service.js';
 
@@ -19,6 +21,7 @@ describe('cleanup services (database)', () => {
   let storage: InMemoryStorageService;
   let queue: StorageCleanupQueueService;
   let assets: AssetCleanupService;
+  let cleanupBatchSize: number;
   const assetIds: string[] = [];
   const lessonIds: string[] = [];
   const moduleIds: string[] = [];
@@ -32,6 +35,9 @@ describe('cleanup services (database)', () => {
     storage = getTestStorageService(app);
     queue = app.get(StorageCleanupQueueService);
     assets = app.get(AssetCleanupService);
+    cleanupBatchSize = app
+      .get<ConfigService<Env, true>>(ConfigService)
+      .get('cleanup.batchSize', { infer: true });
   });
 
   afterAll(async () => {
@@ -285,6 +291,26 @@ describe('cleanup services (database)', () => {
       prisma.assetFile.findUnique({ where: { id: fresh.fileId } }),
     ).resolves.toMatchObject({ status: AssetFileStatus.UPLOADING });
     await expect(prisma.assetFile.findUnique({ where: { id: stale.fileId } })).resolves.toBeNull();
+  });
+
+  it('deletes no more than the configured batch of stale files per run', async () => {
+    const staleFiles = await Promise.all(
+      Array.from({ length: cleanupBatchSize + 1 }, () =>
+        createAssetFile(AssetFileStatus.FAILED, new Date(Date.now() - 48 * 60 * 60 * 1_000)),
+      ),
+    );
+
+    const firstRun = await assets.run();
+    expect(firstRun.staleFilesDeleted).toBe(cleanupBatchSize);
+    await expect(
+      prisma.assetFile.count({ where: { id: { in: staleFiles.map(({ fileId }) => fileId) } } }),
+    ).resolves.toBe(1);
+
+    const secondRun = await assets.run();
+    expect(secondRun.staleFilesDeleted).toBe(1);
+    await expect(
+      prisma.assetFile.count({ where: { id: { in: staleFiles.map(({ fileId }) => fileId) } } }),
+    ).resolves.toBe(0);
   });
 
   async function createQueueEntry(options: {
