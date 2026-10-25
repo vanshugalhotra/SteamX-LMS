@@ -54,31 +54,31 @@ Stack outputs `BucketName`, `Region`, and `BackendUserName`. For local/staging b
 These names, defaults, and bounds match `apps/backend/src/config/env.schema.ts`. AWS access keys
 are optional, but must be set together. `CORS_ORIGINS` must be non-empty in production.
 
-| Variable | Default / requirement |
-| --- | --- |
-| `NODE_ENV` | `development` (`development`, `test`, or `production`) |
-| `PORT` | `3333`; integer 1–65535 |
-| `LOG_LEVEL` | `info` |
-| `DATABASE_URL` | Required |
-| `DB_POOL_MAX` | `10`; integer 1–50 |
-| `DB_CONNECTION_TIMEOUT_MS` | `5000`; integer at least 1000 |
-| `AUTH_JWT_SECRET` | Required; at least 32 characters |
-| `AUTH_TOKEN_TTL_SECONDS` | `86400`; integer at least 60 |
-| `CORS_ORIGINS` | Empty outside production; comma-separated valid URLs |
-| `SWAGGER_ENABLED` | Defaults to enabled only in development |
-| `AWS_REGION`, `S3_BUCKET` | Required |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional pair; omit both when using an AWS role |
-| `UPLOAD_URL_TTL_SECONDS` | `900`; positive integer up to 3600 |
-| `CLEANUP_ENABLED` | `true` |
-| `CLEANUP_INTERVAL_SECONDS` | `300`; integer at least 10 |
-| `CLEANUP_BATCH_SIZE` | `50`; positive integer |
-| `ASSET_STALE_FILE_AFTER_HOURS` | `24`; integer at least 1 |
-| `ASSET_MAX_BYTES_IMAGE` | 10 MiB; positive integer |
-| `ASSET_MAX_BYTES_PDF` | 50 MiB; positive integer |
-| `ASSET_MAX_BYTES_VIDEO` | 1 GiB; positive integer |
-| `ASSET_ACCESS_TTL_IMAGE_SECONDS` | `600`; positive integer up to 43,200 |
-| `ASSET_ACCESS_TTL_PDF_SECONDS` | `1800`; positive integer up to 43,200 |
-| `ASSET_ACCESS_TTL_VIDEO_SECONDS` | `7200`; positive integer up to 43,200 |
+| Variable                                     | Default / requirement                                  |
+| -------------------------------------------- | ------------------------------------------------------ |
+| `NODE_ENV`                                   | `development` (`development`, `test`, or `production`) |
+| `PORT`                                       | `3333`; integer 1–65535                                |
+| `LOG_LEVEL`                                  | `info`                                                 |
+| `DATABASE_URL`                               | Required                                               |
+| `DB_POOL_MAX`                                | `10`; integer 1–50                                     |
+| `DB_CONNECTION_TIMEOUT_MS`                   | `5000`; integer at least 1000                          |
+| `AUTH_JWT_SECRET`                            | Required; at least 32 characters                       |
+| `AUTH_TOKEN_TTL_SECONDS`                     | `86400`; integer at least 60                           |
+| `CORS_ORIGINS`                               | Empty outside production; comma-separated valid URLs   |
+| `SWAGGER_ENABLED`                            | Defaults to enabled only in development                |
+| `AWS_REGION`, `S3_BUCKET`                    | Required                                               |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Optional pair; omit both when using an AWS role        |
+| `UPLOAD_URL_TTL_SECONDS`                     | `900`; positive integer up to 3600                     |
+| `CLEANUP_ENABLED`                            | `true`                                                 |
+| `CLEANUP_INTERVAL_SECONDS`                   | `300`; integer at least 10                             |
+| `CLEANUP_BATCH_SIZE`                         | `50`; positive integer                                 |
+| `ASSET_STALE_FILE_AFTER_HOURS`               | `24`; integer at least 1                               |
+| `ASSET_MAX_BYTES_IMAGE`                      | 10 MiB; positive integer                               |
+| `ASSET_MAX_BYTES_PDF`                        | 50 MiB; positive integer                               |
+| `ASSET_MAX_BYTES_VIDEO`                      | 1 GiB; positive integer                                |
+| `ASSET_ACCESS_TTL_IMAGE_SECONDS`             | `600`; positive integer up to 43,200                   |
+| `ASSET_ACCESS_TTL_PDF_SECONDS`               | `1800`; positive integer up to 43,200                  |
+| `ASSET_ACCESS_TTL_VIDEO_SECONDS`             | `7200`; positive integer up to 43,200                  |
 
 Cleanup runs in the API process with a self-rescheduling, unref'd timer. It processes bounded
 batches; failed queue entries are retried on every run. Prefix deletion waits for the upload URL
