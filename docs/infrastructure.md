@@ -82,6 +82,20 @@ Non-READY files older than the stale-file threshold are deleted from the databas
 the database trigger queues their storage prefixes. READY files are retained. Empty assets not
 referenced by lesson blocks are removed in a separate bounded step.
 
+#### Storage cleanup queue smoke test
+
+Run this against an idle local database and a test bucket; it creates and deletes two temporary
+objects and queue entries:
+
+```powershell
+pnpm --dir apps/backend storage:cleanup:smoke
+```
+
+It calls the queue drain directly, so it does not wait for the scheduler interval. The eligible
+entry is backdated past the upload-link lifetime and grace period; the young entry should remain
+pending. It refuses to run if other eligible prefix entries already exist and removes only its own
+objects and queue rows.
+
 ## Browser storage smoke test
 
 Uploads to the real bucket from a local browser and checks metadata, signed URLs, downloads, range requests, and unsigned access.
