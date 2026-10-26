@@ -1,5 +1,5 @@
 import type { Asset, AssetFile } from '../generated/prisma/client.js';
-import type { CreateUploadUrlResult } from '../storage/storage.service.js';
+import type { CreateUploadUrlResult } from '../storage/storage.types.js';
 import {
   AssetDto,
   AssetFileDto,
@@ -8,7 +8,7 @@ import {
 } from './dto/asset-response.dto.js';
 import type { AssetFileSelection } from './library/asset-file-selection.js';
 import type { AssetLibraryDetailDto, AssetListItemDto } from './dto/asset-library-response.dto.js';
-import type { AssetDetailRecord, AssetLibraryRecord } from './assets.repository.js';
+import type { AssetDetailRecord, AssetLibraryRecord } from './assets.types.js';
 import { pickCurrentFile } from './library/asset-library.js';
 
 /** Exposes only the asset fields intended for API clients. */

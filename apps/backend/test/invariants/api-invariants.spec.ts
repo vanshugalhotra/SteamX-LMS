@@ -555,7 +555,7 @@ describe('Black-box API invariants', () => {
     for (const user of users) {
       expect(user.steamxId).toMatch(new RegExp(`^${school.code}-[A-Z]{4,8}[0-9]{3}$`));
     }
-    expect(teacher.profile).toBeDefined();
+    expect(teacher.profile).toMatchObject({ primaryAssignment: null });
     expect(student.profile.classSectionId).toBe(section.id);
     expect(teacher.mustChangePassword).toBe(true);
     expect(student.mustChangePassword).toBe(true);

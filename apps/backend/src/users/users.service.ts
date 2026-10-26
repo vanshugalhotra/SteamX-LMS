@@ -29,7 +29,8 @@ import type { UpdateUserDto } from './dto/update-user.dto.js';
 import type { UpdateUserStatusDto } from './dto/update-user-status.dto.js';
 import { userVisibility } from './user-visibility.js';
 import { toUserListItem, toUserResponse } from './users.mapper.js';
-import { UsersRepository, type UserDetailRecord } from './users.repository.js';
+import { UsersRepository } from './users.repository.js';
+import type { UserDetailRecord } from './users.types.js';
 import { SteamxIdService } from './steamx-id/steamx-id.service.js';
 import { isValidSteamxId } from './steamx-id/steamx-id.js';
 
