@@ -2,7 +2,7 @@
  * Maps selected Prisma user records to public response DTOs.
  */
 import { UserType } from '../generated/prisma/client.js';
-import type { UserDetailRecord, UserListRecord } from './users.repository.js';
+import type { UserDetailRecord, UserListRecord } from './users.types.js';
 import type { UserListItemResponseDto } from './dto/user-list-item-response.dto.js';
 import type { UserResponseDto } from './dto/user-response.dto.js';
 

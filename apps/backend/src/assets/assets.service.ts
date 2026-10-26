@@ -46,7 +46,7 @@ import {
 import { AssetsRepository } from './assets.repository.js';
 import { AssetUsageRepository } from './library/asset-usage.repository.js';
 import { AssetProcessorRegistry } from './processing/asset-processor.registry.js';
-import type { MakeReadyInput } from './assets.repository.js';
+import type { MakeReadyInput } from './assets.types.js';
 
 const UUID_SCHEMA = z.uuid();
 

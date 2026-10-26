@@ -4,7 +4,7 @@ import type {
   CreateUploadUrlInput,
   CreateUploadUrlResult,
   StorageHeadResult,
-} from '../../src/storage/storage.service.js';
+} from '../../src/storage/storage.types.js';
 import {
   assertPositiveInteger,
   MAX_DOWNLOAD_URL_TTL_SECONDS,
@@ -29,6 +29,16 @@ interface SimulatedUpload {
   bytes?: Buffer | Uint8Array;
   sizeBytes?: number;
   contentType: string;
+}
+
+/** Mirrors the S3 error returned for a failed If-None-Match: * PUT. */
+class PreconditionFailedError extends Error {
+  readonly $metadata = { httpStatusCode: 412 };
+
+  constructor(key: string) {
+    super(`Precondition Failed: object already exists at ${key}`);
+    this.name = 'PreconditionFailed';
+  }
 }
 
 /** S3-free StorageService test double; tests populate objects with simulateUpload. */
@@ -116,6 +126,19 @@ export class InMemoryStorageService extends StorageService {
 
   simulateUpload(key: string, { bytes, sizeBytes, contentType }: SimulatedUpload): void {
     assertValidKey(key);
+    if (this.objects.has(key)) {
+      throw new PreconditionFailedError(key);
+    }
+    this.storeObject(key, { bytes, sizeBytes, contentType });
+  }
+
+  /** Explicitly replaces an object for tests that need to model an unconditional write. */
+  simulateOverwrite(key: string, upload: SimulatedUpload): void {
+    assertValidKey(key);
+    this.storeObject(key, upload);
+  }
+
+  private storeObject(key: string, { bytes, sizeBytes, contentType }: SimulatedUpload): void {
     if (!contentType) {
       throw new StorageInvalidArgumentError('contentType must not be empty');
     }
