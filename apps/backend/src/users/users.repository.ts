@@ -5,28 +5,10 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, type UserStatus, type UserType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { paginatedSearch } from '../common/repositories/paginated-search.js';
+import { USER_DETAIL_SELECT, USER_LIST_SELECT } from './users.types.js';
+import type { UserDetailRecord, UserListRecord } from './users.types.js';
 
-const USER_LIST_SELECT = {
-  id: true,
-  steamxId: true,
-  name: true,
-  email: true,
-  status: true,
-  role: { select: { key: true, name: true } },
-  userType: true,
-  schoolId: true,
-  createdAt: true,
-} satisfies Prisma.UserSelect;
-
-const USER_DETAIL_SELECT = {
-  ...USER_LIST_SELECT,
-  mustChangePassword: true,
-  studentProfile: { select: { guardianName: true, classSectionId: true } },
-  teacherProfile: { select: { primaryAssignment: true } },
-} satisfies Prisma.UserSelect;
-
-export type UserListRecord = Prisma.UserGetPayload<{ select: typeof USER_LIST_SELECT }>;
-export type UserDetailRecord = Prisma.UserGetPayload<{ select: typeof USER_DETAIL_SELECT }>;
+export type { UserDetailRecord, UserListRecord } from './users.types.js';
 
 /** Runs user persistence queries; related profile writes stay in the same transaction. */
 @Injectable()

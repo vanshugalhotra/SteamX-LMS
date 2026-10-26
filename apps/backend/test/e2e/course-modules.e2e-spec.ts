@@ -372,7 +372,7 @@ describe('Course modules endpoints (e2e)', () => {
     await getModule(adminCookie, module.id).expect(200);
     await expect(
       prisma.lesson.findUniqueOrThrow({ where: { id: lesson.id } }),
-    ).resolves.toBeTruthy();
+    ).resolves.toMatchObject({ id: lesson.id, courseId, moduleId: module.id });
   });
 
   it('enforces authentication and platform staff permissions', async () => {

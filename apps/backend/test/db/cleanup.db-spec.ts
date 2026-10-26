@@ -276,21 +276,29 @@ describe('cleanup services (database)', () => {
   it('applies the stale cutoff strictly with lt on either side of the boundary', async () => {
     const fresh = await createAssetFile(AssetFileStatus.UPLOADING);
     const stale = await createAssetFile(AssetFileStatus.UPLOADING);
-    await prisma.assetFile.update({
-      where: { id: fresh.fileId },
-      data: { updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1_000 + 5_000) },
-    });
-    await prisma.assetFile.update({
-      where: { id: stale.fileId },
-      data: { updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1_000 - 5_000) },
-    });
+    const fixedNow = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(fixedNow);
+    try {
+      await prisma.assetFile.update({
+        where: { id: fresh.fileId },
+        data: { updatedAt: new Date(fixedNow - 24 * 60 * 60 * 1_000) },
+      });
+      await prisma.assetFile.update({
+        where: { id: stale.fileId },
+        data: { updatedAt: new Date(fixedNow - 24 * 60 * 60 * 1_000 - 1) },
+      });
 
-    const result = await assets.run();
-    expect(result.staleFilesDeleted).toBe(1);
-    await expect(
-      prisma.assetFile.findUnique({ where: { id: fresh.fileId } }),
-    ).resolves.toMatchObject({ status: AssetFileStatus.UPLOADING });
-    await expect(prisma.assetFile.findUnique({ where: { id: stale.fileId } })).resolves.toBeNull();
+      const result = await assets.run();
+      expect(result.staleFilesDeleted).toBe(1);
+      await expect(
+        prisma.assetFile.findUnique({ where: { id: fresh.fileId } }),
+      ).resolves.toMatchObject({ status: AssetFileStatus.UPLOADING });
+      await expect(
+        prisma.assetFile.findUnique({ where: { id: stale.fileId } }),
+      ).resolves.toBeNull();
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('deletes no more than the configured batch of stale files per run', async () => {
