@@ -85,7 +85,6 @@ describe('PermissionGuard', () => {
       permissions,
     );
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
-    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     await moduleRef.close();
   });
 });

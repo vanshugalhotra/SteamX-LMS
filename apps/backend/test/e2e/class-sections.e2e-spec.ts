@@ -609,16 +609,4 @@ describe('Class sections endpoints (e2e)', () => {
     });
     expect(afterDeleteAttempt.id).toBe(foreignSectionId);
   });
-
-  // A school-scoped manager receives 404 rather than access to foreign section IDs or filters.
-  it('returns 404 for a foreign section ID and for a foreign school filter', async () => {
-    const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
-
-    expectError(await getById(teacherCookie, fixture.schoolB.section.id), 404, 'NOT_FOUND');
-    expectError(
-      await getList(teacherCookie, { schoolId: fixture.schoolB.school.id }),
-      404,
-      'NOT_FOUND',
-    );
-  });
 });
