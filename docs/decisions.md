@@ -32,6 +32,12 @@ Each entry records the current design choice and why.
 - **Delete = FK-restricted only** — deletion blocked by foreign keys, using shared `RESOURCE_IN_USE` error code.
 - **Outline read model** — `GET /courses/:id/outline` reads across course/module/lesson in one query. Writes stay in their feature folders. Admin-only and unfiltered; teacher/student outlines need separate filtered endpoints.
 - **No content version history** — replacements aren't archived versions. Add when revision browsing becomes a requirement.
+- **Editor-agnostic block tree** — lesson blocks and layouts do not depend on an editor; only `lesson-content/rich-text/` knows TipTap. Rich text carries a `format` tag, so another editor format can be introduced without changing the storage schema.
+- **Reject unknown lesson content** — unknown fields, nodes, marks, and attributes fail validation so client/server mismatches surface early rather than silently losing data. TipTap's default link `target`, `rel`, and `class` attributes are accepted and dropped.
+- **Client-generated block IDs** — clients assign stable UUIDs for editor identity and future per-block features; the server rejects duplicate IDs across the full tree.
+- **Fixed two-column layout** — columns are always a two-item array of nullable blocks. This keeps the layout contract simple and prevents nested layouts.
+- **No PPTX lesson blocks** — the database enum retains PPTX for asset compatibility, but lesson content validation does not accept PPTX blocks.
+- **Bounded lesson content** — cap blocks (100), text (50,000 characters/document), rich-text nodes (5,000/document), depth (20), and issue reporting (50). These limits bound validation work and keep oversized or deeply nested editor input from exhausting memory or the call stack.
 
 ## Asset library
 
