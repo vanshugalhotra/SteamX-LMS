@@ -72,13 +72,17 @@ export function useSchoolNames() {
   return useMemo(() => new Map((data?.items ?? []).map((s) => [s.id, s.name])), [data]);
 }
 
-/** Debounced school search for async selects (active schools only). */
-export function useSchoolSearch(search: string): AsyncSearchResult {
+function useSchoolSearchBy(search: string, status: 'ACTIVE' | 'ALL'): AsyncSearchResult {
   const q = useDebouncedValue(search.trim());
-  const { data, isPending, isError } = useSchools({ page: 1, limit: 20, q, status: 'ACTIVE' });
+  const { data, isPending, isError } = useSchools({ page: 1, limit: 20, q, status });
   const options = useMemo(
     () => (data?.items ?? []).map((s) => ({ value: s.id, label: s.name, description: s.code })),
     [data],
   );
   return { options, isPending, isError };
 }
+
+/** For forms: only active schools can get new users. */
+export const useSchoolSearch = (search: string) => useSchoolSearchBy(search, 'ACTIVE');
+/** For filters: every school. */
+export const useAnySchoolSearch = (search: string) => useSchoolSearchBy(search, 'ALL');

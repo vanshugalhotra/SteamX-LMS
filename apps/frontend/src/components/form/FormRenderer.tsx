@@ -1,5 +1,6 @@
 import {
   Controller,
+  useWatch,
   type Control,
   type FieldErrors,
   type FieldValues,
@@ -29,8 +30,12 @@ export interface FieldConfig<T extends FieldValues> {
   autoCapitalize?: string;
   /** Static options for `select`. */
   options?: FieldOption[];
-  /** Search hook for `async-select` (calls the API, debounced inside). */
-  useSearch?: (search: string) => AsyncSearchResult;
+  /** Search hook for `async-select`. `context` is the value of `dependsOn`. */
+  useSearch?: (search: string, context: string) => AsyncSearchResult;
+  /** Another field whose value the search depends on (e.g. 'schoolId'). */
+  dependsOn?: Path<T>;
+  /** Label for the current value before the user picks anything (edit forms). */
+  initialLabel?: string;
   /** Column span from the sm breakpoint (6-column grid). Default 'full'. */
   width?: 'full' | 'half' | 'third';
 }
@@ -42,10 +47,54 @@ const SPAN = {
   third: 'sm:col-span-2',
 } as const;
 
+interface AriaProps {
+  id: string;
+  'aria-invalid': boolean;
+  'aria-describedby': string | undefined;
+}
+
+interface AsyncFieldProps<T extends FieldValues> {
+  field: FieldConfig<T>;
+  useSearch: (search: string, context: string) => AsyncSearchResult;
+  control: Control<T>;
+  disabled: boolean;
+  aria: AriaProps;
+}
+
+/** Own component because useWatch is a hook and cannot be called inside the fields loop. */
+function AsyncField<T extends FieldValues>({
+  field,
+  useSearch,
+  control,
+  disabled,
+  aria,
+}: AsyncFieldProps<T>) {
+  const watched: unknown = useWatch({ control, name: field.dependsOn ?? field.name });
+  const context = field.dependsOn && typeof watched === 'string' ? watched : '';
+
+  return (
+    <Controller
+      control={control}
+      name={field.name}
+      render={({ field: f }) => (
+        <AsyncSelect
+          {...aria}
+          value={typeof f.value === 'string' ? f.value : ''}
+          onChange={f.onChange}
+          useSearch={useSearch}
+          searchContext={context}
+          initialLabel={field.initialLabel}
+          placeholder={field.placeholder}
+          disabled={disabled}
+        />
+      )}
+    />
+  );
+}
+
 interface FormRendererProps<T extends FieldValues> {
   fields: FieldConfig<T>[];
   register: UseFormRegister<T>;
-  /** Needed for fields that are not plain inputs (async-select). */
   control: Control<T>;
   errors: FieldErrors<T>;
   disabled?: boolean;
@@ -64,7 +113,6 @@ export function FormRenderer<T extends FieldValues>({
     <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-6">
       {fields.map((field) => {
         const message = errorMap[field.name]?.message;
-        const useSearch = field.useSearch;
         const isDisabled = Boolean(disabled) || Boolean(field.readOnly);
 
         return (
@@ -74,21 +122,14 @@ export function FormRenderer<T extends FieldValues>({
               error={typeof message === 'string' ? message : undefined}
             >
               {(aria) => {
-                if (field.type === 'async-select' && useSearch) {
+                if (field.type === 'async-select' && field.useSearch) {
                   return (
-                    <Controller
+                    <AsyncField
+                      field={field}
+                      useSearch={field.useSearch}
                       control={control}
-                      name={field.name}
-                      render={({ field: f }) => (
-                        <AsyncSelect
-                          {...aria}
-                          value={typeof f.value === 'string' ? f.value : ''}
-                          onChange={f.onChange}
-                          useSearch={useSearch}
-                          placeholder={field.placeholder}
-                          disabled={isDisabled}
-                        />
-                      )}
+                      disabled={isDisabled}
+                      aria={aria}
                     />
                   );
                 }
@@ -109,9 +150,9 @@ export function FormRenderer<T extends FieldValues>({
                     </Select>
                   );
                 }
-                const Control_ = field.type === 'password' ? PasswordInput : Input;
+                const Field = field.type === 'password' ? PasswordInput : Input;
                 return (
-                  <Control_
+                  <Field
                     {...aria}
                     {...register(field.name)}
                     type={field.type === 'password' ? undefined : (field.type ?? 'text')}

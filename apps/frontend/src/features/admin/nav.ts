@@ -32,7 +32,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { label: 'Schools', icon: School, to: PATHS.admin.schools },
       { label: 'Teachers', icon: GraduationCap, to: PATHS.admin.teachers },
-      { label: 'Students', icon: User },
+      { label: 'Students', icon: User, to: PATHS.admin.students },
       { label: 'Credential Resets', icon: Lock },
     ],
   },

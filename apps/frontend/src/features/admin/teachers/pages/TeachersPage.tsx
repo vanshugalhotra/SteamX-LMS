@@ -7,7 +7,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { AsyncSelect } from '@/components/ui/async-select';
 import { PATHS } from '@/lib/paths';
 import { useListParams } from '@/lib/use-list-params';
-import { useSchoolSearch, useSchoolNames } from '../../schools/queries';
+import { useAnySchoolSearch, useSchoolNames } from '../../schools/queries';
 import type { UserStatusFilter } from '../../users/model/types';
 import { useUsers } from '../../users/queries';
 import {
@@ -81,7 +81,7 @@ export function TeachersPage() {
             aria-label="Filter by school"
             value={schoolId}
             onChange={setSchoolId}
-            useSearch={useSchoolSearch}
+            useSearch={useAnySchoolSearch}
             placeholder="All schools"
           />
         </div>

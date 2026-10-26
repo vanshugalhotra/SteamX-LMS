@@ -19,11 +19,16 @@ interface AsyncSelectProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
-  /** Hook that searches the API for the typed text (debounce inside it). */
-  useSearch: (search: string) => AsyncSearchResult;
+  /** Hook that searches the API for the typed text. `context` is e.g. the chosen school id. */
+  useSearch: (search: string, context: string) => AsyncSearchResult;
+  /** Extra value the search depends on (e.g. a school id). */
+  searchContext?: string;
+  /** Label to show for `value` before the user picks anything (edit forms). */
+  initialLabel?: string;
   placeholder?: string;
   maxLength?: number;
   disabled?: boolean;
+  'aria-label'?: string;
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
 }
@@ -33,6 +38,8 @@ export function AsyncSelect({
   value,
   onChange,
   useSearch,
+  searchContext = '',
+  initialLabel = '',
   placeholder,
   maxLength = 120,
   disabled,
@@ -41,9 +48,9 @@ export function AsyncSelect({
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [label, setLabel] = useState('');
+  const [label, setLabel] = useState(initialLabel);
+  const { options, isPending, isError } = useSearch(query, searchContext);
   const [active, setActive] = useState(0);
-  const { options, isPending, isError } = useSearch(query);
 
   // Clearing the field also clears the chosen value.
   const shown = open ? query : value ? label : '';
