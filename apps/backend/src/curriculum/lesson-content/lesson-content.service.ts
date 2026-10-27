@@ -25,7 +25,7 @@ export class LessonContentService {
     }
     const blocks = buildBlockTree(await this.content.findBlocks(id));
     const assetIds = collectAssetIds(blocks);
-    const summaries = assetIds.length > 0 ? await this.assets.getSummaries(assetIds) : new Map();
+    const summaries = await this.assets.getSummaries(assetIds);
     return toLessonContentResponse(lessonVersion.contentVersion, blocks, summaries);
   }
 }
