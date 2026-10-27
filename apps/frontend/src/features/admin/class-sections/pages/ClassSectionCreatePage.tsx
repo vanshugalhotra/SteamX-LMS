@@ -34,14 +34,16 @@ export function ClassSectionCreatePage() {
   const onSubmit = handleSubmit(async (values) => {
     if (busy) return;
     setFormError(null);
+    const { sectionName, ...rest } = values;
     try {
-      await create.mutateAsync(values);
+      // An empty section is not sent, so the backend applies its default ("All").
+      await create.mutateAsync(sectionName ? { ...rest, sectionName } : rest);
       toast.success('Class section created');
-      // Keep the school so several sections can be added in a row.
+      // Keep the school and class so several sections can be added in a row.
       reset({ schoolId: values.schoolId, className: values.className, sectionName: '' });
     } catch (error) {
       if (hasErrorCode(error, API_ERROR_CODE.CLASS_SECTION_EXISTS)) {
-        setError('sectionName', { message: getErrorMessage(error) });
+        setError('className', { message: getErrorMessage(error) });
         return;
       }
       setFormError(getErrorMessage(error));
@@ -51,7 +53,7 @@ export function ClassSectionCreatePage() {
   return (
     <FormPageLayout
       title="Add class section"
-      subtitle="Create a class and section inside a school so students can be assigned to it."
+      subtitle="Create a class (and optionally a section) inside a school so students can be assigned to it."
       backTo={PATHS.admin.students}
       backLabel="Students"
     >
@@ -81,7 +83,7 @@ export function ClassSectionCreatePage() {
             Done
           </Button>
           <Button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Add section'}
+            {busy ? 'Saving…' : 'Add class section'}
           </Button>
         </div>
       </form>

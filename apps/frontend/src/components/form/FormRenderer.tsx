@@ -150,12 +150,23 @@ export function FormRenderer<T extends FieldValues>({
                     </Select>
                   );
                 }
-                const Field = field.type === 'password' ? PasswordInput : Input;
+                if (field.type === 'password') {
+                  return (
+                    <PasswordInput
+                      {...aria}
+                      {...register(field.name)}
+                      placeholder={field.placeholder}
+                      className="h-10.5"
+                      autoComplete={field.autoComplete ?? 'new-password'}
+                      disabled={disabled}
+                    />
+                  );
+                }
                 return (
-                  <Field
+                  <Input
                     {...aria}
                     {...register(field.name)}
-                    type={field.type === 'password' ? undefined : (field.type ?? 'text')}
+                    type={field.type ?? 'text'}
                     placeholder={field.placeholder}
                     readOnly={field.readOnly}
                     className={cn(

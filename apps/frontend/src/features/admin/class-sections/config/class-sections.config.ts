@@ -12,5 +12,10 @@ export const CLASS_SECTION_FIELDS: FieldConfig<ClassSectionFormValues>[] = [
     useSearch: useSchoolSearch,
   },
   { name: 'className', label: 'Class', required: true, width: 'half', placeholder: 'e.g. Grade 8' },
-  { name: 'sectionName', label: 'Section', required: true, width: 'half', placeholder: 'e.g. A' },
+  {
+    name: 'sectionName',
+    label: 'Section',
+    width: 'half',
+    placeholder: 'Optional, e.g. A (default: All)',
+  },
 ];

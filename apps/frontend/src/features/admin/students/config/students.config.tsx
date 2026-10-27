@@ -137,13 +137,11 @@ export function getStudentFieldGroups(isEdit: boolean, classLabel = ''): Student
                 useSearch: useSchoolSearch,
               },
             ] satisfies FieldConfig<StudentFormValues>[])),
-        // TODO: there is no UI to create class sections yet (only GET /class-sections
-        // is wired in the admin frontend), so this is optional for now. Make it required
-        // again once class sections can be created from the admin site.
         {
           name: 'classSectionId',
           label: 'Class section',
           type: 'async-select',
+          required: true,
           placeholder: isEdit ? 'Search class sections' : 'Choose a school first',
           useSearch: useClassSectionSearch,
           dependsOn: 'schoolId',

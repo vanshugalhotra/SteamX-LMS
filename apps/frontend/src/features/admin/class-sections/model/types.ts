@@ -10,7 +10,7 @@ export interface ClassSection {
 export interface CreateClassSectionPayload {
   schoolId: string;
   className: string;
-  sectionName: string;
+  sectionName?: string;
 }
 
 export const classSectionLabel = (c: Pick<ClassSection, 'className' | 'sectionName'>) =>
