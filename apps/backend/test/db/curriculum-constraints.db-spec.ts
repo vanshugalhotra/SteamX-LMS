@@ -304,6 +304,24 @@ describe('curriculum and asset database rules', () => {
     await bad();
   });
 
+  it('defaults content_version to zero, accepts nonnegative values, and rejects negative values', async () => {
+    const courseId = await createCourse();
+    const moduleId = await createModule(courseId);
+    const lessonId = await createLesson(moduleId, courseId);
+    const defaultVersion = await client.query<{ content_version: number }>(
+      'SELECT content_version FROM lessons WHERE id = $1',
+      [lessonId],
+    );
+    expect(defaultVersion.rows[0]?.content_version).toBe(0);
+
+    await client.query('UPDATE lessons SET content_version = 0 WHERE id = $1', [lessonId]);
+    await client.query('UPDATE lessons SET content_version = 7 WHERE id = $1', [lessonId]);
+    await expectPgFailure('UPDATE lessons SET content_version = -1 WHERE id = $1', [lessonId], {
+      code: '23514',
+      name: 'lessons_content_version_nonneg',
+    });
+  });
+
   it('reorders positions through an unused value and replaces two-column children in one transaction', async () => {
     const course = await createCourse();
     const firstModule = await createModule(course, { position: 1 });

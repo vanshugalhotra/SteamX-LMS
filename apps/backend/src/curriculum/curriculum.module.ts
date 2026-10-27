@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AssetsModule } from '../assets/assets.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { CoursesController } from './courses/courses.controller.js';
 import { CoursesRepository } from './courses/courses.repository.js';
@@ -12,14 +13,18 @@ import { LessonsService } from './lessons/lessons.service.js';
 import { CourseOutlineController } from './outline/course-outline.controller.js';
 import { CourseOutlineRepository } from './outline/course-outline.repository.js';
 import { CourseOutlineService } from './outline/course-outline.service.js';
+import { LessonContentController } from './lesson-content/lesson-content.controller.js';
+import { LessonContentRepository } from './lesson-content/lesson-content.repository.js';
+import { LessonContentService } from './lesson-content/lesson-content.service.js';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AssetsModule],
   controllers: [
     CoursesController,
     CourseModulesController,
     LessonsController,
     CourseOutlineController,
+    LessonContentController,
   ],
   providers: [
     CoursesRepository,
@@ -30,6 +35,8 @@ import { CourseOutlineService } from './outline/course-outline.service.js';
     LessonsService,
     CourseOutlineRepository,
     CourseOutlineService,
+    LessonContentRepository,
+    LessonContentService,
   ],
 })
 export class CurriculumModule {}

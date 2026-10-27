@@ -58,6 +58,39 @@ be nested. Asset IDs are top-level block fields, never part of `content`. PPTX b
 supported. Titles, alt text, and captions are trimmed; empty optional alt text and captions are
 omitted.
 
+## Reading content
+
+`GET /lessons/:id/content` returns the complete save-shaped tree together with its version and an
+asset side table:
+
+```json
+{
+  "version": 0,
+  "blocks": [],
+  "assets": {
+    "asset-uuid": {
+      "id": "asset-uuid",
+      "type": "IMAGE",
+      "title": "Diagram",
+      "status": "ACTIVE",
+      "file": {
+        "status": "READY",
+        "mimeType": "image/png",
+        "sizeBytes": 1024,
+        "originalFilename": "diagram.png",
+        "lastError": null
+      }
+    }
+  }
+}
+```
+
+`blocks` has the same block shape accepted by the save validator; it can be edited and sent back
+unchanged without stripping or merging read-only metadata. `assets` is keyed by each referenced
+asset ID and contains its metadata and current file state, not access URLs. The frontend asks the
+asset access endpoint for temporary URLs when it needs to render a file. The `version` is the
+optimistic concurrency token that the content save endpoint (CUR-19) will require.
+
 ## Rich-text whitelist
 
 | Rich-text type | Kept                                                                                                                                                                                                           | Accepted and dropped                                         | Rejected                                                                                         |

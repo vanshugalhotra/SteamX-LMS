@@ -55,6 +55,7 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 ### Curriculum & assets
 
 - **Titles/positions:** course/module/lesson/asset titles must be nonblank. Module, lesson, and top-level block positions must be positive.
+- **Lesson content version:** `lessons.content_version` defaults to `0` and is checked nonnegative.
 - **Blocks:** content must be JSON object. DB checks enforce asset/block shape, two-column layout, column range, valid parent + asset types.
 - **Immutable fields:** module `course_id`, lesson `course_id`, asset `type`, lesson-block `lesson_id` and `type`.
 - **Ordering:** Unique constraints prevent duplicate positions. Use temporary positions when reordering; delete + recreate two-column children rather than swapping.

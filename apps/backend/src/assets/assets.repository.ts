@@ -5,12 +5,18 @@ import type { SupportedAssetType } from './asset-rules.js';
 import type { AssetListQueryDto } from './dto/asset-list-query.dto.js';
 import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ASSET_ACCESS_SELECT, ASSET_DETAIL_SELECT, ASSET_LIBRARY_SELECT } from './assets.types.js';
+import {
+  ASSET_ACCESS_SELECT,
+  ASSET_DETAIL_SELECT,
+  ASSET_LIBRARY_SELECT,
+  ASSET_SUMMARY_SELECT,
+} from './assets.types.js';
 import type {
   AssetAccessRecord,
   AssetDetailRecord,
   AssetFileForCompletion,
   AssetLibraryRecord,
+  AssetSummaryRecord,
   CreateAssetFileRecordInput,
   DeleteAssetResult,
   MakeReadyInput,
@@ -72,6 +78,15 @@ export class AssetsRepository {
 
   findAssetForAccess(id: string): Promise<AssetAccessRecord | null> {
     return this.prisma.asset.findUnique({ where: { id }, select: ASSET_ACCESS_SELECT });
+  }
+
+  findSummaries(ids: string[]): Promise<AssetSummaryRecord[]> {
+    // Fetch all requested assets together instead of looking them up one by one.
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.prisma.asset.findMany({
+      where: { id: { in: ids } },
+      select: ASSET_SUMMARY_SELECT,
+    });
   }
 
   findAssetTypeById(id: string): Promise<Pick<Asset, 'id' | 'type'> | null> {
