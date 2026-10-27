@@ -4,7 +4,6 @@ import { z } from 'zod';
 const base = {
   name: z.string().trim().min(1, 'Enter the student’s name').max(120, 'Use at most 120 characters'),
   guardianName: z.string().trim().max(120, 'Use at most 120 characters'),
-  // TODO: Make it required when class section exists
   classSectionId: z.string(),
   status: z.enum(['ACTIVE', 'INACTIVE']),
   // Read-only on edit, never sent.
