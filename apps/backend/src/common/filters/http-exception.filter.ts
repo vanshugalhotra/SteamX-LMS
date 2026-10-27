@@ -1,5 +1,6 @@
 /** Normalizes framework, middleware, and persistence errors into the API response envelope. */
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { Logger } from 'nestjs-pino';
 import { mapPrismaError } from '../errors/prisma-error.js';
@@ -94,6 +95,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    const requestId = request.id ?? randomUUID();
     const error = mapPrismaError(exception) ?? exception;
     const statusCode = getStatusCode(error);
     const exceptionResponse = getExceptionResponse(error);
@@ -103,7 +105,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const originalError = exception instanceof Error ? exception : new Error(String(exception));
       this.logger.error({
         err: originalError,
-        requestId: request.id,
+        requestId,
         msg: 'Unhandled request error',
       });
     }
@@ -114,7 +116,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message: getMessage(error, exceptionResponse, statusCode),
       ...(statusCode < 500 &&
         exceptionResponse?.details !== undefined && { details: exceptionResponse.details }),
-      requestId: request.id,
+      requestId,
     });
   }
 }

@@ -1,3 +1,4 @@
+// Converts flat database block rows into the nested tree returned by the API.
 import { BlockType } from '../../../generated/prisma/enums.js';
 import type { NormalizedBlock } from '../validation/types.js';
 
@@ -11,10 +12,12 @@ export type LessonContentBlockRow = {
   columnIndex: number | null;
 };
 
+/** Check that stored block content has the object shape expected by the API. */
 function isContentObject(content: unknown): content is Record<string, unknown> {
   return typeof content === 'object' && content !== null && !Array.isArray(content);
 }
 
+/** Build the API block fields from one database row. */
 function toBlock(row: LessonContentBlockRow): NormalizedBlock {
   if (!isContentObject(row.content)) {
     throw new Error(`Lesson block ${row.id} has non-object content.`);
@@ -28,7 +31,7 @@ function toBlock(row: LessonContentBlockRow): NormalizedBlock {
   };
 }
 
-/** Turns database rows into the block tree returned by the API. */
+/** Join stored column rows to their layout blocks and return blocks in lesson order. */
 export function buildBlockTree(rows: LessonContentBlockRow[]): NormalizedBlock[] {
   // Keep one block per ID so column children can be attached without copying or returning them twice.
   const blocksById = new Map(rows.map((row) => [row.id, toBlock(row)]));

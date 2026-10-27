@@ -126,6 +126,14 @@ export const API_ERROR = {
     code: 'INVALID_STATUS_TRANSITION',
     message: 'The requested content status transition is not allowed',
   },
+  INVALID_LESSON_CONTENT: {
+    code: 'INVALID_LESSON_CONTENT',
+    message: 'Lesson content is invalid',
+  },
+  VERSION_CONFLICT: {
+    code: 'VERSION_CONFLICT',
+    message: 'Lesson content has changed since it was read',
+  },
 } as const;
 
 export const HTTP_ERROR_CODES: Partial<Record<number, string>> = {
