@@ -63,6 +63,12 @@ omitted.
 `GET /lessons/:id/content` returns the complete save-shaped tree together with its version and an
 asset side table:
 
+This is the admin/builder read. It returns content for every lesson, including DRAFT, ARCHIVED, and
+TEACHER_ONLY lessons. Only platform admins should have `curriculum.read`; do not grant it to teacher
+or student roles. Teacher/student delivery reads must use a separate endpoint that checks lesson
+release and applies the “released lesson is accessible” rule. Do not use this builder endpoint for
+delivery access.
+
 ```json
 {
   "version": 0,

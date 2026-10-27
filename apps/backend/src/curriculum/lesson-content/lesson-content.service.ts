@@ -16,6 +16,10 @@ export class LessonContentService {
     private readonly assets: AssetsService,
   ) {}
 
+  /**
+   * Admin/builder read only. Delivery readers need a separate release-aware endpoint.
+   * Never grant curriculum.read to teacher or student roles.
+   */
   async findByLessonId(actor: AuthContext, id: string): Promise<LessonContentResponseDto> {
     assertPlatformStaff(actor);
 
