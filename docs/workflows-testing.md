@@ -36,8 +36,25 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 - **Failure and retry:** Complete before upload and expect retryable `409 UPLOAD_NOT_COMPLETE`. Verify invalid stored bytes become FAILED with a stable code. Start a new attempt and confirm it can complete and appear in the library.
 - **Replacement:** Keep the old READY file serving while a replacement is UPLOADING. Successful completion swaps files and queues the old prefix; failed completion preserves the old file. UPLOADED/PROCESSING work blocks another replacement; older UPLOADING attempts are superseded.
 - **Manage:** Rename and verify the trimmed title. Archive and verify default-list hiding while detail/access remain available; unarchive and confirm the default listing returns.
-- **Delete and cleanup:** Delete an unused asset and verify file rows are removed and prefixes queued. A lesson-block reference returns `409 RESOURCE_IN_USE`; this is database-FK protection because no block service exists yet. After removing the block, deletion succeeds. Backdate stale files and queued prefixes in the isolated database, run cleanup, and verify abandoned rows and objects are removed while READY objects remain.
+- **Delete and cleanup:** Delete an unused asset and verify file rows are removed and prefixes queued. A lesson-block reference returns `409 RESOURCE_IN_USE`; after saving lesson content without that reference, deletion succeeds. Backdate stale files and queued prefixes in the isolated database, run cleanup, and verify abandoned rows and objects are removed while READY objects remain.
 - For real browser uploads and access, use the [asset upload and access smoke tests](./infrastructure.md).
+
+## Lesson content
+
+**Goal:** Read, replace, and edit lesson content while preserving version safety and asset usage.
+
+**Preconditions:** Admin with `curriculum.read`, `curriculum.write`, `asset.read`, and
+`asset.write`; isolated test database; lesson and READY assets created through the Prisma client.
+
+1. Read a lesson with no blocks and confirm version `0`, empty `blocks`, and empty `assets`.
+2. Save rich text and asset-backed blocks with `expectedVersion: 0`; read again and verify the
+   normalized tree, asset side table, and version `1`.
+3. Edit, reorder, and move blocks between top level and two-column slots; verify omitted blocks
+   were deleted and stable IDs were retained.
+4. Submit a changed save with a stale version; expect `409 VERSION_CONFLICT`, reload, and re-apply
+   the edit using the latest version.
+5. Confirm an asset referenced by the lesson cannot be deleted (`409 RESOURCE_IN_USE`); save
+   without its final reference and confirm the asset can then be deleted.
 
 ## First admin login and password change
 

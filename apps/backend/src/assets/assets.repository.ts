@@ -1,3 +1,4 @@
+// Database queries for asset records.
 import { Injectable } from '@nestjs/common';
 import { AssetFileStatus, ContentStatus, Prisma } from '../generated/prisma/client.js';
 import type { Asset, AssetFile } from '../generated/prisma/client.js';
@@ -80,10 +81,12 @@ export class AssetsRepository {
     return this.prisma.asset.findUnique({ where: { id }, select: ASSET_ACCESS_SELECT });
   }
 
-  findSummaries(ids: string[]): Promise<AssetSummaryRecord[]> {
+  /** Read requested asset summaries, using the save transaction when one is provided. */
+  findSummaries(ids: string[], tx?: Prisma.TransactionClient): Promise<AssetSummaryRecord[]> {
     // Fetch all requested assets together instead of looking them up one by one.
     if (ids.length === 0) return Promise.resolve([]);
-    return this.prisma.asset.findMany({
+    // Saves pass tx so asset checks see the same transaction as the block replacement.
+    return (tx ?? this.prisma).asset.findMany({
       where: { id: { in: ids } },
       select: ASSET_SUMMARY_SELECT,
     });

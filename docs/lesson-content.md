@@ -95,7 +95,43 @@ delivery access.
 unchanged without stripping or merging read-only metadata. `assets` is keyed by each referenced
 asset ID and contains its metadata and current file state, not access URLs. The frontend asks the
 asset access endpoint for temporary URLs when it needs to render a file. The `version` is the
-optimistic concurrency token that the content save endpoint (CUR-19) will require.
+optimistic concurrency token required by the content save endpoint.
+
+## Saving content
+
+`PUT /lessons/:id/content` replaces the complete lesson tree. Send the latest version with all
+blocks, including their stable client-generated IDs:
+
+```json
+{
+  "expectedVersion": 3,
+  "blocks": [
+    {
+      "id": "uuid",
+      "type": "RICH_TEXT",
+      "content": { "format": "tiptap", "doc": { "type": "doc", "content": [] } }
+    }
+  ]
+}
+```
+
+The response has the same `{ version, blocks, assets }` shape as the read endpoint; `version` is
+the new version after a changed save. Blocks omitted from the request are deleted. IDs re-sent in
+the request are kept, including blocks moved between top level and columns. Sending the current
+tree unchanged is a safe no-op and does not increment the version.
+
+Always send the version from the latest read or save response. Allow only one save in flight at a
+time. On `409 VERSION_CONFLICT`, reload the lesson and re-apply the user's edit before saving
+again. Retrying the identical request is safe: a successful first attempt is recognized as a
+no-op on retry.
+
+New asset references must point to an ACTIVE asset with a READY file and the matching asset type.
+An asset already referenced by this lesson may remain after it is archived or its READY file is no
+longer available. An asset may be shared by multiple blocks. Removing the last block reference
+allows the asset to be deleted.
+
+The JSON body limit is 1 MB, which is the real maximum for a lesson save. The frontend may choose
+whether to autosave; autosave uses this same endpoint and version contract.
 
 ## Rich-text whitelist
 

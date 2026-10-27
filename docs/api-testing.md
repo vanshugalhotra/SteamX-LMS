@@ -270,6 +270,21 @@ Caller: platform `admin` with `curriculum.read`; reads all content regardless of
 - [auto] When response JSON is scanned -> expect no storage keys, playback keys, upload/processing IDs, or URLs.
 - [auto] When lesson ID is malformed or unknown -> expect `404 NOT_FOUND`; when teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
+### `PUT /lessons/:id/content`
+
+Caller: platform `admin` with `curriculum.write`; replaces the complete lesson content tree.
+
+- [auto] When a valid tree is saved with the current `expectedVersion` -> expect `200` with the normalized blocks, referenced asset summaries, and incremented version; verify ordered top-level positions and column child ownership in the database.
+- [auto] When a read response's blocks are sent back unchanged with its version -> expect `200` and no version increment. Repeating a successful identical request is also safe.
+- [auto] When blocks are omitted, reordered, or moved between top level and columns -> expect replace semantics; omitted rows are deleted and re-sent IDs are retained. An empty tree clears content and increments version only if content changed.
+- [auto] When changed content has a stale version -> expect `409 VERSION_CONFLICT` with `details.currentVersion`; verify no block or version changes. When expectedVersion is missing, negative, fractional, or a string -> expect `400`.
+- [auto] When block structure, rich text, links, IDs, fields, asset references, or cross-lesson block ownership are invalid -> expect `400 INVALID_LESSON_CONTENT` with issue paths and no writes. Existing IDs and archived/unready assets already referenced by this lesson remain allowed.
+- [auto] When a referenced asset is missing, has the wrong type, is archived for a new reference, or has no READY file for a new reference -> expect `400 INVALID_LESSON_CONTENT` with the matching issue code and path.
+- [auto] When two changed saves race with the same expected version -> expect one `200` and one `409`; when identical requests race -> expect both `200` with one version increment.
+- [auto] When a body is about 900 KB -> expect `200`; when it exceeds 1 MB -> expect `413 PAYLOAD_TOO_LARGE` in the standard error envelope.
+- [auto] When a save fails during child insertion -> expect the old blocks and version to remain intact. An asset referenced by saved content cannot be deleted (`409 RESOURCE_IN_USE`) until a later save removes that reference.
+- [auto] When lesson ID is malformed or unknown -> expect `404 NOT_FOUND`; lesson status and audience do not prevent save, and their title/status/position remain unchanged. Teacher, school staff, and student callers receive `403`; unauthenticated callers receive `401`.
+
 ### `DELETE /lessons/:id`
 
 Caller: platform `admin` with `curriculum.write`; deletes a lesson with no dependent records.

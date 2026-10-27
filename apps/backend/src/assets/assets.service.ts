@@ -11,6 +11,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { AssetFileStatus } from '../generated/prisma/client.js';
 import type { Asset } from '../generated/prisma/client.js';
 import type { AssetFile } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
@@ -79,8 +80,12 @@ export class AssetsService {
   }
 
   /** Returns a summary for each requested asset, without exposing file storage details. */
-  async getSummaries(assetIds: string[]): Promise<Map<string, AssetSummary>> {
-    const records = await this.assets.findSummaries(assetIds);
+  /** Return public asset details for blocks, without exposing storage keys or signed URLs. */
+  async getSummaries(
+    assetIds: string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Map<string, AssetSummary>> {
+    const records = await this.assets.findSummaries(assetIds, tx);
     return new Map(
       records.map((asset) => {
         // Use the READY file when there is one; otherwise use the latest file attempt.
@@ -170,7 +175,7 @@ export class AssetsService {
         'Asset status changed',
       );
     }
-    // TODO(blocks): the block service must reject archived assets when attaching
+    // Lesson content saves reject new references to ARCHIVED assets.
     return toAssetDto(result.asset);
   }
 
