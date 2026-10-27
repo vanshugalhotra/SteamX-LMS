@@ -17,6 +17,8 @@ import { API_ERROR } from './common/errors/api-errors.js';
 
 type FieldErrors = { field: string; errors: string[] };
 
+export const JSON_BODY_LIMIT = '1mb';
+
 /** Preserves nested DTO field paths so clients can identify the invalid input. */
 function getValidationDetails(errors: ValidationError[], parent = ''): FieldErrors[] {
   return errors.flatMap((error) => {
@@ -35,6 +37,11 @@ export function configureApp(app: INestApplication): void {
 
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
+  const httpAdapter = app.getHttpAdapter();
+  if (!httpAdapter.useBodyParser) {
+    throw new Error('The configured HTTP adapter must support body parsing.');
+  }
+  httpAdapter.useBodyParser('json', false, { limit: JSON_BODY_LIMIT });
   app.use(cookieParser());
   app.use(helmet());
   if (config.get('SWAGGER_ENABLED', { infer: true })) {

@@ -101,4 +101,4 @@ All steps are idempotent. Multiple API instances can run cleanup without coordin
 - Access URLs are S3 presigned URLs, not CloudFront.
 - Cleanup runs in-process. Failed queue entries retry every run with no backoff or cap.
 - Completed queue entries are never pruned from `storage_cleanup_queue`.
-- No block service yet; asset-in-use deletion relies on the database FK.
+- Asset-in-use deletion is enforced by the database FK; lesson content saves validate new asset references before replacing blocks.

@@ -1,9 +1,21 @@
-import { Controller, Get, NotFoundException, Param, ParseUUIDPipe } from '@nestjs/common';
+// HTTP routes for reading and saving lesson content.
 import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Put,
+} from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator.js';
@@ -13,6 +25,7 @@ import { PERMISSION } from '../../auth/permissions.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import { ApiProtectedController } from '../../common/decorators/api-protected-controller.decorator.js';
 import { LessonContentResponseDto } from './dto/lesson-content-response.dto.js';
+import { SaveLessonContentDto } from './dto/save-lesson-content.dto.js';
 import { LessonContentService } from './lesson-content.service.js';
 
 @ApiTags('Lessons')
@@ -23,8 +36,10 @@ import { LessonContentService } from './lesson-content.service.js';
 })
 @Controller()
 export class LessonContentController {
+  /** Inject the service that handles lesson-content rules and database work. */
   constructor(private readonly lessonContent: LessonContentService) {}
 
+  /** Read the lesson tree and asset summaries for an authorized curriculum reader. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get('lessons/:id/content')
   @ApiOperation({ summary: 'Get lesson content' })
@@ -45,5 +60,31 @@ export class LessonContentController {
     id: string,
   ): Promise<LessonContentResponseDto> {
     return this.lessonContent.findByLessonId(actor, id);
+  }
+
+  /** Replace the full lesson tree for an authorized curriculum writer. */
+  @RequirePermission(PERMISSION.CURRICULUM_WRITE)
+  @Put('lessons/:id/content')
+  @ApiOperation({ summary: 'Replace lesson content' })
+  @ApiOkResponse({
+    description: 'The saved content tree, new version token, and referenced asset summaries.',
+    type: LessonContentResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'The version or lesson content is invalid.' })
+  @ApiNotFoundResponse({ description: 'Lesson not found or the lesson ID is invalid.' })
+  @ApiConflictResponse({ description: 'The lesson content version is stale.' })
+  @ApiResponse({ status: 413, description: 'The JSON request body exceeds 1 MB.' })
+  saveByLessonId(
+    @CurrentAuth() actor: AuthContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () => new NotFoundException(API_ERROR.NOT_FOUND),
+      }),
+    )
+    id: string,
+    @Body() body: SaveLessonContentDto,
+  ): Promise<LessonContentResponseDto> {
+    return this.lessonContent.saveByLessonId(actor, id, body);
   }
 }

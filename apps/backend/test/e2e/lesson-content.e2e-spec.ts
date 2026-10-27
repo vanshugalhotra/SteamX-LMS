@@ -1,8 +1,10 @@
 /** Covers the lesson content read shape, referenced assets, ordering, and access boundary. */
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { vi } from 'vitest';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/app.module.js';
@@ -17,6 +19,9 @@ import {
   PrismaClient,
 } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
+import type { Env } from '../../src/config/env.schema.js';
+import { LessonContentRepository } from '../../src/curriculum/lesson-content/lesson-content.repository.js';
+import { JSON_BODY_LIMIT } from '../../src/configure-app.js';
 import {
   collectAssetIds,
   validateLessonContent,
@@ -33,7 +38,9 @@ describe('Lesson content endpoint (e2e)', () => {
   let setupClient: PrismaClient;
   let setupPool: Pool;
   let fixture: TwoSchoolFixture;
+  let origin: string;
   let adminCookie: string;
+  let revokeAdminPermissions: (() => Promise<void>) | undefined;
   let revokeTeacherPermissions: (() => Promise<void>) | undefined;
   let revokeStudentPermissions: (() => Promise<void>) | undefined;
   const createdCourseIds: string[] = [];
@@ -50,12 +57,19 @@ describe('Lesson content endpoint (e2e)', () => {
     const readPermission = [PERMISSION.CURRICULUM_READ];
     const teacherGrant = await grantPermissions(setupClient, 'teacher', readPermission);
     const studentGrant = await grantPermissions(setupClient, 'student', readPermission);
+    const adminGrant = await grantPermissions(setupClient, 'admin', [PERMISSION.CURRICULUM_WRITE]);
+    revokeAdminPermissions = adminGrant.revoke;
     revokeTeacherPermissions = teacherGrant.revoke;
     revokeStudentPermissions = studentGrant.revoke;
 
     app = await createTestApp(AppModule);
     prisma = app.get(PrismaService);
     fixture = await createTwoSchoolFixture(prisma);
+    origin =
+      app.get<ConfigService<Env, true>>(ConfigService).get('CORS_ORIGINS', { infer: true })[0] ??
+      '';
+    if (!origin)
+      throw new Error('Lesson content e2e tests require a configured CORS_ORIGINS entry.');
   });
 
   afterAll(async () => {
@@ -92,6 +106,7 @@ describe('Lesson content endpoint (e2e)', () => {
       );
     }
     await app?.close();
+    await revokeAdminPermissions?.();
     await revokeStudentPermissions?.();
     await revokeTeacherPermissions?.();
     await setupClient?.$disconnect();
@@ -102,12 +117,23 @@ describe('Lesson content endpoint (e2e)', () => {
     adminCookie = await loginAsCookie(app, fixture.admin);
   });
 
+  /** Read lesson content through the real HTTP endpoint. */
   function getContent(cookie: string, lessonId: string) {
     return request(app.getHttpServer())
       .get(`/api/v1/lessons/${lessonId}/content`)
       .set('Cookie', cookie);
   }
 
+  /** Replace lesson content through the real HTTP endpoint. */
+  function putContent(cookie: string, lessonId: string, body: object) {
+    return request(app.getHttpServer())
+      .put(`/api/v1/lessons/${lessonId}/content`)
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send(body);
+  }
+
+  /** Create a lesson directly in the test database. */
   async function createLesson(
     options: {
       status?: ContentStatus;
@@ -115,10 +141,21 @@ describe('Lesson content endpoint (e2e)', () => {
       contentVersion?: number;
     } = {},
   ): Promise<string> {
-    const course = await prisma.course.create({ data: { title: `Course ${randomUUID()}` } });
+    const active = options.status === ContentStatus.ACTIVE;
+    const course = await prisma.course.create({
+      data: {
+        title: `Course ${randomUUID()}`,
+        ...(active ? { status: ContentStatus.ACTIVE } : {}),
+      },
+    });
     createdCourseIds.push(course.id);
     const module = await prisma.module.create({
-      data: { courseId: course.id, title: 'Module', position: 1 },
+      data: {
+        courseId: course.id,
+        title: 'Module',
+        position: 1,
+        ...(active ? { status: ContentStatus.ACTIVE } : {}),
+      },
     });
     const lesson = await prisma.lesson.create({
       data: {
@@ -126,20 +163,15 @@ describe('Lesson content endpoint (e2e)', () => {
         moduleId: module.id,
         title: 'Lesson',
         position: 1,
-        status: ContentStatus.DRAFT,
+        status: options.status ?? ContentStatus.DRAFT,
         audience: options.audience ?? LessonAudience.TEACHER_ONLY,
         contentVersion: options.contentVersion ?? 0,
       },
     });
-    if (options.status === ContentStatus.ARCHIVED) {
-      await prisma.lesson.update({
-        where: { id: lesson.id },
-        data: { status: ContentStatus.ARCHIVED },
-      });
-    }
     return lesson.id;
   }
 
+  /** Create an asset directly in the test database. */
   async function createAsset(
     type: AssetType,
     options: { status?: ContentStatus; fileStatus?: AssetFileStatus } = {},
@@ -158,6 +190,7 @@ describe('Lesson content endpoint (e2e)', () => {
     return asset.id;
   }
 
+  /** Create an asset file in the requested processing state. */
   async function createFile(
     assetId: string,
     type: AssetType,
@@ -209,6 +242,7 @@ describe('Lesson content endpoint (e2e)', () => {
     return id;
   }
 
+  /** Create one saved block row for read-side test setup. */
   async function createBlock(
     lessonId: string,
     input: {
@@ -445,11 +479,590 @@ describe('Lesson content endpoint (e2e)', () => {
     expect(response.body.blocks[29].assetId).toBe(assetIds[29]);
   });
 
+  it('saves a mixed block tree, persists its positions, and reads back the same response', async () => {
+    const lessonId = await createLesson();
+    const imageId = await createAsset(AssetType.IMAGE, { fileStatus: AssetFileStatus.READY });
+    const videoId = await createAsset(AssetType.VIDEO, { fileStatus: AssetFileStatus.READY });
+    const pdfId = await createAsset(AssetType.PDF, { fileStatus: AssetFileStatus.READY });
+    const richText = (id: string, value: string) => ({
+      id,
+      type: BlockType.RICH_TEXT,
+      content: {
+        format: 'tiptap',
+        doc: {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: value }] }],
+        },
+      },
+    });
+    const blocks = [
+      richText(randomUUID(), 'Lesson introduction'),
+      {
+        id: randomUUID(),
+        type: BlockType.ACCORDION,
+        content: {
+          title: 'Details',
+          body: { format: 'tiptap', doc: { type: 'doc' } },
+        },
+      },
+      { id: randomUUID(), type: BlockType.IMAGE, assetId: imageId, content: { alt: 'Diagram' } },
+      { id: randomUUID(), type: BlockType.VIDEO, assetId: videoId, content: { caption: 'Clip' } },
+      { id: randomUUID(), type: BlockType.PDF, assetId: pdfId, content: { caption: 'Handout' } },
+      {
+        id: randomUUID(),
+        type: BlockType.TWO_COLUMN,
+        content: {},
+        columns: [
+          richText(randomUUID(), 'Left column'),
+          { id: randomUUID(), type: BlockType.IMAGE, assetId: imageId, content: {} },
+        ],
+      },
+    ];
+    const validation = validateLessonContent({ blocks });
+    expect(validation.ok).toBe(true);
+    if (!validation.ok) throw new Error('Expected the mixed block tree to be valid.');
+
+    const response = await putContent(adminCookie, lessonId, {
+      expectedVersion: 0,
+      blocks,
+    }).expect(200);
+    expect(response.body.version).toBe(1);
+    expect(response.body.blocks).toEqual(validation.blocks);
+    expect(Object.keys(response.body.assets).sort()).toEqual([imageId, pdfId, videoId].sort());
+
+    const rows = await prisma.lessonBlock.findMany({
+      where: { lessonId },
+      select: {
+        id: true,
+        type: true,
+        assetId: true,
+        content: true,
+        position: true,
+        parentBlockId: true,
+        columnIndex: true,
+      },
+    });
+    const topRows = rows.filter(({ parentBlockId }) => parentBlockId === null);
+    const childRows = rows.filter(({ parentBlockId }) => parentBlockId !== null);
+    expect(
+      topRows
+        .sort((left, right) => (left.position ?? 0) - (right.position ?? 0))
+        .map(({ id, position }) => [id, position]),
+    ).toEqual(blocks.map((block, index) => [block.id, index + 1]));
+    expect(childRows).toHaveLength(2);
+    expect(
+      childRows.map(({ id, parentBlockId, columnIndex, position }) => [
+        id,
+        parentBlockId,
+        columnIndex,
+        position,
+      ]),
+    ).toEqual([
+      [validation.blocks[5]?.columns?.[0]?.id, validation.blocks[5]?.id, 0, null],
+      [validation.blocks[5]?.columns?.[1]?.id, validation.blocks[5]?.id, 1, null],
+    ]);
+    expect(rows).toHaveLength(8);
+    expect((await getContent(adminCookie, lessonId).expect(200)).body).toEqual(response.body);
+  });
+
+  it('replaces blocks, preserves re-sent IDs, and makes unchanged retries safe', async () => {
+    const lessonId = await createLesson();
+    const emptyNoOp = await putContent(adminCookie, lessonId, {
+      expectedVersion: 12,
+      blocks: [],
+    }).expect(200);
+    expect(emptyNoOp.body.version).toBe(0);
+    const moveIntoColumnId = randomUUID();
+    const layoutId = randomUUID();
+    const moveToTopId = randomUUID();
+    const omittedId = randomUUID();
+    const richText = (id: string, text: string) => ({
+      id,
+      type: BlockType.RICH_TEXT,
+      content: {
+        format: 'tiptap',
+        doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] },
+      },
+    });
+    const first = [
+      richText(moveIntoColumnId, 'Move into column'),
+      {
+        id: layoutId,
+        type: BlockType.TWO_COLUMN,
+        content: {},
+        columns: [richText(moveToTopId, 'Move to top'), null],
+      },
+      richText(omittedId, 'Remove'),
+    ];
+
+    await putContent(adminCookie, lessonId, { expectedVersion: 0, blocks: first }).expect(200);
+    const replacement = [
+      {
+        id: layoutId,
+        type: BlockType.TWO_COLUMN,
+        content: {},
+        columns: [null, richText(moveIntoColumnId, 'Move into column')],
+      },
+      richText(moveToTopId, 'Move to top'),
+    ];
+    await putContent(adminCookie, lessonId, {
+      expectedVersion: 1,
+      blocks: replacement,
+    }).expect(200);
+
+    const rows = await prisma.lessonBlock.findMany({
+      where: { lessonId },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true, parentBlockId: true, columnIndex: true },
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows).toContainEqual({
+      id: layoutId,
+      position: 1,
+      parentBlockId: null,
+      columnIndex: null,
+    });
+    expect(rows).toContainEqual({
+      id: moveToTopId,
+      position: 2,
+      parentBlockId: null,
+      columnIndex: null,
+    });
+    expect(rows).toContainEqual({
+      id: moveIntoColumnId,
+      position: null,
+      parentBlockId: layoutId,
+      columnIndex: 1,
+    });
+    expect(rows.some(({ id }) => id === omittedId)).toBe(false);
+
+    const current = (await getContent(adminCookie, lessonId).expect(200)).body;
+    await putContent(adminCookie, lessonId, {
+      expectedVersion: current.version,
+      blocks: current.blocks,
+    }).expect(200);
+    expect(
+      (await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).contentVersion,
+    ).toBe(2);
+
+    await putContent(adminCookie, lessonId, { expectedVersion: 2, blocks: [] })
+      .expect(200)
+      .then(({ body }) => expect(body).toMatchObject({ version: 3, blocks: [], assets: {} }));
+    await putContent(adminCookie, lessonId, { expectedVersion: 2, blocks: [] })
+      .expect(200)
+      .then(({ body }) => expect(body.version).toBe(3));
+    expect(await prisma.lessonBlock.count({ where: { lessonId } })).toBe(0);
+  });
+
+  it('rejects stale versions and invalid request/content fields without changing stored data', async () => {
+    const lessonId = await createLesson();
+    const original = {
+      id: randomUUID(),
+      type: BlockType.RICH_TEXT,
+      content: { format: 'tiptap', doc: { type: 'doc' } },
+    };
+    await putContent(adminCookie, lessonId, { expectedVersion: 0, blocks: [original] }).expect(200);
+
+    const stale = await putContent(adminCookie, lessonId, {
+      expectedVersion: 0,
+      blocks: [{ ...original, id: randomUUID() }],
+    }).expect(409);
+    expect(stale.body).toMatchObject({
+      code: 'VERSION_CONFLICT',
+      details: { currentVersion: 1 },
+    });
+
+    for (const body of [
+      { blocks: [] },
+      { expectedVersion: -1, blocks: [] },
+      { expectedVersion: 0.5, blocks: [] },
+      { expectedVersion: '1', blocks: [] },
+      { expectedVersion: 1, blocks: [], extra: true },
+    ]) {
+      await putContent(adminCookie, lessonId, body).expect(400);
+    }
+
+    const invalid = await putContent(adminCookie, lessonId, {
+      expectedVersion: 1,
+      blocks: [{ id: randomUUID(), type: 'UNKNOWN', content: {} }],
+    }).expect(400);
+    expect(invalid.body).toMatchObject({
+      code: 'INVALID_LESSON_CONTENT',
+      details: [{ path: 'blocks[0].type', code: 'BLOCK_TYPE_NOT_SUPPORTED' }],
+    });
+    expect(await prisma.lessonBlock.count({ where: { lessonId } })).toBe(1);
+    expect(
+      (await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).contentVersion,
+    ).toBe(1);
+  });
+
+  it('rejects block IDs owned by another lesson with the block path', async () => {
+    const lessonId = await createLesson();
+    const otherLessonId = await createLesson();
+    const foreign = await createBlock(otherLessonId, {
+      type: BlockType.RICH_TEXT,
+      content: { format: 'tiptap', doc: { type: 'doc' } },
+    });
+
+    const response = await putContent(adminCookie, lessonId, {
+      expectedVersion: 0,
+      blocks: [
+        {
+          id: foreign.id,
+          type: BlockType.RICH_TEXT,
+          content: { format: 'tiptap', doc: { type: 'doc' } },
+        },
+      ],
+    }).expect(400);
+
+    expect(response.body).toMatchObject({
+      code: 'INVALID_LESSON_CONTENT',
+      details: [{ path: 'blocks[0]', code: 'BLOCK_ID_IN_USE' }],
+    });
+    expect(await prisma.lessonBlock.count({ where: { lessonId } })).toBe(0);
+    expect(
+      (await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).contentVersion,
+    ).toBe(0);
+  });
+
+  it('rejects unsupported, nested, duplicate, oversized, malformed-link, and unknown-field blocks', async () => {
+    const lessonId = await createLesson();
+    const richText = (id: string) => ({
+      id,
+      type: BlockType.RICH_TEXT,
+      content: { format: 'tiptap', doc: { type: 'doc' } },
+    });
+    const duplicateId = randomUUID();
+    const cases: Array<{ blocks: object[]; code: string; path: string }> = [
+      {
+        blocks: [{ id: randomUUID(), type: 'UNRECOGNIZED', content: {} }],
+        code: 'BLOCK_TYPE_NOT_SUPPORTED',
+        path: 'blocks[0].type',
+      },
+      {
+        blocks: [{ id: randomUUID(), type: BlockType.PPTX, content: {} }],
+        code: 'BLOCK_TYPE_NOT_SUPPORTED',
+        path: 'blocks[0].type',
+      },
+      {
+        blocks: [
+          {
+            id: randomUUID(),
+            type: BlockType.TWO_COLUMN,
+            content: {},
+            columns: [
+              {
+                id: randomUUID(),
+                type: BlockType.TWO_COLUMN,
+                content: {},
+                columns: [null, null],
+              },
+              null,
+            ],
+          },
+        ],
+        code: 'INVALID_CONTENT',
+        path: 'blocks[0].columns[0].type',
+      },
+      {
+        blocks: [richText(duplicateId), richText(duplicateId)],
+        code: 'DUPLICATE_ID',
+        path: 'blocks[1].id',
+      },
+      {
+        blocks: Array.from({ length: 101 }, () => richText(randomUUID())),
+        code: 'TOO_MANY_BLOCKS',
+        path: 'blocks[100]',
+      },
+      {
+        blocks: [
+          {
+            id: randomUUID(),
+            type: BlockType.RICH_TEXT,
+            content: {
+              format: 'tiptap',
+              doc: {
+                type: 'doc',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'Unsafe link',
+                        marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        ],
+        code: 'INVALID_LINK',
+        path: 'blocks[0].content.doc.content[0].content[0].marks[0].attrs.href',
+      },
+      {
+        blocks: [{ ...richText(randomUUID()), unsupported: true }],
+        code: 'UNKNOWN_FIELD',
+        path: 'blocks[0].unsupported',
+      },
+    ];
+
+    for (const { blocks, code, path } of cases) {
+      const response = await putContent(adminCookie, lessonId, {
+        expectedVersion: 0,
+        blocks,
+      }).expect(400);
+      expect(response.body).toMatchObject({
+        code: 'INVALID_LESSON_CONTENT',
+        details: [expect.objectContaining({ code, path })],
+      });
+    }
+
+    expect(await prisma.lessonBlock.count({ where: { lessonId } })).toBe(0);
+    expect(
+      (await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).contentVersion,
+    ).toBe(0);
+  });
+
+  it('serializes concurrent saves, returns a conflict only for competing content, and rolls back failed inserts', async () => {
+    const lessonId = await createLesson();
+    const firstPayload = {
+      expectedVersion: 0,
+      blocks: [
+        {
+          id: randomUUID(),
+          type: BlockType.RICH_TEXT,
+          content: { format: 'tiptap', doc: { type: 'doc' } },
+        },
+      ],
+    };
+    const identical = await Promise.all([
+      putContent(adminCookie, lessonId, firstPayload),
+      putContent(adminCookie, lessonId, firstPayload),
+    ]);
+    expect(identical.map(({ status }) => status)).toEqual([200, 200]);
+    expect(
+      (await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).contentVersion,
+    ).toBe(1);
+
+    const competing = await Promise.all([
+      putContent(adminCookie, lessonId, {
+        expectedVersion: 1,
+        blocks: [
+          {
+            id: randomUUID(),
+            type: BlockType.RICH_TEXT,
+            content: { format: 'tiptap', doc: { type: 'doc' } },
+          },
+        ],
+      }),
+      putContent(adminCookie, lessonId, {
+        expectedVersion: 1,
+        blocks: [
+          {
+            id: randomUUID(),
+            type: BlockType.RICH_TEXT,
+            content: { format: 'tiptap', doc: { type: 'doc' } },
+          },
+        ],
+      }),
+    ]);
+    expect(competing.map(({ status }) => status).sort((left, right) => left - right)).toEqual([
+      200, 409,
+    ]);
+    const winner = competing.find(({ status }) => status === 200);
+    expect(winner).toBeDefined();
+    expect((await getContent(adminCookie, lessonId).expect(200)).body.blocks).toEqual(
+      winner?.body.blocks,
+    );
+    expect(
+      (await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).contentVersion,
+    ).toBe(2);
+
+    const repository = app.get(LessonContentRepository);
+    const createChildren = vi
+      .spyOn(repository, 'createChildBlocks')
+      .mockRejectedValueOnce(new Error('Simulated child insert failure'));
+    const failure = await putContent(adminCookie, lessonId, {
+      expectedVersion: 2,
+      blocks: [
+        {
+          id: randomUUID(),
+          type: BlockType.TWO_COLUMN,
+          content: {},
+          columns: [
+            {
+              id: randomUUID(),
+              type: BlockType.RICH_TEXT,
+              content: { format: 'tiptap', doc: { type: 'doc' } },
+            },
+            null,
+          ],
+        },
+      ],
+    }).expect(500);
+    expect(failure.body).toMatchObject({ code: 'INTERNAL_ERROR' });
+    createChildren.mockRestore();
+    expect((await getContent(adminCookie, lessonId).expect(200)).body.version).toBe(2);
+    expect(await prisma.lessonBlock.count({ where: { lessonId } })).toBe(1);
+  });
+
+  it('validates new asset references and allows an archived asset already in this lesson', async () => {
+    const lessonId = await createLesson();
+    const pdfId = await createAsset(AssetType.PDF, { fileStatus: AssetFileStatus.READY });
+    const archivedId = await createAsset(AssetType.IMAGE, {
+      status: ContentStatus.ARCHIVED,
+      fileStatus: AssetFileStatus.READY,
+    });
+    const uploadingId = await createAsset(AssetType.IMAGE, {
+      fileStatus: AssetFileStatus.UPLOADING,
+    });
+    const failedId = await createAsset(AssetType.IMAGE, { fileStatus: AssetFileStatus.FAILED });
+    const cases = [
+      { assetId: randomUUID(), code: 'ASSET_NOT_FOUND' },
+      { assetId: pdfId, code: 'ASSET_TYPE_MISMATCH' },
+      { assetId: archivedId, code: 'ASSET_ARCHIVED' },
+      { assetId: uploadingId, code: 'ASSET_NOT_READY' },
+      { assetId: failedId, code: 'ASSET_NOT_READY' },
+    ];
+    for (const { assetId, code } of cases) {
+      const response = await putContent(adminCookie, lessonId, {
+        expectedVersion: 0,
+        blocks: [{ id: randomUUID(), type: BlockType.IMAGE, assetId, content: {} }],
+      }).expect(400);
+      expect(response.body).toMatchObject({
+        code: 'INVALID_LESSON_CONTENT',
+        details: [{ path: 'blocks[0].assetId', code }],
+      });
+    }
+    expect(await prisma.lessonBlock.count({ where: { lessonId } })).toBe(0);
+
+    const readyImageId = await createAsset(AssetType.IMAGE, { fileStatus: AssetFileStatus.READY });
+    await createFile(readyImageId, AssetType.IMAGE, AssetFileStatus.UPLOADING);
+    const imageBlockId = randomUUID();
+    await putContent(adminCookie, lessonId, {
+      expectedVersion: 0,
+      blocks: [{ id: imageBlockId, type: BlockType.IMAGE, assetId: readyImageId, content: {} }],
+    }).expect(200);
+    await prisma.asset.update({
+      where: { id: readyImageId },
+      data: { status: ContentStatus.ARCHIVED },
+    });
+    await putContent(adminCookie, lessonId, {
+      expectedVersion: 1,
+      blocks: [
+        { id: imageBlockId, type: BlockType.IMAGE, assetId: readyImageId, content: {} },
+        {
+          id: randomUUID(),
+          type: BlockType.RICH_TEXT,
+          content: { format: 'tiptap', doc: { type: 'doc' } },
+        },
+      ],
+    }).expect(200);
+  });
+
+  it('prevents deleting referenced assets until a save removes them and reports where-used lessons', async () => {
+    const lessonId = await createLesson();
+    const assetId = await createAsset(AssetType.IMAGE, { fileStatus: AssetFileStatus.READY });
+    const image = { id: randomUUID(), type: BlockType.IMAGE, assetId, content: {} };
+    await putContent(adminCookie, lessonId, { expectedVersion: 0, blocks: [image] }).expect(200);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/assets/${assetId}`)
+      .set('Cookie', adminCookie)
+      .expect(200);
+    expect(detail.body.usedIn.items).toContainEqual(expect.objectContaining({ lessonId }));
+    await request(app.getHttpServer())
+      .delete(`/api/v1/assets/${assetId}`)
+      .set('Origin', origin)
+      .set('Cookie', adminCookie)
+      .expect(409)
+      .then(({ body }) => expect(body.code).toBe('RESOURCE_IN_USE'));
+
+    await putContent(adminCookie, lessonId, { expectedVersion: 1, blocks: [] }).expect(200);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/assets/${assetId}`)
+      .set('Origin', origin)
+      .set('Cookie', adminCookie)
+      .expect(204);
+  });
+
+  it('accepts a JSON lesson body below the configured limit and rejects one above it uniformly', async () => {
+    const lessonId = await createLesson();
+    const limitBytes = Number.parseInt(JSON_BODY_LIMIT, 10) * 1024 * 1024;
+    const makeLargeBlocks = (textLength: number) =>
+      Array.from({ length: 100 }, () => ({
+        id: randomUUID(),
+        type: BlockType.RICH_TEXT,
+        content: {
+          format: 'tiptap',
+          doc: {
+            type: 'doc',
+            content: [
+              { type: 'paragraph', content: [{ type: 'text', text: 'x'.repeat(textLength) }] },
+            ],
+          },
+        },
+      }));
+    const belowLimit = { expectedVersion: 0, blocks: makeLargeBlocks(8_800) };
+    expect(Buffer.byteLength(JSON.stringify(belowLimit))).toBeLessThan(limitBytes);
+    await putContent(adminCookie, lessonId, belowLimit).expect(200);
+
+    const aboveLimit = { expectedVersion: 1, blocks: makeLargeBlocks(12_000) };
+    expect(Buffer.byteLength(JSON.stringify(aboveLimit))).toBeGreaterThan(limitBytes);
+    const response = await putContent(adminCookie, lessonId, aboveLimit).expect(413);
+    expect(response.body).toMatchObject({
+      statusCode: 413,
+      code: 'PAYLOAD_TOO_LARGE',
+      requestId: expect.any(String),
+    });
+    expect(
+      (await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } })).contentVersion,
+    ).toBe(1);
+  });
+
+  it('saves lessons regardless of status or audience without changing lesson metadata', async () => {
+    for (const [status, audience] of [
+      [ContentStatus.DRAFT, LessonAudience.TEACHER_ONLY],
+      [ContentStatus.ACTIVE, LessonAudience.STUDENT],
+      [ContentStatus.ARCHIVED, LessonAudience.TEACHER_ONLY],
+    ] as const) {
+      const lessonId = await createLesson({ status, audience });
+      await putContent(adminCookie, lessonId, {
+        expectedVersion: 0,
+        blocks: [
+          {
+            id: randomUUID(),
+            type: BlockType.RICH_TEXT,
+            content: { format: 'tiptap', doc: { type: 'doc' } },
+          },
+        ],
+      }).expect(200);
+      const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId } });
+      expect(lesson).toMatchObject({
+        title: 'Lesson',
+        status,
+        audience,
+        position: 1,
+        contentVersion: 1,
+      });
+    }
+  });
+
   it('returns 404 for unknown and malformed IDs, 401 without auth, and 403 for school users', async () => {
     const lessonId = await createLesson();
     await getContent(adminCookie, randomUUID()).expect(404);
     await getContent(adminCookie, 'not-a-uuid').expect(404);
+    await putContent(adminCookie, randomUUID(), { expectedVersion: 0, blocks: [] }).expect(404);
+    await putContent(adminCookie, 'not-a-uuid', { expectedVersion: 0, blocks: [] }).expect(404);
     await request(app.getHttpServer()).get(`/api/v1/lessons/${lessonId}/content`).expect(401);
+    await request(app.getHttpServer())
+      .put(`/api/v1/lessons/${lessonId}/content`)
+      .set('Origin', origin)
+      .send({ expectedVersion: 0, blocks: [] })
+      .expect(401);
 
     for (const user of [
       fixture.schoolA.teacher,
@@ -458,6 +1071,7 @@ describe('Lesson content endpoint (e2e)', () => {
     ]) {
       const cookie = await loginAsCookie(app, user);
       await getContent(cookie, lessonId).expect(403);
+      await putContent(cookie, lessonId, { expectedVersion: 0, blocks: [] }).expect(403);
     }
   });
 });
