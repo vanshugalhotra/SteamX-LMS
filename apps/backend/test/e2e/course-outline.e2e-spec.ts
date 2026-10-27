@@ -408,9 +408,9 @@ describe('Course outline endpoint (e2e)', () => {
     ).toBe(true);
   });
 
-  it('returns 404 for unknown and malformed IDs, 401 without a cookie, and 403 for school users', async () => {
+  it('returns 400 for malformed IDs, 404 for unknown IDs, 401 without a cookie, and 403 for school users', async () => {
     await getOutline(adminCookie, randomUUID()).expect(404);
-    await getOutline(adminCookie, 'not-a-uuid').expect(404);
+    await getOutline(adminCookie, 'not-a-uuid').expect(400);
     await getOutline('', randomUUID()).expect(401);
 
     const teacherCookie = await loginAsCookie(app, fixture.schoolA.teacher);

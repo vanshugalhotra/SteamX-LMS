@@ -37,9 +37,7 @@ export class LessonContentRepository {
   }
 
   // Read the version and blocks from one PostgreSQL snapshot for the builder response.
-  findSnapshot(
-    lessonId: string,
-  ): Promise<{
+  findSnapshot(lessonId: string): Promise<{
     lessonVersion: { contentVersion: number } | null;
     blocks: LessonContentBlockRow[];
   }> {

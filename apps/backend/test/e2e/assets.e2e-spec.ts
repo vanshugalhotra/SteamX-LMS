@@ -411,9 +411,9 @@ describe('Assets endpoints (e2e)', () => {
     await getAssetAccess(adminCookie, assetId).expect(200);
   });
 
-  it('returns 404 for unknown and malformed asset IDs', async () => {
+  it('returns 400 for malformed and 404 for unknown asset IDs', async () => {
     await getAssetAccess(adminCookie, randomUUID()).expect(404);
-    await getAssetAccess(adminCookie, 'not-a-uuid').expect(404);
+    await getAssetAccess(adminCookie, 'not-a-uuid').expect(400);
   });
 
   it('requires authentication and asset.read permission for access URLs', async () => {
@@ -819,7 +819,7 @@ describe('Assets endpoints (e2e)', () => {
         createdAssetIds.push(assetId);
       });
     await postAssetFile(adminCookie, randomUUID(), base).expect(404);
-    await postAssetFile(adminCookie, 'invalid-id', base).expect(404);
+    await postAssetFile(adminCookie, 'invalid-id', base).expect(400);
 
     const archivedId = await createDatabaseAsset(AssetType.IMAGE, {
       status: ContentStatus.ARCHIVED,
@@ -1122,7 +1122,7 @@ describe('Assets endpoints (e2e)', () => {
       /storageKey|playbackKey|uploadId|processingJobId|storage_key|playback_key|upload_id|processing_job_id/i,
     );
     await getAsset(adminCookie, '550e8400-e29b-41d4-a716-446655440099').expect(404);
-    await getAsset(adminCookie, 'invalid-id').expect(404);
+    await getAsset(adminCookie, 'invalid-id').expect(400);
   });
 
   it('lists distinct asset usage across top-level and nested blocks, ordered with a capped total', async () => {
@@ -1283,8 +1283,8 @@ describe('Assets endpoints (e2e)', () => {
     await getAssetFile(adminCookie, first.asset.id, '550e8400-e29b-41d4-a716-446655440099').expect(
       404,
     );
-    await getAssetFile(adminCookie, 'invalid-id', first.file.id).expect(404);
-    await getAssetFile(adminCookie, first.asset.id, 'invalid-id').expect(404);
+    await getAssetFile(adminCookie, 'invalid-id', first.file.id).expect(400);
+    await getAssetFile(adminCookie, first.asset.id, 'invalid-id').expect(400);
     await getAssetFile(teacherCookie, first.asset.id, first.file.id).expect(403);
     await getAssetFile(studentCookie, first.asset.id, first.file.id).expect(403);
     await getAssetFile(schoolStaffCookie, first.asset.id, first.file.id).expect(403);
@@ -1479,7 +1479,7 @@ describe('Assets endpoints (e2e)', () => {
     ).resolves.toMatchObject({ status: AssetFileStatus.READY });
   });
 
-  it('returns 404 for foreign, unknown, and malformed completion IDs and enforces permissions', async () => {
+  it('returns 404 for foreign or unknown IDs, 400 for malformed IDs, and enforces permissions', async () => {
     const first = await createAndUpload(AssetType.IMAGE, 'image/jpeg', JPEG_BYTES);
     const second = await createAndUpload(AssetType.PDF, 'application/pdf', PDF_BYTES);
 
@@ -1494,8 +1494,8 @@ describe('Assets endpoints (e2e)', () => {
       first.asset.id,
       '550e8400-e29b-41d4-a716-446655440099',
     ).expect(404);
-    await completeAssetFile(adminCookie, 'invalid-id', first.file.id).expect(404);
-    await completeAssetFile(adminCookie, first.asset.id, 'invalid-id').expect(404);
+    await completeAssetFile(adminCookie, 'invalid-id', first.file.id).expect(400);
+    await completeAssetFile(adminCookie, first.asset.id, 'invalid-id').expect(400);
     await completeAssetFile(undefined, first.asset.id, first.file.id).expect(401);
     await completeAssetFile(teacherCookie, first.asset.id, first.file.id).expect(403);
     await completeAssetFile(studentCookie, first.asset.id, first.file.id).expect(403);
@@ -1620,7 +1620,7 @@ describe('Assets endpoints (e2e)', () => {
     }
     await patchAsset(adminCookie, assetId, { title: 'Valid', extra: true }).expect(400);
     await patchAsset(adminCookie, randomUUID(), { title: 'Valid' }).expect(404);
-    await patchAsset(adminCookie, 'invalid-id', { title: 'Valid' }).expect(404);
+    await patchAsset(adminCookie, 'invalid-id', { title: 'Valid' }).expect(400);
   });
 
   it('archives and restores assets without changing updatedAt for a repeated status', async () => {
@@ -1659,7 +1659,7 @@ describe('Assets endpoints (e2e)', () => {
     await patchAssetStatus(adminCookie, assetId, { status: 'junk' }).expect(400);
     await patchAssetStatus(adminCookie, assetId, { status: 'ACTIVE', extra: true }).expect(400);
     await patchAssetStatus(adminCookie, randomUUID(), { status: 'ARCHIVED' }).expect(404);
-    await patchAssetStatus(adminCookie, 'invalid-id', { status: 'ARCHIVED' }).expect(404);
+    await patchAssetStatus(adminCookie, 'invalid-id', { status: 'ARCHIVED' }).expect(400);
   });
 
   it('deletes eligible files and the asset atomically, queuing each file prefix', async () => {
@@ -1701,7 +1701,7 @@ describe('Assets endpoints (e2e)', () => {
     const library = await getAssets(adminCookie).expect(200);
     expect(library.body.items.some((item: { id: string }) => item.id === assetId)).toBe(false);
     await deleteAsset(adminCookie, randomUUID()).expect(404);
-    await deleteAsset(adminCookie, 'invalid-id').expect(404);
+    await deleteAsset(adminCookie, 'invalid-id').expect(400);
   });
 
   it('rolls back file deletion and cleanup when top-level or child blocks reference an asset', async () => {
