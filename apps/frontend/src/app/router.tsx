@@ -86,6 +86,37 @@ export const router = createBrowserRouter([
               return { Component: TeacherEditPage };
             },
           },
+          {
+            path: PATHS.admin.students,
+            lazy: async () => {
+              const { StudentsPage } = await import('@/features/admin/students/pages/StudentsPage');
+              return { Component: StudentsPage };
+            },
+          },
+          {
+            path: PATHS.admin.studentNew,
+            lazy: async () => {
+              const { StudentCreatePage } =
+                await import('@/features/admin/students/pages/StudentCreatePage');
+              return { Component: StudentCreatePage };
+            },
+          },
+          {
+            path: PATHS.admin.studentEdit(':id'),
+            lazy: async () => {
+              const { StudentEditPage } =
+                await import('@/features/admin/students/pages/StudentEditPage');
+              return { Component: StudentEditPage };
+            },
+          },
+          {
+            path: PATHS.admin.classSectionNew,
+            lazy: async () => {
+              const { ClassSectionCreatePage } =
+                await import('@/features/admin/class-sections/pages/ClassSectionCreatePage');
+              return { Component: ClassSectionCreatePage };
+            },
+          },
           { path: PATHS.admin.base, loader: () => redirect(PATHS.admin.dashboard) },
         ],
       },
