@@ -777,7 +777,7 @@ describe('Assets endpoints (e2e)', () => {
     expect(fileRows.find((file) => file.status === AssetFileStatus.READY)?.id).toBe(ready.id);
     const attempts = responses.map((response) => response.body.file.id as string);
     const surviving = fileRows.find((file) => file.status !== AssetFileStatus.READY);
-    expect(surviving).toBeDefined();
+    expect(surviving).toMatchObject({ status: AssetFileStatus.UPLOADING });
     const queuedAttempts = attempts.filter((id) => id !== surviving?.id);
     expect(queuedAttempts).toHaveLength(1);
     const cleanupRows = await prisma.$queryRaw<
