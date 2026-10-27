@@ -4,8 +4,8 @@ import { assertPlatformStaff } from '../../auth/assert-platform-staff.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import type { LessonContentResponseDto } from './dto/lesson-content-response.dto.js';
-import { buildBlockTree } from './build-block-tree.js';
-import { collectAssetIds } from './validate-lesson-content.js';
+import { buildBlockTree } from './tree/build-block-tree.js';
+import { collectAssetIds } from './validation/validate-lesson-content.js';
 import { toLessonContentResponse } from './lesson-content.mapper.js';
 import { LessonContentRepository } from './lesson-content.repository.js';
 

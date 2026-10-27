@@ -1,4 +1,4 @@
-import { BlockType } from '../../generated/prisma/client.js';
+import { BlockType } from '../../../generated/prisma/client.js';
 import { buildBlockTree } from './build-block-tree.js';
 
 const row = (

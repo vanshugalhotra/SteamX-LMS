@@ -1,5 +1,5 @@
-import { BlockType } from '../../generated/prisma/enums.js';
-import type { NormalizedBlock } from './types.js';
+import { BlockType } from '../../../generated/prisma/enums.js';
+import type { NormalizedBlock } from '../validation/types.js';
 
 export type LessonContentBlockRow = {
   id: string;

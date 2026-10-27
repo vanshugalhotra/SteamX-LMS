@@ -1,4 +1,4 @@
-import type { AssetType, BlockType } from '../../generated/prisma/enums.js';
+import type { AssetType, BlockType } from '../../../generated/prisma/enums.js';
 
 export type Issue = { path: string; code: string; message: string };
 

@@ -1,5 +1,5 @@
 import { normalizeRichText } from '../rich-text/tiptap-normalizer.js';
-import type { BlockDefinition } from '../types.js';
+import type { BlockDefinition } from '../validation/types.js';
 
 export const richTextDefinition: BlockDefinition = {
   allowedInColumn: true,

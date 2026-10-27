@@ -1,8 +1,8 @@
-import { BlockType } from '../../generated/prisma/enums.js';
+import { BlockType } from '../../../generated/prisma/enums.js';
 import { z } from 'zod';
 import { MAX_BLOCKS, MAX_ISSUES } from './limits.js';
-import { blockDefinitions } from './block-definitions/registry.js';
-import { addIssue, isObject } from './block-definitions/validation-helpers.js';
+import { blockDefinitions } from '../block-definitions/registry.js';
+import { addIssue, isObject } from './helpers.js';
 import type { Issue, NormalizedBlock } from './types.js';
 
 /**

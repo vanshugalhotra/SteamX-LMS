@@ -20,7 +20,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.js';
 import {
   collectAssetIds,
   validateLessonContent,
-} from '../../src/curriculum/lesson-content/validate-lesson-content.js';
+} from '../../src/curriculum/lesson-content/validation/validate-lesson-content.js';
 import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
 import { cleanupFixtures } from '../support/setup/cleanup.js';
 import { grantPermissions } from '../support/setup/grant-permissions.js';

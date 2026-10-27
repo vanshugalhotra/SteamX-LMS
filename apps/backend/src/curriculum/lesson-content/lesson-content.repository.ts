@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
-import type { LessonContentBlockRow } from './build-block-tree.js';
+import type { LessonContentBlockRow } from './tree/build-block-tree.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
 const LESSON_CONTENT_BLOCK_SELECT = {
