@@ -43,11 +43,11 @@ export class LessonContentService {
   async findByLessonId(actor: AuthContext, id: string): Promise<LessonContentResponseDto> {
     assertPlatformStaff(actor);
 
-    const lessonVersion = await this.content.findVersion(id);
+    const { lessonVersion, blocks: blockRows } = await this.content.findSnapshot(id);
     if (!lessonVersion) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
-    const blocks = buildBlockTree(await this.content.findBlocks(id));
+    const blocks = buildBlockTree(blockRows);
     const assetIds = collectAssetIds(blocks);
     const summaries = await this.assets.getSummaries(assetIds);
     return toLessonContentResponse(lessonVersion.contentVersion, blocks, summaries);

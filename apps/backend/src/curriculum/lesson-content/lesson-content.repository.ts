@@ -36,12 +36,33 @@ export class LessonContentRepository {
     return rows[0] ?? null;
   }
 
-  // Read only the current version, used by the lesson-content GET endpoint.
-  findVersion(lessonId: string): Promise<{ contentVersion: number } | null> {
-    return this.prisma.lesson.findUnique({
-      where: { id: lessonId },
-      select: { contentVersion: true },
-    });
+  // Read the version and blocks from one PostgreSQL snapshot for the builder response.
+  findSnapshot(
+    lessonId: string,
+  ): Promise<{
+    lessonVersion: { contentVersion: number } | null;
+    blocks: LessonContentBlockRow[];
+  }> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const lessonVersion = await tx.lesson.findUnique({
+          where: { id: lessonId },
+          select: { contentVersion: true },
+        });
+        if (!lessonVersion) return { lessonVersion, blocks: [] };
+
+        const blocks = await tx.lessonBlock.findMany({
+          where: { lessonId },
+          orderBy: [{ position: 'asc' }, { columnIndex: 'asc' }],
+          select: LESSON_CONTENT_BLOCK_SELECT,
+        });
+        return { lessonVersion, blocks };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+        timeout: 15_000,
+      },
+    );
   }
 
   // Read a lesson's saved block rows; pass tx when this read belongs to a save.
