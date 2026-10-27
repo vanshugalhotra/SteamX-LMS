@@ -1,5 +1,5 @@
-import { MAX_ALT_OR_CAPTION, MAX_ISSUES, MAX_TITLE } from '../limits.js';
-import type { Issue } from '../types.js';
+import { MAX_ALT_OR_CAPTION, MAX_ISSUES, MAX_TITLE } from './limits.js';
+import type { Issue } from './types.js';
 
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

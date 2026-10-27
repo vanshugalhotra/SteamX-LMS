@@ -23,5 +23,6 @@ import { AssetProcessingModule } from './processing/asset-processing.module.js';
     AssetCleanupService,
     CleanupScheduler,
   ],
+  exports: [AssetsService],
 })
 export class AssetsModule {}

@@ -1,6 +1,6 @@
 import { AssetType } from '../../../generated/prisma/enums.js';
-import type { BlockDefinition } from '../types.js';
-import { optionalText, recordContent, rejectUnknownFields } from './validation-helpers.js';
+import type { BlockDefinition } from '../validation/types.js';
+import { optionalText, recordContent, rejectUnknownFields } from '../validation/helpers.js';
 
 export const imageDefinition: BlockDefinition = {
   assetType: AssetType.IMAGE,

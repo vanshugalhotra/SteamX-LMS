@@ -47,6 +47,8 @@ import { AssetsRepository } from './assets.repository.js';
 import { AssetUsageRepository } from './library/asset-usage.repository.js';
 import { AssetProcessorRegistry } from './processing/asset-processor.registry.js';
 import type { MakeReadyInput } from './assets.types.js';
+import type { AssetSummary } from './assets.types.js';
+import { pickCurrentFile } from './library/asset-library.js';
 
 const UUID_SCHEMA = z.uuid();
 
@@ -74,6 +76,35 @@ export class AssetsService {
   ): Promise<PaginationResponseDto<AssetListItemDto>> {
     const { items, total } = await this.assets.findLibraryItems(query);
     return paginate(items.map(toAssetListItemDto), query.page, query.limit, total);
+  }
+
+  /** Returns a summary for each requested asset, without exposing file storage details. */
+  async getSummaries(assetIds: string[]): Promise<Map<string, AssetSummary>> {
+    const records = await this.assets.findSummaries(assetIds);
+    return new Map(
+      records.map((asset) => {
+        // Use the READY file when there is one; otherwise use the latest file attempt.
+        const file = pickCurrentFile(asset.files);
+        return [
+          asset.id,
+          {
+            id: asset.id,
+            type: asset.type,
+            title: asset.title,
+            status: asset.status,
+            file: file
+              ? {
+                  status: file.status,
+                  mimeType: file.mimeType,
+                  sizeBytes: file.sizeBytes === null ? null : Number(file.sizeBytes),
+                  originalFilename: file.originalFilename,
+                  lastError: file.lastError,
+                }
+              : null,
+          },
+        ];
+      }),
+    );
   }
 
   // ─────────────────────────────────────────

@@ -58,6 +58,45 @@ be nested. Asset IDs are top-level block fields, never part of `content`. PPTX b
 supported. Titles, alt text, and captions are trimmed; empty optional alt text and captions are
 omitted.
 
+## Reading content
+
+`GET /lessons/:id/content` returns the complete save-shaped tree together with its version and an
+asset side table:
+
+This is the admin/builder read. It returns content for every lesson, including DRAFT, ARCHIVED, and
+TEACHER_ONLY lessons. Only platform admins should have `curriculum.read`; do not grant it to teacher
+or student roles. Teacher/student delivery reads must use a separate endpoint that checks lesson
+release and applies the “released lesson is accessible” rule. Do not use this builder endpoint for
+delivery access.
+
+```json
+{
+  "version": 0,
+  "blocks": [],
+  "assets": {
+    "asset-uuid": {
+      "id": "asset-uuid",
+      "type": "IMAGE",
+      "title": "Diagram",
+      "status": "ACTIVE",
+      "file": {
+        "status": "READY",
+        "mimeType": "image/png",
+        "sizeBytes": 1024,
+        "originalFilename": "diagram.png",
+        "lastError": null
+      }
+    }
+  }
+}
+```
+
+`blocks` has the same block shape accepted by the save validator; it can be edited and sent back
+unchanged without stripping or merging read-only metadata. `assets` is keyed by each referenced
+asset ID and contains its metadata and current file state, not access URLs. The frontend asks the
+asset access endpoint for temporary URLs when it needs to render a file. The `version` is the
+optimistic concurrency token that the content save endpoint (CUR-19) will require.
+
 ## Rich-text whitelist
 
 | Rich-text type | Kept                                                                                                                                                                                                           | Accepted and dropped                                         | Rejected                                                                                         |

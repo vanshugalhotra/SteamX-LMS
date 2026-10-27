@@ -12,7 +12,9 @@ ALTER TABLE "lessons"
   ADD CONSTRAINT "lessons_title_nonempty"
   CHECK (length(btrim("title")) > 0),
   ADD CONSTRAINT "lessons_position_positive"
-  CHECK ("position" >= 1);
+  CHECK ("position" >= 1),
+  ADD CONSTRAINT "lessons_content_version_nonneg"
+  CHECK ("content_version" >= 0);
 
 ALTER TABLE "assets"
   ADD CONSTRAINT "assets_title_nonempty"

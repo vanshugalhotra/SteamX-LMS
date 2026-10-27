@@ -4,8 +4,8 @@ import {
   MAX_RICH_TEXT_CHARS,
   MAX_RICH_TEXT_DEPTH,
   MAX_RICH_TEXT_NODES,
-} from '../limits.js';
-import type { Issue } from '../types.js';
+} from '../validation/limits.js';
+import type { Issue } from '../validation/types.js';
 import {
   ALLOWED_MARKS,
   BLOCK_NODES,

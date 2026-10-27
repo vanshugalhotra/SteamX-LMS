@@ -31,6 +31,8 @@ Each entry records the current design choice and why.
 - **Unpaginated nested lists** — module and lesson lists are unpaginated so reorder clients get the complete set.
 - **Delete = FK-restricted only** — deletion blocked by foreign keys, using shared `RESOURCE_IN_USE` error code.
 - **Outline read model** — `GET /courses/:id/outline` reads across course/module/lesson in one query. Writes stay in their feature folders. Admin-only and unfiltered; teacher/student outlines need separate filtered endpoints.
+- **Lesson content read model** — `GET /lessons/:id/content` returns the save-shaped block tree plus an asset side table, so the frontend never strips or merges metadata. Curriculum obtains summaries through an exported assets-module method rather than reading asset tables.
+- **Optimistic whole-lesson saves** — `content_version` is preferred over last-write-wins because a stale editor tab could silently overwrite the entire lesson. The cost is one integer column;
 - **No content version history** — replacements aren't archived versions. Add when revision browsing becomes a requirement.
 - **Editor-agnostic block tree** — lesson blocks and layouts do not depend on an editor; only `lesson-content/rich-text/` knows TipTap. Rich text carries a `format` tag, so another editor format can be introduced without changing the storage schema.
 - **Reject unknown lesson content** — unknown fields, nodes, marks, and attributes fail validation so client/server mismatches surface early rather than silently losing data. TipTap's default link `target`, `rel`, and `class` attributes are accepted and dropped.

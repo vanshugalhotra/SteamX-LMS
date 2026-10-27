@@ -376,6 +376,7 @@ model Lesson {
   position  Int
   status    ContentStatus  @default(DRAFT)
   audience  LessonAudience @default(TEACHER_ONLY)
+  contentVersion Int @default(0) @map("content_version")
   createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -388,6 +389,7 @@ model Lesson {
   releases            DeliveryLessonRelease[]
   completions         LessonCompletion[]
   // [CHECK] length(btrim(title)) > 0; position >= 1
+  // [CHECK] content_version >= 0.
   // [IDX]   UNIQUE (module_id, position); reorder using unused temporary positions to avoid collisions.
   // [RULE]  Do not upsert positional rows; duplicate positions fail immediately.
   // [TRG]   course_id immutable (moving between modules of the SAME course is allowed; FK guarantees same course).

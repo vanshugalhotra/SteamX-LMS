@@ -1,4 +1,4 @@
-import { BlockType } from '../../generated/prisma/enums.js';
+import { BlockType } from '../../../generated/prisma/enums.js';
 import { describe, expect, it } from 'vitest';
 import { MAX_BLOCKS, MAX_ISSUES } from './limits.js';
 import {

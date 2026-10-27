@@ -61,9 +61,44 @@ export const ASSET_ACCESS_SELECT = {
   },
 } satisfies Prisma.AssetSelect;
 
+export const ASSET_SUMMARY_SELECT = {
+  id: true,
+  type: true,
+  title: true,
+  status: true,
+  files: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true,
+      assetId: true,
+      status: true,
+      originalFilename: true,
+      mimeType: true,
+      sizeBytes: true,
+      lastError: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+} satisfies Prisma.AssetSelect;
+
 export type AssetLibraryRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_LIBRARY_SELECT }>;
 export type AssetDetailRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_DETAIL_SELECT }>;
 export type AssetAccessRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_ACCESS_SELECT }>;
+export type AssetSummaryRecord = Prisma.AssetGetPayload<{ select: typeof ASSET_SUMMARY_SELECT }>;
+export type AssetSummary = {
+  id: string;
+  type: Asset['type'];
+  title: string;
+  status: Asset['status'];
+  file: {
+    status: AssetFile['status'];
+    mimeType: string | null;
+    sizeBytes: number | null;
+    originalFilename: string | null;
+    lastError: string | null;
+  } | null;
+};
 
 export type AssetFileForCompletion = Prisma.AssetFileGetPayload<{
   include: { asset: { select: { type: true } } };

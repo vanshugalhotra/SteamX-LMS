@@ -1,5 +1,5 @@
 import { BlockType } from '../../../generated/prisma/enums.js';
-import type { BlockDefinition } from '../types.js';
+import type { BlockDefinition } from '../validation/types.js';
 import { accordionDefinition } from './accordion.definition.js';
 import { imageDefinition } from './image.definition.js';
 import { pdfDefinition } from './pdf.definition.js';

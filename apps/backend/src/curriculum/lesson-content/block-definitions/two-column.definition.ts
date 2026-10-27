@@ -1,5 +1,5 @@
-import type { BlockDefinition } from '../types.js';
-import { recordContent, rejectUnknownFields } from './validation-helpers.js';
+import type { BlockDefinition } from '../validation/types.js';
+import { recordContent, rejectUnknownFields } from '../validation/helpers.js';
 
 export const twoColumnDefinition: BlockDefinition = {
   allowedInColumn: false,

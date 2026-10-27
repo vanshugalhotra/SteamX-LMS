@@ -1,7 +1,7 @@
-import { MAX_TITLE } from '../limits.js';
+import { MAX_TITLE } from '../validation/limits.js';
 import { normalizeRichText } from '../rich-text/tiptap-normalizer.js';
-import type { BlockDefinition } from '../types.js';
-import { addIssue, recordContent, rejectUnknownFields } from './validation-helpers.js';
+import type { BlockDefinition } from '../validation/types.js';
+import { addIssue, recordContent, rejectUnknownFields } from '../validation/helpers.js';
 
 export const accordionDefinition: BlockDefinition = {
   allowedInColumn: true,

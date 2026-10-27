@@ -257,6 +257,19 @@ Caller: platform admin with `curriculum.read` for GET and `curriculum.write` for
 - [auto] When lesson ID is malformed -> expect `400 BAD_REQUEST`; when valid but unknown -> expect `404 NOT_FOUND`.
 - [auto] When teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
+### `GET /lessons/:id/content`
+
+Caller: platform `admin` with `curriculum.read`; reads all content regardless of lesson status or audience.
+
+- [auto] When lesson has no blocks -> expect `{ version: 0, blocks: [], assets: {} }`.
+- [auto] When blocks include rich text, accordion, image, video, PDF, and two-column layouts -> expect stored content and top-level blocks in position order; layouts contain two nullable column entries.
+- [auto] When one asset is reused in top-level and nested blocks -> expect one asset-summary entry; assets referenced only inside columns are included.
+- [auto] When an asset has only a FAILED file, is ARCHIVED, or has a READY file plus a newer UPLOADING replacement -> expect the summary to include its state and choose READY over the replacement.
+- [auto] When lesson content version is set to `7` -> expect `version: 7`; the returned blocks pass `validateLessonContent` unchanged.
+- [auto] When lesson has 100 blocks and 30 distinct referenced assets -> expect every block ordered and all summaries returned.
+- [auto] When response JSON is scanned -> expect no storage keys, playback keys, upload/processing IDs, or URLs.
+- [auto] When lesson ID is malformed or unknown -> expect `404 NOT_FOUND`; when teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
+
 ### `DELETE /lessons/:id`
 
 Caller: platform `admin` with `curriculum.write`; deletes a lesson with no dependent records.
