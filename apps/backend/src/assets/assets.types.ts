@@ -9,13 +9,17 @@ export const ASSET_LIBRARY_SELECT = {
   createdAt: true,
   updatedAt: true,
   files: {
-    where: { status: AssetFileStatus.READY },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: 1,
     select: {
+      id: true,
+      assetId: true,
+      status: true,
+      lastError: true,
       mimeType: true,
       sizeBytes: true,
       originalFilename: true,
+      createdAt: true,
+      updatedAt: true,
     },
   },
 } satisfies Prisma.AssetSelect;

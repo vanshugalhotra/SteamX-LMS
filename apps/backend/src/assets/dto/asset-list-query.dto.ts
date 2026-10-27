@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Trim } from '../../common/decorators/trim.decorator.js';
 import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto.js';
-import { AssetType, ContentStatus } from '../../generated/prisma/client.js';
+import { AssetFileStatus, AssetType, ContentStatus } from '../../generated/prisma/client.js';
 
 const ASSET_LIBRARY_STATUSES = [ContentStatus.ACTIVE, ContentStatus.ARCHIVED] as const;
 
@@ -16,6 +16,15 @@ export class AssetListQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(ASSET_LIBRARY_STATUSES)
   status: ContentStatus = ContentStatus.ACTIVE;
+
+  @ApiPropertyOptional({
+    enum: AssetFileStatus,
+    description:
+      'Matches assets that have at least one file in this status. An asset with a READY file and a failed replacement appears under FAILED, and the file summary shows the READY file.',
+  })
+  @IsOptional()
+  @IsEnum(AssetFileStatus)
+  fileStatus?: AssetFileStatus;
 
   @ApiPropertyOptional({
     maxLength: 100,

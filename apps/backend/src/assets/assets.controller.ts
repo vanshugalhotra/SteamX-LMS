@@ -60,7 +60,10 @@ export class AssetsController {
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get()
   @ApiOperation({ summary: 'List assets' })
-  @ApiOkResponse({ description: 'Paginated assets with READY files.', type: AssetListResponseDto })
+  @ApiOkResponse({
+    description: 'Paginated assets with their current file summary, if any.',
+    type: AssetListResponseDto,
+  })
   @ApiBadRequestResponse({ description: 'Query parameters are invalid.' })
   findLibraryItems(@Query() query: AssetListQueryDto): Promise<AssetListResponseDto> {
     return this.assets.findLibraryItems(query);

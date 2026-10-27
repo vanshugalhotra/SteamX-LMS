@@ -299,19 +299,20 @@ Caller: platform `admin` with `curriculum.write`; deletes a lesson with no depen
 
 ### `GET /assets`
 
-Caller: authenticated role with `asset.read`; lists ACTIVE assets by default and ARCHIVED assets on request, but only when the asset has a READY file.
+Caller: authenticated role with `asset.read`; lists ACTIVE assets by default and ARCHIVED assets on request, regardless of file state.
 
-- [auto] When no query is supplied -> expect page 1, limit 20, ACTIVE assets with a READY file only.
-- [auto] When an asset has no files or only FAILED, UPLOADING, UPLOADED, or PROCESSING files -> omit it; when a READY file has a newer UPLOADING replacement -> include the asset using the READY file.
-- [auto] When `status=ARCHIVED` -> return archived assets with READY files; DRAFT and unknown status values -> expect `400`.
+- [auto] When no query is supplied -> expect page 1, limit 20, ACTIVE assets with or without files.
+- [auto] Each item includes the READY file when one exists, otherwise the most recent file; when there are no files, `file` is null. The summary includes file ID, status, last error, size, MIME, and original filename.
+- [auto] When `fileStatus` is supplied -> include assets with at least one file in that status (READY, FAILED, UPLOADING, UPLOADED, or PROCESSING); the file summary still prefers READY over other files. A FAILED filter can therefore include an asset whose summary file is READY.
+- [auto] When `status=ARCHIVED` -> return archived assets regardless of file state; DRAFT and unknown status values -> expect `400`.
 - [auto] When type is supplied -> return only matching asset types; invalid types -> expect `400`.
 - [auto] When search has surrounding spaces, partial text, or different casing -> trim and match asset titles case-insensitively.
 - [auto] When search contains `%` or `_` -> treat those characters literally.
 - [auto] When status, type, and search are combined -> apply all filters to both returned items and `total`.
 - [auto] When pagination is omitted -> expect page 1 and limit 20; when page is beyond the last page -> expect empty items and matching total; limits above 100 and search longer than 100 characters -> expect `400`.
 - [auto] When assets share a `createdAt` value -> order by descending ID after descending creation time.
-- [auto] Each item has only asset identity/type/title/status/timestamps and READY-file MIME, numeric size, and original filename; no usage or internal storage fields.
-- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+- [auto] Each item has only asset identity/type/title/status/timestamps and a safe file summary; no usage or internal storage fields.
+- [auto] When caller is unauthenticated -> expect `401`; roles without `asset.read` -> expect `403`.
 
 ### `GET /assets/:id`
 
