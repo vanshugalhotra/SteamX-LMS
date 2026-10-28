@@ -637,6 +637,51 @@ describe('curriculum and asset database rules', () => {
     }
   });
 
+  it('serializes lesson activation with concurrent module archival', async () => {
+    const otherClient = await connectRawClient();
+    try {
+      const course = await createCourse('ACTIVE');
+      const module = await createModule(course, { status: 'ACTIVE' });
+      const lesson = await createLesson(module, course);
+      await client.query('COMMIT');
+      await client.query('BEGIN');
+      const firstPid = await client.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+      const secondPid = await otherClient.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+
+      await client.query(`UPDATE lessons SET status = 'ACTIVE' WHERE id = $1`, [lesson]);
+      await otherClient.query('BEGIN');
+      const archive = otherClient.query(`UPDATE modules SET status = 'ARCHIVED' WHERE id = $1`, [
+        module,
+      ]);
+
+      let isBlocked = false;
+      for (let attempt = 0; attempt < 10000 && !isBlocked; attempt += 1) {
+        const blockers = await client.query<{ blocked: boolean }>(
+          'SELECT $1 = ANY(pg_blocking_pids($2)) AS blocked',
+          [firstPid.rows[0]?.pid, secondPid.rows[0]?.pid],
+        );
+        isBlocked = blockers.rows[0]?.blocked ?? false;
+        if (!isBlocked) {
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        }
+      }
+      expect(isBlocked).toBe(true);
+
+      await client.query('COMMIT');
+      await archive;
+      await otherClient.query('COMMIT');
+      const finalState = await otherClient.query(
+        `SELECT m.status AS module, l.status AS lesson
+         FROM modules m JOIN lessons l ON l.module_id = m.id WHERE m.id = $1`,
+        [module],
+      );
+      expect(finalState.rows[0]).toEqual({ module: 'ARCHIVED', lesson: 'ARCHIVED' });
+    } finally {
+      await otherClient.query('ROLLBACK');
+      await otherClient.end();
+    }
+  });
+
   it('rejects changes to every immutable curriculum column', async () => {
     const course = await createCourse('ACTIVE');
     const otherCourse = await createCourse('ACTIVE');
