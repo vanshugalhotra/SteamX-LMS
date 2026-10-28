@@ -6,7 +6,8 @@ import { PasswordService } from '../../src/auth/services/password.service.js';
 import type { Env } from '../../src/config/env.schema.js';
 import { PrismaClient, UserStatus, UserType } from '../../src/generated/prisma/client.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
-import { createTestApp } from './create-test-app.js';
+import { createTestApp, getTestStorageService } from './create-test-app.js';
+import type { InMemoryStorageService } from './in-memory-storage.service.js';
 import type { Response, Test } from 'supertest';
 import request from 'supertest';
 import { grantPermissions } from './setup/grant-permissions.js';
@@ -23,6 +24,7 @@ export type InvariantApi = {
   app: INestApplication;
   prisma: PrismaService;
   origin: string;
+  storage: InMemoryStorageService;
   admin: { id: string; steamxId: string; password: string };
   routes: ApiRoute[];
   send: (
@@ -56,6 +58,7 @@ export async function startInvariantApi(
       ? await grantPermissions(setupClient, 'teacher', options.teacherPermissions)
       : undefined;
   const app = await createTestApp();
+  const storage = getTestStorageService(app);
   const prisma = app.get(PrismaService);
   const config = app.get<ConfigService<Env, true>>(ConfigService);
   const origin = config.get('CORS_ORIGINS', { infer: true })[0] ?? '';
@@ -156,6 +159,7 @@ export async function startInvariantApi(
     app,
     prisma,
     origin,
+    storage,
     admin: { ...admin, password: INVARIANT_ADMIN.password },
     routes,
     send,

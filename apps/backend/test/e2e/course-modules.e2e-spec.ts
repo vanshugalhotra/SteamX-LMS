@@ -254,6 +254,9 @@ describe('Course modules endpoints (e2e)', () => {
     await postModule(adminCookie, unknownId, { title: 'Missing course' }).expect(404);
     await listModules(adminCookie, unknownId).expect(404);
     await reorderModules(adminCookie, unknownId, []).expect(404);
+    await patchModule(adminCookie, unknownId, { title: 'Missing module' }).expect(404);
+    await patchModuleStatus(adminCookie, unknownId, ContentStatus.ACTIVE).expect(404);
+    await deleteModule(adminCookie, unknownId).expect(404);
     const missingModule = await getModule(adminCookie, unknownId).expect(404);
     expectSafeError(missingModule.body);
   });
@@ -270,6 +273,8 @@ describe('Course modules endpoints (e2e)', () => {
     await patchModule(adminCookie, module.id, { title: 'Updated', extra: true }).expect(400);
     await patchModuleStatus(adminCookie, module.id, 'UNKNOWN').expect(400);
     await reorderModules(adminCookie, courseId, ['not-a-uuid']).expect(400);
+    await listModules(adminCookie, 'not-a-uuid').expect(400);
+    await reorderModules(adminCookie, 'not-a-uuid', []).expect(400);
   });
 
   it('requires an active parent for activation and enforces content transitions', async () => {
@@ -390,6 +395,7 @@ describe('Course modules endpoints (e2e)', () => {
       await patchModuleStatus(cookie, module.id, ContentStatus.ACTIVE).expect(403);
       await deleteModule(cookie, module.id).expect(403);
     }
+    await postModule('', courseId, { title: 'Unauthenticated' }).expect(401);
     await deleteModule('', module.id).expect(401);
   });
 
@@ -397,6 +403,8 @@ describe('Course modules endpoints (e2e)', () => {
     const malformed = await getModule(adminCookie, 'not-a-uuid').expect(400);
     expectSafeError(malformed.body);
     await postModule(adminCookie, 'not-a-uuid', { title: 'Invalid parent' }).expect(400);
+    await patchModule(adminCookie, 'not-a-uuid', { title: 'Invalid module' }).expect(400);
+    await patchModuleStatus(adminCookie, 'not-a-uuid', ContentStatus.ACTIVE).expect(400);
     await deleteModule(adminCookie, 'not-a-uuid').expect(400);
     const unknownDelete = await deleteModule(adminCookie, randomUUID()).expect(404);
     expectSafeError(unknownDelete.body);

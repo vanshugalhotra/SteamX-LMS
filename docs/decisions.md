@@ -21,30 +21,22 @@ Each entry records the current design choice and why.
 
 ## Curriculum
 
-- **Shared status helper** — courses, modules, and lessons use one pure `canTransitionContentStatus` function.
-- **No return to DRAFT** — status can never go back to `DRAFT` after leaving it.
-- **DRAFT → ARCHIVED allowed** — useful for populated draft content that can't be deleted due to dependents.
-- **Course titles not unique** — admins are responsible for avoiding confusing duplicates.
-- **Archival + release access** — archiving a parent archives active descendants (not drafts). Restoring a parent does not restore children. Already-released content stays served while subscription is valid. See [database.md](./database.md).
-- **Immediate ordering constraints** — Prisma unique constraints on positions. Reordering uses temporary positions to avoid collisions. Two-column children: delete + recreate rather than swap.
-- **Full-list reorder** — `PUT .../order` accepts the complete ordered ID list under a parent row lock. Position gaps from deletes are normalized by reorder.
-- **Unpaginated nested lists** — module and lesson lists are unpaginated so reorder clients get the complete set.
-- **Delete = FK-restricted only** — deletion blocked by foreign keys, using shared `RESOURCE_IN_USE` error code.
-- **Outline read model** — `GET /courses/:id/outline` reads across course/module/lesson in one query. Writes stay in their feature folders. Admin-only and unfiltered; teacher/student outlines need separate filtered endpoints.
-- **Lesson content read model** — `GET /lessons/:id/content` returns the save-shaped block tree plus an asset side table, so the frontend never strips or merges metadata. Curriculum obtains summaries through an exported assets-module method rather than reading asset tables.
-- **Whole-lesson replacement** — save deletes child blocks before all remaining blocks, then inserts the new tree in one transaction. No diff/upsert is used because positional unique constraints are immediate.
-- **Save ordering and concurrency** — lock the lesson first, compare for a no-op before checking the expected version, then reject stale changed content with `VERSION_CONFLICT`. This makes retries safe while protecting against stale editor tabs.
-- **Asset references in saves** — new references must use an active asset of the matching type with a READY file; references already in the lesson remain valid if the asset is archived or loses its READY file. Asset summaries are read through the save transaction client.
-- **Client block IDs** — IDs are supplied by the editor and can be reused across saves only for the same lesson; save rejects IDs owned by another lesson. Two rare races are accepted: a simultaneous cross-lesson UUID collision and asset deletion between validation and insert can result in a generic 500.
-- **JSON body limit** — lesson content requests use a 1 MB JSON body limit, which bounds the actual lesson payload.
-- **Optimistic whole-lesson saves** — `content_version` is preferred over last-write-wins because a stale editor tab could silently overwrite the entire lesson. The cost is one integer column.
-- **No content version history** — replacements aren't archived versions. Add when revision browsing becomes a requirement.
-- **Editor-agnostic block tree** — lesson blocks and layouts do not depend on an editor; only `lesson-content/rich-text/` knows TipTap. Rich text carries a `format` tag, so another editor format can be introduced without changing the storage schema.
-- **Reject unknown lesson content** — unknown fields, nodes, marks, and attributes fail validation so client/server mismatches surface early rather than silently losing data. TipTap's default link `target`, `rel`, and `class` attributes are accepted and dropped.
-- **Client-generated block IDs** — clients assign stable UUIDs for editor identity and future per-block features; the server rejects duplicate IDs across the full tree.
-- **Fixed two-column layout** — columns are always a two-item array of nullable blocks. This keeps the layout contract simple and prevents nested layouts.
-- **No PPTX lesson blocks** — the database enum retains PPTX for asset compatibility, but lesson content validation does not accept PPTX blocks.
-- **Bounded lesson content** — cap blocks (100), text (50,000 characters/document), rich-text nodes (5,000/document), depth (20), and issue reporting (50). These limits bound validation work and keep oversized or deeply nested editor input from exhausting memory or the call stack.
+- **Lifecycle and deletion** — courses, modules, and lessons share `canTransitionContentStatus`: status never returns to `DRAFT`, while `DRAFT → ARCHIVED` is allowed. Course titles are not unique.
+- **Archival and release access** — a parent archives active descendants only; restoring it does not restore children. Draft content is not student-visible, while already-released active or archived content remains available until subscription expiry.
+- **Deletes are FK-restricted** — deleting a resource with dependents returns `RESOURCE_IN_USE`.
+- **Ordering and outline** — reorders take the complete ID list under a parent lock; unpaginated module/lesson lists support that contract. `GET /courses/:id/outline` is an admin-only, unfiltered read model; writes remain in their owning feature.
+
+## Lesson content
+
+- **Read model and validation boundary** — `GET /lessons/:id/content` returns the save-shaped block tree, version, and referenced asset summaries. Curriculum uses the assets module's summary API; pure block validation is separate from persistence.
+- **Whole-lesson atomic saves** — `PUT` replaces all blocks in one transaction; delete children before parents and recreate positional rows because database uniqueness is immediate. There is no per-block API.
+- **Version and retry rules** — lock the lesson, recognize a normalized no-op before checking `expectedVersion`, and reject stale changed content with `VERSION_CONFLICT`. Successful changed saves increment `content_version` once; failed transactions do not.
+- **Asset references** — new references require an active asset, matching type, and READY file; references already in the lesson remain valid after archival or loss of a READY file. Asset summaries are read through the save transaction.
+- **Block identity and layout** — clients supply UUID block IDs; duplicates and IDs owned by another lesson are rejected. Two-column layouts have exactly two nullable slots, permit at most one non-layout block per slot, and cannot nest.
+- **Accepted save races** — a simultaneous cross-lesson block-ID collision or asset deletion between validation and insert can still produce a generic `500`; these rare races are not handled specially.
+- **Rich text and supported formats** — the block tree is editor-independent, but the only accepted rich-text format is TipTap. Unknown nodes, marks, fields, and attributes fail; TipTap link `target`, `rel`, and `class` attributes are accepted and dropped.
+- **Limits and history** — JSON requests are capped at 1 MB; a lesson has at most 100 blocks, 50,000 rich-text characters/document, 5,000 rich-text nodes/document, depth 20, and 50 reported issues. Saves replace current content; there is no version history.
+- **Unsupported block types** — PPTX remains in the asset/database enums for compatibility but is not accepted as lesson content.
 
 ## Asset library
 

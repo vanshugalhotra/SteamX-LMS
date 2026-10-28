@@ -259,7 +259,9 @@ Caller: platform admin with `curriculum.read` for GET and `curriculum.write` for
 
 ### `GET /lessons/:id/content`
 
-Caller: platform `admin` with `curriculum.read`; reads all content regardless of lesson status or audience.
+Caller: platform `admin` with `curriculum.read`; reads content regardless of lesson status or
+audience. Authentication runs before permission checks; a school role remains forbidden even when
+granted `curriculum.read`. A valid unknown lesson returns `404`; a malformed UUID returns `400`.
 
 - [auto] When lesson has no blocks -> expect `{ version: 0, blocks: [], assets: {} }`.
 - [auto] When blocks include rich text, accordion, image, video, PDF, and two-column layouts -> expect stored content and top-level blocks in position order; layouts contain two nullable column entries.
@@ -267,23 +269,33 @@ Caller: platform `admin` with `curriculum.read`; reads all content regardless of
 - [auto] When an asset has only a FAILED file, is ARCHIVED, or has a READY file plus a newer UPLOADING replacement -> expect the summary to include its state and choose READY over the replacement.
 - [auto] When lesson content version is set to `7` -> expect `version: 7`; the returned blocks pass `validateLessonContent` unchanged.
 - [auto] When lesson has 100 blocks and 30 distinct referenced assets -> expect every block ordered and all summaries returned.
-- [auto] When response JSON is scanned -> expect no storage keys, playback keys, upload/processing IDs, or URLs.
+- [auto] When response JSON is scanned -> expect no storage keys, playback keys, upload/processing IDs, or signed URLs.
 - [auto] When lesson ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`; when teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
 ### `PUT /lessons/:id/content`
 
-Caller: platform `admin` with `curriculum.write`; replaces the complete lesson content tree.
+Caller: platform `admin` with `curriculum.write`; replaces the complete lesson content tree. A
+school role remains forbidden even when granted `curriculum.write`. The global validation pipe
+requires an object with only `expectedVersion` and `blocks`; `expectedVersion` is an integer `>= 0`
+and `blocks` is an array. A valid unknown lesson returns `404`; a malformed UUID returns `400`.
 
 - [auto] When a valid tree is saved with the current `expectedVersion` -> expect `200` with the normalized blocks, referenced asset summaries, and incremented version; verify ordered top-level positions and column child ownership in the database.
-- [auto] When a read response's blocks are sent back unchanged with its version -> expect `200` and no version increment. Repeating a successful identical request is also safe.
+- [auto] When a read response's blocks are sent back unchanged -> expect `200` and no version increment, even on an identical retry. The no-op check precedes the version check; a stale version conflicts only when the submitted normalized tree changes stored content.
 - [auto] When blocks are omitted, reordered, or moved between top level and columns -> expect replace semantics; omitted rows are deleted and re-sent IDs are retained. An empty tree clears content and increments version only if content changed.
 - [auto] When changed content has a stale version -> expect `409 VERSION_CONFLICT` with `details.currentVersion`; verify no block or version changes. When expectedVersion is missing, negative, fractional, or a string -> expect `400`.
-- [auto] When block structure, rich text, links, IDs, fields, asset references, or cross-lesson block ownership are invalid -> expect `400 INVALID_LESSON_CONTENT` with issue paths and no writes. Existing IDs and archived/unready assets already referenced by this lesson remain allowed.
+- [auto] When block structure, rich text, links, IDs, fields, asset references, or cross-lesson block ownership are invalid -> expect `400 INVALID_LESSON_CONTENT` with issue paths and no writes. IDs must be UUIDs, unique across the full tree, and not owned by another lesson.
 - [auto] When a referenced asset is missing, has the wrong type, is archived for a new reference, or has no READY file for a new reference -> expect `400 INVALID_LESSON_CONTENT` with the matching issue code and path.
+- [auto] When an asset was already referenced by this lesson before it becomes ARCHIVED or loses its READY file -> it may remain in the saved tree; new references still require an ACTIVE asset, matching type, and READY file.
 - [auto] When two changed saves race with the same expected version -> expect one `200` and one `409`; when identical requests race -> expect both `200` with one version increment.
-- [auto] When a body is about 900 KB -> expect `200`; when it exceeds 1 MB -> expect `413 PAYLOAD_TOO_LARGE` in the standard error envelope.
+- [auto] When a JSON body below 1 MB is valid -> expect `200`; when the body exceeds the 1 MB JSON parser limit -> expect `413 PAYLOAD_TOO_LARGE` in the standard error envelope.
 - [auto] When a save fails during child insertion -> expect the old blocks and version to remain intact. An asset referenced by saved content cannot be deleted (`409 RESOURCE_IN_USE`) until a later save removes that reference.
-- [auto] When lesson ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`. Lesson status and audience do not prevent save, and their title/status/position remain unchanged. Teacher, school staff, and student callers receive `403`; unauthenticated callers receive `401`.
+- [auto] When validation or persistence fails -> expect the transaction to leave both block rows and `content_version` unchanged; errors use `{ statusCode, code, message, requestId }` with optional `details`, and responses never expose storage keys, playback keys, upload/processing IDs, or password hashes.
+- [auto] When lesson status or audience is DRAFT, ACTIVE, ARCHIVED, TEACHER_ONLY, or STUDENT -> expect save to work without changing lesson metadata. Teacher, school staff, and student callers receive `403` even with the route permission; unauthenticated callers receive `401`.
+
+Block shapes, the TipTap whitelist, per-document limits (100 blocks, 50,000 text characters,
+5,000 rich-text nodes, depth 20, and 50 issues), and validation issue codes are specified in
+[lesson-content.md](./lesson-content.md). Saves are whole-lesson replacements in one transaction;
+there is no per-block endpoint or content history.
 
 ### `DELETE /lessons/:id`
 
