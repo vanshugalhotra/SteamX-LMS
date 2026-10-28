@@ -517,7 +517,7 @@ model Subscription {
   //         DEFERRABLE INITIALLY DEFERRED  [needs btree_gist]. One term per school-course, no overlap.
   // [TRG]   school_id, course_id immutable. INSERT requires course ACTIVE.
   // [TRG]   BEFORE UPDATE OF max_deliveries: lock this row, reject if new cap < count(ACTIVE deliveries for school+course).
-  // [RULE]  Validity = start_date <= today <= end_date in business timezone (assumption A4). Renewal = new row.
+  // [RULE]  Validity = start_date <= today <= end_date in business timezone. Renewal = new row.
   // [RULE]  Retained/purge-eligible = DERIVED: max(end_date) + 2 years (G3). Nothing stored.
 
   @@index([schoolId, courseId, startDate, endDate]) // hot path: has_course_access()

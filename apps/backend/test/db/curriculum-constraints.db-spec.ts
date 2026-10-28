@@ -543,7 +543,7 @@ describe('curriculum and asset database rules', () => {
     await client.query(
       `INSERT INTO subscriptions
          (id, school_id, course_id, start_date, end_date, max_deliveries, updated_at)
-       VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_DATE, 1, now())`,
+       VALUES ($1, $2, $3, business_today(), business_today(), 1, now())`,
       [subscriptionId, schoolId, activeCourse],
     );
     const activeDeliveryId = randomUUID();
@@ -1110,6 +1110,12 @@ describe('curriculum and asset database rules', () => {
       `INSERT INTO student_profiles (user_id, school_id, class_section_id, updated_at)
        VALUES ($1, $2, $3, now())`,
       [studentId, schoolId, sectionId],
+    );
+    await client.query(
+      `INSERT INTO subscriptions
+         (id, school_id, course_id, start_date, end_date, max_deliveries, updated_at)
+       VALUES ($1, $2, $3, business_today(), business_today(), 1, now())`,
+      [randomUUID(), schoolId, course],
     );
     await client.query(
       `INSERT INTO deliveries
