@@ -241,11 +241,34 @@ describe('User update endpoint (e2e)', () => {
       .expect(201);
     ctx.trackUser(student.body);
 
+    const targetBefore = await ctx.prisma.user.findUniqueOrThrow({
+      where: { id: target.body.id },
+      select: {
+        name: true,
+        email: true,
+        teacherProfile: { select: { primaryAssignment: true } },
+      },
+    });
     expectError(
-      await ctx.updateUser(adminCookie, target.body.id, { email: owner.body.email }),
+      await ctx.updateUser(adminCookie, target.body.id, {
+        name: 'Must not be partially saved',
+        email: owner.body.email,
+        primaryAssignment: 'Must not be partially saved',
+      }),
       409,
       'CONFLICT',
     );
+    await expect(
+      ctx.prisma.user.findUniqueOrThrow({
+        where: { id: target.body.id },
+        select: {
+          name: true,
+          email: true,
+          teacherProfile: { select: { primaryAssignment: true } },
+        },
+      }),
+    ).resolves.toEqual(targetBefore);
+
     const before = await ctx.prisma.studentProfile.findUniqueOrThrow({
       where: { userId: student.body.id },
       select: { classSectionId: true },
