@@ -71,7 +71,7 @@ export class AssetsService {
   // GET /assets — List library assets
   // ─────────────────────────────────────────
 
-  /** Lists ACTIVE assets by default, with an optional file-status filter. */
+  /** Returns a page of ACTIVE assets by default, with optional type, file-state, and title filters. */
   async findLibraryItems(
     query: AssetListQueryDto,
   ): Promise<PaginationResponseDto<AssetListItemDto>> {
@@ -79,8 +79,10 @@ export class AssetsService {
     return paginate(items.map(toAssetListItemDto), query.page, query.limit, total);
   }
 
-  /** Returns a summary for each requested asset, without exposing file storage details. */
-  /** Return public asset details for blocks, without exposing storage keys or signed URLs. */
+  /**
+   * Returns summaries for referenced asset IDs without exposing storage keys or signed URLs.
+   * When supplied, the caller's transaction is used for a consistent read.
+   */
   async getSummaries(
     assetIds: string[],
     tx?: Prisma.TransactionClient,
@@ -116,7 +118,10 @@ export class AssetsService {
   // GET /assets/:id — Get a library asset
   // ─────────────────────────────────────────
 
-  /** Reads a specific asset and current file state, including assets without READY files. */
+  /**
+   * Returns asset details, the current file attempt, and up to 50 distinct lesson usages.
+   * A missing asset throws 404.
+   */
   async findLibraryAsset(assetId: string): Promise<AssetLibraryDetailDto> {
     const asset = await this.assets.findLibraryAssetById(assetId);
     if (!asset) {
@@ -141,6 +146,7 @@ export class AssetsService {
   // PATCH /assets/:id — Rename an asset
   // ─────────────────────────────────────────
 
+  /** Updates an asset title and returns its public DTO; a missing asset throws 404. */
   async update(actor: AuthContext, assetId: string, body: UpdateAssetDto) {
     const id = this.normalizeAssetId(assetId);
     const asset = await this.assets.updateTitle(id, body.title);
@@ -158,6 +164,7 @@ export class AssetsService {
   // PATCH /assets/:id/status — Archive or unarchive an asset
   // ─────────────────────────────────────────
 
+  /** Changes ACTIVE/ARCHIVED status; a missing asset throws 404. */
   async updateStatus(actor: AuthContext, assetId: string, body: UpdateAssetStatusDto) {
     const id = this.normalizeAssetId(assetId);
     const result = await this.assets.updateStatus(id, body.status);
@@ -183,6 +190,10 @@ export class AssetsService {
   // DELETE /assets/:id — Delete an unused asset
   // ─────────────────────────────────────────
 
+  /**
+   * Deletes an asset and its file records; object prefixes are queued by the database trigger.
+   * Missing assets throw 404; lesson references or in-flight work throw 409.
+   */
   async delete(actor: AuthContext, assetId: string): Promise<void> {
     const id = this.normalizeAssetId(assetId);
     try {
@@ -218,7 +229,10 @@ export class AssetsService {
   // POST /assets — Create an asset and upload file
   // ─────────────────────────────────────────
 
-  /** Persists the upload intent first, then asks storage for a short-lived PUT URL. */
+  /**
+   * Creates the asset and UPLOADING file record, then returns a short-lived PUT URL.
+   * Invalid type, MIME, or size throws 400; the caller must upload and complete the file separately.
+   */
   async create(actor: AuthContext, body: CreateAssetDto): Promise<CreateAssetResponseDto> {
     const mimeType = normalizeMimeType(body.mimeType);
     const type = this.validateUpload(body.type, mimeType, body.sizeBytes);
@@ -247,7 +261,10 @@ export class AssetsService {
   // POST /assets/:id/files — Replace or retry an asset file
   // ─────────────────────────────────────────
 
-  /** Reuses the asset's existing identity while replacing only unfinished file attempts. */
+  /**
+   * Starts a replacement attempt without changing the asset ID or current READY file.
+   * Missing assets throw 404; an UPLOADED/PROCESSING attempt throws 409.
+   */
   async replaceFile(
     actor: AuthContext,
     assetId: string,
@@ -294,7 +311,7 @@ export class AssetsService {
   // GET /assets/:id/files/:fileId — Get file state
   // ─────────────────────────────────────────
 
-  /** Returns only a file that belongs to the asset named in the route. */
+  /** Returns public file state only when both IDs match; otherwise throws 404. */
   async findFile(assetId: string, fileId: string): Promise<AssetFileDto> {
     const normalizedAssetId = this.normalizeUuid(assetId);
     const normalizedFileId = this.normalizeUuid(fileId);
@@ -313,7 +330,10 @@ export class AssetsService {
   // POST /assets/:id/files/:fileId/complete — Verify and process upload
   // ─────────────────────────────────────────
 
-  /** Idempotently verifies an uploaded object and advances its file through processing. */
+  /**
+   * Verifies S3 metadata and file signature, then advances the attempt to READY.
+   * Missing IDs throw 404; an object not yet in storage throws 409; repeat completion returns current state.
+   */
   async complete(actor: AuthContext, assetId: string, fileId: string): Promise<AssetFileDto> {
     const normalizedAssetId = this.normalizeUuid(assetId);
     const normalizedFileId = this.normalizeUuid(fileId);
@@ -413,8 +433,8 @@ export class AssetsService {
   }
 
   /**
-   * Makes one processed file the asset's current serving file.
-   * The repository transaction locks the asset and rolls back a failed conditional update.
+   * Makes a processed file the serving file and removes the previous READY row transactionally.
+   * The repository locks the asset; failed conditional updates roll back the file swap.
    */
   makeReady(fileId: string, input: MakeReadyInput): Promise<AssetFile> {
     return this.assets.makeReady(fileId, input);

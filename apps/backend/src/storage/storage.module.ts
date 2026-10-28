@@ -6,6 +6,7 @@ import { S3_CLIENT, S3StorageService, createS3Client } from './s3-storage.servic
 import { StorageService } from './storage.service.js';
 import { StorageCleanupQueueService } from './storage-cleanup-queue.service.js';
 
+/** Provides the S3-backed StorageService and the database-backed cleanup queue. */
 @Module({
   imports: [PrismaModule],
   providers: [

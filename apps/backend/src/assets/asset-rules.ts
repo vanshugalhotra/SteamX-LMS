@@ -1,3 +1,4 @@
+/** Holds upload-type, declared-metadata, size, and content-signature validation rules. */
 import { AssetType } from '../generated/prisma/client.js';
 import type { FileKind } from './file-signatures.js';
 import { detectFileKind } from './file-signatures.js';

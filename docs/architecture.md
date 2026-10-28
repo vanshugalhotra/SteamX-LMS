@@ -24,7 +24,8 @@ in `apps/backend/src/common/`; feature rules stay in their feature modules.
 | `ClassSectionsModule`                           | School-owned class/section records and scoped CRUD. Exports `ClassSectionsService`.               |
 | `TenancyModule`                                 | Resolves active schools for scoped workflows.                                                     |
 | `CurriculumModule`                              | Global course/module/lesson lifecycle, ordering, and lesson content.                              |
-| `AssetsModule`, `StorageModule`                 | Asset and file records, S3 access, and queued object cleanup.                                     |
+| `AssetsModule`                                  | Asset/file lifecycle, validation, processing, and author preview.                                 |
+| `StorageModule`                                 | S3 storage contract, presigned URLs, and queued object cleanup.                                  |
 | `PrismaModule`                                  | Configured Prisma client.                                                                         |
 | `HealthModule`, `LoggingModule`, `ConfigModule` | Liveness/readiness, request logging, and validated environment configuration.                     |
 
@@ -72,6 +73,18 @@ school staff and students currently see only their own record. See [access contr
    returns the standard error envelope.
 
 Rate limiting is not configured. The API prefix is `/api/v1`; Swagger is at `/api/docs` when enabled.
+
+## Asset upload and storage
+
+1. `AssetsService` validates declared type, MIME, and size; `AssetsRepository` creates the asset and
+   an `UPLOADING` file row in one transaction.
+2. `StorageService` returns a presigned S3 PUT URL. The client uploads directly to S3, then calls
+   the completion route.
+3. Completion checks S3 size/type and the first 16 bytes, runs the registered processor, and
+   transactionally makes the file `READY`. Current processors do not transform files.
+4. Deleting file rows queues their S3 prefixes through a PostgreSQL trigger. The in-process cleanup
+   scheduler drains the queue and removes stale non-READY files; details and limits are in
+   [infrastructure](./infrastructure.md).
 
 ## Related guides
 

@@ -66,8 +66,8 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
   - Archiving a parent archives active descendants only (not drafts). Does not affect existing deliveries.
   - Status cannot return to DRAFT.
   - Draft content is never student-visible. Released active/archived content stays available until subscription expiry.
-- **Asset files:** IDs are UUIDv7. Storage keys must start with `assets/<asset_id>/<asset_file_id>/`. Only one READY file per asset. READY/FAILED rows reject updates. VIDEO READY files require a playback key. Lifecycle: UPLOADING → UPLOADED → (PROCESSING for VIDEO/PPTX) → READY or FAILED.
-- **Cleanup queue:** Deleting a file queues its prefix. Workers delete objects before marking done. Pending jobs have partial indexes.
+- **Asset files:** IDs are UUIDv7. Storage keys must start with `assets/<asset_id>/<asset_file_id>/`. Only one READY file per asset. READY/FAILED rows reject updates. VIDEO READY files require a playback key. The database permits `UPLOADED → READY` for IMAGE/PDF and requires `PROCESSING` for VIDEO/PPTX; the current completion service routes supported types through `PROCESSING`. PPTX remains in the enum but uploads are rejected.
+- **Cleanup queue:** Deleting an asset file queues its prefix; deleting a submission file queues its object key. The current worker handles prefixes only. Pending jobs have partial indexes.
 
 ## Migrations
 

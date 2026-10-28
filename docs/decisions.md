@@ -57,10 +57,11 @@ This page records current design decisions and their consequences. It does not d
 - **File lifecycle** — uploads need at least 16 bytes. UPLOADING → UPLOADED → PROCESSING → READY. Completion verifies S3 HEAD metadata and file-signature bytes. Failure codes are stable strings, not provider messages.
 - **Access** — author previews need `asset.read` + platform staff; an asset ID alone grants no access. Signed URL uses `playbackKey ?? storageKey`, per-type TTL, `Cache-Control: no-store`. No HEAD check before signing.
 - **Processing** — passthrough for all types; VIDEO sets `playbackKey = storageKey`. HLS replaces the video processor later without a schema change.
-- **Cleanup** — in-process scheduler; non-overlapping, idempotent, no distributed lock. Prefixes wait upload-URL-TTL + 5 min before S3 delete. Stale non-READY files removed after 24 h (configurable). Empty unreferenced assets removed.
+- **Cleanup** — in-process scheduler; each instance avoids overlapping its own runs, and prefix deletion is idempotent across instances. Prefixes wait upload-URL-TTL + 5 min before S3 delete. Stale non-READY files are removed after 24 h (configurable); empty unreferenced assets are also removed. Current limitations: no orphan-object scan, object-only queue entries are skipped, failed entries retry without backoff or a retry cap, and completed queue rows are retained.
 
 ## Storage
 
 - **Abstract boundary** — `StorageService` is abstract with an S3 implementation and an in-memory test double. Not a generic wrapper.
 - **Presigned PUT** — signs `Content-Type`, `Content-Length`, and `If-None-Match: *` via `signableHeaders` to prevent overwrites and mismatches.
 - **SDK checksums** — `requestChecksumCalculation` and `responseChecksumValidation` set to `WHEN_REQUIRED`; SDK defaults break presigned browser uploads.
+- **Storage key validation** — keys use lowercase UUIDs and the `assets/` or `submissions/` namespace; filenames remain metadata. This keeps client filenames out of object paths.

@@ -86,8 +86,22 @@ Cleanup runs in the API process on a self-rescheduling `setTimeout().unref()` ti
 2. Delete stale non-READY asset files (older than `ASSET_STALE_FILE_AFTER_HOURS`)
 3. Delete empty, unreferenced assets
 
-Each step processes a bounded batch (`CLEANUP_BATCH_SIZE`). Failed queue entries retry next run.
-READY files are never deleted. Set `CLEANUP_ENABLED=false` in automated tests.
+The queue drain reads at most 20 pages of `CLEANUP_BATCH_SIZE` eligible prefix entries (1,000 per
+run with the defaults). Stale-file and empty-asset cleanup each use one configured batch. Failed
+prefix deletions remain pending and retry next run; there is no backoff or retry limit. Eligible
+object-only entries are counted and skipped. Completed queue rows are retained, and cleanup does
+not scan S3 for objects missing from the database. READY files are not stale-file cleanup candidates.
+Set `CLEANUP_ENABLED=false` in automated tests.
+
+Asset upload is direct to S3: the API creates an `UPLOADING` row and returns a presigned PUT URL;
+the client uploads with the returned headers and calls the completion route. Completion checks S3
+metadata and a 16-byte signature sample before the processor marks the file `READY`. Supported
+uploads are JPEG/PNG/WEBP images, PDF, and MP4 video; PPTX is present in the database enum but
+rejected by upload validation. See the [API test checklist](./api-testing.md#assets) for endpoint cases.
+
+File deletion queues a prefix from a PostgreSQL trigger; the queue worker waits for the upload URL
+TTL plus a 5-minute late-PUT grace period before deleting it. Submission-file deletion currently
+queues an object-only entry, which the worker skips. There is no orphan-object reconciliation.
 
 #### Storage cleanup queue smoke test
 
@@ -110,7 +124,7 @@ real bucket.
 pnpm --dir apps/backend storage:smoke --port 5173
 ```
 
-Port must be free **and** listed in deployed CORS origins. Needs `AWS_REGION`, `S3_BUCKET`, and
+Port must be free **and** listed in deployed CORS origins. Requires `AWS_REGION`, `S3_BUCKET`, and
 access keys in `apps/backend/.env`. Expected: upload → 200, size mismatch → 403, unsigned GET →
 403, range → 206. Click **Clean up** after testing.
 
@@ -141,7 +155,7 @@ keys for cleanup verification:
 pnpm assets:smoke -- --verify-cleanup
 ```
 
-Needs `DATABASE_URL`, `AWS_REGION`, `S3_BUCKET`, and the AWS credentials already used by the backend,
+Requires `DATABASE_URL`, `AWS_REGION`, `S3_BUCKET`, and the AWS credentials already used by the backend,
 from `apps/backend/.env` or the AWS default credential chain. Use staging test data.
 
 ## Asset access URL smoke test

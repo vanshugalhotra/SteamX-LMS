@@ -40,7 +40,7 @@ import { AssetLibraryDetailDto, AssetListResponseDto } from './dto/asset-library
 import { AssetsService } from './assets.service.js';
 import { AssetAccessService } from './asset-access.service.js';
 
-/** HTTP and permission boundary for asset creation and file-state reads. */
+/** HTTP and permission boundary for asset library, upload, lifecycle, and preview routes. */
 @ApiTags('Assets')
 @ApiProtectedController()
 @ApiForbiddenResponse({
@@ -57,6 +57,7 @@ export class AssetsController {
   // GET /assets — List assets
   // ─────────────────────────────────────────
 
+  /** Lists asset summaries for callers with asset.read permission. */
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get()
   @ApiOperation({ summary: 'List assets' })
@@ -73,6 +74,7 @@ export class AssetsController {
   // GET /assets/:id — Get an asset
   // ─────────────────────────────────────────
 
+  /** Returns an asset's current file state and lesson usage. */
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get(':id')
   @ApiOperation({ summary: 'Get an asset' })
@@ -90,6 +92,7 @@ export class AssetsController {
   // GET /assets/:id/access — Get an asset access URL
   // ─────────────────────────────────────────
 
+  /** Issues a no-store, short-lived URL for a READY file to platform staff. */
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get(':id/access')
   @ApiOperation({ summary: 'Get an asset access URL' })
@@ -110,6 +113,7 @@ export class AssetsController {
   // POST /assets — Create an asset
   // ─────────────────────────────────────────
 
+  /** Creates an asset and upload attempt, returning the required presigned PUT instructions. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Post()
   @ApiOperation({ summary: 'Create an asset' })
@@ -129,6 +133,7 @@ export class AssetsController {
   // PATCH /assets/:id/status — Update an asset status
   // ─────────────────────────────────────────
 
+  /** Archives or reactivates an asset. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update an asset status' })
@@ -147,6 +152,7 @@ export class AssetsController {
   // PATCH /assets/:id — Update an asset
   // ─────────────────────────────────────────
 
+  /** Updates an asset's title. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Patch(':id')
   @ApiOperation({ summary: 'Update an asset' })
@@ -165,6 +171,7 @@ export class AssetsController {
   // DELETE /assets/:id — Delete an asset
   // ─────────────────────────────────────────
 
+  /** Deletes an unused asset; referenced or in-flight assets return a conflict. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -183,6 +190,7 @@ export class AssetsController {
   // POST /assets/:id/files — Replace a file
   // ─────────────────────────────────────────
 
+  /** Starts a replacement attempt while retaining the asset identity. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Post(':id/files')
   @ApiOperation({ summary: 'Replace an asset file' })
@@ -205,6 +213,7 @@ export class AssetsController {
   // GET /assets/:id/files/:fileId — Get file state
   // ─────────────────────────────────────────
 
+  /** Reads a file attempt only when it belongs to the asset in the route. */
   @RequirePermission(PERMISSION.ASSET_READ)
   @Get(':id/files/:fileId')
   @ApiOperation({ summary: 'Get asset file status' })
@@ -222,6 +231,7 @@ export class AssetsController {
   // POST /assets/:id/files/:fileId/complete — Complete upload
   // ─────────────────────────────────────────
 
+  /** Verifies the stored upload and advances its file lifecycle. */
   @RequirePermission(PERMISSION.ASSET_WRITE)
   @Post(':id/files/:fileId/complete')
   @HttpCode(HttpStatus.OK)

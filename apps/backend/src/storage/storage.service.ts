@@ -46,8 +46,14 @@ export abstract class StorageService {
    * Use this only when the client may access S3; app-streamed downloads do not need it.
    */
   abstract createDownloadUrl(input: CreateDownloadUrlInput): Promise<CreateDownloadUrlResult>;
+
+  /** Reads object size and content type; returns null only when the key is missing. */
   abstract head(key: string): Promise<StorageHeadResult | null>;
+
+  /** Reads a bounded prefix sample for upload signature verification. */
   abstract readFirstBytes(key: string, length: number): Promise<Buffer>;
+
+  /** Deletes every object under a validated prefix and returns the number removed. */
   abstract deleteByPrefix(prefix: string): Promise<number>;
 }
 

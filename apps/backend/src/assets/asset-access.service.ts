@@ -29,6 +29,7 @@ function ttlFor(type: AssetType, access: Env['assetAccess']): number {
   }
 }
 
+/** Enforces preview eligibility and delegates temporary download URL creation to storage. */
 @Injectable()
 export class AssetAccessService {
   constructor(
@@ -40,11 +41,7 @@ export class AssetAccessService {
     this.logger.setContext(AssetAccessService.name);
   }
 
-  /**
-   * Author previews are platform-staff-only, even when another role has asset.read.
-   * Module 3's student path must do lesson, delivery, and subscription checks in its caller
-   * before calling issueForFile.
-   */
+  /** Issues a URL for the newest READY file; non-platform actors are forbidden. */
   async issueForAuthor(assetId: string, actor: AuthContext): Promise<AssetAccessResponseDto> {
     assertPlatformStaff(actor);
     // This lookup filters files to READY and takes the newest one, excluding in-progress replacements.
@@ -66,7 +63,7 @@ export class AssetAccessService {
     return access;
   }
 
-  /** Delivers a READY file; this is the only method that creates a signed URL. */
+  /** Issues the signed URL for a selected READY file, using the content-type access TTL. */
   async issueForFile(
     file: AssetFileForSigning,
     assetType: AssetType,

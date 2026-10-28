@@ -1,3 +1,4 @@
+/** Detects the supported upload formats from a bounded sample of file bytes. */
 export type FileKind = 'JPEG' | 'PNG' | 'WEBP' | 'PDF' | 'MP4';
 
 // MP4 brands approved for uploads. HEIC and QuickTime/MOV brands must not pass as MP4.
