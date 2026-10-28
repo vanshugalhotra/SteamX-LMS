@@ -36,13 +36,40 @@ The app runs at <http://localhost:5173>.
 
 Run from the repository root with `pnpm --filter frontend <script>`:
 
-| Script      | What it does                       |
-| ----------- | ---------------------------------- |
-| `dev`       | Start the Vite dev server          |
-| `lint`      | ESLint (type-aware)                |
-| `typecheck` | `tsc -b`                           |
-| `build`     | Type-check and production build    |
-| `preview`   | Serve the production build locally |
+| Script       | What it does                                   |
+| ------------ | ---------------------------------------------- |
+| `dev`        | Start the Vite dev server                      |
+| `lint`       | ESLint (type-aware)                            |
+| `typecheck`  | `tsc -b`                                       |
+| `build`      | Type-check and production build                |
+| `preview`    | Serve the production build locally             |
+| `test`       | Run the unit and component tests once (Vitest) |
+| `test:watch` | Run the tests in watch mode while developing   |
+
+## Testing
+
+Tests use [Vitest](https://vitest.dev) with jsdom and Testing Library. They do not need the backend or a database: API calls and the router session are mocked.
+
+```bash
+pnpm --filter frontend test        # run once (what CI should run)
+pnpm --filter frontend test:watch  # re-run on file changes
+```
+
+- Test files sit next to the code they test and are named `*.test.ts` / `*.test.tsx`.
+- Shared setup is in `src/test/setup.ts` (jest-dom matchers and a mocked `env`).
+- Mock the API module (`../api/api`) in component tests instead of calling `fetch`.
+
+Critical flows covered:
+
+| Area                 | File                                              |
+| -------------------- | ------------------------------------------------- |
+| API error mapping    | `lib/api-errors.test.ts`                          |
+| List page reset      | `lib/use-list-params.test.ts`                     |
+| Auth route guards    | `features/auth/loaders.test.ts`                   |
+| Login form           | `features/auth/pages/LoginPage.test.tsx`          |
+| Change-password form | `features/auth/pages/ChangePasswordPage.test.tsx` |
+
+Before opening a PR run `lint`, `typecheck`, `build` and `test`.
 
 ## Trying the login page
 
@@ -111,9 +138,9 @@ The global 401/403 handlers (`app/session-handlers.ts`) only run for API calls m
 Open **Schools** in the sidebar (`/steamx/admin/schools`). The signed-in admin needs the `school.read` permission (and `school.manage` to create or edit); both are granted to the admin role by the backend migrations.
 
 - The list loads from `GET /schools`. Search (by name or code, debounced), the status filter (All, Active, Inactive) and pagination are handled by the API.
-- **Add school** opens a drawer. Empty required fields show field errors; a duplicate school code is shown on the code field.
-- **Edit** opens the same drawer. The code cannot be changed, and clearing an optional field saves it as empty.
-- Esc, the close button or a click on the backdrop closes the drawer and returns focus to the button that opened it.
+- **Add school** opens a new page. Empty required fields show field errors; a duplicate school code is shown on the code field.
+- **Edit** opens the same page. The code cannot be changed, and clearing an optional field saves it as empty.
+- Esc, the close button or a click on the backdrop closes the page and returns focus to the button that opened it.
 - If the list cannot be loaded, an error with a **Retry** button is shown.
 
 If the list returns `403` (missing `school.read`), your local database probably has an older version of the `reference_data` migration applied. Reset the dev database (`prisma migrate reset` in `apps/backend`, which wipes local data) and run `admin:create` again.
@@ -123,12 +150,13 @@ If the list returns `403` (missing `school.read`), your local database probably 
 ```
 src/
   app/          App wiring: providers, router, session handlers
-  components/   Shared UI (components/ui: Button, Input, PasswordInput, FormField, Alert, Drawer, Pagination), Logo
+  components/   Shared UI (components/ui: Button, Input, PasswordInput, FormField, Alert, Pagination), Logo
   features/     One folder per feature (landing, auth, admin, ...)
     auth/       api/, pages/, model/, components/, queries.ts, loaders.ts
     admin/      components/ (layout, sidebar, header), pages/, nav.ts
       schools/  api/, model/, components/, pages/, queries.ts
   lib/          Shared helpers: api-client, env, query-client, paths, pagination, use-debounced-value, utils
+  test/         Vitest setup (setup.ts)
 ```
 
 Conventions:

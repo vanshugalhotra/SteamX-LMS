@@ -50,6 +50,7 @@ export function SchoolEditPage() {
       subtitle="Update the school's information and contact details."
       tag={school?.code}
       tagVariant="warning"
+      currentId={school?.id}
     >
       {content}
     </SchoolFormLayout>
