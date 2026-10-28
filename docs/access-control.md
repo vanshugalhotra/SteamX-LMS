@@ -43,20 +43,36 @@ delivery, and subscription access before requesting a URL.
 
 Two separate filters:
 
-| Helper                              | Question it answers                                   |
-| ----------------------------------- | ----------------------------------------------------- |
-| `resolveSchoolScope`                | Which school's records can this caller query?         |
-| `schoolFilter`                      | Turns resolved scope into a Prisma `where` predicate. |
-| `ActiveSchoolService.resolveSchool` | Loads + validates one specific school for workflows.  |
-| `userVisibility`                    | Which user records can this caller see?               |
+| Helper                              | Question it answers                                               |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `resolveSchoolScope`                | Which school's records can this caller query?                     |
+| `schoolFilter`                      | Turns resolved scope into a Prisma `where` predicate.             |
+| `ActiveSchoolService.resolveSchool` | Requires a concrete in-scope school and checks that it is active. |
+| `userVisibility`                    | Which user records can this caller see?                           |
 
 Key rules:
 
 - Platform staff may request any school or go unscoped. School users are fixed to their own `schoolId`.
 - Repositories combine target ID + scope + visibility in a single query — never fetch-then-check.
 - Foreign or invisible IDs return 404 (same as nonexistent) to prevent cross-school discovery.
+- School status does not alter a school user's `schoolId`; authentication rejects that user while
+  the school is inactive. Workflows that create school-owned records also require an active school.
 - Platform staff can see all user records. School staff and students currently see only their own
   user record, even when they have `user.read`.
+
+## School and class-section access
+
+- `school.read` and `school.manage` guard school read and management routes. School creation has an
+  additional service rule: only `PLATFORM_STAFF` can create schools.
+- School staff can read or manage only their own school when granted the route permission.
+  Platform staff can work across schools; an explicit `schoolId` narrows the query.
+- `classsection.read` and `classsection.manage` guard section reads and writes. Section queries
+  always include resolved school scope; foreign IDs return the same 404 as missing IDs.
+- Class-section creation resolves the selected school with `ActiveSchoolService`, so it requires a
+  school ID for platform staff and an active in-scope school for every caller.
+
+See the [school and class-section API cases](./api-testing.md#schools) and
+[architecture flow](./architecture.md#schools-and-class-sections) for implementation owners.
 
 ## Auth and user lifecycle
 

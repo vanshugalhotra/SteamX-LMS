@@ -44,13 +44,14 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 ### Identity & users
 
 - School codes: uppercase, `[A-Z0-9][A-Z0-9_-]{1,11}`. Names and cities must be nonblank after trim. Contact email: trimmed + lowercase.
+- School codes are immutable after creation. School status is a separate field; the API does not cascade a status update to users.
 - Platform staff: no `school_id`. Other types: must have a school.
 - SteamX IDs: uppercase, trimmed, `[A-Z0-9][A-Z0-9._-]{2,31}`. Names: nonblank after trim.
 - Email: trimmed + lowercase when present. Students cannot have email.
 - Deferred triggers require matching profile rows (student profile for `STUDENT`, teacher profile for `teacher` role).
 - Immutability triggers: role keys, school codes, class-section school IDs, user type + school ID.
 - SteamX ID changes blocked unless `steamx.allow_steamx_id_change` is set in the transaction.
-- Class/section names: nonblank, no surrounding whitespace. Case-insensitive unique per school.
+- Class/section names: nonblank, no surrounding whitespace. Case-insensitive unique per school. `section_name` defaults to `All`; each row represents a class/section pair.
 
 ### Curriculum & assets
 

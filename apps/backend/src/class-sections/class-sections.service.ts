@@ -1,4 +1,4 @@
-/** Applies school scoping and domain errors to class-section operations. */
+/** Applies school scope and domain rules to class-section operations. */
 import {
   BadRequestException,
   ConflictException,
@@ -39,7 +39,10 @@ export class ClassSectionsService {
   // POST /class-sections — Create a class section
   // ─────────────────────────────────────────
 
-  /** Creates a section only in the caller's active school. */
+  /**
+   * Creates a section in the caller's active school and returns its response DTO.
+   * Missing/inactive/foreign schools and duplicate names produce their domain errors.
+   */
   async create(actor: AuthContext, body: CreateClassSectionDto): Promise<ClassSectionResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
 
@@ -60,7 +63,7 @@ export class ClassSectionsService {
   // GET /class-sections — List class sections
   // ─────────────────────────────────────────
 
-  /** Lists sections within the resolved school scope. */
+  /** Returns a paginated list of sections in scope, optionally filtered by school and name. */
   async findMany(
     actor: AuthContext,
     query: ClassSectionListQueryDto,
@@ -79,7 +82,7 @@ export class ClassSectionsService {
   // GET /class-sections/:id — Get a class section
   // ─────────────────────────────────────────
 
-  /** Returns a section only when its ID belongs to the caller's school scope. */
+  /** Returns a section in caller scope; missing and foreign IDs throw the same 404. */
   async findById(actor: AuthContext, id: string): Promise<ClassSectionResponseDto> {
     const scope = resolveSchoolScope(actor);
     const section = await this.sections.findById(id, scope);
@@ -89,7 +92,7 @@ export class ClassSectionsService {
     return toClassSectionResponse(section);
   }
 
-  /** Verifies a referenced section belongs to the supplied school before assignment. */
+  /** Verifies a referenced section belongs to the supplied school; missing or foreign IDs throw 404. */
   async assertInSchool(id: string, schoolId: string): Promise<void> {
     const section = await this.sections.findById(id, schoolId);
     if (!section) {
@@ -101,7 +104,10 @@ export class ClassSectionsService {
   // PATCH /class-sections/:id — Update a class section
   // ─────────────────────────────────────────
 
-  /** Updates a scoped section and translates duplicate-name conflicts to the API error. */
+  /**
+   * Updates names on a section in caller scope and returns its response DTO.
+   * Empty patches throw 400, duplicate names throw 409, and missing or foreign IDs throw 404.
+   */
   async update(
     actor: AuthContext,
     id: string,
@@ -132,7 +138,10 @@ export class ClassSectionsService {
   // DELETE /class-sections/:id — Delete a class section
   // ─────────────────────────────────────────
 
-  /** Deletes a scoped section, reporting in-use sections as conflicts. */
+  /**
+   * Deletes a section in caller scope.
+   * Referenced sections throw 409 RESOURCE_IN_USE; missing or foreign IDs throw 404.
+   */
   async delete(actor: AuthContext, id: string): Promise<void> {
     const scope = resolveSchoolScope(actor);
     try {

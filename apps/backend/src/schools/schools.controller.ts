@@ -22,6 +22,7 @@ import { UpdateSchoolDto } from './dto/update-school.dto.js';
 import { UpdateSchoolStatusDto } from './dto/update-school-status.dto.js';
 import { SchoolsService } from './schools.service.js';
 
+/** Declares school-management routes and delegates authorization-sensitive behavior to SchoolsService. */
 @ApiTags('Schools')
 @ApiProtectedController()
 @ApiForbiddenResponse({
@@ -43,6 +44,7 @@ export class SchoolsController {
   @ApiConflictResponse({
     description: 'A school with this code already exists.',
   })
+  /** Creates a school; only platform staff may do so, even if another user has the permission. */
   create(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateSchoolDto,
@@ -61,6 +63,7 @@ export class SchoolsController {
   @ApiBadRequestResponse({
     description: 'Query parameters are invalid.',
   })
+  /** Returns a page of schools within the caller's resolved scope and optional filters. */
   findMany(
     @CurrentAuth() actor: AuthContext,
     @Query() query: SchoolListQueryDto,
@@ -78,6 +81,7 @@ export class SchoolsController {
   @ApiOkResponse({ description: 'School details.', type: SchoolResponseDto })
   @ApiBadRequestResponse({ description: 'The school ID is not a UUID.' })
   @ApiNotFoundResponse({ description: 'School not found.' })
+  /** Returns a school in the caller's scope; foreign and missing school IDs both return 404. */
   findById(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -97,6 +101,7 @@ export class SchoolsController {
     description: 'The school ID or update body is invalid.',
   })
   @ApiNotFoundResponse({ description: 'School not found.' })
+  /** Updates allowed school details; the school code cannot be changed through this route. */
   update(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -117,6 +122,7 @@ export class SchoolsController {
     description: 'The school ID or status is invalid.',
   })
   @ApiNotFoundResponse({ description: 'School not found.' })
+  /** Updates the school status; repeating its current status returns the unchanged school. */
   updateStatus(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,

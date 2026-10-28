@@ -1,7 +1,8 @@
 # Workflow testing
 
-This guide covers workflows implemented by the current backend. API details and exact field
-requirements are in Swagger at `/api/docs`; this guide names routes and outcomes, not payloads.
+This guide covers multi-request workflows implemented by the current backend. Start with the
+scenario you need; API field requirements and individual endpoint cases are in Swagger at
+`/api/docs` and the [API testing checklist](./api-testing.md).
 
 ## Test data setup
 
@@ -65,7 +66,8 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 **Preconditions:** A usable admin session; admin has default school and user permissions.
 
 1. As admin, call `POST /api/v1/schools` twice to create School A and School B.
-2. Call `POST /api/v1/class-sections` for each school.
+2. Call `POST /api/v1/class-sections` for each school. Omit `sectionName` once and confirm it is
+   returned as `All`.
 3. Call `POST /api/v1/users/teachers` to create one teacher in each school.
 4. Call `POST /api/v1/users/students` to create one student in each school, using a section from
    that student's school.
@@ -76,6 +78,26 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 9. As each account, call `GET /api/v1/auth/me`; expect forced-change state cleared.
 10. As each account, call a permission-protected admin route; expect `403` unless a grant was
     explicitly added before backend startup.
+11. As admin, deactivate School A. Its teacher and student should fail login and their next
+    authenticated request should return `401`; their stored user status remains unchanged.
+12. Reactivate School A; active accounts can authenticate again.
+
+## School and class-section constraints
+
+**Goal:** Verify immutable school identity, scoped class-section operations, and delete protection.
+
+**Preconditions:** Admin session; two schools and one unused section in School A; one section in
+School B and a student profile assigned to School A's section.
+
+1. As admin, update a school's name or contact details with `PATCH /api/v1/schools/:id`; expect
+   success. Send `code` in the patch; expect validation failure because the API does not allow code
+   changes.
+2. Create the same class/section name pair twice in one school with different casing; expect the
+   second request to conflict. Create that pair in the other school; expect success.
+3. As a teacher with `classsection.read`, list sections with no school filter; expect only their
+   school. Request the other school's ID; expect the same `404` as for a missing ID.
+4. As admin, try deleting a section referenced by a student profile; expect `409 RESOURCE_IN_USE`.
+   Delete an unused section; expect `204`.
 
 ## Password reset and revocation
 

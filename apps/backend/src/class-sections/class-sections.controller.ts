@@ -34,6 +34,7 @@ import { CreateClassSectionDto } from './dto/create-class-section.dto.js';
 import { UpdateClassSectionDto } from './dto/update-class-section.dto.js';
 import { ClassSectionsService } from './class-sections.service.js';
 
+/** Declares class-section routes and delegates tenant and lifecycle rules to ClassSectionsService. */
 @ApiTags('Class sections')
 @ApiProtectedController()
 @ApiForbiddenResponse({
@@ -58,6 +59,7 @@ export class ClassSectionsController {
     description: 'School is inactive or class section already exists.',
   })
   @ApiNotFoundResponse({ description: 'School not found.' })
+  /** Creates a section in one active school; the school ID is required for platform-wide callers. */
   create(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateClassSectionDto,
@@ -77,6 +79,7 @@ export class ClassSectionsController {
     description: 'Query parameters are invalid.',
   })
   @ApiNotFoundResponse({ description: 'School not found.' })
+  /** Returns a paginated section list within the caller's scope, optionally filtered by school and name. */
   findMany(
     @CurrentAuth() actor: AuthContext,
     @Query() query: ClassSectionListQueryDto,
@@ -96,6 +99,7 @@ export class ClassSectionsController {
     description: 'The class-section ID is not a UUID.',
   })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
+  /** Returns a section in the caller's school scope; foreign and missing IDs both return 404. */
   findById(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -116,6 +120,7 @@ export class ClassSectionsController {
   })
   @ApiConflictResponse({ description: 'Class section already exists.' })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
+  /** Updates class or section names without allowing the section to move to another school. */
   update(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -138,6 +143,7 @@ export class ClassSectionsController {
   })
   @ApiConflictResponse({ description: 'Section has dependent records and cannot be deleted.' })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
+  /** Deletes a section; dependent student profiles or deliveries produce a conflict response. */
   delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.sections.delete(actor, id);
   }

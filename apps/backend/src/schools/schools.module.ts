@@ -4,6 +4,7 @@ import { SchoolsController } from './schools.controller.js';
 import { SchoolsRepository } from './schools.repository.js';
 import { SchoolsService } from './schools.service.js';
 
+/** Wires school routes and persistence; exports SchoolsService for other feature modules. */
 @Module({
   imports: [PrismaModule],
   controllers: [SchoolsController],

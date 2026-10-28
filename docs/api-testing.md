@@ -1,5 +1,8 @@
 # API testing checklist
 
+This checklist records endpoint-level API cases and expected outcomes. Start with the section for
+the route you changed; use [workflow testing](./workflows-testing.md) for multi-request scenarios.
+
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
 health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; malformed path UUIDs rejected
 by `ParseUUIDPipe` use `BAD_REQUEST`, while valid but unknown IDs return `404 NOT_FOUND`. Error
@@ -545,7 +548,7 @@ Caller: authenticated role with `classsection.manage`; creates a class section i
 - [auto] When same names are used in another school -> expect success.
 - [auto] When class or section name is blank, null (section), or over 50 characters -> expect `400 VALIDATION_ERROR`.
 - [auto] When an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
-- [auto] When name is non-string, missing, or exactly at the maximum -> expect validation failure or acceptance at the documented boundary.
+- [auto] When className is missing or non-string -> expect `400 VALIDATION_ERROR`; when either name is exactly 50 characters -> expect acceptance.
 - [auto] When student or teacher lacks permission -> expect `403 FORBIDDEN`.
 - [auto] When platform staff omits school ID or uses a malformed UUID -> expect `400` (`SCHOOL_REQUIRED` or `VALIDATION_ERROR`).
 
@@ -594,11 +597,11 @@ Caller: authenticated role with `classsection.manage`; changes class or section 
 
 ### `DELETE /class-sections/:id`
 
-Caller: authenticated role with `classsection.manage`; deletes a section with no referencing student profile.
+Caller: authenticated role with `classsection.manage`; deletes a section with no referencing student profile or delivery.
 
 - [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When admin deletes an unused section -> expect `204`.
-- [auto] When a student profile references the section -> expect `409 RESOURCE_IN_USE`.
+- [auto] When a student profile or delivery references the section -> expect `409 RESOURCE_IN_USE`.
 - [auto] When section does not exist -> expect `404 NOT_FOUND`.
 - [auto] When teacher with manage permission targets a foreign section or missing ID -> expect same `404 NOT_FOUND`.
 - [auto] When student or ungranted caller calls -> expect `403 FORBIDDEN`.

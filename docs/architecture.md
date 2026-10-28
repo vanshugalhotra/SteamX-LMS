@@ -20,7 +20,8 @@ in `apps/backend/src/common/`; feature rules stay in their feature modules.
 | `AppModule`                                     | Composes config, feature modules, global guards, and the exception filter.                        |
 | `AuthModule`                                    | Login, password changes, session tokens, and permission checks. Exports auth services and guards. |
 | `UsersModule`                                   | User accounts, profiles, status, password resets, and SteamX IDs.                                 |
-| `SchoolsModule`, `ClassSectionsModule`          | School and class-section records; export services used by user workflows.                         |
+| `SchoolsModule`                                 | School identity, contact details, status, and school-scope reads. Exports `SchoolsService`.       |
+| `ClassSectionsModule`                           | School-owned class/section records and scoped CRUD. Exports `ClassSectionsService`.               |
 | `TenancyModule`                                 | Resolves active schools for scoped workflows.                                                     |
 | `CurriculumModule`                              | Global course/module/lesson lifecycle, ordering, and lesson content.                              |
 | `AssetsModule`, `StorageModule`                 | Asset and file records, S3 access, and queued object cleanup.                                     |
@@ -43,6 +44,22 @@ Delivery, enrollment, and assignment tables exist in Prisma but do not have API 
 
 User-record visibility is separate from school scope: platform staff can see all users, while
 school staff and students currently see only their own record. See [access control](./access-control.md).
+
+## Schools and class sections
+
+- `SchoolsController` → `SchoolsService` → `SchoolsRepository` handles school CRUD. School creation
+  is platform-staff-only even when another actor has `school.manage`; school reads and updates use
+  resolved scope.
+- `ClassSectionsController` → `ClassSectionsService` → `ClassSectionsRepository` handles
+  school-owned class/section rows. Creation resolves an active school; list, detail, update, and
+  delete queries include school scope. The service maps duplicate names and referenced deletes to
+  domain conflicts.
+- Class names and section names are stored on each row. A missing section name uses the database
+  default `All`; case-insensitive name pairs are unique within a school. A row is how the schema
+  represents a class and one of its sections.
+- School status is checked by authentication for school users and by `ActiveSchoolService` in
+  workflows that require an active school. See [database constraints](./database.md#identity--users),
+  [access control](./access-control.md), and the [API test checklist](./api-testing.md).
 
 ## HTTP request path
 

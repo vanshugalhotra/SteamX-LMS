@@ -27,6 +27,7 @@ This page records current design decisions and their consequences. It does not d
 - **Explicit school scope** — passed into queries, not ambient request context. Keeps tenant filters visible and platform-wide access deliberate. See [access-control.md](./access-control.md).
 - **404 for foreign resources** — same response for foreign-school and nonexistent IDs. Prevents cross-school existence probes.
 - **Fail-closed user visibility** — explicit in queries. Prevents new callers from accidentally inheriting unrestricted access.
+- **School as the tenant key** — users and academic structures reference a school; class and section names are rows owned by that school. The database enforces case-insensitive uniqueness for each school/name pair.
 
 ## Curriculum
 
