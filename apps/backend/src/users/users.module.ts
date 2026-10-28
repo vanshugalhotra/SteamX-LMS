@@ -9,6 +9,7 @@ import { UsersController } from './users.controller.js';
 import { UsersRepository } from './users.repository.js';
 import { UsersService } from './users.service.js';
 
+/** Wires user management to authentication, school, class-section, and tenancy services. */
 @Module({
   imports: [AuthModule, ClassSectionsModule, SchoolsModule, TenancyModule, PrismaModule],
   controllers: [UsersController],

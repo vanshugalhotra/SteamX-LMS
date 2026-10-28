@@ -31,7 +31,7 @@ export class FirstAdminService {
     private readonly users: AuthContextRepository,
   ) {}
 
-  /** Resets only an existing admin account and forces a password change at next login. */
+  /** Resets only an existing admin account; unknown IDs or non-admin targets throw FirstAdminError. */
   async resetAdminPassword(input: Pick<FirstAdminInput, 'steamxId' | 'password'>): Promise<string> {
     const steamxId = normalizeSteamxId(input.steamxId);
     try {
@@ -68,7 +68,8 @@ export class FirstAdminService {
 
   /**
    * Creates the first admin, optionally inside a caller-owned transaction.
-   * Serializable isolation prevents concurrent setup processes from both winning creation.
+   * Otherwise uses serializable isolation; returns the existing admin on repeat setup.
+   * Invalid input, missing reference data, or known setup conflicts throw FirstAdminError.
    */
   async create(
     input: FirstAdminInput,

@@ -1,6 +1,6 @@
 # Decisions
 
-Each entry records the current design choice and why.
+This page records current design decisions and their consequences. It does not describe planned behavior.
 
 ## Infrastructure
 
@@ -9,9 +9,18 @@ Each entry records the current design choice and why.
 
 ## Identity & auth
 
-- **Single `name` field** — no separate first/last. All creation, display, and SteamX ID generation use one value.
-- **JWT cookie + per-request DB check** — the DB lookup makes deactivation instant without a session table (one identity query per protected request).
-- **No audit/history table yet** — SteamX ID renames are logged but old IDs aren't stored as queryable history.
+- **Account name**
+  - Context: account creation, display, and SteamX ID generation use the user's name.
+  - Decision: keep one `name` field; there are no separate first/last fields.
+  - Consequence: all three workflows use the same value.
+- **Session state**
+  - Context: protected requests must observe current account and school status.
+  - Decision: store the JWT in a cookie and reload the account from PostgreSQL on each protected request.
+  - Consequence: deactivation applies on the next request without a session table; each request performs an identity lookup.
+- **SteamX ID history**
+  - Context: SteamX IDs can be renamed; there is no history table.
+  - Decision: do not store previous IDs as queryable records.
+  - Consequence: renames are logged, but prior IDs cannot be queried as history.
 
 ## Multi-tenancy
 

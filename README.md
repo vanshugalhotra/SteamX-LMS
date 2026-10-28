@@ -14,7 +14,7 @@ STEAMX is a company-owned curriculum platform with school-specific access, teach
 - pnpm 12.8.1
 - PostgreSQL; the backend setup currently documents PostgreSQL 18
 
-## Setup
+## Quick start (about 15 minutes)
 
 Run commands from the repository root. Create a local PostgreSQL database, then configure the
 backend connection and secrets using [`apps/backend/.env.example`](./apps/backend/.env.example).

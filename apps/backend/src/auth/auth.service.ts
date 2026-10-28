@@ -31,7 +31,10 @@ export class AuthService {
   // Login
   // ─────────────────────────────────────────
 
-  /** Authenticates an active user and returns a session token with a safe profile. */
+  /**
+   * Normalizes the login ID and authenticates an active account.
+   * Returns a token and public profile; failed credentials or inactive accounts throw 401.
+   */
   async login(rawSteamxId: string, password: string): Promise<LoginResult> {
     const steamxId = rawSteamxId.trim().toUpperCase();
     const user = await this.users.findLoginUser(steamxId);
@@ -66,7 +69,10 @@ export class AuthService {
   // Change password
   // ─────────────────────────────────────────
 
-  /** Verifies the current password, applies policy, updates credentials, and issues a fresh token. */
+  /**
+   * Verifies and replaces the caller's password and change timestamp, then issues a fresh token and profile.
+   * Missing accounts throw 401; incorrect or policy-invalid passwords throw 400.
+   */
   async changePassword(
     auth: AuthContext,
     currentPassword: string,
