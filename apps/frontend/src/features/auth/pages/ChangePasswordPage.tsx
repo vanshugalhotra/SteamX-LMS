@@ -14,6 +14,7 @@ import { AuthLayout } from '../components/AuthLayout';
 import { getErrorMessages } from '@/lib/api-errors';
 import { getHomePath } from '../model/redirects';
 import { sessionQueryOptions } from '../queries';
+import { Spinner } from '@/components/ui/spinner';
 
 const changePasswordSchema = z
   .object({
@@ -129,10 +130,7 @@ export function ChangePasswordPage() {
         >
           {isSubmitting ? (
             <>
-              <span
-                className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                aria-hidden="true"
-              />
+              <Spinner />
               Saving…
             </>
           ) : (

@@ -16,7 +16,7 @@ import {
   STUDENTS_PAGE_SIZE,
   STUDENTS_SEARCH_MAX_LENGTH,
 } from '../config/students.config';
-import { StudentStatsCards } from '../components/StudentStatsCards';
+import { UserStatsCards } from '../../users/components/UserStatsCards';
 
 export function StudentsPage() {
   const {
@@ -66,7 +66,7 @@ export function StudentsPage() {
         </ButtonLink>
       </div>
 
-      <StudentStatsCards />
+      <UserStatsCards role="student" plural="students" />
 
       <div className="flex flex-wrap items-center gap-2">
         <ListToolbar

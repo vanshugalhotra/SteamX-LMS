@@ -151,10 +151,3 @@ export function getFieldErrors(error: unknown): Record<string, string> {
   }
   return result;
 }
-
-// TODO: Add tests once the frontend testing setup is in place.
-// Cover:
-// - Error-code and HTTP-status fallbacks, including unknown codes.
-// - Password-policy violation details and fallback messages.
-// - VALIDATION_ERROR field-error extraction.
-// - Feature-specific message overrides.

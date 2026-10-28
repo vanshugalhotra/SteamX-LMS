@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { useLogout } from '../queries';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 export function LogoutButton({ className }: { className?: string }) {
   const logout = useLogout();
@@ -18,10 +19,7 @@ export function LogoutButton({ className }: { className?: string }) {
     >
       {logout.isPending ? (
         <>
-          <span
-            className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-            aria-hidden="true"
-          />
+          <Spinner />
           Signing out…
         </>
       ) : (

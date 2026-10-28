@@ -6,7 +6,6 @@ import { FormRenderer } from '@/components/form/FormRenderer';
 import { FormSection } from '@/components/form/FormSection';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
   API_ERROR_CODE,
   getErrorMessage,
@@ -14,19 +13,15 @@ import {
   getFieldErrors,
   hasErrorCode,
 } from '@/lib/api-errors';
-import type { User, UserStatus } from '../../users/model/types';
+import type { User } from '../../users/model/types';
 import { useCreateStudent, useUpdateUser, useUpdateUserStatus } from '../../users/queries';
+import { UserStatusSection } from '../../users/components/UserStatusSection';
 import { getStudentFieldGroups } from '../config/students.config';
 import { createStudentSchema, editStudentSchema, type StudentFormValues } from '../model/schemas';
 import { Link } from 'react-router';
 import { PATHS } from '@/lib/paths';
 
 const toNull = (value: string) => (value === '' ? null : value);
-
-const STATUS_OPTIONS = [
-  { value: 'ACTIVE', label: 'Active', dotClass: 'bg-teal-500' },
-  { value: 'INACTIVE', label: 'Inactive', dotClass: 'bg-magenta-500' },
-] satisfies { value: UserStatus; label: string; dotClass: string }[];
 
 function toDefaults(student?: User, schoolName = ''): StudentFormValues {
   return {
@@ -192,18 +187,12 @@ export function StudentForm({
                 control={control}
                 name="status"
                 render={({ field }) => (
-                  <div className="mb-4.5 sm:w-1/2 sm:pr-2">
-                    <SegmentedControl
-                      label="Account status"
-                      options={STATUS_OPTIONS}
-                      value={field.value}
-                      onChange={field.onChange}
-                      disabled={busy}
-                    />
-                    <p className="mt-1.5 text-xs text-gray-600">
-                      Inactive students cannot sign in.
-                    </p>
-                  </div>
+                  <UserStatusSection
+                    plural="students"
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={busy}
+                  />
                 )}
               />
             )}

@@ -16,7 +16,8 @@ import {
   TEACHERS_PAGE_SIZE,
   TEACHERS_SEARCH_MAX_LENGTH,
 } from '../config/teachers.config';
-import { TeacherStatsCards } from '../components/TeacherStatsCards';
+import { StatsCard } from '@/components/ui/stats-card';
+import { UserStatsCards } from '../../users/components/UserStatsCards';
 
 export function TeachersPage() {
   const {
@@ -66,7 +67,10 @@ export function TeachersPage() {
         </ButtonLink>
       </div>
 
-      <TeacherStatsCards />
+      <UserStatsCards role="teacher" plural="teachers">
+        {/* TODO: placeholder until the CourseDeliveries API provides this count. */}
+        <StatsCard label="Delivery assignments" hint="Placeholder data" value={12} tone="plain" />
+      </UserStatsCards>
 
       <div className="flex flex-wrap items-center gap-2">
         <ListToolbar

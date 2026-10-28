@@ -11,6 +11,7 @@ import { getPostLoginPath, SESSION_EXPIRED } from '../model/redirects';
 import { useLogin } from '../queries';
 import { loginSchema, type LoginValues } from '../model/schemas';
 import { getErrorMessage, type ErrorOverrides } from '@/lib/api-errors';
+import { Spinner } from '@/components/ui/spinner';
 
 const LOGIN_ERRORS: ErrorOverrides = {
   UNAUTHORIZED: 'We couldn’t sign you in. Check your SteamX ID and password, or ask your teacher.',
@@ -108,10 +109,7 @@ export function LoginPage() {
         >
           {busy ? (
             <>
-              <span
-                className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                aria-hidden="true"
-              />
+              <Spinner />
               Signing in…
             </>
           ) : (
