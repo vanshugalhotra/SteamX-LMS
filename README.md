@@ -99,4 +99,5 @@ script across workspace packages.
 - [Backend setup reference](./apps/backend/README.md)
 - [API testing checklist](./docs/api-testing.md)
 - [Workflow testing](./docs/workflows-testing.md)
+- [Lesson content contract](./docs/lesson-content.md)
 - [Infrastructure](./docs/infrastructure.md)

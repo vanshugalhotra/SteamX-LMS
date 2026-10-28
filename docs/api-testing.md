@@ -125,8 +125,10 @@ Caller: platform `admin` with `curriculum.read`; reads the complete, unfiltered 
   no status or audience filtering is applied.
 - [auto] When the course has no modules -> expect `modules: []`; when a module has no lessons ->
   expect `lessons: []`.
-- [auto] After reorder, moving a lesson to another module, deletion, or archive cascade -> expect
+- [auto] After reorder, deletion, or archive cascade -> expect
   the next outline read to reflect the current hierarchy and statuses.
+- [auto] The outline e2e test changes a lesson's module directly in test setup; this is not an API
+  operation, and no lesson-move route currently exists.
 - [auto] When the course has 20 modules with 10 lessons each -> expect all 200 lessons and
   position-ordered modules and lessons.
 - [auto] When the ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.

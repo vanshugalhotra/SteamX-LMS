@@ -35,6 +35,7 @@ This page records current design decisions and their consequences. It does not d
 - **Archival and release access** — a parent archives active descendants only; restoring it does not restore children. Draft content is not student-visible, while already-released active or archived content remains available until subscription expiry.
 - **Deletes are FK-restricted** — deleting a resource with dependents returns `RESOURCE_IN_USE`.
 - **Ordering and outline** — reorders take the complete ID list under a parent lock; unpaginated module/lesson lists support that contract. `GET /courses/:id/outline` is an admin-only, unfiltered read model; writes remain in their owning feature.
+- **Lesson placement** — a lesson's module can change within its existing course at the database level, but there is no API operation for moving it. The course outline e2e test changes the foreign key directly to verify the read model.
 
 ## Lesson content
 

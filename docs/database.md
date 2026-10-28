@@ -1,6 +1,6 @@
 # Database
 
-The Prisma schema defines all tables. API modules currently cover identity, schools, class sections, and curriculum. Other tables (delivery, enrollment, assignments) exist in the schema but have no API yet.
+The Prisma schema defines all tables. API modules cover identity, schools, class sections, curriculum, and asset storage. Delivery, enrollment, and assignment tables exist in the schema but have no API modules yet.
 
 ## Tables
 
@@ -55,16 +55,18 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 
 ### Curriculum & assets
 
-- **Titles/positions:** course/module/lesson/asset titles must be nonblank. Module, lesson, and top-level block positions must be positive.
+- **Curriculum hierarchy:** courses are global, with no school foreign key. Module `course_id` and lesson `course_id` are immutable. Lesson `module_id` can change only within the same course, enforced by the composite foreign key; the current API has no lesson-move route. Lesson audience defaults to `TEACHER_ONLY`.
+- **Titles/positions:** course/module/lesson/asset titles must be nonblank. Module, lesson, and top-level block positions must be positive. Module positions are unique per course; lesson positions are unique per module. Gaps are allowed.
+- **Reordering:** append and reorder operations lock the parent course or module. Reorder APIs accept the exact complete set of child IDs; positions are temporarily moved out of range before reassignment to satisfy immediate unique constraints.
 - **Lesson content version:** `lessons.content_version` is an integer defaulting to `0`; CHECK `lessons_content_version_nonneg` enforces `content_version >= 0`.
 - **Lesson blocks:** `content` must be a JSON object; asset IDs are required exactly for IMAGE, VIDEO, PDF, and PPTX rows. Top-level rows have a positive `position` and no parent/column index; child rows have a parent and a column index of `0` or `1`, with no position.
 - **Block relationships:** the composite parent FK keeps a child in its lesson; a trigger requires a TWO_COLUMN parent and matching asset/block types. Children cannot themselves be TWO_COLUMN. Unique `(lesson_id, position)` and `(parent_block_id, column_index)` constraints prevent duplicate order/slots. The database permits an empty or partially filled layout; the API materializes two nullable slots and enforces the request shape.
 - **Immutable fields:** module `course_id`, lesson `course_id`, asset `type`, lesson-block `lesson_id` and `type`.
 - **Ordering:** Unique constraints prevent duplicate positions. Use temporary positions when reordering; delete + recreate two-column children rather than swapping.
 - **Status transitions:**
+  - Courses, modules, and lessons may move from DRAFT to ACTIVE or ARCHIVED; ACTIVE and ARCHIVED may transition between each other, but no status returns to DRAFT.
   - Modules require active courses; lessons require active modules.
-  - Archiving a parent archives active descendants only (not drafts). Does not affect existing deliveries.
-  - Status cannot return to DRAFT.
+  - Archiving a parent archives active descendants only (not drafts) and does not change existing deliveries.
   - Draft content is never student-visible. Released active/archived content stays available until subscription expiry.
 - **Asset files:** IDs are UUIDv7. Storage keys must start with `assets/<asset_id>/<asset_file_id>/`. Only one READY file per asset. READY/FAILED rows reject updates. VIDEO READY files require a playback key. The database permits `UPLOADED → READY` for IMAGE/PDF and requires `PROCESSING` for VIDEO/PPTX; the current completion service routes supported types through `PROCESSING`. PPTX remains in the enum but uploads are rejected.
 - **Cleanup queue:** Deleting an asset file queues its prefix; deleting a submission file queues its object key. The current worker handles prefixes only. Pending jobs have partial indexes.

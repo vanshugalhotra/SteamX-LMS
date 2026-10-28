@@ -23,13 +23,27 @@ in `apps/backend/src/common/`; feature rules stay in their feature modules.
 | `SchoolsModule`                                 | School identity, contact details, status, and school-scope reads. Exports `SchoolsService`.       |
 | `ClassSectionsModule`                           | School-owned class/section records and scoped CRUD. Exports `ClassSectionsService`.               |
 | `TenancyModule`                                 | Resolves active schools for scoped workflows.                                                     |
-| `CurriculumModule`                              | Global course/module/lesson lifecycle, ordering, and lesson content.                              |
+| `CurriculumModule`                              | Global course/module/lesson authoring, ordering, outline reads, and lesson content.               |
 | `AssetsModule`                                  | Asset/file lifecycle, validation, processing, and author preview.                                 |
-| `StorageModule`                                 | S3 storage contract, presigned URLs, and queued object cleanup.                                  |
+| `StorageModule`                                 | S3 storage contract, presigned URLs, and queued object cleanup.                                   |
 | `PrismaModule`                                  | Configured Prisma client.                                                                         |
 | `HealthModule`, `LoggingModule`, `ConfigModule` | Liveness/readiness, request logging, and validated environment configuration.                     |
 
 Delivery, enrollment, and assignment tables exist in Prisma but do not have API modules yet.
+
+## Curriculum authoring
+
+- Curriculum is global, not school-scoped. Course, module, and lesson routes require platform staff
+  as well as their declared `curriculum.read` or `curriculum.write` permission.
+- The hierarchy is `Course → Module → Lesson`. Create routes append draft children; module and
+  lesson lists are unpaginated and position-ordered. Reorder routes require the complete ID set.
+- `CourseOutlineController` is a read-only aggregate over courses, modules, and lessons. It returns
+  all statuses and lesson audiences; it is not the teacher/student delivery view.
+- `LessonContentController` serves the admin authoring read/write path. Reads return a block tree,
+  version, and asset summaries; saves validate and replace the full tree transactionally. Asset
+  summaries come from `AssetsService`; delivery access and student-facing reads are not implemented.
+- The schema permits moving a lesson between modules in its current course, but there is no public
+  API route for moving lessons.
 
 ## Authentication and user data flow
 

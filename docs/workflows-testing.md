@@ -290,8 +290,8 @@ email, names, and creation times.
 
 1. Create a course and read `GET /api/v1/courses/:id/outline`; verify course fields and `modules: []`.
 2. Add modules and lessons; verify position order, module nesting, and empty child lists in the outline.
-3. Reorder modules and lessons, move a lesson to another module, and reread the outline after each
-   change to verify the current hierarchy and positions.
+3. Reorder modules and lessons and reread the outline after each change to verify the hierarchy and
+   positions. There is no API route for moving a lesson between modules.
 4. Verify status transitions and archive cascades: active descendants archive, drafts stay draft,
    and reactivation does not revive archived descendants. Verify lesson audience values.
 5. Create matching-type assets with READY files through upload and completion, then read the lesson

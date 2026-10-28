@@ -1,3 +1,4 @@
+/** HTTP and permission boundary for the nested course-outline read model. */
 import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -25,6 +26,7 @@ import { CourseOutlineService } from './course-outline.service.js';
 export class CourseOutlineController {
   constructor(private readonly outlines: CourseOutlineService) {}
 
+  /** Returns the complete position-ordered outline or 404 for an unknown course. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get('courses/:id/outline')
   @ApiOperation({ summary: 'Get a course outline' })

@@ -1,3 +1,4 @@
+/** HTTP and permission boundary for global course authoring and reads. */
 import {
   Body,
   Controller,
@@ -49,6 +50,7 @@ export class CoursesController {
   // POST /courses — Create a course
   // ─────────────────────────────────────────
 
+  /** Creates a global course in DRAFT status. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Post()
   @ApiOperation({ summary: 'Create a course' })
@@ -65,6 +67,7 @@ export class CoursesController {
   // GET /courses — List courses
   // ─────────────────────────────────────────
 
+  /** Lists global courses with optional status/title filters and pagination. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get()
   @ApiOperation({ summary: 'List courses' })
@@ -81,6 +84,7 @@ export class CoursesController {
   // GET /courses/:id — Get a course
   // ─────────────────────────────────────────
 
+  /** Returns a course or 404 when it does not exist. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get(':id')
   @ApiOperation({ summary: 'Get a course' })
@@ -98,6 +102,7 @@ export class CoursesController {
   // PATCH /courses/:id — Update a course
   // ─────────────────────────────────────────
 
+  /** Updates the supplied course fields; an empty patch is invalid. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Patch(':id')
   @ApiOperation({ summary: 'Update a course' })
@@ -116,6 +121,7 @@ export class CoursesController {
   // PATCH /courses/:id/status — Update status
   // ─────────────────────────────────────────
 
+  /** Changes course lifecycle status; invalid transitions return 409. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update a course status' })
@@ -135,6 +141,7 @@ export class CoursesController {
   // DELETE /courses/:id — Delete an unused course
   // ─────────────────────────────────────────
 
+  /** Deletes an unreferenced course; missing or referenced courses return 404 or 409. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)

@@ -1,4 +1,4 @@
-// Database queries and writes used by the lesson-content service.
+/** Reads and replaces lesson block rows within the content service's transactions. */
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import type { LessonContentBlockRow } from './tree/build-block-tree.js';
@@ -63,7 +63,7 @@ export class LessonContentRepository {
     );
   }
 
-  // Read a lesson's saved block rows; pass tx when this read belongs to a save.
+  /** Reads a lesson's saved block rows from the supplied save transaction when present. */
   findBlocks(lessonId: string, tx?: Prisma.TransactionClient): Promise<LessonContentBlockRow[]> {
     // Use the save transaction when given one; otherwise use the regular Prisma client.
     return (tx ?? this.prisma).lessonBlock.findMany({
@@ -111,7 +111,7 @@ export class LessonContentRepository {
     if (data.length > 0) await tx.lessonBlock.createMany({ data });
   }
 
-  // Increase the version once after the complete replacement succeeds.
+  /** Increments the content version once after the complete replacement has been inserted. */
   incrementVersion(
     tx: Prisma.TransactionClient,
     lessonId: string,

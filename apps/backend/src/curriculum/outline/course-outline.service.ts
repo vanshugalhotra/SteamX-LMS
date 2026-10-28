@@ -6,10 +6,12 @@ import type { CourseOutlineResponseDto } from './dto/course-outline-response.dto
 import { toCourseOutlineResponse } from './course-outline.mapper.js';
 import { CourseOutlineRepository } from './course-outline.repository.js';
 
+/** Restricts the global outline read model to platform staff. */
 @Injectable()
 export class CourseOutlineService {
   constructor(private readonly outlines: CourseOutlineRepository) {}
 
+  /** Returns every module and lesson, without status or audience filtering. */
   async findByCourseId(actor: AuthContext, id: string): Promise<CourseOutlineResponseDto> {
     assertPlatformStaff(actor);
     const course = await this.outlines.findByCourseId(id);
@@ -18,6 +20,4 @@ export class CourseOutlineService {
     }
     return toCourseOutlineResponse(course);
   }
-
-  // TODO(deliveries): teacher/student outlines (release + audience filtering) are separate endpoints
 }

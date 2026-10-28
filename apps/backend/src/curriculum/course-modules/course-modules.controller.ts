@@ -1,3 +1,4 @@
+/** HTTP and permission boundary for global course-module authoring and reads. */
 import {
   Body,
   Controller,
@@ -48,6 +49,7 @@ export class CourseModulesController {
   // POST /courses/:courseId/modules — Create a module
   // ─────────────────────────────────────────
 
+  /** Appends a DRAFT module to the selected course. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Post('courses/:courseId/modules')
   @ApiOperation({ summary: 'Create a course module' })
@@ -66,6 +68,7 @@ export class CourseModulesController {
   // GET /courses/:courseId/modules — List modules
   // ─────────────────────────────────────────
 
+  /** Returns all modules in the course in position order. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get('courses/:courseId/modules')
   @ApiOperation({ summary: 'List modules in a course' })
@@ -83,6 +86,7 @@ export class CourseModulesController {
   // PUT /courses/:courseId/modules/order — Reorder modules
   // ─────────────────────────────────────────
 
+  /** Applies a complete permutation of the course's module IDs. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Put('courses/:courseId/modules/order')
   @ApiOperation({ summary: 'Reorder course modules' })
@@ -106,6 +110,7 @@ export class CourseModulesController {
   // GET /modules/:id — Get a module
   // ─────────────────────────────────────────
 
+  /** Returns a module or 404 when it does not exist. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get('modules/:id')
   @ApiOperation({ summary: 'Get a course module' })
@@ -123,6 +128,7 @@ export class CourseModulesController {
   // PATCH /modules/:id — Update a module
   // ─────────────────────────────────────────
 
+  /** Updates a module's title; an empty patch is invalid. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Patch('modules/:id')
   @ApiOperation({ summary: 'Update a course module' })
@@ -141,6 +147,7 @@ export class CourseModulesController {
   // PATCH /modules/:id/status — Update status
   // ─────────────────────────────────────────
 
+  /** Changes module lifecycle status subject to its course's active status. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Patch('modules/:id/status')
   @ApiOperation({ summary: 'Update a course module status' })
@@ -162,6 +169,7 @@ export class CourseModulesController {
   // DELETE /modules/:id — Delete a module
   // ─────────────────────────────────────────
 
+  /** Deletes an unreferenced module; dependent records cause a conflict. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Delete('modules/:id')
   @HttpCode(HttpStatus.NO_CONTENT)

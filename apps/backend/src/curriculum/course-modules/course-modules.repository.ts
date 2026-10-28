@@ -20,6 +20,7 @@ export class CourseModulesRepository {
 
   async create(courseId: string, data: CreateCourseModuleDto): Promise<CourseModuleRecord | null> {
     return this.prisma.$transaction(async (tx) => {
+      // Serializes appends so concurrent creates cannot choose the same next position.
       if (!(await lockCourse(tx, courseId))) {
         return null;
       }
@@ -70,6 +71,7 @@ export class CourseModulesRepository {
         return { kind: 'invalid-order' };
       }
 
+      // Positions are unique immediately; park the rows before assigning a permutation.
       await tx.module.updateMany({
         where: { courseId },
         data: { position: { increment: PARK_OFFSET } },
@@ -130,6 +132,7 @@ export class CourseModulesRepository {
   }
 }
 
+/** Locks the parent so module appends and reorders for this course serialize. */
 async function lockCourse(tx: Prisma.TransactionClient, courseId: string): Promise<boolean> {
   const rows = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM courses WHERE id = ${courseId}::uuid FOR UPDATE
