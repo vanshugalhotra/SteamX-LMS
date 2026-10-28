@@ -1,4 +1,7 @@
-// Database queries for asset records.
+/**
+ * Persists asset and file state, coordinating conditional transitions and transactions
+ * that keep one READY file per asset.
+ */
 import { Injectable } from '@nestjs/common';
 import { AssetFileStatus, ContentStatus, Prisma } from '../generated/prisma/client.js';
 import type { Asset, AssetFile } from '../generated/prisma/client.js';
@@ -41,6 +44,7 @@ export type {
 export class AssetsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Returns a filtered library page and total count in stable newest-first order. */
   findLibraryItems(
     query: AssetListQueryDto,
   ): Promise<{ items: AssetLibraryRecord[]; total: number }> {
@@ -73,10 +77,12 @@ export class AssetsRepository {
     });
   }
 
+  /** Loads asset detail and its file attempts for the library response. */
   findLibraryAssetById(id: string): Promise<AssetDetailRecord | null> {
     return this.prisma.asset.findUnique({ where: { id }, select: ASSET_DETAIL_SELECT });
   }
 
+  /** Selects only the newest READY file for signed access. */
   findAssetForAccess(id: string): Promise<AssetAccessRecord | null> {
     return this.prisma.asset.findUnique({ where: { id }, select: ASSET_ACCESS_SELECT });
   }
@@ -229,6 +235,7 @@ export class AssetsRepository {
     return this.prisma.assetFile.findFirst({ where: { id: fileId, assetId } });
   }
 
+  /** Loads the asset type and a file's current status for an upload completion attempt. */
   findFileForCompletion(assetId: string, fileId: string): Promise<AssetFileForCompletion | null> {
     return this.prisma.assetFile.findFirst({
       where: { id: fileId, assetId },
@@ -236,6 +243,7 @@ export class AssetsRepository {
     });
   }
 
+  /** Loads a file attempt by its primary ID for returning its latest state after a race. */
   findFileById(fileId: string): Promise<AssetFile | null> {
     return this.prisma.assetFile.findUnique({ where: { id: fileId } });
   }

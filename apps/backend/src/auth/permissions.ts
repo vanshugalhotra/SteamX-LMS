@@ -1,3 +1,4 @@
+/** Defines the permission keys and role keys used by route policy and the permission guard. */
 export const PERMISSION = {
   USER_PASSWORD_RESET: 'user.password.reset',
   USER_READ: 'user.read',

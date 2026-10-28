@@ -53,7 +53,10 @@ export class UsersService {
   // POST /users/teachers — Create a teacher
   // ─────────────────────────────────────────
 
-  /** Creates a teacher in an active scoped school with a unique login ID and hashed password. */
+  /**
+   * Creates a teacher and profile for an active school visible to the actor.
+   * Returns the public user response; invalid passwords, missing schools, and conflicts are errors.
+   */
   async createTeacher(actor: AuthContext, body: CreateTeacherDto): Promise<UserResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
     const role = await this.resolveRole(USER_ROLE_KEY.TEACHER, UserType.SCHOOL_STAFF);
@@ -86,7 +89,10 @@ export class UsersService {
   // POST /users/students — Create a student
   // ─────────────────────────────────────────
 
-  /** Creates a student only when the selected class section belongs to the active school. */
+  /**
+   * Creates a student and profile after checking school and class-section ownership.
+   * Returns the public user response; invalid passwords, missing resources, and conflicts are errors.
+   */
   async createStudent(actor: AuthContext, body: CreateStudentDto): Promise<UserResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
     await this.sections.assertInSchool(body.classSectionId, school.id);
@@ -120,7 +126,10 @@ export class UsersService {
   // GET /users — List users
   // ─────────────────────────────────────────
 
-  /** Combines school scope and user visibility before querying to avoid leaking foreign records. */
+  /**
+   * Returns a paginated list using school scope and user visibility before querying.
+   * An explicitly requested school outside the actor's scope is not found.
+   */
   async findMany(
     actor: AuthContext,
     query: UserListQueryDto,
@@ -149,7 +158,10 @@ export class UsersService {
   // GET /users/:id — Get a user
   // ─────────────────────────────────────────
 
-  /** Finds a user under both school scope and role-specific visibility; missing and foreign IDs return 404. */
+  /**
+   * Returns one user under school scope and role-specific visibility.
+   * Missing, foreign, or invisible IDs throw 404.
+   */
   async findById(actor: AuthContext, id: string): Promise<UserResponseDto> {
     const scope = resolveSchoolScope(actor);
     const user = await this.users.findById({
@@ -164,7 +176,8 @@ export class UsersService {
   }
 
   /**
-   * Renames a user's school-prefixed ID after checking visibility and validating the school code.
+   * Renames a visible school user's login ID after validating its school prefix and format.
+   * Missing or invisible IDs throw 404; invalid IDs throw 400 and duplicates throw 409.
    * The repository enables the database guard only inside the rename transaction.
    */
   async renameSteamxId(
@@ -213,7 +226,10 @@ export class UsersService {
     }
   }
 
-  /** Applies only fields valid for the target account type and updates the profile atomically. */
+  /**
+   * Updates applicable account and profile fields together for a visible school user.
+   * Invalid fields or platform-staff targets throw 400; invisible IDs throw 404.
+   */
   async update(actor: AuthContext, id: string, body: UpdateUserDto): Promise<UserResponseDto> {
     const { user, where } = await this.findVisibleTarget(actor, id);
     this.assertSchoolUser(user);
@@ -252,7 +268,6 @@ export class UsersService {
         body.classSectionId !== undefined &&
         body.classSectionId !== user.studentProfile?.classSectionId
       ) {
-        // TODO(enrollments): mark old-class enrollments COMPLETED
         await this.sections.assertInSchool(body.classSectionId, user.schoolId);
         studentData.classSectionId = body.classSectionId;
       }
@@ -281,7 +296,10 @@ export class UsersService {
     }
   }
 
-  /** Changes another manageable school user's status; self-changes are rejected. */
+  /**
+   * Changes the status of a visible school user; rejects self-changes and platform staff.
+   * The next authenticated request observes deactivation; invisible IDs throw 404.
+   */
   async updateStatus(
     actor: AuthContext,
     id: string,
@@ -312,7 +330,10 @@ export class UsersService {
     return toUserResponse(updated);
   }
 
-  /** Resets another visible user's password and requires a password change at next login. */
+  /**
+   * Resets another visible user's password and requires a change at next login.
+   * Self-reset throws 400, invisible IDs throw 404, and success updates password-change time.
+   */
   async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {
     const { user, where } = await this.findVisibleTarget(actor, userId);
     if (user.id === actor.userId) {

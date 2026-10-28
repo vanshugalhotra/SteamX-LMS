@@ -6,6 +6,7 @@ import { StorageCleanupQueueService } from '../../storage/storage-cleanup-queue.
 import { AssetCleanupService } from './asset-cleanup.service.js';
 import { safeError } from '../../common/errors/safe-error.js';
 
+/** Schedules non-overlapping storage-queue and stale-asset cleanup runs in the API process. */
 @Injectable()
 export class CleanupScheduler implements OnApplicationBootstrap, OnApplicationShutdown {
   /** Whether Nest should start automatic cleanup when the API boots. */

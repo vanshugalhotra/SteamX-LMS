@@ -37,6 +37,7 @@ import { RenameSteamxIdDto } from './dto/rename-steamx-id.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto.js';
 
+/** Declares user-management routes; business rules and visibility checks live in UsersService. */
 @ApiTags('Users')
 @ApiProtectedController()
 @ApiForbiddenResponse({
@@ -50,6 +51,7 @@ export class UsersController {
   // POST /users/teachers — Create a teacher
   // ─────────────────────────────────────────
 
+  /** Creates a teacher from the request body and returns its public profile; invalid input or conflicts are rejected. */
   @RequirePermission(PERMISSION.USER_CREATE_TEACHER)
   @Post('teachers')
   @ApiOperation({ summary: 'Create a teacher' })
@@ -71,6 +73,7 @@ export class UsersController {
   // POST /users/students — Create a student
   // ─────────────────────────────────────────
 
+  /** Creates a student from the request body and returns its public profile; section ownership is checked. */
   @RequirePermission(PERMISSION.USER_CREATE_STUDENT)
   @Post('students')
   @ApiOperation({ summary: 'Create a student' })
@@ -94,6 +97,7 @@ export class UsersController {
   // GET /users — List users
   // ─────────────────────────────────────────
 
+  /** Returns a paginated user list filtered by the query, caller visibility, and school scope. */
   @RequirePermission(PERMISSION.USER_READ)
   @Get()
   @ApiOperation({ summary: 'List users' })
@@ -115,6 +119,7 @@ export class UsersController {
   // GET /users/:id — Get a user
   // ─────────────────────────────────────────
 
+  /** Returns one visible user; foreign and nonexistent IDs share the same 404 response. */
   @RequirePermission(PERMISSION.USER_READ)
   @Get(':id')
   @ApiOperation({ summary: 'Get a user' })
@@ -132,6 +137,7 @@ export class UsersController {
   // PATCH /users/:id — Update a user
   // ─────────────────────────────────────────
 
+  /** Updates supported account/profile fields and returns the profile; invalid fields or IDs are rejected. */
   @RequirePermission(PERMISSION.USER_UPDATE)
   @Patch(':id')
   @ApiOperation({ summary: 'Update a user' })
@@ -151,6 +157,7 @@ export class UsersController {
   // PATCH /users/:id/status — Change user status
   // ─────────────────────────────────────────
 
+  /** Changes a visible school user's status and returns the profile; self-deactivation is rejected. */
   @RequirePermission(PERMISSION.USER_DEACTIVATE)
   @Patch(':id/status')
   @ApiOperation({ summary: 'Change a user status' })
@@ -169,6 +176,7 @@ export class UsersController {
   // PATCH /users/:id/steamx-id — Rename a user's SteamX ID
   // ─────────────────────────────────────────
 
+  /** Renames a visible school user's login ID and returns the profile; invalid or duplicate IDs are rejected. */
   @RequirePermission(PERMISSION.USER_STEAMX_ID_UPDATE)
   @Patch(':id/steamx-id')
   @ApiOperation({ summary: "Rename a user's SteamX ID" })
@@ -188,6 +196,7 @@ export class UsersController {
   // POST /users/:id/reset-password — Reset a user password
   // ─────────────────────────────────────────
 
+  /** Resets another visible user's password; returns no content and rejects self-reset. */
   @RequirePermission(PERMISSION.USER_PASSWORD_RESET)
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)

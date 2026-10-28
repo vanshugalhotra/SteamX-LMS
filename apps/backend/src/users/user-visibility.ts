@@ -1,5 +1,4 @@
-/**
- * Limits user reads to the records visible to the authenticated caller. Shared user-record visibility rules, separate from school tenant scope. */
+/** Defines user-record visibility separately from school tenant scope. */
 import { UserType, type Prisma } from '../generated/prisma/client.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 
@@ -14,6 +13,5 @@ export function userVisibility(auth: AuthContext): Prisma.UserWhereInput {
     return {};
   }
 
-  // TODO(teacher-user-mgmt): teachers see only users in their own deliveries once deliveries exist
   return { id: auth.userId };
 }

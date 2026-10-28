@@ -10,6 +10,7 @@ import { FirstAdminService } from './services/first-admin.service.js';
 import { PasswordService } from './services/password.service.js';
 import { TokenService } from './services/token.service.js';
 
+/** Composes authentication providers and exports the guards/services used by feature modules. */
 @Module({
   imports: [PrismaModule],
   controllers: [AuthController],

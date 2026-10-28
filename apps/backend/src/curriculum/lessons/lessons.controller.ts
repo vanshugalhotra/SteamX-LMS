@@ -1,3 +1,4 @@
+/** HTTP and permission boundary for global lesson metadata and content authoring. */
 import {
   Body,
   Controller,
@@ -48,6 +49,7 @@ export class LessonsController {
   // POST /modules/:moduleId/lessons — Create a lesson
   // ─────────────────────────────────────────
 
+  /** Appends a DRAFT lesson to a module. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Post('modules/:moduleId/lessons')
   @ApiOperation({ summary: 'Create a lesson' })
@@ -66,6 +68,7 @@ export class LessonsController {
   // GET /modules/:moduleId/lessons — List lessons
   // ─────────────────────────────────────────
 
+  /** Returns all lessons in the module in position order. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get('modules/:moduleId/lessons')
   @ApiOperation({ summary: 'List lessons in a module' })
@@ -83,6 +86,7 @@ export class LessonsController {
   // PUT /modules/:moduleId/lessons/order — Reorder lessons
   // ─────────────────────────────────────────
 
+  /** Applies a complete permutation of the module's lesson IDs. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Put('modules/:moduleId/lessons/order')
   @ApiOperation({ summary: 'Reorder lessons in a module' })
@@ -103,6 +107,7 @@ export class LessonsController {
   // GET /lessons/:id — Get a lesson
   // ─────────────────────────────────────────
 
+  /** Returns a lesson or 404 when it does not exist. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get('lessons/:id')
   @ApiOperation({ summary: 'Get a lesson' })
@@ -120,6 +125,7 @@ export class LessonsController {
   // PATCH /lessons/:id — Update a lesson
   // ─────────────────────────────────────────
 
+  /** Updates title and/or audience; module placement is not editable through this route. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Patch('lessons/:id')
   @ApiOperation({ summary: 'Update a lesson' })
@@ -138,6 +144,7 @@ export class LessonsController {
   // PATCH /lessons/:id/status — Update status
   // ─────────────────────────────────────────
 
+  /** Changes lesson lifecycle status subject to its module's active status. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Patch('lessons/:id/status')
   @ApiOperation({ summary: 'Update a lesson status' })
@@ -159,6 +166,7 @@ export class LessonsController {
   // DELETE /lessons/:id — Delete a lesson
   // ─────────────────────────────────────────
 
+  /** Deletes a lesson after dependent records, including content blocks, are removed. */
   @RequirePermission(PERMISSION.CURRICULUM_WRITE)
   @Delete('lessons/:id')
   @HttpCode(HttpStatus.NO_CONTENT)

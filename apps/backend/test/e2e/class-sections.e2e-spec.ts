@@ -267,9 +267,20 @@ describe('Class sections endpoints (e2e)', () => {
       'B',
     );
 
+    const original = await prisma.classSection.findUniqueOrThrow({
+      where: { id: section.id },
+      select: { className: true, sectionName: true },
+    });
     await patch(adminCookie, section.id, { sectionName: 'B' })
       .expect(409)
       .then(({ body }) => expect(body.code).toBe('CLASS_SECTION_EXISTS'));
+    await expect(
+      prisma.classSection.findUniqueOrThrow({
+        where: { id: section.id },
+        select: { className: true, sectionName: true },
+      }),
+    ).resolves.toEqual(original);
+
     const changedCase = await patch(adminCookie, section.id, {
       className: `${prefix} Class`.toLowerCase(),
       sectionName: 'a',
@@ -308,6 +319,12 @@ describe('Class sections endpoints (e2e)', () => {
         expect(body.code).toBe('RESOURCE_IN_USE');
         expect(body.message).toBe('Resource has dependent records and cannot be deleted');
       });
+    await expect(
+      prisma.studentProfile.findUniqueOrThrow({
+        where: { userId: fixture.schoolA.student.id },
+        select: { classSectionId: true },
+      }),
+    ).resolves.toEqual({ classSectionId: fixture.schoolA.section.id });
 
     const allSection = await createSection(
       adminCookie,
@@ -578,6 +595,10 @@ describe('Class sections endpoints (e2e)', () => {
       .expect(404)
       .then(({ body }) => expect(body.code).toBe('NOT_FOUND'));
     const foreignSectionId = fixture.schoolB.section.id;
+    const original = await prisma.classSection.findUniqueOrThrow({
+      where: { id: foreignSectionId },
+      select: { className: true },
+    });
     const foreignPatch = await patch(teacherCookie, foreignSectionId, {
       className: 'Unauthorized change',
     }).expect(404);
@@ -588,10 +609,6 @@ describe('Class sections endpoints (e2e)', () => {
     const { requestId: _missingPatchRequestId, ...missingPatchBody } = missingPatch.body;
     expect(foreignPatchBody).toEqual(missingPatchBody);
 
-    const original = await prisma.classSection.findUniqueOrThrow({
-      where: { id: foreignSectionId },
-      select: { className: true },
-    });
     const foreignDelete = await remove(teacherCookie, foreignSectionId).expect(404);
     const missingDelete = await remove(teacherCookie, randomUUID()).expect(404);
     const { requestId: _deleteRequestId, ...foreignDeleteBody } = foreignDelete.body;

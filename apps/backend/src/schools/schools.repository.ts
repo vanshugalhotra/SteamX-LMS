@@ -9,9 +9,9 @@ import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import type { CreateSchoolDto } from './dto/create-school.dto.js';
 import type { UpdateSchoolDto } from './dto/update-school.dto.js';
 
-// Schools scope by their own id, not by a schoolId FK.
-// In findById/update this filter is combined via AND because the lookup id
-// and the scope both target the `id` field — a spread would overwrite one.
+/** Runs Prisma queries with school scope applied in the database predicate. */
+// A school is scoped by its own id, not a schoolId foreign key. Combine ID and scope with AND;
+// spreading both predicates would overwrite one and could drop the scope condition.
 function selfScopeFilter(scope: string | undefined): Prisma.SchoolWhereInput {
   return scope === undefined ? {} : { id: scope };
 }
@@ -20,12 +20,12 @@ function selfScopeFilter(scope: string | undefined): Prisma.SchoolWhereInput {
 export class SchoolsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Inserts a school; duplicate-code conflicts are translated by SchoolsService. */
+  /** Inserts the validated school fields; duplicate codes propagate for SchoolsService translation. */
   create(data: CreateSchoolDto) {
     return this.prisma.school.create({ data });
   }
 
-  /** Reads only a school's code for another module's SteamX ID validation. */
+  /** Returns only the school code for cross-module ID validation, or null if the school is missing. */
   findCodeById(schoolId: string): Promise<{ code: string } | null> {
     return this.prisma.school.findUnique({
       where: { id: schoolId },
@@ -34,8 +34,8 @@ export class SchoolsRepository {
   }
 
   /**
-   * Returns a page and total count using the same scope and optional filters.
-   * Name and ID ordering keeps page boundaries stable when names match.
+   * Returns a page and matching total within scope, filtered by status and/or name/code search.
+   * Name then ID ordering keeps page boundaries stable when names match.
    */
   findMany(
     scope: string | undefined,
@@ -67,7 +67,7 @@ export class SchoolsRepository {
     });
   }
 
-  /** Finds an ID only inside the resolved scope; foreign school IDs therefore return null. */
+  /** Finds the requested school inside scope; a foreign or missing ID returns null. */
   findById(id: string, scope: string | undefined) {
     return this.prisma.school.findFirst({
       where: { AND: [{ id }, selfScopeFilter(scope)] },
@@ -75,8 +75,8 @@ export class SchoolsRepository {
   }
 
   /**
-   * Updates only the matching ID and scope, then reads the updated row.
-   * Returns null when no school matched, without first loading a foreign row.
+   * Applies the patch only to the matching ID and scope, then returns the updated row.
+   * Returns null when nothing matched, without first loading a foreign row.
    */
   async update(
     id: string,

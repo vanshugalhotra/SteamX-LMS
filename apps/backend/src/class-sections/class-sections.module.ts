@@ -5,6 +5,7 @@ import { ClassSectionsController } from './class-sections.controller.js';
 import { ClassSectionsRepository } from './class-sections.repository.js';
 import { ClassSectionsService } from './class-sections.service.js';
 
+/** Wires class-section routes and persistence; exports the service for user workflows. */
 @Module({
   imports: [PrismaModule, TenancyModule],
   controllers: [ClassSectionsController],

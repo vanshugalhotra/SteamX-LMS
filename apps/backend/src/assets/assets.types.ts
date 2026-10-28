@@ -1,3 +1,4 @@
+/** Defines the Prisma projections and persistence input/result shapes used by the asset module. */
 import { AssetFileStatus } from '../generated/prisma/client.js';
 import type { Asset, AssetFile, ContentStatus, Prisma } from '../generated/prisma/client.js';
 

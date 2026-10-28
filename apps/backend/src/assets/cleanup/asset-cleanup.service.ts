@@ -11,6 +11,7 @@ export interface AssetCleanupResult {
   ghostAssetsDeleted: number;
 }
 
+/** Removes stale non-READY file rows and assets with neither files nor lesson references. */
 @Injectable()
 export class AssetCleanupService {
   /** Maximum stale files and empty assets processed in one run. */
@@ -28,6 +29,7 @@ export class AssetCleanupService {
     this.logger.setContext(AssetCleanupService.name);
   }
 
+  /** Deletes at most one configured batch of stale files and empty assets. */
   async run(): Promise<AssetCleanupResult> {
     // READY files are live content; only remove incomplete or failed files past the age limit.
     const staleCutoff = new Date(Date.now() - this.staleAfterHours * 60 * 60 * 1_000);

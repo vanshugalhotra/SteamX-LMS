@@ -22,6 +22,7 @@ import type { AuthContext } from './types/auth-context.js';
 import { AuthProfile, toAuthProfile } from './types/auth-profile.js';
 import { TokenService } from './services/token.service.js';
 
+/** Exposes session endpoints and translates AuthService results into cookie-based HTTP responses. */
 @ApiTags('Authentication')
 @Controller({ path: 'auth' })
 export class AuthController {
@@ -34,6 +35,7 @@ export class AuthController {
   // POST /auth/login — Log in
   // ─────────────────────────────────────────
 
+  /** Authenticates the submitted credentials; returns a profile and sets a no-store session cookie. */
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -65,6 +67,7 @@ export class AuthController {
   // POST /auth/logout — Log out
   // ─────────────────────────────────────────
 
+  /** Clears the caller's browser cookie; it does not revoke a copied token. */
   @AuthenticatedOnly()
   @AllowWhenPasswordChangeRequired()
   @Post('logout')
@@ -90,6 +93,7 @@ export class AuthController {
   // GET /auth/me — Current profile
   // ─────────────────────────────────────────
 
+  /** Returns the current request's database-backed profile without caching it. */
   @AuthenticatedOnly()
   @AllowWhenPasswordChangeRequired()
   @Get('me')
@@ -115,6 +119,7 @@ export class AuthController {
   // POST /auth/change-password — Change password
   // ─────────────────────────────────────────
 
+  /** Updates the password and timestamp, then returns the profile with a replacement session cookie. */
   @AuthenticatedOnly()
   @AllowWhenPasswordChangeRequired()
   @Post('change-password')

@@ -1,109 +1,108 @@
 # Architecture
 
+This page maps the backend's modules and request path. Use it to find the owner of an API behavior.
+
 ## Backend layers
 
-| Layer      | Responsibility                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| Controller | HTTP routes, validated DTOs, auth context → delegates to service → returns result.          |
-| Service    | Business rules, permission checks, school scope. Calls other modules via exported services. |
-| Repository | Prisma queries and transactions. No HTTP or business logic.                                 |
+| Layer      | Responsibility                                                                      |
+| ---------- | ----------------------------------------------------------------------------------- |
+| Controller | HTTP routes, validated DTOs, and response status; delegates to services.            |
+| Service    | Business rules, school scope, and calls to other modules through exported services. |
+| Repository | Prisma queries and transactions; no HTTP behavior.                                  |
 
-Response mappers convert database records → response DTOs. Shared helpers live in `src/common/`; feature rules stay in their modules.
+Mappers convert selected database records to response DTOs. Shared request and domain helpers live
+in `apps/backend/src/common/`; feature rules stay in their feature modules.
 
 ## Module map
 
-| Module                  | Responsibility                                                                                                                                                                                                        | Exports                                                                                                   |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `AppModule`             | Root composition: config, feature modules, global guards, exception filter.                                                                                                                                           | —                                                                                                         |
-| `AuthModule`            | Login, passwords, sessions, permissions.                                                                                                                                                                              | `AuthGuard`, `AuthContextRepository`, `AuthService`, `PasswordService`, `PermissionGuard`, `TokenService` |
-| `UsersModule`           | User CRUD, profiles, status, SteamX IDs.                                                                                                                                                                              | —                                                                                                         |
-| `SchoolsModule`         | School management.                                                                                                                                                                                                    | `SchoolsService`                                                                                          |
-| `ClassSectionsModule`   | Class-section management.                                                                                                                                                                                             | `ClassSectionsService`                                                                                    |
-| `CurriculumModule`      | Global course, module, and lesson lifecycle, ordering, and status transitions.                                                                                                                                        | `CoursesService`, `CourseModulesService`, `LessonsService`, `CourseOutlineService`                        |
-| Curriculum outline      | `GET /courses/:id/outline` is a position-ordered, unfiltered read model across course, modules, and lessons.                                                                                                          | `CourseOutlineService`                                                                                    |
-| Lesson content          | Read/save controller, service, and repository for whole-lesson replacement and versioning. Pure block validation is in `lesson-content/validation/`; TipTap normalization is isolated in `lesson-content/rich-text/`. | —                                                                                                         |
-| `AssetsModule`          | Asset library API, file lifecycle, access URLs, and repositories.                                                                                                                                                     | —                                                                                                         |
-| `AssetProcessingModule` | Per-type processing seam; current processors retain uploaded files.                                                                                                                                                   | `AssetProcessorRegistry`                                                                                  |
-| `CleanupScheduler`      | `AssetsModule` provider; runs stale-file, empty-asset, and storage-queue cleanup.                                                                                                                                     | —                                                                                                         |
-| `StorageModule`         | S3 boundary and queued-prefix cleanup.                                                                                                                                                                                | `StorageService`, `StorageCleanupQueueService`                                                            |
-| `TenancyModule`         | Resolves a required active school for workflows.                                                                                                                                                                      | `ActiveSchoolService`                                                                                     |
-| `PrismaModule`          | Configured Prisma client.                                                                                                                                                                                             | `PrismaService`                                                                                           |
-| `HealthModule`          | Liveness + database readiness checks.                                                                                                                                                                                 | —                                                                                                         |
-| `LoggingModule`         | Pino request logging, request IDs, redaction.                                                                                                                                                                         | —                                                                                                         |
-| Global `ConfigModule`   | Validated environment config.                                                                                                                                                                                         | Global Nest provider                                                                                      |
+| Module                                          | Responsibility                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `AppModule`                                     | Composes config, feature modules, global guards, and the exception filter.                        |
+| `AuthModule`                                    | Login, password changes, session tokens, and permission checks. Exports auth services and guards. |
+| `UsersModule`                                   | User accounts, profiles, status, password resets, and SteamX IDs.                                 |
+| `SchoolsModule`                                 | School identity, contact details, status, and school-scope reads. Exports `SchoolsService`.       |
+| `ClassSectionsModule`                           | School-owned class/section records and scoped CRUD. Exports `ClassSectionsService`.               |
+| `TenancyModule`                                 | Resolves active schools for scoped workflows.                                                     |
+| `CurriculumModule`                              | Global course/module/lesson authoring, ordering, outline reads, and lesson content.               |
+| `AssetsModule`                                  | Asset/file lifecycle, validation, processing, and author preview.                                 |
+| `StorageModule`                                 | S3 storage contract, presigned URLs, and queued object cleanup.                                   |
+| `PrismaModule`                                  | Configured Prisma client.                                                                         |
+| `HealthModule`, `LoggingModule`, `ConfigModule` | Liveness/readiness, request logging, and validated environment configuration.                     |
 
-> **Note:** Delivery, enrollment, and assignment tables exist in the schema but have no API modules yet.
+Delivery, enrollment, and assignment tables exist in Prisma but do not have API modules yet.
 
-## Request lifecycle
+## Curriculum authoring
 
-1. **Logging** — Pino assigns/accepts a UUID request ID, returns `X-Request-Id`.
-2. **Rate limiting** — not configured yet.
-3. **OriginGuard** — checks `Origin` on state-changing requests against `CORS_ORIGINS`.
-4. **AuthGuard** — allows public routes or validates cookie + account state.
-5. **PermissionGuard** — checks declared permission; denies routes without explicit policy.
-6. **ValidationPipe** — transforms DTOs, rejects unknown/invalid fields.
-7. **Controller → Service → Repository** — business rules, then Prisma queries.
-8. **Response mapping** — mapper converts DB records to response DTOs.
-9. **Exception filter** — maps errors to `{ statusCode, code, message, requestId }`.
+- Curriculum is global, not school-scoped. Course, module, and lesson routes require platform staff
+  as well as their declared `curriculum.read` or `curriculum.write` permission.
+- The hierarchy is `Course → Module → Lesson`. Create routes append draft children; module and
+  lesson lists are unpaginated and position-ordered. Reorder routes require the complete ID set.
+- `CourseOutlineController` is a read-only aggregate over courses, modules, and lessons. It returns
+  all statuses and lesson audiences; it is not the teacher/student delivery view.
+- `LessonContentController` serves the admin authoring read/write path. Reads return a block tree,
+  version, and asset summaries; saves validate and replace the full tree transactionally. Asset
+  summaries come from `AssetsService`; delivery access and student-facing reads are not implemented.
+- The schema permits moving a lesson between modules in its current course, but there is no public
+  API route for moving lessons.
 
-## Conventions
+## Authentication and user data flow
 
-- **Error format:** `{ statusCode, code, message, requestId }`, with optional `details` for field-level errors. Server errors use a safe message.
-- **Pagination:** `{ items, page, limit, total }`. Defaults: page 1, limit 20, max 100.
-- **DTOs:** class-validator input DTOs via global pipe. Response DTOs via explicit mappers (never raw Prisma entities).
-- **Config:** Zod validates env vars at startup. Services use typed Nest config.
-- **Asset processing:** `AssetProcessorRegistry` selects a per-type processor. IMAGE and PDF pass through; VIDEO uses its original as the playback key. HLS can replace the video processor without a schema change (`processing_job_id` is already in the model).
-- **Cleanup:** `CleanupScheduler` runs queue drain, stale-file removal, and ghost-asset removal sequentially on a self-rescheduling timer. See "Asset and storage flows" below.
-- **Logging:** Pino structured logs with request ID. Sensitive fields redacted.
-- **API contract:** `/api/v1` prefix. Swagger at `/api/docs` (when enabled).
+1. Login goes from `AuthController` to `AuthService`, which uses `AuthContextRepository` and
+   `PasswordService`; `TokenService` signs the cookie token.
+2. Protected requests load the current user, role, and school from PostgreSQL in `AuthGuard`.
+   `PermissionGuard` checks the route's declared policy against grants cached at startup.
+3. User routes go from `UsersController` to `UsersService`. It combines school scope and user
+   visibility before reading or mutating records, and calls school/class-section services when
+   needed.
+4. `UsersRepository` handles persistence; account and profile creation/updates that must stay
+   together run in a transaction. `users.mapper.ts` returns public DTOs.
 
-## Asset and storage flows
+User-record visibility is separate from school scope: platform staff can see all users, while
+school staff and students currently see only their own record. See [access control](./access-control.md).
 
-### File states
+## Schools and class sections
 
-```
-UPLOADING → UPLOADED → PROCESSING → READY
-    ↓          ↓           ↓
-  FAILED     FAILED      FAILED
-```
+- `SchoolsController` → `SchoolsService` → `SchoolsRepository` handles school CRUD. School creation
+  is platform-staff-only even when another actor has `school.manage`; school reads and updates use
+  resolved scope.
+- `ClassSectionsController` → `ClassSectionsService` → `ClassSectionsRepository` handles
+  school-owned class/section rows. Creation resolves an active school; list, detail, update, and
+  delete queries include school scope. The service maps duplicate names and referenced deletes to
+  domain conflicts.
+- Class names and section names are stored on each row. A missing section name uses the database
+  default `All`; case-insensitive name pairs are unique within a school. A row is how the schema
+  represents a class and one of its sections.
+- School status is checked by authentication for school users and by `ActiveSchoolService` in
+  workflows that require an active school. See [database constraints](./database.md#identity--users),
+  [access control](./access-control.md), and the [API test checklist](./api-testing.md).
 
-IMAGE and PDF may skip PROCESSING at the DB level; the code always goes through it. READY and FAILED are terminal — no further updates allowed.
+## HTTP request path
 
-### Upload
+1. Pino assigns a request ID and logs the request.
+2. `OriginGuard` checks `Origin` on state-changing requests.
+3. `AuthGuard` allows public routes or validates the session and current account state.
+4. `PermissionGuard` checks route policy; a protected route without explicit policy is denied.
+5. The global validation pipe transforms DTOs and rejects unknown or invalid fields.
+6. Controller → service → repository; response mappers shape the result. The exception filter
+   returns the standard error envelope.
 
-1. `POST /assets` — server creates asset + UPLOADING file row, returns a presigned S3 PUT URL (valid for `UPLOAD_URL_TTL_SECONDS`, default 15 min).
-2. Client PUTs the file to S3 using the signed URL. `If-None-Match: *` prevents overwrites; signed `Content-Type` and `Content-Length` prevent type/size mismatches.
-3. `POST /assets/:id/files/:fileId/complete` — server HEADs the S3 object, checks size and content type against declared values, reads 16 bytes for file-signature verification, then transitions UPLOADING → UPLOADED → PROCESSING → READY.
+Rate limiting is not configured. The API prefix is `/api/v1`; Swagger is at `/api/docs` when enabled.
 
-Completion is idempotent: re-calling it for a non-UPLOADING file returns the current state.
+## Asset upload and storage
 
-### Replacement
+1. `AssetsService` validates declared type, MIME, and size; `AssetsRepository` creates the asset and
+   an `UPLOADING` file row in one transaction.
+2. `StorageService` returns a presigned S3 PUT URL. The client uploads directly to S3, then calls
+   the completion route.
+3. Completion checks S3 size/type and the first 16 bytes, runs the registered processor, and
+   transactionally makes the file `READY`. Current processors do not transform files.
+4. Deleting file rows queues their S3 prefixes through a PostgreSQL trigger. The in-process cleanup
+   scheduler drains the queue and removes stale non-READY files; details and limits are in
+   [infrastructure](./infrastructure.md).
 
-`POST /assets/:id/files` replaces the file on an existing asset. The asset ID stays stable. Stale UPLOADING/FAILED files are deleted; in-flight UPLOADED/PROCESSING files block replacement. On success, one transaction deletes the old READY file (its S3 prefix is queued for cleanup by a DB trigger) and flips the new file to READY. If the new file cannot transition, the transaction rolls back and the old file keeps serving.
+## Related guides
 
-### Access
-
-Author previews (`GET /assets/:id/access`) require `asset.read` + platform staff. The response is a signed S3 GET URL using `playbackKey` (if set) or `storageKey`, with per-type TTLs, `Cache-Control: no-store`, and `Content-Disposition: inline`. No HEAD check is made before signing. An asset ID alone grants no access.
-
-### Cleanup
-
-Three steps run in order by `CleanupScheduler` every `CLEANUP_INTERVAL_SECONDS` (default 5 min):
-
-1. **Queue drain** — an `AFTER DELETE ON asset_files` trigger inserts each deleted file's S3 prefix into `storage_cleanup_queue`. The scheduler drains entries older than `UPLOAD_URL_TTL_SECONDS` + 5 min grace, deleting S3 objects under each prefix, then marking the entry done.
-2. **Stale files** — non-READY files with `updatedAt` older than `ASSET_STALE_FILE_AFTER_HOURS` (default 24 h) are deleted (a re-check prevents deleting files that transitioned to READY between scan and delete).
-3. **Ghost assets** — assets with no files and no block references are deleted.
-
-All steps are idempotent. Multiple API instances can run cleanup without coordination. The scheduler uses `setTimeout().unref()` so it does not block process shutdown and cannot overlap with itself.
-
-## Known limits (MVP)
-
-- Video is MP4-only, served as signed MP4 URLs; no HLS.
-- Lesson authoring saves replace the whole lesson; there is no per-block API or content history.
-- Lesson content JSON requests are capped at 1 MB.
-- Lesson content supports one rich-text format: TipTap. PPTX remains in the enum for compatibility,
-  but uploads and lesson-content blocks are unsupported.
-- Uploads are single-PUT (no multipart); size limits are configurable per type.
-- Access URLs are S3 presigned URLs, not CloudFront.
-- Cleanup runs in-process. Failed queue entries retry every run with no backoff or cap.
-- Completed queue entries are never pruned from `storage_cleanup_queue`.
-- Asset-in-use deletion is enforced by the database FK; lesson content saves validate new asset references before replacing blocks.
+- [Database schema and constraints](./database.md)
+- [Access control](./access-control.md)
+- [Infrastructure and storage operations](./infrastructure.md)
+- [Lesson content contract](./lesson-content.md)

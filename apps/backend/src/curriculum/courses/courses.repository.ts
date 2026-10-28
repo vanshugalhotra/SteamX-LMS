@@ -57,6 +57,7 @@ export class CoursesRepository {
     status: ContentStatus,
   ): Promise<Course | null> {
     return this.prisma.$transaction(async (tx) => {
+      // Compare against the status read by the service so a concurrent transition is not overwritten.
       const result = await tx.course.updateMany({
         where: { id, status: currentStatus },
         data: { status },

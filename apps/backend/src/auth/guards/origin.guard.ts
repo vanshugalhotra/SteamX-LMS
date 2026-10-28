@@ -1,4 +1,4 @@
-/** Validates request origins for state-changing cookie-authenticated operations. */
+/** Validates Origin headers for every state-changing HTTP request. */
 import { ForbiddenException, Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
