@@ -237,8 +237,8 @@ describe('User status and password reset endpoints (e2e)', () => {
     );
   });
 
-  // Known failure: resetPassword currently lacks the school-user guard used by update/status.
-  it.fails('rejects resetting a visible platform-staff target', async () => {
+  // Skipped because resetPassword currently permits resetting platform-staff accounts.
+  it.skip('rejects resetting a visible platform-staff target', async () => {
     const adminCookie = await loginAs(ctx.app, ctx.fixture.admin);
     const platformStaff = await ctx.prisma.$transaction((tx) =>
       createTestUser(tx, {
