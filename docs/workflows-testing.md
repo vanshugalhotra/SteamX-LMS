@@ -39,23 +39,6 @@ requirements are in Swagger at `/api/docs`; this guide names routes and outcomes
 - **Delete and cleanup:** Delete an unused asset and verify file rows are removed and prefixes queued. A lesson-block reference returns `409 RESOURCE_IN_USE`; after saving lesson content without that reference, deletion succeeds. Backdate stale files and queued prefixes in the isolated database, run cleanup, and verify abandoned rows and objects are removed while READY objects remain.
 - For real browser uploads and access, use the [asset upload and access smoke tests](./infrastructure.md).
 
-## Lesson content
-
-**Goal:** Read, replace, and edit lesson content while preserving version safety and asset usage.
-
-**Preconditions:** Admin with `curriculum.read`, `curriculum.write`, `asset.read`, and
-`asset.write`; isolated test database; lesson and READY assets created through the Prisma client.
-
-1. Read a lesson with no blocks and confirm version `0`, empty `blocks`, and empty `assets`.
-2. Save rich text and asset-backed blocks with `expectedVersion: 0`; read again and verify the
-   normalized tree, asset side table, and version `1`.
-3. Edit, reorder, and move blocks between top level and two-column slots; verify omitted blocks
-   were deleted and stable IDs were retained.
-4. Submit a changed save with a stale version; expect `409 VERSION_CONFLICT`, reload, and re-apply
-   the edit using the latest version.
-5. Confirm an asset referenced by the lesson cannot be deleted (`409 RESOURCE_IN_USE`); save
-   without its final reference and confirm the asset can then be deleted.
-
 ## First admin login and password change
 
 **Goal:** Confirm first-admin provisioning, forced password update, and session replacement.
@@ -271,22 +254,31 @@ email, names, and creation times.
 - `GET /health/live` does not query the database; `GET /health/ready` returns `503` when its
   database check fails.
 
-## Course authoring workflow
+## Planned workflow areas (no API modules yet)
 
-- School subscription creation/renewal, date boundaries, delivery caps, and school/course isolation.
-- Create a course and call `GET /api/v1/courses/:id/outline`; verify course fields and `modules: []`.
-- Add modules and call the outline after each addition; verify position order and `lessons: []` for
-  modules without lessons.
-- Add lessons and call the outline after each addition; verify their module nesting and position order.
-- Reorder modules and lessons, calling the outline after each reorder to verify both orders.
-- Move a lesson to another module, delete content, and call the outline after each change to verify
-  the current hierarchy and position gaps.
-- Activate course → modules → lessons top-down, calling the outline after each status change to
-  verify the updated status.
-- Archive an active course and verify the outline shows the database cascade to active modules and
-  lessons only; draft descendants stay draft and reactivation does not revive archived descendants.
-- Delete an empty lesson, module, and course; verify deletion is blocked with `RESOURCE_IN_USE` when dependent records remain.
-- Verify lesson audiences, including teacher-only lessons and lessons visible to students.
+- Subscription creation/renewal, date boundaries, delivery caps, and school/course isolation.
 - Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
 - Assignment template publishing, student submission, file upload, grading, and regrading.
 - Student promotion that completes old-class enrollments and validates cross-school moves.
+
+## Course authoring and lesson content
+
+**Preconditions:** Platform admin with `curriculum.read`, `curriculum.write`, `asset.read`, and
+`asset.write`; isolated test database and test storage.
+
+1. Create a course and read `GET /api/v1/courses/:id/outline`; verify course fields and `modules: []`.
+2. Add modules and lessons; verify position order, module nesting, and empty child lists in the outline.
+3. Reorder modules and lessons, move a lesson to another module, and reread the outline after each
+   change to verify the current hierarchy and positions.
+4. Verify status transitions and archive cascades: active descendants archive, drafts stay draft,
+   and reactivation does not revive archived descendants. Verify lesson audience values.
+5. Create matching-type assets with READY files through upload and completion, then read the lesson
+   content and confirm `{ version: 0, blocks: [], assets: {} }`.
+6. Save a complete tree containing TipTap, asset-backed blocks, and a two-column layout with
+   `expectedVersion: 0`; reread and verify normalized blocks, asset summaries, ordered positions,
+   and version `1`.
+7. Reorder/move blocks and save the complete replacement tree; verify omitted blocks are removed
+   and retained block IDs stay stable. An unchanged read/save round trip must not increment version.
+8. Try a changed stale save and an invalid asset/block payload; verify `VERSION_CONFLICT` or
+   `INVALID_LESSON_CONTENT` and no partial writes, then reload, re-apply the edit, and finish by
+   saving with the current version.

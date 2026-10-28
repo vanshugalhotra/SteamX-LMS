@@ -55,8 +55,9 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 ### Curriculum & assets
 
 - **Titles/positions:** course/module/lesson/asset titles must be nonblank. Module, lesson, and top-level block positions must be positive.
-- **Lesson content version:** `lessons.content_version` defaults to `0` and is checked nonnegative.
-- **Blocks:** content must be JSON object. DB checks enforce asset/block shape, two-column layout, column range, valid parent + asset types.
+- **Lesson content version:** `lessons.content_version` is an integer defaulting to `0`; CHECK `lessons_content_version_nonneg` enforces `content_version >= 0`.
+- **Lesson blocks:** `content` must be a JSON object; asset IDs are required exactly for IMAGE, VIDEO, PDF, and PPTX rows. Top-level rows have a positive `position` and no parent/column index; child rows have a parent and a column index of `0` or `1`, with no position.
+- **Block relationships:** the composite parent FK keeps a child in its lesson; a trigger requires a TWO_COLUMN parent and matching asset/block types. Children cannot themselves be TWO_COLUMN. Unique `(lesson_id, position)` and `(parent_block_id, column_index)` constraints prevent duplicate order/slots. The database permits an empty or partially filled layout; the API materializes two nullable slots and enforces the request shape.
 - **Immutable fields:** module `course_id`, lesson `course_id`, asset `type`, lesson-block `lesson_id` and `type`.
 - **Ordering:** Unique constraints prevent duplicate positions. Use temporary positions when reordering; delete + recreate two-column children rather than swapping.
 - **Status transitions:**

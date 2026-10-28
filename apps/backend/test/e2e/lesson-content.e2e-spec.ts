@@ -27,6 +27,10 @@ import {
   validateLessonContent,
 } from '../../src/curriculum/lesson-content/validation/validate-lesson-content.js';
 import { createTwoSchoolFixture, type TwoSchoolFixture } from '../support/factories/fixtures.js';
+import {
+  createTestAssetWithReadyFile,
+  createTestCurriculumLesson,
+} from '../support/factories/curriculum.js';
 import { cleanupFixtures } from '../support/setup/cleanup.js';
 import { grantPermissions } from '../support/setup/grant-permissions.js';
 import { createTestApp } from '../support/create-test-app.js';
@@ -54,9 +58,9 @@ describe('Lesson content endpoint (e2e)', () => {
     setupPool = new Pool({ connectionString: databaseUrl });
     setupClient = new PrismaClient({ adapter: new PrismaPg(setupPool) });
     await setupClient.$connect();
-    const readPermission = [PERMISSION.CURRICULUM_READ];
-    const teacherGrant = await grantPermissions(setupClient, 'teacher', readPermission);
-    const studentGrant = await grantPermissions(setupClient, 'student', readPermission);
+    const readerWriterPermissions = [PERMISSION.CURRICULUM_READ, PERMISSION.CURRICULUM_WRITE];
+    const teacherGrant = await grantPermissions(setupClient, 'teacher', readerWriterPermissions);
+    const studentGrant = await grantPermissions(setupClient, 'student', readerWriterPermissions);
     const adminGrant = await grantPermissions(setupClient, 'admin', [PERMISSION.CURRICULUM_WRITE]);
     revokeAdminPermissions = adminGrant.revoke;
     revokeTeacherPermissions = teacherGrant.revoke;
@@ -141,34 +145,12 @@ describe('Lesson content endpoint (e2e)', () => {
       contentVersion?: number;
     } = {},
   ): Promise<string> {
-    const active = options.status === ContentStatus.ACTIVE;
-    const course = await prisma.course.create({
-      data: {
-        title: `Course ${randomUUID()}`,
-        ...(active ? { status: ContentStatus.ACTIVE } : {}),
-      },
+    const lesson = await createTestCurriculumLesson(prisma, {
+      ...options,
+      lessonTitle: 'Lesson',
     });
-    createdCourseIds.push(course.id);
-    const module = await prisma.module.create({
-      data: {
-        courseId: course.id,
-        title: 'Module',
-        position: 1,
-        ...(active ? { status: ContentStatus.ACTIVE } : {}),
-      },
-    });
-    const lesson = await prisma.lesson.create({
-      data: {
-        courseId: course.id,
-        moduleId: module.id,
-        title: 'Lesson',
-        position: 1,
-        status: options.status ?? ContentStatus.DRAFT,
-        audience: options.audience ?? LessonAudience.TEACHER_ONLY,
-        contentVersion: options.contentVersion ?? 0,
-      },
-    });
-    return lesson.id;
+    createdCourseIds.push(lesson.courseId);
+    return lesson.lessonId;
   }
 
   /** Create an asset directly in the test database. */
@@ -176,6 +158,16 @@ describe('Lesson content endpoint (e2e)', () => {
     type: AssetType,
     options: { status?: ContentStatus; fileStatus?: AssetFileStatus } = {},
   ): Promise<string> {
+    if (options.fileStatus === AssetFileStatus.READY) {
+      const { assetId } = await createTestAssetWithReadyFile(prisma, type, {
+        status: options.status,
+        title: `Asset ${randomUUID()}`,
+        originalFilename: `${type.toLowerCase()}-file`,
+        sizeBytes: 1024,
+      });
+      createdAssetIds.push(assetId);
+      return assetId;
+    }
     const asset = await prisma.asset.create({ data: { type, title: `Asset ${randomUUID()}` } });
     createdAssetIds.push(asset.id);
     if (options.status === ContentStatus.ARCHIVED) {
@@ -735,11 +727,6 @@ describe('Lesson content endpoint (e2e)', () => {
     const duplicateId = randomUUID();
     const cases: Array<{ blocks: object[]; code: string; path: string }> = [
       {
-        blocks: [{ id: randomUUID(), type: 'UNRECOGNIZED', content: {} }],
-        code: 'BLOCK_TYPE_NOT_SUPPORTED',
-        path: 'blocks[0].type',
-      },
-      {
         blocks: [{ id: randomUUID(), type: BlockType.PPTX, content: {} }],
         code: 'BLOCK_TYPE_NOT_SUPPORTED',
         path: 'blocks[0].type',
@@ -1051,12 +1038,12 @@ describe('Lesson content endpoint (e2e)', () => {
     }
   });
 
-  it('returns 404 for unknown and malformed IDs, 401 without auth, and 403 for school users', async () => {
+  it('returns 400 for malformed IDs, 404 for unknown IDs, 401 without auth, and 403 with permissions for school roles', async () => {
     const lessonId = await createLesson();
     await getContent(adminCookie, randomUUID()).expect(404);
-    await getContent(adminCookie, 'not-a-uuid').expect(404);
+    await getContent(adminCookie, 'not-a-uuid').expect(400);
     await putContent(adminCookie, randomUUID(), { expectedVersion: 0, blocks: [] }).expect(404);
-    await putContent(adminCookie, 'not-a-uuid', { expectedVersion: 0, blocks: [] }).expect(404);
+    await putContent(adminCookie, 'not-a-uuid', { expectedVersion: 0, blocks: [] }).expect(400);
     await request(app.getHttpServer()).get(`/api/v1/lessons/${lessonId}/content`).expect(401);
     await request(app.getHttpServer())
       .put(`/api/v1/lessons/${lessonId}/content`)

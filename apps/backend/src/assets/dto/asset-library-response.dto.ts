@@ -1,9 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { AssetType, ContentStatus } from '../../generated/prisma/client.js';
+import { AssetFileStatus, AssetType, ContentStatus } from '../../generated/prisma/client.js';
 import { PaginationResponseDto } from '../../common/pagination/pagination-response.dto.js';
 import { AssetFileDto } from './asset-response.dto.js';
 
 export class AssetListFileDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ enum: AssetFileStatus })
+  status!: AssetFileStatus;
+
+  @ApiProperty({ nullable: true })
+  lastError!: string | null;
+
   @ApiProperty({ nullable: true, maxLength: 255 })
   mimeType!: string | null;
 
@@ -33,8 +42,13 @@ export class AssetListItemDto {
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt!: Date;
 
-  @ApiProperty({ type: AssetListFileDto })
-  file!: AssetListFileDto;
+  @ApiProperty({
+    type: AssetListFileDto,
+    nullable: true,
+    description:
+      'READY file when present; otherwise the most recent file. Null when the asset has no files.',
+  })
+  file!: AssetListFileDto | null;
 }
 
 export class AssetListResponseDto extends PaginationResponseDto<AssetListItemDto> {

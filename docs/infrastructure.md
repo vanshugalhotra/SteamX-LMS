@@ -114,25 +114,35 @@ Port must be free **and** listed in deployed CORS origins. Needs `AWS_REGION`, `
 access keys in `apps/backend/.env`. Expected: upload → 200, size mismatch → 403, unsigned GET →
 403, range → 206. Click **Clean up** after testing.
 
-## Asset upload API smoke test
+## Asset and lesson-content smoke test
 
-End-to-end test of asset creation, presigned upload, completion, replacement, and cleanup queue
-insertion. Runs against a live backend + staging bucket.
+Tests asset uploads and lesson content against a running backend and the real S3 bucket.
 
 ```powershell
-pnpm --dir apps/backend asset:smoke --port 5173
+pnpm assets:smoke
 ```
 
-Open `http://localhost:5173`. Origin must be allowed by both backend `CORS_ORIGINS` and bucket
-CORS. Enter backend URL, seeded admin credentials, an initial PNG, a replacement PNG, and a short
-MP4. Exercises: create → upload → complete (with retry-before-upload check) → replace → cleanup
-queue entry → failed replacement preserving READY file → idempotent completion → wrong-size
-rejection → MP4 playback-key check.
+Open `http://localhost:5173`, enter the local backend URL and seeded admin credentials, then select
+an initial PNG, a different replacement PNG, and a short MP4. The test makes a small PDF itself.
+The page origin must be allowed by backend `CORS_ORIGINS` and bucket CORS. The server binds to
+`127.0.0.1`; its API proxy only accepts asset routes and the course, module, lesson, and lesson
+content routes needed for resources created by this run. It does not show credentials, cookies, or
+signed URLs.
 
-Needs `DATABASE_URL` from `apps/backend/.env` for the playback-key verification. Server binds to
-`127.0.0.1` only. Does not display cookies or signed URLs. After the run, the page prints S3
-cleanup commands — run them with the `steamx-backend` AWS profile. Does not remove DB rows; use an
-isolated staging account.
+The checks cover PNG, PDF, and MP4 upload/completion; replacement and failed replacement; retry and
+wrong-size handling; and the video playback key. They create a course, module, and lesson, save
+rich text, accordion, image, PDF, video, and two-column blocks, then check read-back, no-op and stale
+versions, asset summaries, S3 image/video/PDF access, replacing and unlinking an in-use image, and
+deletion protection. **Run all** cleans up the lesson, module, course, asset records, and S3 objects.
+The **Cleanup** button can repeat cleanup. `.smoke-state.json` records created IDs and S3 object
+keys for cleanup verification:
+
+```powershell
+pnpm assets:smoke -- --verify-cleanup
+```
+
+Needs `DATABASE_URL`, `AWS_REGION`, `S3_BUCKET`, and the AWS credentials already used by the backend,
+from `apps/backend/.env` or the AWS default credential chain. Use staging test data.
 
 ## Asset access URL smoke test
 

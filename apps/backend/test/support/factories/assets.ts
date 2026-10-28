@@ -39,6 +39,7 @@ export async function createTestAssetFile(
     createdAt?: Date;
     lastError?: string;
     originalFilename?: string;
+    sizeBytes?: number;
     fileId?: string;
     playbackKey?: string | null;
   } = {},
@@ -52,7 +53,7 @@ export async function createTestAssetFile(
       storageKey,
       originalFilename: options.originalFilename ?? 'direct-test.png',
       mimeType,
-      sizeBytes: 16n,
+      sizeBytes: options.sizeBytes ?? 16n,
       createdAt: options.createdAt,
     },
   });

@@ -381,6 +381,7 @@ describe('Courses endpoints (e2e)', () => {
     const adminCookie = await loginAsCookie(app, fixture.admin);
     const course = await createCourse(adminCookie, `Denied access ${randomUUID().slice(0, 8)}`);
     await deleteCourse('', course.id).expect(401);
+    await postCourse('', { title: `Unauthenticated ${randomUUID().slice(0, 8)}` }).expect(401);
 
     for (const user of [fixture.schoolA.teacher, fixture.schoolA.student]) {
       const cookie = await loginAsCookie(app, user);
