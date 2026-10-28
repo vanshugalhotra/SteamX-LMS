@@ -275,6 +275,10 @@ describe('Schools endpoints (e2e)', () => {
   // A school-scoped manager can update only its own school; foreign IDs remain indistinguishable from missing.
   it('hides foreign school updates from a school-scoped manager', async () => {
     const teacherCookie = await loginAs(app, fixture.schoolA.teacher);
+    const original = await prisma.school.findUniqueOrThrow({
+      where: { id: fixture.schoolB.school.id },
+      select: { name: true, city: true },
+    });
 
     const foreign = await patchSchool(teacherCookie, fixture.schoolB.school.id, {
       name: 'Should not change',
@@ -286,6 +290,12 @@ describe('Schools endpoints (e2e)', () => {
     expect(foreign.body.code).toBe('NOT_FOUND');
     expect(missing.body.code).toBe('NOT_FOUND');
     expect(foreign.body).not.toHaveProperty('stack');
+    await expect(
+      prisma.school.findUniqueOrThrow({
+        where: { id: fixture.schoolB.school.id },
+        select: { name: true, city: true },
+      }),
+    ).resolves.toEqual(original);
   });
 
   // Valid school patches trim values and normalize contact emails before persistence.
