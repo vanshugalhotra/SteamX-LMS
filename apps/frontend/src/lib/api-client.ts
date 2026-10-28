@@ -66,7 +66,15 @@ export async function apiFetch<T>(
     throw new ApiError(0, 'Network error. Please check your connection.');
   }
 
-  const data: unknown = res.status === 204 ? null : await res.json().catch(() => null);
+  let data: unknown = null;
+  let parseFailed = false;
+  if (res.status !== 204) {
+    try {
+      data = await res.json();
+    } catch {
+      parseFailed = true;
+    }
+  }
 
   if (!res.ok) {
     const body = typeof data === 'object' && data !== null ? (data as ApiErrorBody) : undefined;
@@ -82,6 +90,10 @@ export async function apiFetch<T>(
       if (res.status === 403) handlers.onForbidden?.(error);
     }
     throw error;
+  }
+
+  if (parseFailed) {
+    throw new ApiError(res.status, 'Invalid response from server.');
   }
 
   return data as T;
