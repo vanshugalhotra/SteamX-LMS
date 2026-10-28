@@ -138,6 +138,37 @@ describe('cleanup services (database)', () => {
     expect(storage.has(`${young.prefix}object`)).toBe(true);
   });
 
+  it('retries an idempotent prefix deletion after storage succeeds but queue completion fails', async () => {
+    const entry = await createQueueEntry({ queuedAt: eligibleTimestamp() });
+    storagePrefixes.push(entry.prefix);
+    const objectKey = `${entry.prefix}object`;
+    storage.simulateUpload(objectKey, {
+      bytes: Buffer.from('object'),
+      contentType: 'application/octet-stream',
+    });
+
+    const deletePrefix = storage.deleteByPrefix.bind(storage);
+    const deleteSpy = vi.spyOn(storage, 'deleteByPrefix').mockImplementationOnce(async (prefix) => {
+      await deletePrefix(prefix);
+      throw new Error('queue completion was not recorded');
+    });
+    try {
+      await expect(queue.drain()).resolves.toMatchObject({ done: 0, failed: 1 });
+      await expect(
+        prisma.storageCleanupQueue.findUnique({ where: { id: entry.id } }),
+      ).resolves.toMatchObject({ doneAt: null });
+      expect(storage.has(objectKey)).toBe(false);
+
+      await expect(queue.drain()).resolves.toMatchObject({ done: 1, failed: 0 });
+      await expect(
+        prisma.storageCleanupQueue.findUnique({ where: { id: entry.id } }),
+      ).resolves.toMatchObject({ doneAt: expect.any(Date) });
+      expect(storage.has(objectKey)).toBe(false);
+    } finally {
+      deleteSpy.mockRestore();
+    }
+  });
+
   it('pages past failing entries and attempts each entry only once in a call', async () => {
     const failing = await Promise.all(
       Array.from({ length: 5 }, (_, index) =>
