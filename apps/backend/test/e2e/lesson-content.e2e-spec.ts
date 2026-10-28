@@ -1051,12 +1051,12 @@ describe('Lesson content endpoint (e2e)', () => {
     }
   });
 
-  it('returns 404 for unknown and malformed IDs, 401 without auth, and 403 for school users', async () => {
+  it('returns 400 for malformed IDs, 404 for unknown IDs, 401 without auth, and 403 for school users', async () => {
     const lessonId = await createLesson();
     await getContent(adminCookie, randomUUID()).expect(404);
-    await getContent(adminCookie, 'not-a-uuid').expect(404);
+    await getContent(adminCookie, 'not-a-uuid').expect(400);
     await putContent(adminCookie, randomUUID(), { expectedVersion: 0, blocks: [] }).expect(404);
-    await putContent(adminCookie, 'not-a-uuid', { expectedVersion: 0, blocks: [] }).expect(404);
+    await putContent(adminCookie, 'not-a-uuid', { expectedVersion: 0, blocks: [] }).expect(400);
     await request(app.getHttpServer()).get(`/api/v1/lessons/${lessonId}/content`).expect(401);
     await request(app.getHttpServer())
       .put(`/api/v1/lessons/${lessonId}/content`)

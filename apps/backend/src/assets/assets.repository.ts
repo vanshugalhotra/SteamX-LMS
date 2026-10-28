@@ -55,7 +55,7 @@ export class AssetsRepository {
               mode: 'insensitive',
             },
           }),
-      files: { some: { status: AssetFileStatus.READY } },
+      ...(query.fileStatus === undefined ? {} : { files: { some: { status: query.fileStatus } } }),
     };
     const orderBy = [
       { createdAt: 'desc' },

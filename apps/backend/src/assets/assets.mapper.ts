@@ -40,10 +40,7 @@ export function toAssetFileDto(file: AssetFileSelection): AssetFileDto {
 }
 
 export function toAssetListItemDto(asset: AssetLibraryRecord): AssetListItemDto {
-  const [file] = asset.files;
-  if (!file) {
-    throw new Error('Asset library query returned an asset without a READY file.');
-  }
+  const file = pickCurrentFile(asset.files);
   return {
     id: asset.id,
     type: asset.type,
@@ -51,11 +48,16 @@ export function toAssetListItemDto(asset: AssetLibraryRecord): AssetListItemDto 
     status: asset.status,
     createdAt: asset.createdAt,
     updatedAt: asset.updatedAt,
-    file: {
-      mimeType: file.mimeType,
-      sizeBytes: file.sizeBytes === null ? null : Number(file.sizeBytes),
-      originalFilename: file.originalFilename,
-    },
+    file: file
+      ? {
+          id: file.id,
+          status: file.status,
+          lastError: file.lastError,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes === null ? null : Number(file.sizeBytes),
+          originalFilename: file.originalFilename,
+        }
+      : null,
   };
 }
 

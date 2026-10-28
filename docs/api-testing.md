@@ -1,9 +1,9 @@
 # API testing checklist
 
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
-health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; path UUIDs rejected by
-`ParseUUIDPipe` usually use `BAD_REQUEST`, while asset IDs deliberately return `404 NOT_FOUND`.
-Error responses include a request ID.
+health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; malformed path UUIDs rejected
+by `ParseUUIDPipe` use `BAD_REQUEST`, while valid but unknown IDs return `404 NOT_FOUND`. Error
+responses include a request ID.
 
 ## Before testing
 
@@ -126,7 +126,7 @@ Caller: platform `admin` with `curriculum.read`; reads the complete, unfiltered 
   the next outline read to reflect the current hierarchy and statuses.
 - [auto] When the course has 20 modules with 10 lessons each -> expect all 200 lessons and
   position-ordered modules and lessons.
-- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When the ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] When teacher, school staff, or student calls, even with `curriculum.read` granted ->
   expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
 - [auto] When the response is returned -> verify no fields exist outside the documented nested set.
@@ -268,7 +268,7 @@ Caller: platform `admin` with `curriculum.read`; reads all content regardless of
 - [auto] When lesson content version is set to `7` -> expect `version: 7`; the returned blocks pass `validateLessonContent` unchanged.
 - [auto] When lesson has 100 blocks and 30 distinct referenced assets -> expect every block ordered and all summaries returned.
 - [auto] When response JSON is scanned -> expect no storage keys, playback keys, upload/processing IDs, or URLs.
-- [auto] When lesson ID is malformed or unknown -> expect `404 NOT_FOUND`; when teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
+- [auto] When lesson ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`; when teacher/school staff or student calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
 ### `PUT /lessons/:id/content`
 
@@ -283,7 +283,7 @@ Caller: platform `admin` with `curriculum.write`; replaces the complete lesson c
 - [auto] When two changed saves race with the same expected version -> expect one `200` and one `409`; when identical requests race -> expect both `200` with one version increment.
 - [auto] When a body is about 900 KB -> expect `200`; when it exceeds 1 MB -> expect `413 PAYLOAD_TOO_LARGE` in the standard error envelope.
 - [auto] When a save fails during child insertion -> expect the old blocks and version to remain intact. An asset referenced by saved content cannot be deleted (`409 RESOURCE_IN_USE`) until a later save removes that reference.
-- [auto] When lesson ID is malformed or unknown -> expect `404 NOT_FOUND`; lesson status and audience do not prevent save, and their title/status/position remain unchanged. Teacher, school staff, and student callers receive `403`; unauthenticated callers receive `401`.
+- [auto] When lesson ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`. Lesson status and audience do not prevent save, and their title/status/position remain unchanged. Teacher, school staff, and student callers receive `403`; unauthenticated callers receive `401`.
 
 ### `DELETE /lessons/:id`
 
@@ -299,19 +299,20 @@ Caller: platform `admin` with `curriculum.write`; deletes a lesson with no depen
 
 ### `GET /assets`
 
-Caller: authenticated role with `asset.read`; lists ACTIVE assets by default and ARCHIVED assets on request, but only when the asset has a READY file.
+Caller: authenticated role with `asset.read`; lists ACTIVE assets by default and ARCHIVED assets on request, regardless of file state.
 
-- [auto] When no query is supplied -> expect page 1, limit 20, ACTIVE assets with a READY file only.
-- [auto] When an asset has no files or only FAILED, UPLOADING, UPLOADED, or PROCESSING files -> omit it; when a READY file has a newer UPLOADING replacement -> include the asset using the READY file.
-- [auto] When `status=ARCHIVED` -> return archived assets with READY files; DRAFT and unknown status values -> expect `400`.
+- [auto] When no query is supplied -> expect page 1, limit 20, ACTIVE assets with or without files.
+- [auto] Each item includes the READY file when one exists, otherwise the most recent file; when there are no files, `file` is null. The summary includes file ID, status, last error, size, MIME, and original filename.
+- [auto] When `fileStatus` is supplied -> include assets with at least one file in that status (READY, FAILED, UPLOADING, UPLOADED, or PROCESSING); the file summary still prefers READY over other files. A FAILED filter can therefore include an asset whose summary file is READY.
+- [auto] When `status=ARCHIVED` -> return archived assets regardless of file state; DRAFT and unknown status values -> expect `400`.
 - [auto] When type is supplied -> return only matching asset types; invalid types -> expect `400`.
 - [auto] When search has surrounding spaces, partial text, or different casing -> trim and match asset titles case-insensitively.
 - [auto] When search contains `%` or `_` -> treat those characters literally.
 - [auto] When status, type, and search are combined -> apply all filters to both returned items and `total`.
 - [auto] When pagination is omitted -> expect page 1 and limit 20; when page is beyond the last page -> expect empty items and matching total; limits above 100 and search longer than 100 characters -> expect `400`.
 - [auto] When assets share a `createdAt` value -> order by descending ID after descending creation time.
-- [auto] Each item has only asset identity/type/title/status/timestamps and READY-file MIME, numeric size, and original filename; no usage or internal storage fields.
-- [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
+- [auto] Each item has only asset identity/type/title/status/timestamps and a safe file summary; no usage or internal storage fields.
+- [auto] When caller is unauthenticated -> expect `401`; roles without `asset.read` -> expect `403`.
 
 ### `GET /assets/:id`
 
@@ -323,7 +324,7 @@ Caller: authenticated role with `asset.read`; returns any asset by ID and its cu
 - [auto] When one lesson references the asset in multiple top-level or nested two-column blocks -> list that lesson once.
 - [auto] When usage spans courses -> order by course title, module position, then lesson position; include DRAFT and ARCHIVED lesson statuses.
 - [auto] When the asset is used by more than 50 lessons -> return 50 ordered items and the real total; unused assets have total zero and an empty items list.
-- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When the ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] File response contains lifecycle details and stable error code only; no storage, playback, upload, or processing-job keys/IDs.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
@@ -338,7 +339,7 @@ the asset's READY file.
 - [auto] When a VIDEO file has a `playbackKey` -> sign it; otherwise sign `storageKey`.
 - [auto] When no files exist or only FAILED, UPLOADING, UPLOADED, or PROCESSING files exist -> expect `409 ASSET_NOT_READY`; a READY file remains served while a newer UPLOADING replacement exists.
 - [auto] When the asset is ARCHIVED and has a READY file -> expect `200`.
-- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When the ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`, including at the service boundary if they are granted `asset.read`.
 - [manual] Request a fresh access URL when a fetch returns `403`; verify the signed object returns the expected content type, inline filename, and supports byte ranges for images, PDFs, and video.
 
@@ -373,7 +374,7 @@ the asset's existing type selects the MIME allow-list and size limit.
 - [auto] When two replacement requests race -> expect both `201`, no server error, one remaining non-READY row, and one cleanup entry for the superseded attempt.
 - [auto] When MIME is disallowed or size exceeds the asset-type limit -> expect `400 MIME_NOT_ALLOWED` or `400 FILE_TOO_LARGE`; zero, negative, fractional, empty filename, or unknown fields -> expect `400`.
 - [auto] When filename contains control characters -> expect them removed before persistence; MIME is trimmed and lowercased.
-- [auto] When the asset ID is unknown or malformed -> expect `404`; archived assets remain replaceable.
+- [auto] When the asset ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404`; archived assets remain replaceable.
 - [auto] Replacing and completing a file does not alter lesson-block asset IDs or where-used results.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
@@ -384,7 +385,7 @@ Caller: authenticated admin with `asset.write`; renames an asset whether ACTIVE 
 - [auto] When title has surrounding whitespace -> expect `200` and a trimmed title in the response, detail route, and library list.
 - [auto] When title is empty, whitespace-only, or longer than 200 characters -> expect `400`.
 - [auto] When the body includes an unknown field -> expect `400 VALIDATION_ERROR`.
-- [auto] When the ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When the ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
 ### `PATCH /assets/:id/status`
@@ -394,7 +395,7 @@ Caller: authenticated admin with `asset.write`; sets status directly to ACTIVE o
 - [auto] When status changes to ARCHIVED -> expect `200`; the asset disappears from the default library, but remains available by detail and preview access.
 - [auto] When status changes back to ACTIVE -> expect `200` and the asset returns to the default library.
 - [auto] When status is unchanged -> expect `200` without changing `updatedAt`.
-- [auto] When status is DRAFT or any unknown value -> expect `400`; when ID is unknown or malformed -> expect `404 NOT_FOUND`.
+- [auto] When status is DRAFT or any unknown value -> expect `400`; when ID is malformed -> expect `400 BAD_REQUEST`; when it is a valid unknown UUID -> expect `404 NOT_FOUND`.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
 ### `DELETE /assets/:id`
@@ -406,7 +407,7 @@ Caller: authenticated admin with `asset.write`; deletes an asset only when it is
 - [auto] After removing the lesson block -> expect deletion to succeed.
 - [auto] When any file is UPLOADED or PROCESSING -> expect `409 REPLACEMENT_IN_PROGRESS` without deleting files or changing the cleanup queue.
 - [auto] READY, UPLOADING, and FAILED files are eligible for deletion; archived assets and assets without files are also deletable.
-- [auto] Repeating deletion, or using an unknown/malformed ID -> expect `404 NOT_FOUND`.
+- [auto] Repeating deletion or using a valid unknown UUID -> expect `404 NOT_FOUND`; a malformed ID -> expect `400 BAD_REQUEST`.
 - [auto] After deletion, detail and access return `404`, and the asset is absent from the library.
 - [auto] When deletion races with starting a replacement -> expect no 5xx and either the asset is gone with no files or exists with exactly one UPLOADING file.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
@@ -416,7 +417,7 @@ Caller: authenticated admin with `asset.write`; deletes an asset only when it is
 Caller: authenticated admin with `asset.read`; returns the state of a file belonging to that asset.
 
 - [auto] When asset and file IDs match a row -> expect `200` with status, original filename, MIME, numeric size, error code, and timestamps.
-- [auto] When file belongs to another asset, either ID is unknown, or either ID is malformed -> expect `404 NOT_FOUND`.
+- [auto] When file belongs to another asset or either valid UUID is unknown -> expect `404 NOT_FOUND`; when either ID is malformed -> expect `400 BAD_REQUEST`.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
 ### `POST /assets/:id/files/:fileId/complete`
@@ -431,7 +432,7 @@ Caller: authenticated admin with `asset.write`; verifies the object uploaded to 
 - [auto] When a supported processor throws -> expect `200 FAILED` with `lastError: PROCESSING_FAILED`; response and stored error contain no provider error text.
 - [auto] When completion is repeated for READY or FAILED files -> expect `200` and the unchanged file state.
 - [auto] When two completion requests race -> expect both `200`, one processor execution, and one final READY file.
-- [auto] When file does not belong to the supplied asset, either ID is unknown, or an ID is malformed -> expect `404 NOT_FOUND`.
+- [auto] When file does not belong to the supplied asset or either valid UUID is unknown -> expect `404 NOT_FOUND`; when either ID is malformed -> expect `400 BAD_REQUEST`.
 - [auto] When caller is unauthenticated -> expect `401`; teacher, student, and school staff -> expect `403`.
 
 ## Schools

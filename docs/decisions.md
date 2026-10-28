@@ -48,7 +48,7 @@ Each entry records the current design choice and why.
 
 ## Asset library
 
-- **Listing** — `GET /assets` lists ACTIVE assets with a READY file; ARCHIVED is opt-in. Detail shows the READY file (or newest attempt) and up to 50 where-used lessons with the full count.
+- **Listing** — `GET /assets` requires `asset.read`, lists ACTIVE assets by default (ARCHIVED is opt-in), and includes assets regardless of file state. The file summary prefers READY, otherwise the newest attempt, and is null when no files exist. `fileStatus` matches assets with any file in that state; this lets management find failed/in-flight replacement attempts even while a READY file remains.
 - **Archive and delete** — archived assets leave the list but stay viewable. Deletion is blocked by the DB FK if the asset is used in blocks.
 - **Replacement** — asset ID stays stable. Old READY file serves until replacement succeeds. In-flight UPLOADED/PROCESSING files block new replacements. The swap is one transaction: delete old READY → flip new to READY. Failure rolls back and the old file keeps serving. Removed prefixes are queued for async S3 cleanup.
 - **Upload contract** — IMAGE: JPEG/PNG/WEBP. PDF: PDF. VIDEO: MP4. PPTX: rejected. Keys use `assets/<asset-id>/<file-id>/`; client filenames stay in metadata.

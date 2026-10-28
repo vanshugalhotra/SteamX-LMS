@@ -71,7 +71,7 @@ export class AssetsService {
   // GET /assets — List library assets
   // ─────────────────────────────────────────
 
-  /** Lists only ACTIVE or ARCHIVED assets with a READY file. */
+  /** Lists ACTIVE assets by default, with an optional file-status filter. */
   async findLibraryItems(
     query: AssetListQueryDto,
   ): Promise<PaginationResponseDto<AssetListItemDto>> {
