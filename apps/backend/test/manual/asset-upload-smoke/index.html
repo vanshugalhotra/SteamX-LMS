@@ -55,6 +55,17 @@
         border-left: 4px solid #d99b00;
         padding: 0.8rem;
       }
+      #previews {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+      #previews img,
+      #previews video {
+        max-height: 18rem;
+        max-width: 100%;
+      }
     </style>
     <script>
       window.assetSmokeToken = '__SMOKE_TOKEN__';
@@ -64,8 +75,9 @@
   <body>
     <h1>STEAMX asset upload smoke test</h1>
     <p class="notice">
-      This local page calls the running backend and uploads directly to S3. Use staging test data.
-      It creates asset rows and S3 objects; it does not delete either automatically.
+      This local page calls the running backend through a restricted local proxy and uploads
+      directly to S3. Use staging test data. Assets and curriculum created by the run are removed
+      automatically after the checks.
     </p>
     <form id="settings">
       <label>
@@ -92,14 +104,14 @@
         Short MP4
         <input id="mp4-file" type="file" accept="video/mp4,.mp4" required />
       </label>
-      <button id="run" type="submit">Run asset upload checks</button>
+      <button id="run" type="submit">Run all</button>
+      <button id="cleanup-run" type="button">Cleanup</button>
     </form>
     <h2>Results</h2>
     <ol id="results" aria-live="polite"></ol>
+    <div id="previews" aria-label="Lesson content asset previews"></div>
     <h2>S3 cleanup commands</h2>
-    <p>
-      After verifying the results, replace &lt;bucket&gt; with the staging bucket and run these.
-    </p>
+    <p>Object keys are recorded here and in the local smoke state for cleanup verification.</p>
     <pre id="cleanup">No assets created yet.</pre>
   </body>
 </html>

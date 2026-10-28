@@ -375,12 +375,21 @@ describe('Lessons endpoints (e2e)', () => {
     await postLesson(adminCookie, randomUUID(), { title: 'Missing module' }).expect(404);
     await listLessons(adminCookie, randomUUID()).expect(404);
     await reorderLessons(adminCookie, randomUUID(), []).expect(404);
+    await patchLesson(adminCookie, randomUUID(), { title: 'Missing lesson' }).expect(404);
+    await patchLessonStatus(adminCookie, randomUUID(), ContentStatus.ACTIVE).expect(404);
 
     const lesson = await createLesson(moduleId, 'Valid');
     await patchLesson(adminCookie, lesson.id, {}).expect(400);
     await patchLesson(adminCookie, lesson.id, { title: null }).expect(400);
     await patchLesson(adminCookie, lesson.id, { audience: null }).expect(400);
     await patchLesson(adminCookie, lesson.id, { title: 'Updated', unknown: true }).expect(400);
+    await postLesson(adminCookie, 'not-a-uuid', { title: 'Malformed module' }).expect(400);
+    await listLessons(adminCookie, 'not-a-uuid').expect(400);
+    await reorderLessons(adminCookie, 'not-a-uuid', []).expect(400);
+    await getLesson(adminCookie, 'not-a-uuid').expect(400);
+    await patchLesson(adminCookie, 'not-a-uuid', { title: 'Malformed lesson' }).expect(400);
+    await patchLessonStatus(adminCookie, 'not-a-uuid', ContentStatus.ACTIVE).expect(400);
+    await deleteLesson(adminCookie, 'not-a-uuid').expect(400);
     await getLesson(adminCookie, randomUUID()).expect(404);
     await deleteLesson(adminCookie, randomUUID()).expect(404);
   });
@@ -401,6 +410,7 @@ describe('Lessons endpoints (e2e)', () => {
       await patchLessonStatus(cookie, lesson.id, ContentStatus.ACTIVE).expect(403);
       await deleteLesson(cookie, lesson.id).expect(403);
     }
+    await postLesson('', moduleId, { title: 'Unauthenticated' }).expect(401);
     await deleteLesson('', lesson.id).expect(401);
   });
 });

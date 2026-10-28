@@ -139,6 +139,7 @@ describe('Black-box API invariants', () => {
   it('returns 401 without a cookie for every non-public route registered by the running app', async () => {
     expect(api.routes.length).toBeGreaterThan(10);
     expectAssetRoutesAreEnumerated(api.routes);
+    expectLessonContentRoutesAreEnumerated(api.routes);
     for (const route of api.routes.filter(isBackendRoute)) {
       const path = concretePath(route);
       const options: { body?: object } = {};
@@ -173,6 +174,7 @@ describe('Black-box API invariants', () => {
 
   it('requires an explicit permission on every non-public, non-session-only route', async () => {
     expectAssetRoutesAreEnumerated(api.routes);
+    expectLessonContentRoutesAreEnumerated(api.routes);
     const admin = await adminCookie();
     const school = await createSchool(admin, 'Permission sweep school');
     const section = await createSection(admin, school.id);
@@ -721,6 +723,14 @@ function expectAssetRoutesAreEnumerated(routes: ApiRoute[]): void {
     routes.filter((route) => route.path.startsWith('/api/v1/assets')).map(routeKey),
   );
   expect([...actual].sort()).toEqual(expected.sort());
+}
+
+function expectLessonContentRoutesAreEnumerated(routes: ApiRoute[]): void {
+  const expected = ['GET /api/v1/lessons/:id/content', 'PUT /api/v1/lessons/:id/content'];
+  const actual = routes
+    .filter((route) => route.path.endsWith('/lessons/:id/content'))
+    .map(routeKey);
+  expect(actual.sort()).toEqual(expected.sort());
 }
 
 function routeKey(route: ApiRoute): string {

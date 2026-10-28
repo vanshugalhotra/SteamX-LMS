@@ -8,6 +8,7 @@ coverage/
 !apps/backend/.env.test
 *.log
 apps/backend/src/generated/prisma/
+apps/backend/test/manual/asset-upload-smoke/.smoke-state.json
 .DS_Store
 .idea/
 .vscode/*

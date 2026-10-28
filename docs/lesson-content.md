@@ -53,21 +53,19 @@ examples below show the block shape; UUIDs are shortened only for readability.
 }
 ```
 
-`columns` is a fixed two-item array. Each entry is `null` or one non-layout block; layouts cannot
-be nested. Asset IDs are top-level block fields, never part of `content`. PPTX blocks are not
-supported. Titles, alt text, and captions are trimmed; empty optional alt text and captions are
-omitted.
+`columns` is exactly two entries; each is `null` or one non-layout block. Layouts cannot be nested.
+Asset IDs are top-level block fields. Supported blocks are `RICH_TEXT`, `ACCORDION`, `IMAGE`,
+`VIDEO`, `PDF`, and `TWO_COLUMN`; PPTX is not accepted. Titles, alt text, and captions are trimmed;
+empty optional alt text and captions are omitted.
 
 ## Reading content
 
 `GET /lessons/:id/content` returns the complete save-shaped tree together with its version and an
 asset side table:
 
-This is the admin/builder read. It returns content for every lesson, including DRAFT, ARCHIVED, and
-TEACHER_ONLY lessons. Only platform admins should have `curriculum.read`; do not grant it to teacher
-or student roles. Teacher/student delivery reads must use a separate endpoint that checks lesson
-release and applies the “released lesson is accessible” rule. Do not use this builder endpoint for
-delivery access.
+This is the platform-admin builder read. It returns content regardless of lesson status or audience.
+Grant `curriculum.read` only to platform admins: teacher/student delivery reads need a separate
+endpoint that checks lesson release and access rules.
 
 ```json
 {
@@ -91,11 +89,10 @@ delivery access.
 }
 ```
 
-`blocks` has the same block shape accepted by the save validator; it can be edited and sent back
-unchanged without stripping or merging read-only metadata. `assets` is keyed by each referenced
-asset ID and contains its metadata and current file state, not access URLs. The frontend asks the
-asset access endpoint for temporary URLs when it needs to render a file. The `version` is the
-optimistic concurrency token required by the content save endpoint.
+`blocks` is save-shaped and can be sent back unchanged. `assets` is keyed by referenced asset ID
+and contains metadata/current file state, not URLs or storage identifiers. Keep this side table
+separate from editable blocks; request temporary URLs from the asset-access endpoint when needed.
+Render rich-text `text` as text, never executable HTML. `version` is the concurrency token.
 
 ## Saving content
 
@@ -115,33 +112,35 @@ blocks, including their stable client-generated IDs:
 }
 ```
 
-The response has the same `{ version, blocks, assets }` shape as the read endpoint; `version` is
-the new version after a changed save. Blocks omitted from the request are deleted. IDs re-sent in
-the request are kept, including blocks moved between top level and columns. Sending the current
-tree unchanged is a safe no-op and does not increment the version.
+The response has the same `{ version, blocks, assets }` shape as the read endpoint. A changed save
+replaces the full tree and increments `version`; omitted blocks are deleted and re-sent IDs are
+preserved when blocks move. An unchanged normalized tree is a no-op and does not increment the
+version, even if its `expectedVersion` is stale.
 
-Always send the version from the latest read or save response. Allow only one save in flight at a
-time. On `409 VERSION_CONFLICT`, reload the lesson and re-apply the user's edit before saving
-again. Retrying the identical request is safe: a successful first attempt is recognized as a
-no-op on retry.
+Send a nonnegative integer `expectedVersion` and a `blocks` array; unknown request fields are
+rejected. Serialize saves in the frontend. On `409 VERSION_CONFLICT`, reload and re-apply the edit
+before saving. Retrying an identical successful request is safe.
 
-New asset references must point to an ACTIVE asset with a READY file and the matching asset type.
-An asset already referenced by this lesson may remain after it is archived or its READY file is no
-longer available. An asset may be shared by multiple blocks. Removing the last block reference
-allows the asset to be deleted.
+New references require an ACTIVE asset, a READY file, and the matching asset type. Existing
+references may remain after archival or loss of the READY file; type mismatches are still invalid.
+Assets may be shared by blocks and lessons.
 
-The JSON body limit is 1 MB, which is the real maximum for a lesson save. The frontend may choose
-whether to autosave; autosave uses this same endpoint and version contract.
+The JSON request body limit is 1 MB. All failed saves leave the blocks and version unchanged.
+Errors use `{ statusCode, code, message, requestId }` with optional `details`; an oversized body
+returns `413 PAYLOAD_TOO_LARGE`.
 
 ## Rich-text whitelist
 
-| Rich-text type | Kept                                                                                                                                                                                                           | Accepted and dropped                                         | Rejected                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Nodes          | `doc`, `paragraph`, `heading` (level 1–3), `bulletList`, `orderedList` (start >= 1), `listItem`, `blockquote`, `codeBlock` (language up to 30 `[a-z0-9+#-]` characters), `horizontalRule`, `text`, `hardBreak` | Null-valued attributes                                       | Other node types, including image and table                                                      |
-| Content        | Document → paragraphs, headings, lists, blockquotes, code blocks, horizontal rules; paragraph/heading → inline; lists → list items; list items → paragraphs/lists; blockquotes → paragraphs/lists              | —                                                            | Any other parent/child combination                                                               |
-| Marks          | `bold`, `italic`, `underline`, `strike`, `code`, `link` (`href` required); duplicate marks are de-duplicated                                                                                                   | TipTap link `target`, `rel`, and `class`; empty marks arrays | Other marks and any other attributes                                                             |
-| Text alignment | Paragraph/heading `textAlign`: `left`, `center`, `right`, `justify`                                                                                                                                            | —                                                            | Other values                                                                                     |
-| Links          | Absolute `http:`, `https:`, and `mailto:` URLs without whitespace/control characters                                                                                                                           | —                                                            | Relative, `javascript:`, `data:`, `ftp:`, other protocols, and URLs longer than 2,000 characters |
+- **Format:** only `{ format: "tiptap", doc: ... }` is supported.
+- **Nodes:** `doc`, paragraph, heading (level 1–3), bullet/ordered list (start >= 1), list item,
+  blockquote, code block (language <= 30 `[a-z0-9+#-]` chars), horizontal rule, text, hard break.
+  Parent/child structure is validated; other nodes (including image/table) are rejected.
+- **Marks and attributes:** bold, italic, underline, strike, code, and link (`href` required).
+  Duplicate marks are de-duplicated. Null attributes and TipTap link `target`, `rel`, `class` are
+  dropped; other marks/attributes fail. Paragraph/heading `textAlign` is left, center, right, or
+  justify.
+- **Links:** absolute `http:`, `https:`, or `mailto:` URLs, no whitespace/control characters, max
+  2,000 characters. Relative URLs and other protocols fail.
 
 Text is preserved exactly as text, including strings that look like HTML. Rendering must treat it
 as text, not executable markup.
@@ -159,19 +158,20 @@ as text, not executable markup.
 | Link URL                                              | 2,000 characters  |
 | Returned validation issues                            | 50                |
 
-Validation issue codes: `INVALID_CONTENT`, `INVALID_ID`, `DUPLICATE_ID`, `BLOCK_TYPE_NOT_SUPPORTED`,
-`UNKNOWN_FIELD`, `ASSET_REQUIRED`, `ASSET_NOT_ALLOWED`, `TOO_MANY_BLOCKS`, `TOO_LONG`,
-`TOO_MANY_NODES`, `DEPTH_EXCEEDED`, `INVALID_LINK`, `UNSUPPORTED_ATTRIBUTE`, `UNSUPPORTED_NODE`,
-and `UNSUPPORTED_MARK`.
+Validation issue codes: `INVALID_CONTENT`, `INVALID_ID`, `DUPLICATE_ID`, `BLOCK_ID_IN_USE`,
+`BLOCK_TYPE_NOT_SUPPORTED`, `UNKNOWN_FIELD`, `ASSET_REQUIRED`, `ASSET_NOT_ALLOWED`,
+`ASSET_NOT_FOUND`, `ASSET_TYPE_MISMATCH`, `ASSET_ARCHIVED`, `ASSET_NOT_READY`,
+`TOO_MANY_BLOCKS`, `TOO_LONG`, `TOO_MANY_NODES`, `DEPTH_EXCEEDED`, `INVALID_LINK`,
+`UNSUPPORTED_ATTRIBUTE`, `UNSUPPORTED_NODE`, and `UNSUPPORTED_MARK`. Envelope errors also include
+`VALIDATION_ERROR`, `BAD_REQUEST`, `NOT_FOUND`, `FORBIDDEN`, `UNAUTHORIZED`,
+`VERSION_CONFLICT`, and `PAYLOAD_TOO_LARGE`.
 
-IDs must be UUIDs. The client creates each block ID before saving and keeps it stable while editing;
-IDs must be unique across the entire request, including column children. The server rejects
-collisions. Asset IDs are UUIDs too and can be shared by blocks.
+Block and asset IDs must be UUIDs. Block IDs must be unique across the request and cannot belong to
+another lesson; the same lesson may retain IDs across saves. Asset IDs can be shared by blocks.
 
 ## Adding a block type
 
-1. Add one block definition file under `apps/backend/src/curriculum/lesson-content/block-definitions/`.
-2. Register it in `block-definitions/registry.ts` using the generated Prisma `BlockType`.
-3. Add the enum value through a Prisma schema migration; if it references an asset, declare its
-   required `AssetType` in the block definition.
-4. Add a frontend renderer for the new block shape.
+1. Add its Prisma `BlockType` enum value through a migration and a definition under
+   `block-definitions/`; register it in `registry.ts` and declare any required `AssetType`.
+2. Add validator/unit and HTTP tests for its shape, invalid fields, and asset rules.
+3. Add the frontend renderer for the documented response/save shape.
