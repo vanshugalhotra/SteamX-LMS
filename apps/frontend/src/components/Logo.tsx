@@ -1,28 +1,40 @@
 import { cn } from '@/lib/utils';
+import logoMark from '@/assets/steamx-mark.png';
+import logoWordmark from '@/assets/steamx-wordmark.png';
 
 interface LogoProps {
   className?: string;
   accent?: 'white' | 'teal';
+  variant?: 'compact' | 'wordmark';
 }
 
-export function Logo({ className, accent = 'white' }: LogoProps) {
+export function Logo({ className, accent = 'teal', variant = 'wordmark' }: LogoProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-2.5 text-xl font-semibold tracking-tight text-gray-900',
+        'inline-flex items-center',
         className,
       )}
     >
-      <span aria-hidden className="relative h-7.5 w-8.5 flex-none">
-        <i className="absolute bottom-0 left-0 size-5.5 rounded-full bg-coral-500" />
-        <i
-          className={cn(
-            'absolute top-0 right-0 size-4 rounded-full',
-            accent === 'teal' ? 'bg-teal-500 outline-2 outline-white' : 'bg-white',
-          )}
+      {variant === 'wordmark' && accent === 'teal' ? (
+        <img
+          className="h-auto w-52 max-w-full object-contain"
+          src={logoWordmark}
+          alt="SteamX, Curiosity to Creation"
         />
-      </span>
-      SteamX
+      ) : (
+        <>
+          <img className="size-8 flex-none object-contain" src={logoMark} alt="" />
+          <span
+            className={cn(
+              'ml-2.5 text-xl font-semibold tracking-tight',
+              accent === 'white' ? 'text-white' : 'text-gray-900',
+            )}
+          >
+            SteamX
+          </span>
+        </>
+      )}
     </span>
   );
 }
