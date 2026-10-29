@@ -21,31 +21,45 @@ export function isPrismaKnownError(error: unknown): error is PrismaKnownError {
   );
 }
 
-/** Extracts PostgreSQL's driver code when the adapter includes it in Prisma metadata. */
-export function getPostgresCode(error: PrismaKnownError): string | undefined {
-  if (
-    typeof error.meta !== 'object' ||
-    error.meta === null ||
-    !('driverAdapterError' in error.meta)
+/** Extracts PostgreSQL's code from Prisma metadata or an adapter error at transaction commit. */
+export function getPostgresCode(error: unknown): string | undefined {
+  let adapterCause: unknown;
+  if (isPrismaKnownError(error)) {
+    if (
+      typeof error.meta === 'object' &&
+      error.meta !== null &&
+      'driverAdapterError' in error.meta
+    ) {
+      const driverAdapterError = error.meta.driverAdapterError;
+      if (typeof driverAdapterError === 'object' && driverAdapterError !== null) {
+        adapterCause = 'cause' in driverAdapterError ? driverAdapterError.cause : undefined;
+      }
+    }
+  } else if (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    error.name === 'DriverAdapterError' &&
+    'cause' in error
   ) {
-    return undefined;
+    adapterCause = error.cause;
   }
 
-  const driverAdapterError = error.meta.driverAdapterError;
+  if (typeof adapterCause !== 'object' || adapterCause === null) {
+    return undefined;
+  }
+  if ('originalCode' in adapterCause && typeof adapterCause.originalCode === 'string') {
+    return adapterCause.originalCode;
+  }
   if (
-    typeof driverAdapterError !== 'object' ||
-    driverAdapterError === null ||
-    !('cause' in driverAdapterError)
+    'kind' in adapterCause &&
+    adapterCause.kind === 'postgres' &&
+    'code' in adapterCause &&
+    typeof adapterCause.code === 'string'
   ) {
-    return undefined;
+    return adapterCause.code;
   }
-
-  const cause = driverAdapterError.cause;
-  if (typeof cause !== 'object' || cause === null || !('originalCode' in cause)) {
-    return undefined;
-  }
-
-  return typeof cause.originalCode === 'string' ? cause.originalCode : undefined;
+  return undefined;
 }
 
 /** Identifies Prisma and PostgreSQL foreign-key violations. */
@@ -56,14 +70,18 @@ export function isForeignKeyViolation(error: unknown): boolean {
   );
 }
 
-/** Returns the final Prisma error line for internal logs without exposing it to API callers. */
-export function getPrismaReason(error: PrismaKnownError): string {
-  if (typeof error.message !== 'string') {
+/** Returns the final non-empty line from a Prisma or adapter error message. */
+export function getPrismaReason(error: unknown): string {
+  if (typeof error !== 'object' || error === null || !('message' in error)) {
+    return '';
+  }
+  const message = error.message;
+  if (typeof message !== 'string') {
     return '';
   }
 
   return (
-    error.message
+    message
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0)

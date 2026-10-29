@@ -80,6 +80,19 @@ describe('Prisma error helpers', () => {
     }
   });
 
+  it('reads PostgreSQL codes from adapter errors thrown at transaction commit', () => {
+    expect(
+      getPostgresCode({
+        name: 'DriverAdapterError',
+        cause: {
+          kind: 'postgres',
+          code: '23P01',
+          message: 'conflicting key value violates exclusion constraint',
+        },
+      }),
+    ).toBe('23P01');
+  });
+
   it.each(['P2003', 'P3003'])('recognizes Prisma foreign-key error %s', (code) => {
     expect(isForeignKeyViolation(createPrismaError(code))).toBe(true);
   });

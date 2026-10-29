@@ -71,6 +71,12 @@ Key rules:
 - Class-section creation resolves the selected school with `ActiveSchoolService`, so it requires a
   school ID for platform staff and an active in-scope school for every caller.
 
+## Subscriptions
+
+- `subscription.manage` is restricted to platform staff; grants and renewals require an active school and course, and status is derived from subscription dates and the database business date.
+- Revoke deletes access that has not started, otherwise ends it yesterday; renew creates a new row and restores date-derived access without changing deliveries.
+- `retainedUntil` is informational, derived from the latest school-course end date plus two years, and only governs when purge is allowed.
+
 See the [school and class-section API cases](./api-testing.md#schools) and
 [architecture flow](./architecture.md#schools-and-class-sections) for implementation owners.
 

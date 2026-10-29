@@ -15,6 +15,7 @@ export const PERMISSION = {
   ASSET_WRITE: 'asset.write',
   CLASSSECTION_READ: 'classsection.read',
   CLASSSECTION_MANAGE: 'classsection.manage',
+  SUBSCRIPTION_MANAGE: 'subscription.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION];

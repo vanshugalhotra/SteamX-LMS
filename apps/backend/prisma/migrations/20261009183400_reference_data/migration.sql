@@ -23,6 +23,8 @@ VALUES
   -- Schools
   ('school.manage',          'Create and manage schools'),
   ('school.read',            'View schools'),
+  -- Subscriptions
+  ('subscription.manage',    'Grant and manage school course subscriptions'),
   -- Users
   ('user.create.student',    'Create student users'),
   ('user.create.teacher',    'Create teacher users'),
@@ -49,6 +51,7 @@ WHERE roles.key = 'admin'
     'curriculum.write',
     'school.manage',
     'school.read',
+    'subscription.manage',
     'user.create.student',
     'user.create.teacher',
     'user.deactivate',

@@ -113,6 +113,32 @@ export const API_ERROR = {
     message: 'Class section already exists',
   },
 
+  // ── Subscriptions ─────────────────────────────────────
+  SUBSCRIPTION_NOT_FOUND: {
+    code: 'SUBSCRIPTION_NOT_FOUND',
+    message: 'Subscription not found',
+  },
+  COURSE_NOT_ACTIVE: {
+    code: 'COURSE_NOT_ACTIVE',
+    message: 'Subscriptions can only be granted for an active course',
+  },
+  DELIVERY_CAP_BELOW_ACTIVE: {
+    code: 'DELIVERY_CAP_BELOW_ACTIVE',
+    message: 'Maximum deliveries cannot be below the current active delivery count',
+  },
+  SUBSCRIPTION_ALREADY_ENDED: {
+    code: 'SUBSCRIPTION_ALREADY_ENDED',
+    message: 'Subscription has already ended',
+  },
+  SUBSCRIPTION_OVERLAP: {
+    code: 'SUBSCRIPTION_OVERLAP',
+    message: 'Subscription dates overlap an existing subscription for this school and course',
+  },
+  SUBSCRIPTION_INVALID_DATE_RANGE: {
+    code: 'SUBSCRIPTION_INVALID_DATE_RANGE',
+    message: 'End date must be on or after start date',
+  },
+
   // ── Curriculum ─────────────────────────────────────────
   INVALID_ORDER: {
     code: 'INVALID_ORDER',
