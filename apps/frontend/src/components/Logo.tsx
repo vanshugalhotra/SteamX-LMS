@@ -10,12 +10,7 @@ interface LogoProps {
 
 export function Logo({ className, accent = 'teal', variant = 'wordmark' }: LogoProps) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center',
-        className,
-      )}
-    >
+    <span className={cn('inline-flex items-center', className)}>
       {variant === 'wordmark' && accent === 'teal' ? (
         <img
           className="h-auto w-52 max-w-full object-contain"
