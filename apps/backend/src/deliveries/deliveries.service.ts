@@ -87,7 +87,7 @@ export class DeliveriesService {
   ): Promise<PaginationResponseDto<DeliveryResponseDto>> {
     const scope = resolveSchoolScope(actor, query.schoolId);
     const { items, total } = await this.deliveries.findMany(scope, actor, query);
-    const activity = await this.deliveries.findSubscriptionActivity(
+    const activity = await this.courseAccess.getSubscriptionActivity(
       items.map(({ schoolId, courseId }) => ({ schoolId, courseId })),
     );
     const activeByPair = new Map(
@@ -118,7 +118,7 @@ export class DeliveriesService {
     if (!delivery) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
-    const [activity] = await this.deliveries.findSubscriptionActivity([
+    const [activity] = await this.courseAccess.getSubscriptionActivity([
       { schoolId: delivery.schoolId, courseId: delivery.courseId },
     ]);
     if (!activity) {
@@ -152,7 +152,7 @@ export class DeliveriesService {
         throw new ConflictException(API_ERROR.COURSE_NOT_ACTIVE);
       }
       await this.courseAccess.assertSubscriptionActive(current.schoolId, current.courseId);
-      await this.assertDeliveryCapacity(current.schoolId, current.courseId, current.id);
+      await this.assertDeliveryCapacity(current.schoolId, current.courseId);
     }
 
     try {
@@ -178,7 +178,7 @@ export class DeliveriesService {
   }
 
   private async toResponse(delivery: Parameters<typeof toDeliveryResponse>[0]) {
-    const [activity] = await this.deliveries.findSubscriptionActivity([
+    const [activity] = await this.courseAccess.getSubscriptionActivity([
       { schoolId: delivery.schoolId, courseId: delivery.courseId },
     ]);
     if (!activity) {
@@ -187,16 +187,12 @@ export class DeliveriesService {
     return toDeliveryResponse(delivery, activity.active);
   }
 
-  private async assertDeliveryCapacity(
-    schoolId: string,
-    courseId: string,
-    excludeId?: string,
-  ): Promise<void> {
-    const max = await this.deliveries.findCurrentDeliveryLimit(schoolId, courseId);
+  private async assertDeliveryCapacity(schoolId: string, courseId: string): Promise<void> {
+    const max = await this.courseAccess.getCurrentDeliveryLimit(schoolId, courseId);
     if (max === null) {
       throw new ForbiddenException(API_ERROR.SUBSCRIPTION_EXPIRED);
     }
-    const used = await this.deliveries.countActiveDeliveries(schoolId, courseId, excludeId);
+    const used = await this.deliveries.countActiveDeliveries(schoolId, courseId);
     if (used >= max) {
       throw new ConflictException({
         code: API_ERROR.DELIVERY_LIMIT_REACHED.code,
@@ -215,11 +211,8 @@ export class DeliveriesService {
       getPostgresCode(error) === '23000'
     ) {
       const reason = getPrismaReason(error).toLowerCase();
-      if (
-        reason.includes('deliveries exceed the subscription delivery limit') ||
-        reason.includes('trg_deliveries_require_active_subscription')
-      ) {
-        const max = await this.deliveries.findCurrentDeliveryLimit(schoolId, courseId);
+      if (reason.includes('deliveries exceed the subscription delivery limit')) {
+        const max = await this.courseAccess.getCurrentDeliveryLimit(schoolId, courseId);
         const used = await this.deliveries.countActiveDeliveries(schoolId, courseId);
         throw new ConflictException({
           code: API_ERROR.DELIVERY_LIMIT_REACHED.code,

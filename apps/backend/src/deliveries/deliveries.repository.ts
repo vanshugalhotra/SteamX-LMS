@@ -88,25 +88,12 @@ export class DeliveriesRepository {
   }
 
   // -------------------- Writes --------------------
-  async findCurrentDeliveryLimit(schoolId: string, courseId: string): Promise<number | null> {
-    const [row] = await this.prisma.$queryRaw<{ max_deliveries: number }[]>`
-      SELECT max_deliveries
-      FROM subscriptions
-      WHERE school_id = ${schoolId}::uuid
-        AND course_id = ${courseId}::uuid
-        AND start_date <= business_today()
-        AND business_today() <= end_date
-    `;
-    return row?.max_deliveries ?? null;
-  }
-
-  countActiveDeliveries(schoolId: string, courseId: string, excludeId?: string): Promise<number> {
+  countActiveDeliveries(schoolId: string, courseId: string): Promise<number> {
     return this.prisma.delivery.count({
       where: {
         schoolId,
         courseId,
         status: DeliveryStatus.ACTIVE,
-        ...(excludeId === undefined ? {} : { id: { not: excludeId } }),
       },
     });
   }
@@ -133,32 +120,5 @@ export class DeliveriesRepository {
       data: { status },
     });
     return result.count === 0 ? null : this.findById(id, scope);
-  }
-
-  // -------------------- Derived subscription activity --------------------
-  async findSubscriptionActivity(
-    pairs: { schoolId: string; courseId: string }[],
-  ): Promise<{ schoolId: string; courseId: string; active: boolean }[]> {
-    const uniquePairs = [
-      ...new Map(pairs.map((pair) => [`${pair.schoolId}:${pair.courseId}`, pair])).values(),
-    ];
-    if (uniquePairs.length === 0) {
-      return [];
-    }
-
-    const values = Prisma.join(
-      uniquePairs.map(
-        ({ schoolId, courseId }) => Prisma.sql`(${schoolId}::uuid, ${courseId}::uuid)`,
-      ),
-    );
-    return this.prisma.$queryRaw<{ schoolId: string; courseId: string; active: boolean }[]>(
-      Prisma.sql`
-        WITH page_pairs(school_id, course_id) AS (VALUES ${values})
-        SELECT p.school_id::text AS "schoolId",
-          p.course_id::text AS "courseId",
-          has_course_access(p.school_id, p.course_id, business_today()) AS active
-        FROM page_pairs p
-      `,
-    );
   }
 }
