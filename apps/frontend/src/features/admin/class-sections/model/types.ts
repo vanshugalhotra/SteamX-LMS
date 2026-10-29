@@ -13,5 +13,10 @@ export interface CreateClassSectionPayload {
   sectionName?: string;
 }
 
+export interface UpdateClassSectionPayload {
+  className?: string;
+  sectionName?: string;
+}
+
 export const classSectionLabel = (c: Pick<ClassSection, 'className' | 'sectionName'>) =>
   `${c.className} - ${c.sectionName}`;

@@ -7,15 +7,22 @@ import {
   LayoutGrid,
   Lock,
   School,
+  ShieldCheck,
   User,
   type LucideIcon,
 } from 'lucide-react';
 import { PATHS } from '@/lib/paths';
 
+export interface NavChild {
+  label: string;
+  to: string;
+}
+
 export interface NavItem {
   label: string;
   icon: LucideIcon;
   to?: string;
+  children?: NavChild[];
 }
 
 export interface NavGroup {
@@ -30,9 +37,36 @@ export const ADMIN_NAV: NavGroup[] = [
     id: 'people',
     label: 'People',
     items: [
-      { label: 'Schools', icon: School, to: PATHS.admin.schools },
-      { label: 'Teachers', icon: GraduationCap, to: PATHS.admin.teachers },
-      { label: 'Students', icon: User, to: PATHS.admin.students },
+      {
+        label: 'Schools',
+        icon: School,
+        to: PATHS.admin.schools,
+        children: [
+          { label: 'All schools', to: PATHS.admin.schools },
+          { label: 'Add school', to: PATHS.admin.schoolNew },
+          { label: 'Class sections', to: PATHS.admin.classSections },
+          { label: 'Add class section', to: PATHS.admin.classSectionNew },
+        ],
+      },
+      {
+        label: 'Teachers',
+        icon: GraduationCap,
+        to: PATHS.admin.teachers,
+        children: [
+          { label: 'All teachers', to: PATHS.admin.teachers },
+          { label: 'Add teacher', to: PATHS.admin.teacherNew },
+        ],
+      },
+      {
+        label: 'Students',
+        icon: User,
+        to: PATHS.admin.students,
+        children: [
+          { label: 'All students', to: PATHS.admin.students },
+          { label: 'Add student', to: PATHS.admin.studentNew },
+        ],
+      },
+      { label: 'Admins', icon: ShieldCheck, to: PATHS.admin.admins },
       { label: 'Credential Resets', icon: Lock },
     ],
   },

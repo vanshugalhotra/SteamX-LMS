@@ -117,6 +117,36 @@ export const router = createBrowserRouter([
               return { Component: ClassSectionCreatePage };
             },
           },
+          {
+            path: PATHS.admin.classSections,
+            lazy: async () => {
+              const { ClassSectionsPage } =
+                await import('@/features/admin/class-sections/pages/ClassSectionsPage');
+              return { Component: ClassSectionsPage };
+            },
+          },
+          {
+            path: PATHS.admin.classSectionEdit(':id'),
+            lazy: async () => {
+              const { ClassSectionEditPage } =
+                await import('@/features/admin/class-sections/pages/ClassSectionEditPage');
+              return { Component: ClassSectionEditPage };
+            },
+          },
+          {
+            path: PATHS.admin.admins,
+            lazy: async () => {
+              const { AdminsPage } = await import('@/features/admin/admins/pages/AdminsPage');
+              return { Component: AdminsPage };
+            },
+          },
+          {
+            path: PATHS.admin.adminView(':id'),
+            lazy: async () => {
+              const { AdminViewPage } = await import('@/features/admin/admins/pages/AdminViewPage');
+              return { Component: AdminViewPage };
+            },
+          },
           { path: PATHS.admin.base, loader: () => redirect(PATHS.admin.dashboard) },
         ],
       },

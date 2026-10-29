@@ -1,21 +1,39 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
 import { Logo } from '@/components/Logo';
 import { LogoutButton } from '@/features/auth/components/LogoutButton';
 import { useSession } from '@/features/auth/queries';
 import { cn } from '@/lib/utils';
-import { ADMIN_NAV, type NavItem } from '../nav';
+import { ADMIN_NAV, type NavChild, type NavItem } from '../nav';
 import { ChevronDown } from 'lucide-react';
 
 const itemClass =
   'flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-[13px] font-medium whitespace-nowrap outline-none focus-visible:ring-4 focus-visible:ring-ring/40';
 
-function isCurrent(pathname: string, to?: string) {
+function matches(pathname: string, to?: string) {
   return to !== undefined && (pathname === to || pathname.startsWith(`${to}/`));
 }
 
-function SidebarItem({ item }: { item: NavItem }) {
+/** An item is active on its own path, its children's paths and their sub-paths. */
+function isItemActive(pathname: string, item: NavItem) {
+  return (
+    matches(pathname, item.to) || (item.children?.some((c) => matches(pathname, c.to)) ?? false)
+  );
+}
+
+/** The most specific child wins, so /schools/new highlights "Add school", not "All schools". */
+function activeChild(pathname: string, children: NavChild[]) {
+  return children
+    .filter((c) => matches(pathname, c.to))
+    .sort((a, b) => b.to.length - a.to.length)[0];
+}
+
+function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
   const Icon = item.icon;
+  const active = isItemActive(pathname, item);
+  const [open, setOpen] = useState(false);
+  const expanded = active || open;
+
   if (!item.to) {
     return (
       <span aria-disabled="true" className={cn(itemClass, 'cursor-not-allowed text-gray-400')}>
@@ -24,19 +42,72 @@ function SidebarItem({ item }: { item: NavItem }) {
       </span>
     );
   }
+
+  const current = item.children ? activeChild(pathname, item.children) : undefined;
+  const panelId = `nav-sub-${item.label}`;
+
   return (
-    <NavLink
-      to={item.to}
-      className={({ isActive }) =>
-        cn(
-          itemClass,
-          isActive ? 'bg-white font-semibold shadow-md' : 'text-gray-900 hover:bg-gray-100',
-        )
-      }
-    >
-      <Icon className="size-4 shrink-0" aria-hidden="true" />
-      {item.label}
-    </NavLink>
+    <div className="contents lg:block">
+      <div className="flex shrink-0 items-center">
+        <NavLink
+          to={item.to}
+          className={cn(
+            itemClass,
+            'flex-1',
+            active ? 'bg-white font-semibold shadow-md' : 'text-gray-900 hover:bg-gray-100',
+          )}
+          aria-current={active && !item.children ? 'page' : undefined}
+        >
+          <Icon className="size-4 shrink-0" aria-hidden="true" />
+          {item.label}
+        </NavLink>
+        {item.children && (
+          <button
+            type="button"
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${item.label}`}
+            aria-expanded={expanded}
+            aria-controls={panelId}
+            disabled={active}
+            onClick={() => {
+              setOpen((o) => !o);
+            }}
+            className="ml-1 hidden size-8 shrink-0 place-items-center rounded-lg text-gray-600 outline-none hover:bg-gray-100 focus-visible:ring-4 focus-visible:ring-ring/40 disabled:opacity-40 lg:grid"
+          >
+            <ChevronDown
+              className={cn('size-3.5 transition-transform', !expanded && '-rotate-90')}
+              aria-hidden="true"
+            />
+          </button>
+        )}
+      </div>
+
+      {item.children && expanded && (
+        <ul
+          id={panelId}
+          className="mt-1 mb-1 ml-6 hidden space-y-0.5 border-l border-gray-200 pl-3 lg:block"
+        >
+          {item.children.map((child) => {
+            const isCurrent = current?.to === child.to;
+            return (
+              <li key={child.to}>
+                <Link
+                  to={child.to}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  className={cn(
+                    'block rounded-lg px-3 py-1.5 text-xs outline-none focus-visible:ring-4 focus-visible:ring-ring/40',
+                    isCurrent
+                      ? 'font-semibold text-foreground'
+                      : 'text-gray-600 hover:text-foreground',
+                  )}
+                >
+                  {child.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -68,7 +139,7 @@ export function AdminSidebar() {
           className="-mx-1 flex gap-1 overflow-x-auto pb-1 lg:mx-0 lg:mt-2 lg:flex-col lg:overflow-visible"
         >
           {ADMIN_NAV.map((group) => {
-            const hasCurrent = group.items.some((item) => isCurrent(pathname, item.to));
+            const hasCurrent = group.items.some((item) => isItemActive(pathname, item));
             // The group holding the current page never collapses, so it stays visible.
             const isCollapsed = !hasCurrent && collapsed.has(group.id);
             const panelId = `admin-nav-${group.id}`;
@@ -102,7 +173,7 @@ export function AdminSidebar() {
                   )}
                 >
                   {group.items.map((item) => (
-                    <SidebarItem key={item.label} item={item} />
+                    <SidebarItem key={item.label} item={item} pathname={pathname} />
                   ))}
                 </div>
               </div>
