@@ -213,6 +213,11 @@ All six endpoints require platform staff with `subscription.manage`. Dates are d
 - [auto] When dates overlap another school-course subscription -> expect `409 SUBSCRIPTION_OVERLAP`.
 - [auto] When the source expired more than two years ago -> renewal remains allowed; no retention-window check is applied.
 
+### Subscription access checks
+
+- [auto] When a school's subscription does not cover the database business date -> expect
+  `403 SUBSCRIPTION_EXPIRED` before course content is returned or changed.
+
 ## Course modules
 
 ### `POST /courses/:courseId/modules`
