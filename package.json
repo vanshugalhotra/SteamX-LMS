@@ -18,7 +18,9 @@
   "scripts": {
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "test": "pnpm --filter @steamx/backend --filter frontend test",
+    "test": "pnpm test:backend && pnpm test:frontend",
+    "test:backend": "pnpm --filter @steamx/backend test",
+    "test:frontend": "pnpm --filter frontend test",
     "test:unit": "pnpm --filter @steamx/backend test:unit",
     "test:db": "pnpm --filter @steamx/backend test:db",
     "test:e2e": "pnpm --filter @steamx/backend test:e2e",

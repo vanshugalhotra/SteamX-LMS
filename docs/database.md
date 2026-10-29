@@ -53,6 +53,16 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 - SteamX ID changes blocked unless `steamx.allow_steamx_id_change` is set in the transaction.
 - Class/section names: nonblank, no surrounding whitespace. Case-insensitive unique per school. `section_name` defaults to `All`; each row represents a class/section pair.
 
+### Subscription & delivery rules
+
+- Subscription terms require `end_date >= start_date`, `max_deliveries > 0`, and cannot overlap for the same school and course (inclusive ranges; exclusion is deferred to commit).
+- `business_today()` uses the business timezone and must match the `BUSINESS_TIMEZONE` environment default; `has_course_access()` checks subscription dates only.
+- Subscriptions can be created only for ACTIVE courses; their school/course identity is immutable, and the delivery cap cannot be lowered below the active delivery count.
+- Deliveries require an ACTIVE course and a current subscription, and the subscription row is locked while enforcing the school/course delivery cap.
+- Delivery school, course, class section, and academic year are immutable; academic year must match `YYYY-NN`.
+- Enrollment identity is immutable; dates and status must agree, and enrollment/reactivation requires a matching student and delivery class section, an ACTIVE student and delivery, and current course access.
+- Lesson-release identity is immutable; releases require an ACTIVE STUDENT lesson in an ACTIVE module, an ACTIVE delivery, current course access, and an in-scope release actor.
+
 ### Curriculum & assets
 
 - **Curriculum hierarchy:** courses are global, with no school foreign key. Module `course_id` and lesson `course_id` are immutable. Lesson `module_id` can change only within the same course, enforced by the composite foreign key; the current API has no lesson-move route. Lesson audience defaults to `TEACHER_ONLY`.
