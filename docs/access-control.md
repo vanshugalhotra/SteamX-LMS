@@ -74,14 +74,15 @@ Key rules:
 ## Subscriptions
 
 - `subscription.manage` is restricted to platform staff; grants and renewals require an active school and course, and status is derived from subscription dates and the database business date.
-- Revoke deletes access that has not started, otherwise ends it yesterday; renew creates a new row and restores date-derived access without changing deliveries.
-- `retainedUntil` is informational, derived from the latest school-course end date plus two years, and only governs when purge is allowed.
+- Revoke deletes a term starting today or later; an earlier-started current term ends yesterday. Renewal creates a new row without changing deliveries.
+- `retainedUntil` is informational and derived from the latest school-course end date plus two calendar years. The subscription module does not enforce a purge window.
 
 ### Subscription gating
 
-- Services should call `CourseAccessService.assertCourseAccess(actor, schoolId, courseId)` before
-  returning or mutating course content. Pass the school ID from the loaded resource, not client
-  input; school-bound actors are checked against that resource school and foreign resources return 404. Platform staff bypass the subscription check inside the service.
+- `CourseAccessService.assertCourseAccess(actor, schoolId, courseId)` checks school scope and the
+  current subscription. Pass the school ID from the loaded resource, not client input; school-bound
+  actors are checked against that resource school and foreign resources return 404. Platform staff
+  bypass the subscription check inside the service.
 - Use `getAccessibleCourseIds(actor)` to filter a school-bound actor's course list to currently
   valid subscriptions; the service takes the school from the actor. Platform staff should use
   their explicit school filter directly instead. Subscription dates use database

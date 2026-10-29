@@ -33,6 +33,10 @@ import { SubscriptionResponseDto } from './dto/subscription-response.dto.js';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 
+/**
+ * Exposes platform-staff endpoints for granting, listing, changing, revoking, and renewing
+ * school-course subscriptions. Route permissions are enforced before service-level rules.
+ */
 @ApiTags('Subscriptions')
 @ApiProtectedController()
 @ApiForbiddenResponse({
@@ -45,6 +49,13 @@ export class SubscriptionsController {
   // ─────────────────────────────────────────
   // POST /subscriptions — Grant a subscription
   // ─────────────────────────────────────────
+  /**
+   * Grants access for a school and course.
+   * @param actor Authenticated platform staff.
+   * @param body School, course, date range, and delivery cap.
+   * @returns The created term with derived status and summary fields.
+   * @throws BadRequestException for an invalid range; 404 for missing records; 409 for ineligible records or overlap.
+   */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Post()
   @ApiOperation({ summary: 'Grant a course subscription to a school' })
@@ -62,6 +73,12 @@ export class SubscriptionsController {
   // ─────────────────────────────────────────
   // GET /subscriptions — List subscriptions
   // ─────────────────────────────────────────
+  /**
+   * Lists terms with date-derived status and school-course summaries.
+   * @param actor Authenticated platform staff.
+   * @param query Optional school, course, status, and page filters.
+   * @returns A paginated subscription response.
+   */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Get()
   @ApiOperation({ summary: 'List subscriptions' })
@@ -77,6 +94,13 @@ export class SubscriptionsController {
   // ─────────────────────────────────────────
   // GET /subscriptions/:id — Get a subscription
   // ─────────────────────────────────────────
+  /**
+   * Reads one term.
+   * @param actor Authenticated platform staff.
+   * @param id Subscription UUID.
+   * @returns The term with derived status and summary fields.
+   * @throws NotFoundException when the term does not exist.
+   */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Get(':id')
   @ApiOperation({ summary: 'Get a subscription' })
@@ -93,6 +117,14 @@ export class SubscriptionsController {
   // ─────────────────────────────────────────
   // PATCH /subscriptions/:id — Update a subscription
   // ─────────────────────────────────────────
+  /**
+   * Changes the term end date or delivery cap.
+   * @param actor Authenticated platform staff.
+   * @param id Subscription UUID.
+   * @param body New end date and/or delivery cap.
+   * @returns The updated term with derived fields.
+   * @throws BadRequestException for an empty or invalid update; 404 if missing; 409 for overlap or a cap below active use.
+   */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Patch(':id')
   @ApiOperation({ summary: 'Update a subscription end date or delivery cap' })
@@ -113,6 +145,13 @@ export class SubscriptionsController {
   // ─────────────────────────────────────────
   // POST /subscriptions/:id/revoke — Revoke a subscription
   // ─────────────────────────────────────────
+  /**
+   * Deletes a term starting today or later, or ends a current term yesterday.
+   * @param actor Authenticated platform staff.
+   * @param id Subscription UUID.
+   * @returns No content after removal or early ending.
+   * @throws NotFoundException if missing; ConflictException if already ended.
+   */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Post(':id/revoke')
   @HttpCode(204)
@@ -128,6 +167,14 @@ export class SubscriptionsController {
   // ─────────────────────────────────────────
   // POST /subscriptions/:id/renew — Renew a subscription
   // ─────────────────────────────────────────
+  /**
+   * Creates a new term for the source school and course.
+   * @param actor Authenticated platform staff.
+   * @param id Source subscription UUID.
+   * @param body End date and optional start date or delivery cap.
+   * @returns The new term with derived fields.
+   * @throws NotFoundException if the source is missing; ConflictException for ineligible records or overlap.
+   */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Post(':id/renew')
   @ApiOperation({ summary: 'Renew a subscription with a new date range' })

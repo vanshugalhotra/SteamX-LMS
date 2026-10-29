@@ -2,7 +2,6 @@
 
 This checklist records endpoint-level API cases and expected outcomes. Start with the section for
 the route you changed; use [workflow testing](./workflows-testing.md) for multi-request scenarios.
-
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
 health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; malformed path UUIDs rejected
 by `ParseUUIDPipe` use `BAD_REQUEST`, while valid but unknown IDs return `404 NOT_FOUND`. Error
