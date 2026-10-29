@@ -170,6 +170,49 @@ Caller: platform `admin` with `curriculum.write`; deletes an unused global cours
 - [auto] When no session cookie is sent -> expect `401 UNAUTHORIZED`.
 - [auto] When an error response is returned -> verify it has no stack trace or database details.
 
+## Subscriptions
+
+All six endpoints require platform staff with `subscription.manage`. Dates are date-only
+`YYYY-MM-DD`; status, active-delivery count, and retention date are derived per response.
+
+### `POST /subscriptions`
+
+- [auto] Granting for an existing school and ACTIVE course with a valid date range and positive cap -> expect `201`.
+- [auto] When the date range overlaps an existing subscription for the same school-course -> expect `409 SUBSCRIPTION_OVERLAP`; the next-day adjacent range is accepted.
+- [auto] When the school is unknown -> expect `404 NOT_FOUND`; when it is inactive -> expect `409 SCHOOL_INACTIVE`; when the course is DRAFT or ARCHIVED -> expect `409 COURSE_NOT_ACTIVE`.
+- [auto] When dates are malformed or reversed, cap is below one, or an unknown field is sent -> expect `400`.
+
+### `GET /subscriptions`
+
+- [auto] When listing -> expect pagination and newest `startDate` first, with derived status, `retainedUntil`, and `activeDeliveries`.
+- [auto] When `schoolId`, `courseId`, or `status` (`UPCOMING`, `ACTIVE`, `EXPIRED`) is supplied -> expect the matching records only.
+- [auto] When page and limit are supplied -> expect the stable requested slice.
+
+### `GET /subscriptions/:id`
+
+- [auto] When the subscription exists -> expect `200` with school/course display names and derived fields.
+- [auto] When the ID is malformed -> expect `400 BAD_REQUEST`; when a valid unknown UUID is supplied -> expect `404 SUBSCRIPTION_NOT_FOUND`.
+
+### `PATCH /subscriptions/:id`
+
+- [auto] When `endDate` and/or `maxDeliveries` is valid -> expect `200` and the updated response.
+- [auto] When the updated end date overlaps another school-course subscription -> expect `409 SUBSCRIPTION_OVERLAP`.
+- [auto] When the new cap is lower than active deliveries for the school-course -> expect `409 DELIVERY_CAP_BELOW_ACTIVE`.
+- [auto] When any field besides `endDate` or `maxDeliveries` is supplied, the patch is empty, or end date precedes start date -> expect `400`.
+
+### `POST /subscriptions/:id/revoke`
+
+- [auto] When start date is today or later -> expect `204` and the row is deleted.
+- [auto] When access has started and has not ended -> expect `204`; end date becomes yesterday and status is `EXPIRED`.
+- [auto] When the subscription already ended -> expect `409 SUBSCRIPTION_ALREADY_ENDED`.
+
+### `POST /subscriptions/:id/renew`
+
+- [auto] When only `endDate` is supplied -> expect `201`, with start date one day after the source end date and the source delivery cap.
+- [auto] When explicit `startDate` and/or `maxDeliveries` are supplied -> expect `201` with those values.
+- [auto] When dates overlap another school-course subscription -> expect `409 SUBSCRIPTION_OVERLAP`.
+- [auto] When the source expired more than two years ago -> renewal remains allowed; no retention-window check is applied.
+
 ## Course modules
 
 ### `POST /courses/:courseId/modules`
