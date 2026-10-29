@@ -142,6 +142,14 @@ export const API_ERROR = {
     code: 'SUBSCRIPTION_INVALID_DATE_RANGE',
     message: 'End date must be on or after start date',
   },
+  DELIVERY_ALREADY_EXISTS: {
+    code: 'DELIVERY_ALREADY_EXISTS',
+    message: 'A delivery already exists for this class, course, and academic year',
+  },
+  DELIVERY_LIMIT_REACHED: {
+    code: 'DELIVERY_LIMIT_REACHED',
+    message: 'The active delivery limit has been reached',
+  },
 
   // ── Curriculum ─────────────────────────────────────────
   INVALID_ORDER: {

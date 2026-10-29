@@ -20,6 +20,9 @@ VALUES
   -- Curriculum
   ('curriculum.read',        'View global curriculum content'),
   ('curriculum.write',       'Create and manage global curriculum content'),
+  -- Deliveries
+  ('delivery.manage',        'Create deliveries and change delivery status'),
+  ('delivery.read',          'View deliveries'),
   -- Schools
   ('school.manage',          'Create and manage schools'),
   ('school.read',            'View schools'),
@@ -49,6 +52,8 @@ WHERE roles.key = 'admin'
     'classsection.read',
     'curriculum.read',
     'curriculum.write',
+    'delivery.manage',
+    'delivery.read',
     'school.manage',
     'school.read',
     'subscription.manage',
@@ -60,4 +65,13 @@ WHERE roles.key = 'admin'
     'user.steamx-id.update',
     'user.update'
   )
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- ── Teacher delivery read grant ─────────────────────────
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM roles
+CROSS JOIN permissions
+WHERE roles.key = 'teacher'
+  AND permissions.key = 'delivery.read'
 ON CONFLICT (role_id, permission_id) DO NOTHING;

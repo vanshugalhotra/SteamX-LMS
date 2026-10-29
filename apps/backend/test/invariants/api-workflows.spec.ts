@@ -341,14 +341,19 @@ describe('Documented API workflows', () => {
         if (route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE') {
           options.body = {};
         }
-        assertStatus(
-          await api.send(route.method, concretePath(route), {
-            cookie: session.cookie,
-            ...options,
-          }),
-          403,
-          'FORBIDDEN',
-        );
+        const response = await api.send(route.method, concretePath(route), {
+          cookie: session.cookie,
+          ...options,
+        });
+        if (
+          session === teacherSession &&
+          route.method === 'GET' &&
+          route.path.includes('deliveries')
+        ) {
+          assertStatus(response, route.path.endsWith('/deliveries') ? 200 : 404);
+          continue;
+        }
+        assertStatus(response, 403, 'FORBIDDEN');
       }
     }
     assertStatus(await api.send('GET', '/api/v1/schools', { cookie: admin }), 200);

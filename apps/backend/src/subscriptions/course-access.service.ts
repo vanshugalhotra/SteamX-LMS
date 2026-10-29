@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserType } from '../generated/prisma/client.js';
+import { Prisma, UserType } from '../generated/prisma/client.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -24,12 +24,54 @@ export class CourseAccessService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
 
+    await this.assertSubscriptionActive(schoolId, courseId);
+  }
+
+  async assertSubscriptionActive(schoolId: string, courseId: string): Promise<void> {
     const [result] = await this.prisma.$queryRaw<{ has_access: boolean }[]>`
       SELECT has_course_access(${schoolId}::uuid, ${courseId}::uuid, business_today()) AS has_access
     `;
     if (!result?.has_access) {
       throw new ForbiddenException(API_ERROR.SUBSCRIPTION_EXPIRED);
     }
+  }
+
+  async getCurrentDeliveryLimit(schoolId: string, courseId: string): Promise<number | null> {
+    const [row] = await this.prisma.$queryRaw<{ max_deliveries: number }[]>`
+      SELECT max_deliveries
+      FROM subscriptions
+      WHERE school_id = ${schoolId}::uuid
+        AND course_id = ${courseId}::uuid
+        AND start_date <= business_today()
+        AND business_today() <= end_date
+    `;
+    return row?.max_deliveries ?? null;
+  }
+
+  async getSubscriptionActivity(
+    pairs: { schoolId: string; courseId: string }[],
+  ): Promise<{ schoolId: string; courseId: string; active: boolean }[]> {
+    const uniquePairs = [
+      ...new Map(pairs.map((pair) => [`${pair.schoolId}:${pair.courseId}`, pair])).values(),
+    ];
+    if (uniquePairs.length === 0) {
+      return [];
+    }
+
+    const values = Prisma.join(
+      uniquePairs.map(
+        ({ schoolId, courseId }) => Prisma.sql`(${schoolId}::uuid, ${courseId}::uuid)`,
+      ),
+    );
+    return this.prisma.$queryRaw<
+      { schoolId: string; courseId: string; active: boolean }[]
+    >(Prisma.sql`
+      WITH page_pairs(school_id, course_id) AS (VALUES ${values})
+      SELECT p.school_id::text AS "schoolId",
+        p.course_id::text AS "courseId",
+        has_course_access(p.school_id, p.course_id, business_today()) AS active
+      FROM page_pairs p
+    `);
   }
 
   async getAccessibleCourseIds(actor: AuthContext): Promise<string[]> {

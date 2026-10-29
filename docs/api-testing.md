@@ -218,6 +218,55 @@ All six endpoints require platform staff with `subscription.manage`. Dates are d
 - [auto] When a school's subscription does not cover the database business date -> expect
   `403 SUBSCRIPTION_EXPIRED` before course content is returned or changed.
 
+## Deliveries
+
+### `POST /deliveries`
+
+Caller: `admin` with `delivery.manage`; creates an ACTIVE delivery in the requested school's
+scope. The school, same-school class section, and ACTIVE course are checked before current
+subscription access and the active delivery cap.
+
+- [auto] When school, section, course, and current subscription are valid and capacity remains -> expect `201`, nested course/section fields, derived `displayName`, and `subscriptionActive: true`.
+- [auto] When school is unknown or class section belongs to another school -> expect `404 NOT_FOUND`.
+- [auto] When course is unknown -> expect `404 NOT_FOUND`; when DRAFT or ARCHIVED -> expect `409 COURSE_NOT_ACTIVE`.
+- [auto] When subscription is expired, absent, or upcoming, including for platform admin -> expect `403 SUBSCRIPTION_EXPIRED`.
+- [auto] When active delivery count reaches `maxDeliveries` -> expect `409 DELIVERY_LIMIT_REACHED` with used/max in the message.
+- [auto] When `(classSectionId, courseId, academicYear)` already exists -> expect `409 DELIVERY_ALREADY_EXISTS`; another academic year is allowed.
+- [auto] When two requests race for the final slot -> expect exactly one `201` and one `409 DELIVERY_LIMIT_REACHED`.
+- [auto] When academic year does not match `YYYY-YY` or an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
+- [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `GET /deliveries`
+
+Caller: `admin` or `teacher` with `delivery.read`; returns a paginated, newest-first list and an
+informational `subscriptionActive` value derived for each school-course pair.
+
+- [auto] When course, class section, academic year, or status is supplied -> expect results matching all supplied filters.
+- [auto] When page and limit are supplied -> expect the correct page and total.
+- [auto] When a course subscription expires -> deliveries remain readable and report `subscriptionActive: false`.
+- [auto] When a teacher lists deliveries -> only rows with that teacher's active stint appear; removed and foreign-school rows are absent.
+- [auto] When a teacher requests another school in `schoolId` -> expect `404 NOT_FOUND`.
+- [auto] When student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `GET /deliveries/:id`
+
+Caller: `admin` or `teacher` with `delivery.read`; returns delivery metadata regardless of
+subscription status.
+
+- [auto] When delivery is visible -> expect `200` with the response DTO and derived subscription state.
+- [auto] When delivery is missing, belongs to another school, or has no active teacher stint -> expect the same `404 NOT_FOUND`.
+- [auto] When student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `PATCH /deliveries/:id/status`
+
+Caller: `admin` with `delivery.manage`; changes only delivery status.
+
+- [auto] When status is unchanged -> expect `200` without re-running activation rules.
+- [auto] When changing ACTIVE to INACTIVE -> expect `200`, even if course access has expired.
+- [auto] When changing INACTIVE to ACTIVE -> require ACTIVE course, current subscription, and remaining capacity; otherwise expect `409 COURSE_NOT_ACTIVE`, `403 SUBSCRIPTION_EXPIRED`, or `409 DELIVERY_LIMIT_REACHED`.
+- [auto] When delivery is missing -> expect `404 NOT_FOUND`.
+- [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
 ## Course modules
 
 ### `POST /courses/:courseId/modules`
