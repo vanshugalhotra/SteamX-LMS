@@ -89,6 +89,14 @@ Key rules:
 - School status is checked by `AuthGuard`; subscription status is checked by this service.
 - Denied course access returns `403 SUBSCRIPTION_EXPIRED`.
 
+### Delivery access
+
+- Delivery creation and reactivation call `assertSubscriptionActive`; this check applies to admins
+  as well as school staff and returns `403 SUBSCRIPTION_EXPIRED` when access is not current.
+- Delivery reads are not gated by subscription status; `subscriptionActive` is informational.
+- Teachers see only deliveries with their active `delivery_teachers` stint; admins see all rows in
+  their resolved school scope.
+
 See the [school and class-section API cases](./api-testing.md#schools) and
 [architecture flow](./architecture.md#schools-and-class-sections) for implementation owners.
 

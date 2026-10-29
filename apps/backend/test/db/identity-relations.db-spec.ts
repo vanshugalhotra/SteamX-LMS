@@ -63,7 +63,7 @@ describe('identity foreign keys and indexes', () => {
   it.each([
     {
       table: 'roles',
-      constraint: 'users_role_id_user_type_fkey',
+      constraint: 'role_permissions_role_id_fkey',
       insert: async (schoolId: string) =>
         db.createUser({ userType: 'SCHOOL_STAFF', roleKey: 'teacher', schoolId }),
       target: async () => {
@@ -174,7 +174,7 @@ describe('identity foreign keys and indexes', () => {
     });
     await db.expectFailure('DELETE FROM roles WHERE id = $1', [db.firstRow(role.rows).id], {
       code: '23001',
-      constraint: 'users_role_id_user_type_fkey',
+      constraint: 'role_permissions_role_id_fkey',
     });
     await db.expectFailure('DELETE FROM class_sections WHERE id = $1', [sectionId], {
       code: '23001',

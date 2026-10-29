@@ -24,6 +24,10 @@ export class CourseAccessService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
 
+    await this.assertSubscriptionActive(schoolId, courseId);
+  }
+
+  async assertSubscriptionActive(schoolId: string, courseId: string): Promise<void> {
     const [result] = await this.prisma.$queryRaw<{ has_access: boolean }[]>`
       SELECT has_course_access(${schoolId}::uuid, ${courseId}::uuid, business_today()) AS has_access
     `;
