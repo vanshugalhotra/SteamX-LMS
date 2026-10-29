@@ -62,7 +62,7 @@ export function ClassSectionForm({
         // An empty section is not sent, so the backend applies its default ("All").
         const payload = { schoolId: values.schoolId, className: values.className };
         await create.mutateAsync(
-        values.sectionName ? { ...payload, sectionName: values.sectionName } : payload,
+          values.sectionName ? { ...payload, sectionName: values.sectionName } : payload,
         );
       }
       toast.success(section ? 'Changes saved' : 'Class section created');
