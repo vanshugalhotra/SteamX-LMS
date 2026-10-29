@@ -77,6 +77,18 @@ Key rules:
 - Revoke deletes access that has not started, otherwise ends it yesterday; renew creates a new row and restores date-derived access without changing deliveries.
 - `retainedUntil` is informational, derived from the latest school-course end date plus two years, and only governs when purge is allowed.
 
+### Subscription gating
+
+- Services should call `CourseAccessService.assertCourseAccess(actor, schoolId, courseId)` before
+  returning or mutating course content. Pass the school ID from the loaded resource, not client
+  input; school-bound actors are checked against that resource school and foreign resources return 404. Platform staff bypass the subscription check inside the service.
+- Use `getAccessibleCourseIds(actor)` to filter a school-bound actor's course list to currently
+  valid subscriptions; the service takes the school from the actor. Platform staff should use
+  their explicit school filter directly instead. Subscription dates use database
+  `business_today()`; inactive courses are not checked here.
+- School status is checked by `AuthGuard`; subscription status is checked by this service.
+- Denied course access returns `403 SUBSCRIPTION_EXPIRED`.
+
 See the [school and class-section API cases](./api-testing.md#schools) and
 [architecture flow](./architecture.md#schools-and-class-sections) for implementation owners.
 
