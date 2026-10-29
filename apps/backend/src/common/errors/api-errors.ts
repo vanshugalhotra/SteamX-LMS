@@ -118,6 +118,10 @@ export const API_ERROR = {
     code: 'SUBSCRIPTION_NOT_FOUND',
     message: 'Subscription not found',
   },
+  SUBSCRIPTION_EXPIRED: {
+    code: 'SUBSCRIPTION_EXPIRED',
+    message: "This school's subscription for this course is not active",
+  },
   COURSE_NOT_ACTIVE: {
     code: 'COURSE_NOT_ACTIVE',
     message: 'Subscriptions can only be granted for an active course',
