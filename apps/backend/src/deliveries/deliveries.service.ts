@@ -26,6 +26,10 @@ import type { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto.j
 import { toDeliveryResponse } from './deliveries.mapper.js';
 import { DeliveriesRepository } from './deliveries.repository.js';
 
+/**
+ * Applies school, subscription, and delivery lifecycle rules before repository writes.
+ * The database repeats critical activation checks to protect concurrent requests.
+ */
 @Injectable()
 export class DeliveriesService {
   constructor(
@@ -40,6 +44,13 @@ export class DeliveriesService {
   // ─────────────────────────────────────────
   // POST /deliveries — Create a delivery
   // ─────────────────────────────────────────
+  /**
+   * Creates an ACTIVE delivery after scope, course, subscription, and capacity checks.
+   * @param actor Authenticated actor.
+   * @param body Delivery details, including requested school.
+   * @returns The created delivery response.
+   * @throws NotFoundException for missing or out-of-scope records; ConflictException for invalid course, duplicate, or cap; ForbiddenException without current access.
+   */
   async create(actor: AuthContext, body: CreateDeliveryDto): Promise<DeliveryResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
     const scope = school.id;
@@ -59,6 +70,7 @@ export class DeliveriesService {
     await this.assertDeliveryCapacity(scope, body.courseId);
 
     try {
+      // The database trigger repeats the cap check under a subscription-row lock to serialize races.
       const delivery = await this.deliveries.create(body, scope);
       this.logger.info(
         {
@@ -81,6 +93,12 @@ export class DeliveriesService {
   // ─────────────────────────────────────────
   // GET /deliveries — List deliveries
   // ─────────────────────────────────────────
+  /**
+   * Lists scoped deliveries and attaches current subscription state.
+   * @param actor Authenticated actor; school staff are filtered to active assignments.
+   * @param query School scope, filters, and page settings.
+   * @returns A paginated delivery response.
+   */
   async findMany(
     actor: AuthContext,
     query: DeliveryListQueryDto,
@@ -111,6 +129,13 @@ export class DeliveriesService {
   // ─────────────────────────────────────────
   // GET /deliveries/:id — Get a delivery
   // ─────────────────────────────────────────
+  /**
+   * Reads a scoped delivery; school-staff visibility is further limited to active assignments.
+   * @param actor Authenticated actor.
+   * @param id Delivery UUID.
+   * @returns The delivery and current subscription state.
+   * @throws NotFoundException when the delivery is missing, foreign, or not assigned to the teacher.
+   */
   async findById(actor: AuthContext, id: string): Promise<DeliveryResponseDto> {
     const scope = resolveSchoolScope(actor);
     const teacherId = actor.userType === UserType.SCHOOL_STAFF ? actor.userId : undefined;
@@ -130,6 +155,14 @@ export class DeliveriesService {
   // ─────────────────────────────────────────
   // PATCH /deliveries/:id/status — Change delivery status
   // ─────────────────────────────────────────
+  /**
+   * Changes delivery status; activation requires a current subscription and available capacity.
+   * @param actor Authenticated actor.
+   * @param id Delivery UUID.
+   * @param body Target status.
+   * @returns The updated delivery and current subscription state.
+   * @throws NotFoundException if missing; ConflictException for inactive course or cap; ForbiddenException without current access.
+   */
   async updateStatus(
     actor: AuthContext,
     id: string,

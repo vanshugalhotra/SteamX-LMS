@@ -6,7 +6,8 @@ the route you changed; use [workflow testing](./workflows-testing.md) for multi-
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
 health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; malformed path UUIDs rejected
 by `ParseUUIDPipe` use `BAD_REQUEST`, while valid but unknown IDs return `404 NOT_FOUND`. Error
-responses include a request ID.
+responses include a request ID. DTO validation details use `{ field, errors }` entries with
+dot-separated paths for nested inputs and plain-language messages for each invalid field.
 
 ## Before testing
 

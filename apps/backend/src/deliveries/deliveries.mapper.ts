@@ -1,6 +1,12 @@
 import type { DeliveryRecord } from './deliveries.repository.js';
 import type { DeliveryResponseDto } from './dto/delivery-response.dto.js';
 
+/**
+ * Builds the delivery response, including a display name and subscription-state snapshot.
+ * @param delivery Stored delivery and selected course/class-section fields.
+ * @param subscriptionActive Current access state for this school-course pair.
+ * @returns The public delivery response.
+ */
 export function toDeliveryResponse(
   delivery: DeliveryRecord,
   subscriptionActive: boolean,

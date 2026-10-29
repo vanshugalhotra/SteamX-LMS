@@ -14,21 +14,9 @@ import { Logger } from 'nestjs-pino';
 import { AUTH_COOKIE_NAME } from './auth/auth.constants.js';
 import type { Env } from './config/env.schema.js';
 import { API_ERROR } from './common/errors/api-errors.js';
-
-type FieldErrors = { field: string; errors: string[] };
+import { getValidationDetails } from './common/validation/validation-details.js';
 
 export const JSON_BODY_LIMIT = '1mb';
-
-/** Preserves nested DTO field paths so clients can identify the invalid input. */
-function getValidationDetails(errors: ValidationError[], parent = ''): FieldErrors[] {
-  return errors.flatMap((error) => {
-    const field = parent ? `${parent}.${error.property}` : error.property;
-    const currentError =
-      error.constraints === undefined ? [] : [{ field, errors: Object.values(error.constraints) }];
-
-    return [...currentError, ...getValidationDetails(error.children ?? [], field)];
-  });
-}
 
 /** Configures the Nest application before it begins accepting requests. */
 export function configureApp(app: INestApplication): void {

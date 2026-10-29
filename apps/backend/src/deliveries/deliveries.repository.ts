@@ -22,6 +22,10 @@ const DELIVERY_SELECT = {
 
 export type DeliveryRecord = Prisma.DeliveryGetPayload<{ select: typeof DELIVERY_SELECT }>;
 
+/**
+ * Owns delivery persistence and applies school/teacher filters directly in Prisma queries.
+ * Database triggers enforce subscription and capacity rules on writes.
+ */
 @Injectable()
 export class DeliveriesRepository {
   constructor(private readonly prisma: PrismaService) {}

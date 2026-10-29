@@ -24,12 +24,16 @@ in `apps/backend/src/common/`; feature rules stay in their feature modules.
 | `ClassSectionsModule`                           | School-owned class/section records and scoped CRUD. Exports `ClassSectionsService`.               |
 | `TenancyModule`                                 | Resolves active schools for scoped workflows.                                                     |
 | `CurriculumModule`                              | Global course/module/lesson authoring, ordering, outline reads, and lesson content.               |
+| `SubscriptionsModule`                           | Platform-managed school-course terms and shared course-access checks.                             |
+| `DeliveriesModule`                              | School course deliveries, scoped reads, and status changes.                                       |
 | `AssetsModule`                                  | Asset/file lifecycle, validation, processing, and author preview.                                 |
 | `StorageModule`                                 | S3 storage contract, presigned URLs, and queued object cleanup.                                   |
 | `PrismaModule`                                  | Configured Prisma client.                                                                         |
 | `HealthModule`, `LoggingModule`, `ConfigModule` | Liveness/readiness, request logging, and validated environment configuration.                     |
 
-Delivery, enrollment, and assignment tables exist in Prisma but do not have API modules yet.
+Delivery APIs currently cover delivery creation, listing, detail reads, and status changes.
+Teacher assignments, lesson releases, enrollments, and assignments have schema tables but no API
+modules yet.
 
 ## Curriculum authoring
 
@@ -41,7 +45,7 @@ Delivery, enrollment, and assignment tables exist in Prisma but do not have API 
   all statuses and lesson audiences; it is not the teacher/student delivery view.
 - `LessonContentController` serves the admin authoring read/write path. Reads return a block tree,
   version, and asset summaries; saves validate and replace the full tree transactionally. Asset
-  summaries come from `AssetsService`; delivery access and student-facing reads are not implemented.
+  summaries come from `AssetsService`; student-facing lesson reads are not implemented.
 - The schema permits moving a lesson between modules in its current course, but there is no public
   API route for moving lessons.
 
@@ -75,6 +79,22 @@ school staff and students currently see only their own record. See [access contr
 - School status is checked by authentication for school users and by `ActiveSchoolService` in
   workflows that require an active school. See [database constraints](./database.md#identity--users),
   [access control](./access-control.md), and the [API test checklist](./api-testing.md).
+
+## Subscriptions and deliveries
+
+- `SubscriptionsController` → `SubscriptionsService` → `SubscriptionsRepository` manages
+  school-course terms. Only platform staff with `subscription.manage` can use these routes.
+- `DeliveriesController` → `DeliveriesService` → `DeliveriesRepository` manages active or inactive
+  course deliveries. It uses `ActiveSchoolService` for school scope and the exported
+  `CourseAccessService` for current subscription checks.
+- PostgreSQL constraints enforce non-overlapping terms, active-course requirements, immutable
+  delivery identity, and the per-school-course active-delivery cap. The database trigger locks the
+  current subscription while checking capacity to serialize concurrent activations.
+- Delivery reads remain available after subscription expiry and include `subscriptionActive` as
+  current-state information. Teacher visibility is limited to deliveries with an active assignment.
+
+See [access control](./access-control.md) for scope rules, [database rules](./database.md) for
+constraints, and the [API test checklist](./api-testing.md#subscriptions) for route cases.
 
 ## HTTP request path
 

@@ -28,6 +28,10 @@ import type {
   SubscriptionRecord,
 } from './subscriptions.repository.js';
 
+/**
+ * Applies subscription lifecycle rules and maps repository outcomes to API responses.
+ * The repository owns persistence and database constraints.
+ */
 @Injectable()
 export class SubscriptionsService {
   constructor(
@@ -40,6 +44,13 @@ export class SubscriptionsService {
   // ─────────────────────────────────────────
   // POST /subscriptions — Grant a subscription
   // ─────────────────────────────────────────
+  /**
+   * Grants a term and logs the successful operation.
+   * @param actor Platform staff actor.
+   * @param body School-course term details.
+   * @returns The created term with derived fields.
+   * @throws BadRequestException for reversed dates; NotFoundException for missing records; ConflictException for ineligible records or overlap.
+   */
   async create(actor: AuthContext, body: CreateSubscriptionDto): Promise<SubscriptionResponseDto> {
     assertPlatformStaff(actor);
     const today = await this.today();
@@ -68,6 +79,12 @@ export class SubscriptionsService {
   // ─────────────────────────────────────────
   // GET /subscriptions — List subscriptions
   // ─────────────────────────────────────────
+  /**
+   * Lists terms with one derived school-course summary per page pair.
+   * @param actor Platform staff actor.
+   * @param query Filters and page settings.
+   * @returns A paginated response.
+   */
   async findMany(
     actor: AuthContext,
     query: SubscriptionListQueryDto,
@@ -101,6 +118,13 @@ export class SubscriptionsService {
   // ─────────────────────────────────────────
   // GET /subscriptions/:id — Get a subscription
   // ─────────────────────────────────────────
+  /**
+   * Loads one term.
+   * @param actor Platform staff actor.
+   * @param id Subscription UUID.
+   * @returns The term with derived fields.
+   * @throws NotFoundException when the term does not exist.
+   */
   async findById(actor: AuthContext, id: string): Promise<SubscriptionResponseDto> {
     assertPlatformStaff(actor);
     const today = await this.today();
@@ -114,6 +138,14 @@ export class SubscriptionsService {
   // ─────────────────────────────────────────
   // PATCH /subscriptions/:id — Update a subscription
   // ─────────────────────────────────────────
+  /**
+   * Updates allowed term fields.
+   * @param actor Platform staff actor.
+   * @param id Subscription UUID.
+   * @param body End date and/or delivery cap.
+   * @returns The updated term with derived fields.
+   * @throws BadRequestException for an empty or invalid update; NotFoundException if missing; ConflictException for overlap or a cap below active use.
+   */
   async update(
     actor: AuthContext,
     id: string,
@@ -161,6 +193,13 @@ export class SubscriptionsService {
   // ─────────────────────────────────────────
   // POST /subscriptions/:id/revoke — Revoke a subscription
   // ─────────────────────────────────────────
+  /**
+   * Deletes a term starting today or later, or ends a current term yesterday.
+   * @param actor Platform staff actor.
+   * @param id Subscription UUID.
+   * @returns No value after the revoke succeeds.
+   * @throws NotFoundException if missing; ConflictException if the term already ended.
+   */
   async revoke(actor: AuthContext, id: string): Promise<void> {
     assertPlatformStaff(actor);
     const today = await this.today();
@@ -194,6 +233,14 @@ export class SubscriptionsService {
   // ─────────────────────────────────────────
   // POST /subscriptions/:id/renew — Renew a subscription
   // ─────────────────────────────────────────
+  /**
+   * Creates a new term; omitted start date and delivery cap inherit from the source term.
+   * @param actor Platform staff actor.
+   * @param id Source subscription UUID.
+   * @param body New end date and optional start date or delivery cap.
+   * @returns The new term with derived fields.
+   * @throws NotFoundException if the source is missing; ConflictException for ineligible records or overlap.
+   */
   async renew(
     actor: AuthContext,
     id: string,
