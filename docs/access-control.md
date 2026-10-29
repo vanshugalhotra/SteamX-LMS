@@ -81,8 +81,7 @@ Key rules:
 
 - Services should call `CourseAccessService.assertCourseAccess(actor, schoolId, courseId)` before
   returning or mutating course content. Pass the school ID from the loaded resource, not client
-  input; school-bound actors are checked against that resource school and foreign resources return
-  404. Platform staff bypass the subscription check inside the service.
+  input; school-bound actors are checked against that resource school and foreign resources return 404. Platform staff bypass the subscription check inside the service.
 - Use `getAccessibleCourseIds(actor)` to filter a school-bound actor's course list to currently
   valid subscriptions; the service takes the school from the actor. Platform staff should use
   their explicit school filter directly instead. Subscription dates use database
