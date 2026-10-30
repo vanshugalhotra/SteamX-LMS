@@ -6,6 +6,7 @@ import {
   KeyRound,
   LayoutGrid,
   Lock,
+  Plus,
   School,
   ShieldCheck,
   User,
@@ -16,6 +17,7 @@ import { PATHS } from '@/lib/paths';
 export interface NavChild {
   label: string;
   to: string;
+  icon: LucideIcon;
 }
 
 export interface NavItem {
@@ -42,10 +44,10 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: School,
         to: PATHS.admin.schools,
         children: [
-          { label: 'All schools', to: PATHS.admin.schools },
-          { label: 'Add school', to: PATHS.admin.schoolNew },
-          { label: 'Class sections', to: PATHS.admin.classSections },
-          { label: 'Add class section', to: PATHS.admin.classSectionNew },
+          { label: 'View schools', to: PATHS.admin.schools, icon: School },
+          { label: 'Add school', to: PATHS.admin.schoolNew, icon: Plus },
+          { label: 'Classes', to: PATHS.admin.classSections, icon: LayoutGrid },
+          { label: 'Add class', to: PATHS.admin.classSectionNew, icon: Plus },
         ],
       },
       {
@@ -53,8 +55,8 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: GraduationCap,
         to: PATHS.admin.teachers,
         children: [
-          { label: 'All teachers', to: PATHS.admin.teachers },
-          { label: 'Add teacher', to: PATHS.admin.teacherNew },
+          { label: 'View teachers', to: PATHS.admin.teachers, icon: GraduationCap },
+          { label: 'Add teacher', to: PATHS.admin.teacherNew, icon: Plus },
         ],
       },
       {
@@ -62,8 +64,8 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: User,
         to: PATHS.admin.students,
         children: [
-          { label: 'All students', to: PATHS.admin.students },
-          { label: 'Add student', to: PATHS.admin.studentNew },
+          { label: 'View students', to: PATHS.admin.students, icon: User },
+          { label: 'Add student', to: PATHS.admin.studentNew, icon: Plus },
         ],
       },
       { label: 'Admins', icon: ShieldCheck, to: PATHS.admin.admins },
