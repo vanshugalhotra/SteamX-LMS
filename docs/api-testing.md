@@ -13,10 +13,6 @@ dot-separated paths for nested inputs and plain-language messages for each inval
 
 - Apply migrations to an isolated development or test database.
 - The reference-data migration creates `admin`, `teacher`, and `student` roles.
-- It grants every current permission to `admin` only. Teachers and students get `403` on
-  permission-protected routes unless grants are added before the backend starts. Curriculum
-  services additionally require platform staff, even if a school role is mistakenly granted its
-  permissions.
 - Permission grants are loaded into memory at startup. Restart the backend after changing them.
 - For write requests, send an `Origin` listed in `CORS_ORIGINS`; otherwise `OriginGuard` returns
   `403 ORIGIN_NOT_ALLOWED` before authentication or permission checks.
@@ -296,6 +292,50 @@ Caller: `admin` with `delivery.manage`; returns a paginated assignment list.
 - [auto] By default, only active assignments are returned; `includeRemoved=true` returns full history newest first, including `removedAt` and `removedBy`.
 - [auto] When the delivery is missing -> expect `404 NOT_FOUND`; invalid delivery IDs or paging inputs -> expect `400`.
 - [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `POST /deliveries/:id/enrollments`
+
+Caller: `admin` or an assigned `teacher` with `enrollment.manage`; enrolls the supplied active
+students in one delivery.
+
+Send up to 200 student IDs in one request. For more students, split them into groups of 200 or fewer
+and send more requests. To enroll everyone active in the delivery's class, use the class endpoint below.
+
+- [auto] When valid student IDs are supplied -> expect `200` with `enrolled`, `reactivated`, and `alreadyEnrolled` counts; duplicate IDs are processed once.
+- [auto] When any student is missing or belongs to another school -> expect `404 STUDENT_NOT_FOUND` with IDs in details and no enrollment writes.
+- [auto] When any student is inactive -> expect `409 STUDENT_NOT_ACTIVE`; when any student belongs to another class -> expect `409 STUDENT_WRONG_CLASS`; both validate the full request before writing.
+- [auto] When the delivery is inactive -> expect `409 DELIVERY_NOT_ACTIVE`; when the subscription is expired -> expect `403 SUBSCRIPTION_EXPIRED`, including for admin.
+- [auto] Repeating an enrollment returns `alreadyEnrolled`; reactivating a REMOVED or COMPLETED row reuses its ID and clears ended fields.
+- [auto] When body has 0 or more than 200 IDs, malformed UUIDs, or unknown fields -> expect `400 VALIDATION_ERROR`.
+- [auto] When teacher is unassigned, foreign-school, or removed from the delivery -> expect `404 NOT_FOUND`; student -> `403 FORBIDDEN`; no cookie -> `401 UNAUTHORIZED`.
+
+### `POST /deliveries/:id/enrollments/class`
+
+Caller and access rules match the explicit enrollment route; enrolls active users in the delivery's
+class section, silently skipping inactive users.
+
+- [auto] When active students match the delivery class -> expect `200` counts; a repeat is a no-op, and no matching active students returns zero counts.
+- [auto] Inactive delivery -> `409 DELIVERY_NOT_ACTIVE`; expired subscription -> `403 SUBSCRIPTION_EXPIRED`; an unassigned teacher -> `404 NOT_FOUND`.
+- [auto] When student or unauthenticated caller calls -> expect `403 FORBIDDEN` or `401 UNAUTHORIZED`.
+
+### `GET /deliveries/:id/enrollments`
+
+Caller: `admin` or an assigned `teacher` with `enrollment.manage`; reads are available after
+subscription expiry and return a paginated, newest-first list.
+
+- [auto] When `status` is omitted, all statuses are returned; `status=ACTIVE`, `status=REMOVED`, or `status=COMPLETED` filters the list before pagination.
+- [auto] Each item includes student identity, class section, enrollment status/timestamps, and enrolling/ending actors.
+- [auto] When the delivery is missing, foreign, or has no active teacher stint -> expect `404 NOT_FOUND`; student -> `403 FORBIDDEN`; no cookie -> `401 UNAUTHORIZED`.
+
+### `DELETE /deliveries/:id/enrollments/:studentId`
+
+Caller: `admin` or an assigned `teacher` with `enrollment.manage`; ends an active enrollment without
+deleting history or changing submissions/completions.
+
+- [auto] When ACTIVE -> expect `204` and status REMOVED with ended actor/time; repeating removal is `204` and leaves the row unchanged.
+- [auto] When COMPLETED -> expect `409 ENROLLMENT_NOT_ACTIVE`; when no enrollment exists -> expect `404 ENROLLMENT_NOT_FOUND`.
+- [auto] Removal is allowed on an inactive delivery and with an expired subscription.
+- [auto] When delivery is missing, foreign, or has no active teacher stint -> expect `404 NOT_FOUND`; student -> `403 FORBIDDEN`; no cookie -> `401 UNAUTHORIZED`.
 
 ## Course modules
 
@@ -837,7 +877,7 @@ Caller: authenticated role with `user.update`; updates only fields valid for the
 - [auto] When optional nullable profile fields are set to null -> they are accepted when that field applies; null classSectionId/name is invalid.
 - [auto] When field is unknown, wrong type, too long, or whitespace-only where non-empty is required -> expect `400 VALIDATION_ERROR`.
 - [auto] When user repeats current values -> expect successful response without changing values.
-- [manual] After changing a student's class -> verify old-class enrollment status; the service currently has a TODO and does not update enrollment state.
+- [auto] After changing a student's class -> old-class ACTIVE enrollments become COMPLETED with ending actor/time; REMOVED and COMPLETED rows stay unchanged, and no new-class enrollment is created.
 - [auto] When response is returned -> expect no `passwordHash`.
 
 ### `PATCH /users/:id/status`

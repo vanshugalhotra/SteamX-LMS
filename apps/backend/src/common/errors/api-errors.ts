@@ -152,7 +152,27 @@ export const API_ERROR = {
   },
   DELIVERY_NOT_ACTIVE: {
     code: 'DELIVERY_NOT_ACTIVE',
-    message: 'Teachers can only be assigned to an active delivery',
+    message: 'The delivery must be active for this operation',
+  },
+  STUDENT_NOT_FOUND: {
+    code: 'STUDENT_NOT_FOUND',
+    message: 'One or more students were not found in the delivery school',
+  },
+  STUDENT_NOT_ACTIVE: {
+    code: 'STUDENT_NOT_ACTIVE',
+    message: 'Only active students can be enrolled',
+  },
+  STUDENT_WRONG_CLASS: {
+    code: 'STUDENT_WRONG_CLASS',
+    message: 'Students must belong to the delivery class section',
+  },
+  ENROLLMENT_NOT_FOUND: {
+    code: 'ENROLLMENT_NOT_FOUND',
+    message: 'Enrollment not found',
+  },
+  ENROLLMENT_NOT_ACTIVE: {
+    code: 'ENROLLMENT_NOT_ACTIVE',
+    message: 'Completed enrollments cannot be removed',
   },
   TEACHER_NOT_ACTIVE: {
     code: 'TEACHER_NOT_ACTIVE',

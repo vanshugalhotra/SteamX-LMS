@@ -99,6 +99,9 @@ Key rules:
   their resolved school scope.
 - Teacher access to a delivery equals having an active assignment.
 - Removal takes effect immediately because the active assignment is checked on every request.
+- Enrollment writes require a current subscription, including for platform admins.
+- Enrollment reads and removals are not subscription-gated.
+- Teacher enrollment access requires an active teacher stint on that delivery.
 
 See the [school and class-section API cases](./api-testing.md#schools) and
 [architecture flow](./architecture.md#schools-and-class-sections) for implementation owners.

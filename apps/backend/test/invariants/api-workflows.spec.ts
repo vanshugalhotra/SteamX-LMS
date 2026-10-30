@@ -340,11 +340,18 @@ describe('Documented API workflows', () => {
         const options: { body?: object } = {};
         if (route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE') {
           options.body = {};
+          if (route.method === 'POST' && route.path.endsWith('/deliveries/:id/enrollments')) {
+            options.body = { studentIds: [randomUUID()] };
+          }
         }
         const response = await api.send(route.method, concretePath(route), {
           cookie: session.cookie,
           ...options,
         });
+        if (session === teacherSession && route.path.includes('/deliveries/:id/enrollments')) {
+          assertStatus(response, 404, 'NOT_FOUND');
+          continue;
+        }
         if (
           session === teacherSession &&
           route.method === 'GET' &&
