@@ -88,7 +88,7 @@ export class DeliveryEnrollmentsController {
   // GET /deliveries/:id/enrollments — List enrollments
   // ─────────────────────────────────────────
 
-  /** Lists delivery enrollments, filtered by status and newest enrollment date. */
+  /** Lists delivery enrollments, defaulting to all statuses and sorting newest first. */
   @RequirePermission(PERMISSION.ENROLLMENT_MANAGE)
   @Get(':id/enrollments')
   @ApiOperation({ summary: 'List delivery enrollments' })

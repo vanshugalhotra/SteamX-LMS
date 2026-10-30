@@ -95,17 +95,21 @@ export class DeliveryEnrollmentsRepository {
    * Returns a paginated list of enrollments in newest-first order.
    * @param deliveryId Delivery ID.
    * @param schoolId School that owns the delivery.
-   * @param status Enrollment status to include.
+   * @param status Optional enrollment status filter; omitted includes every status.
    * @param pagination Requested page and limit.
    * @returns Enrollment items and the matching total.
    */
   findMany(
     deliveryId: string,
     schoolId: string,
-    status: EnrollmentStatus,
+    status: EnrollmentStatus | undefined,
     pagination: DeliveryEnrollmentListQueryDto,
   ): Promise<{ items: DeliveryEnrollmentRecord[]; total: number }> {
-    const where: Prisma.DeliveryEnrollmentWhereInput = { deliveryId, schoolId, status };
+    const where: Prisma.DeliveryEnrollmentWhereInput = {
+      deliveryId,
+      schoolId,
+      ...(status === undefined ? {} : { status }),
+    };
     const orderBy = [
       { enrolledAt: 'desc' },
       { id: 'desc' },

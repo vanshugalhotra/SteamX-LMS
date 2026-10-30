@@ -323,7 +323,7 @@ class section, silently skipping inactive users.
 Caller: `admin` or an assigned `teacher` with `enrollment.manage`; reads are available after
 subscription expiry and return a paginated, newest-first list.
 
-- [auto] By default, only ACTIVE rows are returned; `status=COMPLETED` or `status=REMOVED` selects history of that status.
+- [auto] When `status` is omitted, all statuses are returned; `status=ACTIVE`, `status=REMOVED`, or `status=COMPLETED` filters the list before pagination.
 - [auto] Each item includes student identity, class section, enrollment status/timestamps, and enrolling/ending actors.
 - [auto] When the delivery is missing, foreign, or has no active teacher stint -> expect `404 NOT_FOUND`; student -> `403 FORBIDDEN`; no cookie -> `401 UNAUTHORIZED`.
 

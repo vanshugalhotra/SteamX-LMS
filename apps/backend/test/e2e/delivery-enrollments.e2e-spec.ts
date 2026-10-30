@@ -331,7 +331,19 @@ describe('Delivery enrollment endpoints (e2e)', () => {
     expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(1);
 
     await removeEnrollment(adminCookie, deliveryId, student.id).expect(204);
-    expect((await listEnrollments(adminCookie, deliveryId).expect(200)).body.total).toBe(0);
+    const allStatuses = await listEnrollments(adminCookie, deliveryId).expect(200);
+    expect(allStatuses.body).toMatchObject({
+      total: 1,
+      items: [{ id: original.id, status: EnrollmentStatus.REMOVED }],
+    });
+    expectError(
+      await listEnrollments(adminCookie, deliveryId, { status: 'ALL' }),
+      400,
+      'VALIDATION_ERROR',
+    );
+    expect(
+      (await listEnrollments(adminCookie, deliveryId, { status: 'ACTIVE' }).expect(200)).body.total,
+    ).toBe(0);
     const removed = await listEnrollments(adminCookie, deliveryId, { status: 'REMOVED' }).expect(
       200,
     );
