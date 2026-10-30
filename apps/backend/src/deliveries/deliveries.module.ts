@@ -8,15 +8,20 @@ import { DeliveriesService } from './deliveries.service.js';
 import { DeliveryTeachersController } from './delivery-teacher/delivery-teachers.controller.js';
 import { DeliveryTeachersRepository } from './delivery-teacher/delivery-teachers.repository.js';
 import { DeliveryTeachersService } from './delivery-teacher/delivery-teachers.service.js';
+import { DeliveryEnrollmentsController } from './enrollments/delivery-enrollments.controller.js';
+import { DeliveryEnrollmentsRepository } from './enrollments/delivery-enrollments.repository.js';
+import { DeliveryEnrollmentsService } from './enrollments/delivery-enrollments.service.js';
 
 @Module({
   imports: [PrismaModule, SubscriptionsModule, TenancyModule],
-  controllers: [DeliveriesController, DeliveryTeachersController],
+  controllers: [DeliveriesController, DeliveryTeachersController, DeliveryEnrollmentsController],
   providers: [
     DeliveriesRepository,
     DeliveriesService,
     DeliveryTeachersRepository,
     DeliveryTeachersService,
+    DeliveryEnrollmentsRepository,
+    DeliveryEnrollmentsService,
   ],
 })
 export class DeliveriesModule {}
