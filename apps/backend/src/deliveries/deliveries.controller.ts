@@ -21,6 +21,10 @@ import { DeliveryResponseDto } from './dto/delivery-response.dto.js';
 import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto.js';
 import { DeliveriesService } from './deliveries.service.js';
 
+/**
+ * Exposes delivery creation, scoped reads, and status changes.
+ * Permission and request validation run before delivery service rules.
+ */
 @ApiTags('Deliveries')
 @ApiProtectedController()
 @ApiForbiddenResponse({ description: 'The required permission is missing.' })
@@ -31,6 +35,13 @@ export class DeliveriesController {
   // ─────────────────────────────────────────
   // POST /deliveries — Create a delivery
   // ─────────────────────────────────────────
+  /**
+   * Creates an ACTIVE delivery in an active school.
+   * @param actor Authenticated actor with delivery.manage.
+   * @param body School, course, class-section, and academic year.
+   * @returns The created delivery with derived fields.
+   * @throws NotFoundException for out-of-scope records; ConflictException for inactive course, duplicate, or cap; ForbiddenException without current access.
+   */
   @RequirePermission(PERMISSION.DELIVERY_MANAGE)
   @Post()
   @ApiOperation({ summary: 'Create a delivery' })
@@ -50,6 +61,12 @@ export class DeliveriesController {
   // ─────────────────────────────────────────
   // GET /deliveries — List deliveries
   // ─────────────────────────────────────────
+  /**
+   * Lists visible deliveries; teachers see their active assignments.
+   * @param actor Authenticated actor with delivery.read.
+   * @param query Scope, filters, and page settings.
+   * @returns A paginated delivery response.
+   */
   @RequirePermission(PERMISSION.DELIVERY_READ)
   @Get()
   @ApiOperation({ summary: 'List deliveries' })
@@ -65,6 +82,13 @@ export class DeliveriesController {
   // ─────────────────────────────────────────
   // GET /deliveries/:id — Get a delivery
   // ─────────────────────────────────────────
+  /**
+   * Reads a visible delivery.
+   * @param actor Authenticated actor with delivery.read.
+   * @param id Delivery UUID.
+   * @returns The delivery with current subscription state.
+   * @throws NotFoundException for missing, foreign, or unassigned teacher records.
+   */
   @RequirePermission(PERMISSION.DELIVERY_READ)
   @Get(':id')
   @ApiOperation({ summary: 'Get a delivery' })
@@ -81,6 +105,14 @@ export class DeliveriesController {
   // ─────────────────────────────────────────
   // PATCH /deliveries/:id/status — Change delivery status
   // ─────────────────────────────────────────
+  /**
+   * Changes delivery status.
+   * @param actor Authenticated actor with delivery.manage.
+   * @param id Delivery UUID.
+   * @param body Target delivery status.
+   * @returns The updated delivery with current subscription state.
+   * @throws NotFoundException if missing; ConflictException for inactive course or cap; ForbiddenException without current access.
+   */
   @RequirePermission(PERMISSION.DELIVERY_MANAGE)
   @Patch(':id/status')
   @ApiOperation({ summary: 'Change delivery status' })

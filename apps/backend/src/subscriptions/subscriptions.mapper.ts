@@ -2,6 +2,13 @@ import type { SubscriptionRecord } from './subscriptions.repository.js';
 import type { SubscriptionResponseDto } from './dto/subscription-response.dto.js';
 import { calculateRetainedUntil, deriveSubscriptionStatus } from './subscription-rules.js';
 
+/**
+ * Shapes a subscription record and its school-course summary into the public response DTO.
+ * @param subscription Stored subscription and related display names.
+ * @param today Database business date used to derive status.
+ * @param summary Pair-level latest end date and active delivery count.
+ * @returns The public subscription response.
+ */
 export function toSubscriptionResponse(
   subscription: SubscriptionRecord,
   today: string,

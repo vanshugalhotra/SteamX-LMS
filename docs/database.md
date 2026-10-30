@@ -1,6 +1,8 @@
 # Database
 
-The Prisma schema defines all tables. API modules cover identity, schools, class sections, curriculum, and asset storage. Delivery, enrollment, and assignment tables exist in the schema but have no API modules yet.
+The Prisma schema defines the tables and migrations enforce PostgreSQL rules. Subscription and
+delivery APIs are implemented; teacher assignments, releases, enrollments, and assignments remain
+schema-only. Use this page to check persistence constraints before changing a workflow.
 
 ## Tables
 
@@ -56,12 +58,14 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 ### Subscription & delivery rules
 
 - Subscription terms require `end_date >= start_date`, `max_deliveries > 0`, and cannot overlap for the same school and course (inclusive ranges; exclusion is deferred to commit).
-- `business_today()` uses the business timezone and must match the `BUSINESS_TIMEZONE` environment default; `has_course_access()` checks subscription dates only.
+- `business_today()` currently uses the hard-coded `Asia/Kolkata` timezone; the migration comment says it should match a `BUSINESS_TIMEZONE` default, but the backend does not define that setting. `has_course_access()` checks subscription dates only.
 - Subscriptions can be created only for ACTIVE courses; their school/course identity is immutable, and the delivery cap cannot be lowered below the active delivery count.
-- Deliveries require an ACTIVE course and a current subscription, and the subscription row is locked while enforcing the school/course delivery cap.
+- Delivery creation and INACTIVE-to-ACTIVE transitions require an ACTIVE course and a current subscription. The trigger locks the current subscription row while enforcing the school-course active-delivery cap.
 - Delivery school, course, class section, and academic year are immutable; academic year must match `YYYY-NN`.
 - Enrollment identity is immutable; dates and status must agree, and enrollment/reactivation requires a matching student and delivery class section, an ACTIVE student and delivery, and current course access.
 - Lesson-release identity is immutable; releases require an ACTIVE STUDENT lesson in an ACTIVE module, an ACTIVE delivery, current course access, and an in-scope release actor.
+
+For route-level behavior, see the [subscription and delivery API cases](./api-testing.md#subscriptions).
 
 ### Curriculum & assets
 

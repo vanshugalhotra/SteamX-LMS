@@ -9,12 +9,17 @@ import { API_ERROR } from '../common/errors/api-errors.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
+/**
+ * Provides the database-date subscription checks shared by delivery workflows and course access.
+ * School identity must come from an authenticated actor or a loaded resource.
+ */
 @Injectable()
 export class CourseAccessService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * schoolId must come from the loaded resource, never from client input.
+   * Checks school scope and subscription dates before course access.
+   * @throws NotFoundException for a foreign-school resource and ForbiddenException without access.
    */
   async assertCourseAccess(actor: AuthContext, schoolId: string, courseId: string): Promise<void> {
     if (actor.userType === UserType.PLATFORM_STAFF) {
@@ -27,6 +32,12 @@ export class CourseAccessService {
     await this.assertSubscriptionActive(schoolId, courseId);
   }
 
+  /**
+   * Checks whether a term covers the database business date.
+   * @param schoolId School that owns the access.
+   * @param courseId Course to check.
+   * @throws ForbiddenException when no current term exists.
+   */
   async assertSubscriptionActive(schoolId: string, courseId: string): Promise<void> {
     const [result] = await this.prisma.$queryRaw<{ has_access: boolean }[]>`
       SELECT has_course_access(${schoolId}::uuid, ${courseId}::uuid, business_today()) AS has_access
@@ -36,6 +47,12 @@ export class CourseAccessService {
     }
   }
 
+  /**
+   * Reads the current term's delivery cap.
+   * @param schoolId School that owns the access.
+   * @param courseId Course to check.
+   * @returns The current cap, or null when no term covers the business date.
+   */
   async getCurrentDeliveryLimit(schoolId: string, courseId: string): Promise<number | null> {
     const [row] = await this.prisma.$queryRaw<{ max_deliveries: number }[]>`
       SELECT max_deliveries
@@ -48,6 +65,11 @@ export class CourseAccessService {
     return row?.max_deliveries ?? null;
   }
 
+  /**
+   * Reads current subscription state for unique school-course pairs in one query.
+   * @param pairs School-course pairs to check.
+   * @returns One current-state result per unique pair.
+   */
   async getSubscriptionActivity(
     pairs: { schoolId: string; courseId: string }[],
   ): Promise<{ schoolId: string; courseId: string; active: boolean }[]> {
@@ -74,6 +96,12 @@ export class CourseAccessService {
     `);
   }
 
+  /**
+   * Lists currently accessible course IDs for the actor's school.
+   * @param actor Actor whose school defines the query scope.
+   * @returns Course IDs with a term covering the business date.
+   * @throws BadRequestException when the actor has no school.
+   */
   async getAccessibleCourseIds(actor: AuthContext): Promise<string[]> {
     if (actor.schoolId === null) {
       throw new BadRequestException(API_ERROR.SCHOOL_REQUIRED);

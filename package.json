@@ -26,6 +26,7 @@
     "test:e2e": "pnpm --filter @steamx/backend test:e2e",
     "test:invariants": "pnpm --filter @steamx/backend test:invariants",
     "typecheck": "pnpm -r typecheck",
+    "db:test:seed": "pnpm --filter @steamx/backend db:test:seed",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev:backend": "pnpm --filter @steamx/backend start:dev",

@@ -88,8 +88,8 @@ describe('API bootstrap (e2e)', () => {
     });
     expect(validationFailure.body.details).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ field: 'block.name' }),
-        expect.objectContaining({ field: 'block.extra' }),
+        { field: 'block.name', errors: ['Name must be text.'] },
+        { field: 'block.extra', errors: ['Extra is not an allowed field.'] },
       ]),
     );
 

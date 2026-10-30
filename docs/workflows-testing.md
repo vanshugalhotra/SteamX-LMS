@@ -276,10 +276,10 @@ email, names, and creation times.
 - `GET /health/live` does not query the database; `GET /health/ready` returns `503` when its
   database check fails.
 
-## Planned workflow areas (no API modules yet)
+## Planned workflow areas
 
-- Subscription creation/renewal, date boundaries, delivery caps, and school/course isolation.
-- Delivery setup, teacher assignment history, lesson release, enrollment, re-enrollment, and progress.
+- Teacher assignment history, lesson release, enrollment, re-enrollment, and progress. Delivery setup
+  is covered by the [delivery API cases](./api-testing.md#deliveries).
 - Assignment template publishing, student submission, file upload, grading, and regrading.
 - Student promotion that completes old-class enrollments and validates cross-school moves.
 

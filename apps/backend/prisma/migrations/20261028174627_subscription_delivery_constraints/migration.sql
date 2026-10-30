@@ -336,3 +336,7 @@ CREATE TRIGGER trg_delivery_lesson_releases_immutable_identity
 BEFORE UPDATE OF school_id, course_id, delivery_id, lesson_id ON delivery_lesson_releases
 FOR EACH ROW
 EXECUTE FUNCTION reject_column_change('school_id', 'course_id', 'delivery_id', 'lesson_id');
+
+CREATE UNIQUE INDEX "delivery_teacher_active_unique"
+  ON "delivery_teachers" ("delivery_id", "teacher_id")
+  WHERE "removed_at" IS NULL;

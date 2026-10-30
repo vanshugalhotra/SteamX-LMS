@@ -410,6 +410,16 @@ describe('Subscriptions endpoints (e2e)', () => {
       maxDeliveries: 2,
       startDate: today,
     }).expect(400);
+    expectError(
+      await patchSubscription(adminCookie, subscription.id, { endDate: null }),
+      400,
+      'VALIDATION_ERROR',
+    );
+    expectError(
+      await patchSubscription(adminCookie, subscription.id, { maxDeliveries: null }),
+      400,
+      'VALIDATION_ERROR',
+    );
     await patchSubscription(adminCookie, subscription.id, {}).expect(400);
     await patchSubscription(adminCookie, subscription.id, {
       unexpected: true,
@@ -458,6 +468,22 @@ describe('Subscriptions endpoints (e2e)', () => {
     const defaultRenewal = await renewSubscription(adminCookie, original.id, {
       endDate: addDateDays(today, 20),
     }).expect(201);
+    expectError(
+      await renewSubscription(adminCookie, original.id, {
+        startDate: null,
+        endDate: addDateDays(today, 20),
+      }),
+      400,
+      'VALIDATION_ERROR',
+    );
+    expectError(
+      await renewSubscription(adminCookie, original.id, {
+        maxDeliveries: null,
+        endDate: addDateDays(today, 20),
+      }),
+      400,
+      'VALIDATION_ERROR',
+    );
     expect(defaultRenewal.body.startDate).toBe(today);
     expect(defaultRenewal.body.maxDeliveries).toBe(4);
     expect(defaultRenewal.body.retainedUntil).toBe(calculateRetainedUntil(addDateDays(today, 20)));

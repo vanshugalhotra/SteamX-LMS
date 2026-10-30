@@ -35,6 +35,10 @@ export type SubscriptionEligibilityError =
   | { courseNotFound: true }
   | { courseNotActive: true };
 
+/**
+ * Reads and writes subscription rows, including transaction-scoped eligibility checks and
+ * school-course summary queries used to build API responses.
+ */
 @Injectable()
 export class SubscriptionsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -217,6 +221,7 @@ export class SubscriptionsRepository {
     schoolId: string,
     courseId: string,
   ): Promise<SubscriptionEligibilityError | null> {
+    // Keep school and course status stable through the subscription insert in this transaction.
     const [school] = await tx.$queryRaw<{ status: SchoolStatus }[]>`
       SELECT status::text AS status
       FROM schools
