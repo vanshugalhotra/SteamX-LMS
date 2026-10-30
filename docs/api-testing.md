@@ -245,7 +245,7 @@ informational `subscriptionActive` value derived for each school-course pair.
 - [auto] When course, class section, academic year, or status is supplied -> expect results matching all supplied filters.
 - [auto] When page and limit are supplied -> expect the correct page and total.
 - [auto] When a course subscription expires -> deliveries remain readable and report `subscriptionActive: false`.
-- [auto] When a teacher lists deliveries -> only rows with that teacher's active stint appear; removed and foreign-school rows are absent.
+- [auto] When a teacher lists deliveries -> only rows with that teacher's active assignment appear; removed and foreign-school rows are absent.
 - [auto] When a teacher requests another school in `schoolId` -> expect `404 NOT_FOUND`.
 - [auto] When student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
 
@@ -255,7 +255,7 @@ Caller: `admin` or `teacher` with `delivery.read`; returns delivery metadata reg
 subscription status.
 
 - [auto] When delivery is visible -> expect `200` with the response DTO and derived subscription state.
-- [auto] When delivery is missing, belongs to another school, or has no active teacher stint -> expect the same `404 NOT_FOUND`.
+- [auto] When delivery is missing, belongs to another school, or has no active teacher assignment -> expect the same `404 NOT_FOUND`.
 - [auto] When student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
 
 ### `PATCH /deliveries/:id/status`
@@ -266,6 +266,35 @@ Caller: `admin` with `delivery.manage`; changes only delivery status.
 - [auto] When changing ACTIVE to INACTIVE -> expect `200`, even if course access has expired.
 - [auto] When changing INACTIVE to ACTIVE -> require ACTIVE course, current subscription, and remaining capacity; otherwise expect `409 COURSE_NOT_ACTIVE`, `403 SUBSCRIPTION_EXPIRED`, or `409 DELIVERY_LIMIT_REACHED`.
 - [auto] When delivery is missing -> expect `404 NOT_FOUND`.
+- [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `POST /deliveries/:id/teachers`
+
+Caller: `admin` with `delivery.manage`; assigns a teacher from the delivery's school.
+
+- [auto] When the delivery is ACTIVE and its school has an ACTIVE teacher profile -> expect `201` with the assignment and its assigning actor.
+- [auto] When the delivery is missing -> expect `404 NOT_FOUND`; when its school does not contain the teacher profile -> expect `404 NOT_FOUND`.
+- [auto] When the delivery is INACTIVE -> expect `409 DELIVERY_NOT_ACTIVE`; when the teacher user is INACTIVE -> expect `409 TEACHER_NOT_ACTIVE`.
+- [auto] When the teacher already has an active assignment -> expect `409 TEACHER_ALREADY_ASSIGNED`; concurrent duplicate assignments produce exactly one `201` and one `409`.
+- [auto] When a previously removed teacher is assigned again -> expect a new assignment row; history retains both assignments.
+- [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `DELETE /deliveries/:id/teachers/:teacherId`
+
+Caller: `admin` with `delivery.manage`; ends an active assignment without deleting its history or changing teacher data.
+
+- [auto] When an active assignment exists -> expect `204` with `removedAt` and `removedBy` recorded.
+- [auto] When no active assignment exists, including a repeated removal -> expect `404 TEACHER_NOT_ASSIGNED`.
+- [auto] When the delivery is INACTIVE -> removal is still allowed.
+- [auto] After removal the teacher no longer sees the delivery; a different active teacher's access is unchanged.
+- [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `GET /deliveries/:id/teachers`
+
+Caller: `admin` with `delivery.manage`; returns a paginated assignment list.
+
+- [auto] By default, only active assignments are returned; `includeRemoved=true` returns full history newest first, including `removedAt` and `removedBy`.
+- [auto] When the delivery is missing -> expect `404 NOT_FOUND`; invalid delivery IDs or paging inputs -> expect `400`.
 - [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
 
 ## Course modules

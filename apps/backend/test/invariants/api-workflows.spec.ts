@@ -348,7 +348,8 @@ describe('Documented API workflows', () => {
         if (
           session === teacherSession &&
           route.method === 'GET' &&
-          route.path.includes('deliveries')
+          route.path.includes('deliveries') &&
+          !route.path.includes('/teachers')
         ) {
           assertStatus(response, route.path.endsWith('/deliveries') ? 200 : 404);
           continue;

@@ -150,6 +150,22 @@ export const API_ERROR = {
     code: 'DELIVERY_LIMIT_REACHED',
     message: 'The active delivery limit has been reached',
   },
+  DELIVERY_NOT_ACTIVE: {
+    code: 'DELIVERY_NOT_ACTIVE',
+    message: 'Teachers can only be assigned to an active delivery',
+  },
+  TEACHER_NOT_ACTIVE: {
+    code: 'TEACHER_NOT_ACTIVE',
+    message: 'Only active teachers can be assigned to a delivery',
+  },
+  TEACHER_ALREADY_ASSIGNED: {
+    code: 'TEACHER_ALREADY_ASSIGNED',
+    message: 'The teacher already has an active assignment to this delivery',
+  },
+  TEACHER_NOT_ASSIGNED: {
+    code: 'TEACHER_NOT_ASSIGNED',
+    message: 'The teacher has no active assignment to this delivery',
+  },
 
   // ── Curriculum ─────────────────────────────────────────
   INVALID_ORDER: {
