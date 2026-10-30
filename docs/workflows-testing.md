@@ -12,8 +12,9 @@ scenario you need; API field requirements and individual endpoint cases are in S
 3. Install packages and generate Prisma client if needed:
    `pnpm install`, then `pnpm --filter @steamx/backend prisma:generate`.
 4. Apply committed schema/reference data with `pnpm --filter @steamx/backend migrate:deploy`.
-   The reference migration creates `admin`, `teacher`, and `student` roles; all current permissions
-   are granted to admin only. There is no Prisma seed script and no default admin account.
+   The reference migration creates `admin`, `teacher`, and `student` roles; current permissions
+   are granted to admin, with `enrollment.manage` also granted to teacher. There is no Prisma seed
+   script and no default admin account.
 5. Set `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD`, then run
    `pnpm --filter @steamx/backend admin:create`. This creates the first admin and sets
    `mustChangePassword`.
@@ -139,7 +140,7 @@ change occur in different whole seconds when checking old-token revocation.
 
 ## Student class-section change
 
-**Goal:** Confirm section ownership checks and record the currently incomplete enrollment behavior.
+**Goal:** Confirm section ownership and complete old-class enrollments during student promotion.
 
 **Preconditions:** Admin session; student in School A; one section in each of Schools A and B.
 
@@ -148,8 +149,12 @@ change occur in different whole seconds when checking old-token revocation.
 3. Call the same route with School B's section ID.
 4. Expect `404 NOT_FOUND` and the student's section to remain unchanged.
 5. Select the student's current section again; expect a successful no-op response.
-6. If test data includes delivery enrollments, inspect their status after a valid class change.
-   Current code does not update old-class enrollments; this is a pending TODO.
+6. With ACTIVE, REMOVED, and COMPLETED enrollments in deliveries for the student's old class,
+   change to the new section. Expect old-class ACTIVE rows to become COMPLETED with `endedAt` and
+   `endedBy` recorded; REMOVED and COMPLETED rows remain unchanged.
+7. Confirm no enrollment was created for a delivery in the new section.
+8. Change back to the old section and enroll again. Expect the existing COMPLETED enrollment row
+   to be reactivated with the same ID and cleared ending fields.
 
 ## SteamX ID generation and rename
 
@@ -278,10 +283,9 @@ email, names, and creation times.
 
 ## Planned workflow areas
 
-- Teacher assignment history, lesson release, enrollment, re-enrollment, and progress. Delivery setup
-  is covered by the [delivery API cases](./api-testing.md#deliveries).
+- Lesson release and progress. Delivery setup, teacher assignment history, enrollment, and
+  re-enrollment are covered by the [delivery API cases](./api-testing.md#deliveries).
 - Assignment template publishing, student submission, file upload, grading, and regrading.
-- Student promotion that completes old-class enrollments and validates cross-school moves.
 
 ## Course authoring and lesson content
 

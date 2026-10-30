@@ -2,7 +2,12 @@
  * Runs Prisma queries for users and creates each account with its profile atomically.
  */
 import { Injectable } from '@nestjs/common';
-import { Prisma, type UserStatus, type UserType } from '../generated/prisma/client.js';
+import {
+  EnrollmentStatus,
+  Prisma,
+  type UserStatus,
+  type UserType,
+} from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import { USER_DETAIL_SELECT, USER_LIST_SELECT } from './users.types.js';
@@ -153,19 +158,41 @@ export class UsersRepository {
     profileData?:
       | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
       | { student: Prisma.StudentProfileUncheckedUpdateManyInput },
-  ): Promise<UserDetailRecord | null> {
+    classChange?: { newClassSectionId: string; actorId: string },
+  ): Promise<{ user: UserDetailRecord | null; completedEnrollments: number }> {
     // User and profile fields must commit together so a partial update is never reported as success.
     return this.prisma.$transaction(async (tx) => {
       const visible = await tx.user.findFirst({ where, select: { id: true } });
       if (!visible) {
-        return null;
+        return { user: null, completedEnrollments: 0 };
       }
 
       if (Object.keys(userData).length > 0) {
         const user = await tx.user.updateMany({ where, data: userData });
         if (user.count === 0) {
-          return null;
+          return { user: null, completedEnrollments: 0 };
         }
+      }
+
+      let completedEnrollments = 0;
+      if (classChange) {
+        completedEnrollments = (
+          await tx.deliveryEnrollment.updateMany({
+            where: {
+              studentId: userId,
+              schoolId,
+              status: EnrollmentStatus.ACTIVE,
+              delivery: {
+                is: { classSectionId: { not: classChange.newClassSectionId } },
+              },
+            },
+            data: {
+              status: EnrollmentStatus.COMPLETED,
+              endedAt: new Date(),
+              endedById: classChange.actorId,
+            },
+          })
+        ).count;
       }
 
       if (profileData) {
@@ -188,7 +215,10 @@ export class UsersRepository {
         }
       }
 
-      return tx.user.findFirst({ where, select: USER_DETAIL_SELECT });
+      return {
+        user: await tx.user.findFirst({ where, select: USER_DETAIL_SELECT }),
+        completedEnrollments,
+      };
     });
   }
 

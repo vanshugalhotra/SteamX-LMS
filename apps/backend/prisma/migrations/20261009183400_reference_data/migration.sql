@@ -23,6 +23,7 @@ VALUES
   -- Deliveries
   ('delivery.manage',        'Create deliveries and change delivery status'),
   ('delivery.read',          'View deliveries'),
+  ('enrollment.manage',      'Enroll students and manage delivery enrollments'),
   -- Schools
   ('school.manage',          'Create and manage schools'),
   ('school.read',            'View schools'),
@@ -54,6 +55,7 @@ WHERE roles.key = 'admin'
     'curriculum.write',
     'delivery.manage',
     'delivery.read',
+    'enrollment.manage',
     'school.manage',
     'school.read',
     'subscription.manage',
@@ -73,5 +75,5 @@ SELECT roles.id, permissions.id
 FROM roles
 CROSS JOIN permissions
 WHERE roles.key = 'teacher'
-  AND permissions.key = 'delivery.read'
+  AND permissions.key IN ('delivery.read', 'enrollment.manage')
 ON CONFLICT (role_id, permission_id) DO NOTHING;

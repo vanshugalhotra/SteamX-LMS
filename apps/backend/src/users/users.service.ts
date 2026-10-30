@@ -256,6 +256,7 @@ export class UsersService {
       | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
       | { student: Prisma.StudentProfileUncheckedUpdateManyInput }
       | undefined;
+    let newClassSectionId: string | undefined;
     if (user.userType === UserType.SCHOOL_STAFF && body.primaryAssignment !== undefined) {
       profileData = { teacher: { primaryAssignment: body.primaryAssignment } };
     }
@@ -270,6 +271,7 @@ export class UsersService {
       ) {
         await this.sections.assertInSchool(body.classSectionId, user.schoolId);
         studentData.classSectionId = body.classSectionId;
+        newClassSectionId = body.classSectionId;
       }
       if (Object.keys(studentData).length > 0) {
         profileData = { student: studentData };
@@ -281,12 +283,24 @@ export class UsersService {
     }
 
     try {
-      const updated = await this.users.update(id, where, userData, user.schoolId, profileData);
+      const { user: updated, completedEnrollments } = await this.users.update(
+        id,
+        where,
+        userData,
+        user.schoolId,
+        profileData,
+        newClassSectionId === undefined ? undefined : { newClassSectionId, actorId: actor.userId },
+      );
       if (!updated) {
         throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
       this.logger.info(
-        { actorId: actor.userId, userId: updated.id, schoolId: updated.schoolId },
+        {
+          actorId: actor.userId,
+          userId: updated.id,
+          schoolId: updated.schoolId,
+          ...(newClassSectionId === undefined ? {} : { completedEnrollments }),
+        },
         'User updated',
       );
       return toUserResponse(updated);

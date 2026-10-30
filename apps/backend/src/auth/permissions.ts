@@ -18,6 +18,7 @@ export const PERMISSION = {
   SUBSCRIPTION_MANAGE: 'subscription.manage',
   DELIVERY_READ: 'delivery.read',
   DELIVERY_MANAGE: 'delivery.manage',
+  ENROLLMENT_MANAGE: 'enrollment.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION];

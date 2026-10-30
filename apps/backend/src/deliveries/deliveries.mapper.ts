@@ -1,7 +1,9 @@
 import type { DeliveryRecord } from './deliveries.repository.js';
+import type { DeliveryEnrollmentRecord } from './enrollments/delivery-enrollments.repository.js';
 import type { DeliveryTeacherRecord } from './delivery-teacher/delivery-teachers.repository.js';
 import type { DeliveryResponseDto } from './dto/delivery-response.dto.js';
 import type { DeliveryTeacherResponseDto } from './dto/delivery-teacher-response.dto.js';
+import type { DeliveryEnrollmentResponseDto } from './enrollments/dto/delivery-enrollment-response.dto.js';
 
 /**
  * Builds the delivery response, including a display name and subscription-state snapshot.
@@ -44,5 +46,23 @@ export function toDeliveryTeacherResponse(
     assignedBy: assignment.assignedBy,
     removedAt: assignment.removedAt,
     removedBy: assignment.removedBy,
+  };
+}
+
+/** Shapes an enrollment and its related student fields for the delivery enrollment API. */
+export function toDeliveryEnrollmentResponse(
+  enrollment: DeliveryEnrollmentRecord,
+): DeliveryEnrollmentResponseDto {
+  return {
+    id: enrollment.id,
+    studentId: enrollment.studentId,
+    name: enrollment.student.user.name,
+    steamxId: enrollment.student.user.steamxId,
+    classSection: enrollment.student.classSection,
+    status: enrollment.status,
+    enrolledAt: enrollment.enrolledAt,
+    enrolledBy: enrollment.enrolledBy,
+    endedAt: enrollment.endedAt,
+    endedBy: enrollment.endedBy,
   };
 }
