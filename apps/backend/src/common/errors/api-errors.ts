@@ -172,7 +172,7 @@ export const API_ERROR = {
   },
   ENROLLMENT_NOT_ACTIVE: {
     code: 'ENROLLMENT_NOT_ACTIVE',
-    message: 'Only active enrollments can be removed',
+    message: 'Completed enrollments cannot be removed',
   },
   TEACHER_NOT_ACTIVE: {
     code: 'TEACHER_NOT_ACTIVE',

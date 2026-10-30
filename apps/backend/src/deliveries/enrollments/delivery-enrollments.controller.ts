@@ -118,7 +118,10 @@ export class DeliveryEnrollmentsController {
   @ApiNoContentResponse({ description: 'Enrollment removed or already removed.' })
   @ApiBadRequestResponse({ description: 'The delivery or student ID is invalid.' })
   @ApiNotFoundResponse({ description: 'Delivery or enrollment not found.' })
-  @ApiConflictResponse({ description: 'ENROLLMENT_NOT_ACTIVE.' })
+  @ApiConflictResponse({
+    description:
+      'ENROLLMENT_NOT_ACTIVE: completed enrollments cannot be removed. Already-REMOVED enrollments return 204.',
+  })
   async remove(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
