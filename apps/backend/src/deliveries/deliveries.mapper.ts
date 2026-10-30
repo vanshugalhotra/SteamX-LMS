@@ -1,4 +1,5 @@
-import type { DeliveryRecord, DeliveryTeacherRecord } from './deliveries.repository.js';
+import type { DeliveryRecord } from './deliveries.repository.js';
+import type { DeliveryTeacherRecord } from './delivery-teacher/delivery-teachers.repository.js';
 import type { DeliveryResponseDto } from './dto/delivery-response.dto.js';
 import type { DeliveryTeacherResponseDto } from './dto/delivery-teacher-response.dto.js';
 

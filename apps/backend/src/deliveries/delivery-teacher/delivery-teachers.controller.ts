@@ -21,15 +21,15 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { CurrentAuth } from '../auth/decorators/current-auth.decorator.js';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator.js';
-import { PERMISSION } from '../auth/permissions.js';
-import type { AuthContext } from '../auth/types/auth-context.js';
-import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
-import { CreateDeliveryTeacherDto } from './dto/create-delivery-teacher.dto.js';
-import { DeliveryTeacherListQueryDto } from './dto/delivery-teacher-list-query.dto.js';
-import { DeliveryTeacherListResponseDto } from './dto/delivery-teacher-response.dto.js';
-import { DeliveryTeacherResponseDto } from './dto/delivery-teacher-response.dto.js';
+import { CurrentAuth } from '../../auth/decorators/current-auth.decorator.js';
+import { RequirePermission } from '../../auth/decorators/require-permission.decorator.js';
+import { PERMISSION } from '../../auth/permissions.js';
+import type { AuthContext } from '../../auth/types/auth-context.js';
+import { ApiProtectedController } from '../../common/decorators/api-protected-controller.decorator.js';
+import { CreateDeliveryTeacherDto } from '../dto/create-delivery-teacher.dto.js';
+import { DeliveryTeacherListQueryDto } from '../dto/delivery-teacher-list-query.dto.js';
+import { DeliveryTeacherListResponseDto } from '../dto/delivery-teacher-response.dto.js';
+import { DeliveryTeacherResponseDto } from '../dto/delivery-teacher-response.dto.js';
 import { DeliveryTeachersService } from './delivery-teachers.service.js';
 
 /**

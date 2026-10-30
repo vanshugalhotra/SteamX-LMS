@@ -1,17 +1,17 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliveryStatus, UserStatus } from '../generated/prisma/client.js';
+import { DeliveryStatus, UserStatus } from '../../generated/prisma/client.js';
 import { PinoLogger } from 'nestjs-pino';
-import { API_ERROR } from '../common/errors/api-errors.js';
-import { throwConflictOnDuplicate } from '../common/errors/prisma-error.js';
-import { paginate } from '../common/pagination/paginate.js';
-import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
-import { resolveSchoolScope } from '../common/tenancy/school-scope.js';
-import type { AuthContext } from '../auth/types/auth-context.js';
-import type { CreateDeliveryTeacherDto } from './dto/create-delivery-teacher.dto.js';
-import type { DeliveryTeacherListQueryDto } from './dto/delivery-teacher-list-query.dto.js';
-import type { DeliveryTeacherResponseDto } from './dto/delivery-teacher-response.dto.js';
-import { toDeliveryTeacherResponse } from './deliveries.mapper.js';
-import { DeliveriesRepository } from './deliveries.repository.js';
+import { API_ERROR } from '../../common/errors/api-errors.js';
+import { throwConflictOnDuplicate } from '../../common/errors/prisma-error.js';
+import { paginate } from '../../common/pagination/paginate.js';
+import type { PaginationResponseDto } from '../../common/pagination/pagination-response.dto.js';
+import { resolveSchoolScope } from '../../common/tenancy/school-scope.js';
+import type { AuthContext } from '../../auth/types/auth-context.js';
+import type { CreateDeliveryTeacherDto } from '../dto/create-delivery-teacher.dto.js';
+import type { DeliveryTeacherListQueryDto } from '../dto/delivery-teacher-list-query.dto.js';
+import type { DeliveryTeacherResponseDto } from '../dto/delivery-teacher-response.dto.js';
+import { toDeliveryTeacherResponse } from '../deliveries.mapper.js';
+import { DeliveryTeachersRepository } from './delivery-teachers.repository.js';
 
 /**
  * Assigns, removes, and lists delivery teachers without changing teacher profiles.
@@ -19,7 +19,7 @@ import { DeliveriesRepository } from './deliveries.repository.js';
 @Injectable()
 export class DeliveryTeachersService {
   constructor(
-    private readonly deliveries: DeliveriesRepository,
+    private readonly deliveryTeachers: DeliveryTeachersRepository,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(DeliveryTeachersService.name);
@@ -40,7 +40,7 @@ export class DeliveryTeachersService {
     body: CreateDeliveryTeacherDto,
   ): Promise<DeliveryTeacherResponseDto> {
     const scope = resolveSchoolScope(actor);
-    const delivery = await this.deliveries.findForTeacherAssignment(deliveryId, scope);
+    const delivery = await this.deliveryTeachers.findForTeacherAssignment(deliveryId, scope);
     if (!delivery) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
@@ -48,7 +48,10 @@ export class DeliveryTeachersService {
       throw new ConflictException(API_ERROR.DELIVERY_NOT_ACTIVE);
     }
 
-    const teacher = await this.deliveries.findTeacherStatus(body.teacherId, delivery.schoolId);
+    const teacher = await this.deliveryTeachers.findTeacherStatus(
+      body.teacherId,
+      delivery.schoolId,
+    );
     if (!teacher) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
@@ -57,7 +60,7 @@ export class DeliveryTeachersService {
     }
 
     try {
-      const assignment = await this.deliveries.createTeacherAssignment({
+      const assignment = await this.deliveryTeachers.createTeacherAssignment({
         deliveryId,
         schoolId: delivery.schoolId,
         teacherId: body.teacherId,
@@ -90,7 +93,7 @@ export class DeliveryTeachersService {
    */
   async remove(actor: AuthContext, deliveryId: string, teacherId: string): Promise<void> {
     const scope = resolveSchoolScope(actor);
-    const [assignment] = await this.deliveries.removeActiveTeacherAssignment(
+    const [assignment] = await this.deliveryTeachers.removeActiveTeacherAssignment(
       deliveryId,
       teacherId,
       scope,
@@ -125,11 +128,11 @@ export class DeliveryTeachersService {
     query: DeliveryTeacherListQueryDto,
   ): Promise<PaginationResponseDto<DeliveryTeacherResponseDto>> {
     const scope = resolveSchoolScope(actor);
-    const delivery = await this.deliveries.findForTeacherAssignment(deliveryId, scope);
+    const delivery = await this.deliveryTeachers.findForTeacherAssignment(deliveryId, scope);
     if (!delivery) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
-    const { items, total } = await this.deliveries.findTeacherAssignments(
+    const { items, total } = await this.deliveryTeachers.findTeacherAssignments(
       deliveryId,
       scope,
       query.includeRemoved,
