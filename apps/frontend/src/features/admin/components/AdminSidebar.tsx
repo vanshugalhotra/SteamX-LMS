@@ -8,7 +8,7 @@ import { ADMIN_NAV, type NavChild, type NavItem } from '../nav';
 import { ChevronDown } from 'lucide-react';
 
 const itemClass =
-  'flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-[13px] font-medium whitespace-nowrap outline-none focus-visible:ring-4 focus-visible:ring-ring/40';
+  'flex shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium whitespace-nowrap outline-none transition-[background-color,color,transform] duration-150 motion-reduce:transition-none motion-reduce:hover:scale-100 focus-visible:ring-4 focus-visible:ring-ring/40';
 
 function matches(pathname: string, to?: string) {
   return to !== undefined && (pathname === to || pathname.startsWith(`${to}/`));
@@ -54,7 +54,9 @@ function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
           className={cn(
             itemClass,
             'flex-1',
-            active ? 'bg-white font-semibold shadow-md' : 'text-gray-900 hover:bg-gray-100',
+            active
+              ? 'bg-white font-semibold shadow-md'
+              : 'text-gray-900 hover:scale-[1.02] hover:bg-teal-100 hover:text-teal-900',
           )}
           aria-current={active && !item.children ? 'page' : undefined}
         >
@@ -94,12 +96,13 @@ function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
                   to={child.to}
                   aria-current={isCurrent ? 'page' : undefined}
                   className={cn(
-                    'block rounded-lg px-3 py-1.5 text-xs outline-none focus-visible:ring-4 focus-visible:ring-ring/40',
+                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm outline-none transition-[background-color,color,transform] duration-150 motion-reduce:transition-none motion-reduce:hover:scale-100 focus-visible:ring-4 focus-visible:ring-ring/40',
                     isCurrent
-                      ? 'font-semibold text-foreground'
-                      : 'text-gray-600 hover:text-foreground',
+                      ? 'bg-teal-100 font-semibold text-teal-900'
+                      : 'text-gray-600 hover:scale-[1.02] hover:bg-teal-100 hover:text-teal-900',
                   )}
                 >
+                  <child.icon className="size-3.5 shrink-0" aria-hidden="true" />
                   {child.label}
                 </Link>
               </li>
@@ -129,7 +132,7 @@ export function AdminSidebar() {
     <aside className="bg-gray-50 lg:w-64 lg:shrink-0">
       <div className="flex flex-col gap-3 p-4 lg:sticky lg:top-0 lg:h-svh lg:overflow-y-auto lg:p-6">
         <div className="flex items-center justify-between gap-3">
-          <Logo accent="teal" />
+          <Logo accent="teal" variant="compact" />
           {/* Mobile only: compact sign out in the top row */}
           <LogoutButton className="lg:hidden" />
         </div>
