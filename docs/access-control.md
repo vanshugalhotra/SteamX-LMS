@@ -95,8 +95,10 @@ Key rules:
 - Delivery creation and reactivation call `assertSubscriptionActive`; this check applies to admins
   as well as school staff and returns `403 SUBSCRIPTION_EXPIRED` when access is not current.
 - Delivery reads are not gated by subscription status; `subscriptionActive` is informational.
-- Teachers see only deliveries with their active `delivery_teachers` stint; admins see all rows in
+- Teachers see only deliveries with their active `delivery_teachers` assignment; admins see all rows in
   their resolved school scope.
+- Teacher access to a delivery equals having an active assignment.
+- Removal takes effect immediately because the active assignment is checked on every request.
 
 See the [school and class-section API cases](./api-testing.md#schools) and
 [architecture flow](./architecture.md#schools-and-class-sections) for implementation owners.

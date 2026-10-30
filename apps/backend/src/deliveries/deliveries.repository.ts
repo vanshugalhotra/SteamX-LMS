@@ -31,12 +31,23 @@ export class DeliveriesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   // -------------------- Section and course lookups --------------------
+  /**
+   * Checks whether a class section belongs to the supplied school.
+   * @param classSectionId Class section UUID.
+   * @param schoolId School UUID.
+   * @returns Whether the section exists in that school.
+   */
   classSectionExistsInSchool(classSectionId: string, schoolId: string): Promise<boolean> {
     return this.prisma.classSection
       .findFirst({ where: { id: classSectionId, schoolId }, select: { id: true } })
       .then((section) => section !== null);
   }
 
+  /**
+   * Loads the course fields needed for delivery status validation.
+   * @param courseId Course UUID.
+   * @returns The course summary, or null when it does not exist.
+   */
   findCourse(
     courseId: string,
   ): Promise<{ id: string; title: string; status: ContentStatus } | null> {
@@ -47,6 +58,13 @@ export class DeliveriesRepository {
   }
 
   // -------------------- Reads --------------------
+  /**
+   * Finds a paginated, school-scoped delivery list and filters school staff to their active assignments.
+   * @param scope Resolved school UUID, or undefined for platform-wide access.
+   * @param actor Authenticated actor used to apply teacher visibility.
+   * @param query Delivery filters and pagination.
+   * @returns The matching delivery page and total count.
+   */
   findMany(
     scope: string | undefined,
     actor: AuthContext,
@@ -76,6 +94,13 @@ export class DeliveriesRepository {
     });
   }
 
+  /**
+   * Finds one delivery under school scope and optional active-teacher visibility.
+   * @param id Delivery UUID.
+   * @param scope Resolved school UUID, or undefined for platform-wide access.
+   * @param teacherId Optional teacher UUID requiring an active assignment.
+   * @returns The delivery, or null when missing, out of scope, or not assigned.
+   */
   findById(
     id: string,
     scope: string | undefined,
@@ -92,6 +117,12 @@ export class DeliveriesRepository {
   }
 
   // -------------------- Writes --------------------
+  /**
+   * Counts ACTIVE deliveries for a school-course pair.
+   * @param schoolId School UUID.
+   * @param courseId Course UUID.
+   * @returns The number of active deliveries.
+   */
   countActiveDeliveries(schoolId: string, courseId: string): Promise<number> {
     return this.prisma.delivery.count({
       where: {
@@ -102,6 +133,12 @@ export class DeliveriesRepository {
     });
   }
 
+  /**
+   * Creates a delivery for a school.
+   * @param data Delivery fields supplied by the caller.
+   * @param schoolId Resolved school UUID.
+   * @returns The created delivery record.
+   */
   create(data: CreateDeliveryDto, schoolId: string): Promise<DeliveryRecord> {
     return this.prisma.delivery.create({
       data: {
@@ -114,6 +151,13 @@ export class DeliveriesRepository {
     });
   }
 
+  /**
+   * Updates delivery status under school scope and reloads the updated record.
+   * @param id Delivery UUID.
+   * @param scope Resolved school UUID, or undefined for platform-wide access.
+   * @param status Target status.
+   * @returns The updated delivery, or null when missing or out of scope.
+   */
   async updateStatus(
     id: string,
     scope: string | undefined,
