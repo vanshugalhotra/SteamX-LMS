@@ -36,6 +36,20 @@ export const API_ERROR_CODE = {
   INVALID_ORDER: 'INVALID_ORDER',
   PARENT_NOT_ACTIVE: 'PARENT_NOT_ACTIVE',
   INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
+  ASSET_NOT_READY: 'ASSET_NOT_READY',
+  REPLACEMENT_IN_PROGRESS: 'REPLACEMENT_IN_PROGRESS',
+  ASSET_TYPE_NOT_SUPPORTED: 'ASSET_TYPE_NOT_SUPPORTED',
+  INVALID_LESSON_CONTENT: 'INVALID_LESSON_CONTENT',
+  VERSION_CONFLICT: 'VERSION_CONFLICT',
+  SUBSCRIPTION_NOT_FOUND: 'SUBSCRIPTION_NOT_FOUND',
+  SUBSCRIPTION_EXPIRED: 'SUBSCRIPTION_EXPIRED',
+  COURSE_NOT_ACTIVE: 'COURSE_NOT_ACTIVE',
+  DELIVERY_CAP_BELOW_ACTIVE: 'DELIVERY_CAP_BELOW_ACTIVE',
+  SUBSCRIPTION_ALREADY_ENDED: 'SUBSCRIPTION_ALREADY_ENDED',
+  SUBSCRIPTION_OVERLAP: 'SUBSCRIPTION_OVERLAP',
+  SUBSCRIPTION_INVALID_DATE_RANGE: 'SUBSCRIPTION_INVALID_DATE_RANGE',
+  DELIVERY_ALREADY_EXISTS: 'DELIVERY_ALREADY_EXISTS',
+  DELIVERY_LIMIT_REACHED: 'DELIVERY_LIMIT_REACHED',
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODE)[keyof typeof API_ERROR_CODE];
@@ -75,6 +89,20 @@ const DEFAULT_MESSAGES: Record<ApiErrorCode, string> = {
   INVALID_ORDER: 'The order is not valid. Please refresh and try again.',
   PARENT_NOT_ACTIVE: 'The parent item must be active.',
   INVALID_STATUS_TRANSITION: 'This status change is not allowed.',
+  ASSET_NOT_READY: 'This asset is not ready to use yet.',
+  REPLACEMENT_IN_PROGRESS: 'A new file is already being processed for this asset.',
+  ASSET_TYPE_NOT_SUPPORTED: 'This file type is not supported.',
+  INVALID_LESSON_CONTENT: 'The lesson content could not be saved. Please review it and try again.',
+  VERSION_CONFLICT: 'This lesson changed while you were editing. Refresh and try again.',
+  SUBSCRIPTION_NOT_FOUND: "We couldn't find this subscription.",
+  SUBSCRIPTION_EXPIRED: "This school's subscription for this course is no longer active.",
+  COURSE_NOT_ACTIVE: 'Only active courses can be assigned to a school.',
+  DELIVERY_CAP_BELOW_ACTIVE: 'The delivery limit cannot be lower than the number already in use.',
+  SUBSCRIPTION_ALREADY_ENDED: 'This subscription has already ended.',
+  SUBSCRIPTION_OVERLAP: 'These dates overlap another subscription for this school and course.',
+  SUBSCRIPTION_INVALID_DATE_RANGE: 'The end date must be on or after the start date.',
+  DELIVERY_ALREADY_EXISTS: 'A delivery already exists for this class, course, and school year.',
+  DELIVERY_LIMIT_REACHED: 'The active delivery limit has been reached.',
 };
 
 // Mirrors PASSWORD_POLICY_VIOLATION in apps/backend/src/auth/validators/password-policy.ts.
