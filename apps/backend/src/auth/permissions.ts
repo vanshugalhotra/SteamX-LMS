@@ -19,6 +19,7 @@ export const PERMISSION = {
   DELIVERY_READ: 'delivery.read',
   DELIVERY_MANAGE: 'delivery.manage',
   ENROLLMENT_MANAGE: 'enrollment.manage',
+  RELEASE_MANAGE: 'release.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION];
