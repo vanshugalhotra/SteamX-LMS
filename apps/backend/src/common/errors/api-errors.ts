@@ -154,6 +154,22 @@ export const API_ERROR = {
     code: 'DELIVERY_NOT_ACTIVE',
     message: 'The delivery must be active for this operation',
   },
+  LESSON_NOT_FOUND: {
+    code: 'LESSON_NOT_FOUND',
+    message: 'Lesson not found in the delivery course',
+  },
+  MODULE_NOT_FOUND: {
+    code: 'MODULE_NOT_FOUND',
+    message: 'Module not found in the delivery course',
+  },
+  LESSON_NOT_RELEASABLE: {
+    code: 'LESSON_NOT_RELEASABLE',
+    message: 'Lesson is not eligible for release',
+  },
+  MODULE_NOT_ACTIVE: {
+    code: 'MODULE_NOT_ACTIVE',
+    message: 'The module must be active for this operation',
+  },
   STUDENT_NOT_FOUND: {
     code: 'STUDENT_NOT_FOUND',
     message: 'One or more students were not found in the delivery school',

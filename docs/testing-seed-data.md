@@ -57,8 +57,10 @@ All accounts use the password **`SteamX-Local-2026!`**. The seed prints this log
 | NORTH / `Foundations of Robotics` active assigned delivery and inactive delivery                         | Delivery status filters and teacher visibility                                       |
 | SOUTH / `Foundations of Robotics` active delivery with no teacher                                        | Empty teacher-assignment list                                                        |
 | Two teacher-assignment rows on the NORTH active delivery                                                 | Removed assignment history and a later re-assignment                                 |
+| Alex Morgan and Riley Bennett enrolled in the NORTH active delivery                                      | Enrollment list and student membership                                               |
+| `Build a Line-Following Robot` released in the NORTH active delivery                                     | Release management outline and released lesson state                                 |
 
-Enrollment, lesson-release, assignment, and submission records are not seeded: those workflows do
-not currently have APIs. No seed step is expected to violate a database trigger; the file records
-are advanced through the permitted upload transitions, and all subscription dates come from
-PostgreSQL `business_today()`.
+Assignment and submission records are not seeded. Enrollment and lesson-release rows use the active
+NORTH subscription and delivery so their database guards pass. No seed step is expected to violate
+a database trigger; the file records are advanced through the permitted upload transitions, and all
+subscription dates come from PostgreSQL `business_today()`.

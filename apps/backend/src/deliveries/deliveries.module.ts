@@ -11,10 +11,19 @@ import { DeliveryTeachersService } from './delivery-teacher/delivery-teachers.se
 import { DeliveryEnrollmentsController } from './enrollments/delivery-enrollments.controller.js';
 import { DeliveryEnrollmentsRepository } from './enrollments/delivery-enrollments.repository.js';
 import { DeliveryEnrollmentsService } from './enrollments/delivery-enrollments.service.js';
+import { DeliveryAccessService } from './delivery-access.service.js';
+import { DeliveryReleasesController } from './delivery-releases/delivery-releases.controller.js';
+import { DeliveryReleasesRepository } from './delivery-releases/delivery-releases.repository.js';
+import { DeliveryReleasesService } from './delivery-releases/delivery-releases.service.js';
 
 @Module({
   imports: [PrismaModule, SubscriptionsModule, TenancyModule],
-  controllers: [DeliveriesController, DeliveryTeachersController, DeliveryEnrollmentsController],
+  controllers: [
+    DeliveriesController,
+    DeliveryTeachersController,
+    DeliveryEnrollmentsController,
+    DeliveryReleasesController,
+  ],
   providers: [
     DeliveriesRepository,
     DeliveriesService,
@@ -22,6 +31,9 @@ import { DeliveryEnrollmentsService } from './enrollments/delivery-enrollments.s
     DeliveryTeachersService,
     DeliveryEnrollmentsRepository,
     DeliveryEnrollmentsService,
+    DeliveryAccessService,
+    DeliveryReleasesRepository,
+    DeliveryReleasesService,
   ],
 })
 export class DeliveriesModule {}

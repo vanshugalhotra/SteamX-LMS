@@ -7,6 +7,8 @@ export type DeliverySeedSummary = {
   subscriptions: number;
   deliveries: number;
   deliveryTeacherStints: number;
+  enrollments: number;
+  lessonReleases: number;
   skippedScenarios: string[];
 };
 
@@ -25,6 +27,8 @@ const IDS = {
   capNorthDelivery: '019a0000-0000-7000-8000-000000000505',
   removedTeacherStint: '019a0000-0000-7000-8000-000000000521',
   activeTeacherStint: '019a0000-0000-7000-8000-000000000522',
+  alexEnrollment: '019a0000-0000-7000-8000-000000000531',
+  rileyEnrollment: '019a0000-0000-7000-8000-000000000532',
 } as const;
 
 type BusinessDates = {
@@ -226,10 +230,41 @@ export async function seedSubscriptionsAndDeliveries(
     ],
   });
 
+  await prisma.deliveryEnrollment.createMany({
+    data: [
+      {
+        id: IDS.alexEnrollment,
+        schoolId: identity.north.id,
+        deliveryId: IDS.coreNorthActiveDelivery,
+        studentId: identity.north.students.alex,
+        enrolledById: identity.admin.id,
+      },
+      {
+        id: IDS.rileyEnrollment,
+        schoolId: identity.north.id,
+        deliveryId: IDS.coreNorthActiveDelivery,
+        studentId: identity.north.students.riley,
+        enrolledById: identity.admin.id,
+      },
+    ],
+  });
+
+  await prisma.deliveryLessonRelease.create({
+    data: {
+      schoolId: identity.north.id,
+      deliveryId: IDS.coreNorthActiveDelivery,
+      courseId: curriculum.courses.active,
+      lessonId: curriculum.lesson,
+      releasedById: identity.admin.id,
+    },
+  });
+
   return {
     subscriptions: 7,
     deliveries: skippedScenarios.length === 0 ? 5 : 4,
     deliveryTeacherStints: 2,
+    enrollments: 2,
+    lessonReleases: 1,
     skippedScenarios,
   };
 }

@@ -17,8 +17,8 @@ export class DeliveryEnrollmentClassSectionDto {
   @ApiProperty()
   className!: string;
 
-  @ApiProperty({ nullable: true })
-  sectionName!: string | null;
+  @ApiProperty()
+  sectionName!: string;
 }
 
 export class DeliveryEnrollmentResponseDto {

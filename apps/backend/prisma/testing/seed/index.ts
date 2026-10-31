@@ -68,8 +68,9 @@ async function main(): Promise<void> {
     console.log('2 schools; 6 class sections; 19 users (1 admin, 6 teachers, 12 students).');
     console.log('7 courses; 3 modules; 5 lessons; 9 lesson blocks.');
     console.log('8 assets; 8 asset files; 7 subscriptions.');
+    console.log(`${deliverySummary.deliveries} deliveries.`);
     console.log(
-      `${deliverySummary.deliveries} deliveries; ${deliverySummary.deliveryTeacherStints} delivery-teacher history rows.`,
+      `${deliverySummary.deliveryTeacherStints} delivery-teacher history rows; ${deliverySummary.enrollments} enrollments; ${deliverySummary.lessonReleases} lesson release rows.`,
     );
     if (deliverySummary.skippedScenarios.length > 0) {
       console.log('\nSkipped scenarios:');
