@@ -9,7 +9,7 @@ import type {
   SaveLessonContentPayload,
   UpdateLessonPayload,
 } from '../model/types';
-import type { ContentStatus } from '../../../courses/model/types';
+import type { ContentStatus } from '@/lib/content-status';
 
 /** POST /modules/:moduleId/lessons */
 export function createLesson(moduleId: string, payload: CreateLessonPayload) {

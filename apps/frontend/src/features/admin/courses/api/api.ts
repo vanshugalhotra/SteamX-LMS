@@ -2,13 +2,13 @@ import { apiFetch } from '@/lib/api-client';
 import type { Paginated } from '@/lib/pagination';
 import { COURSE_ENDPOINTS } from './endpoints';
 import type {
-  ContentStatus,
   Course,
   CourseListParams,
   CourseOutline,
   CreateCoursePayload,
   UpdateCoursePayload,
 } from '../model/types';
+import type { ContentStatus } from '@/lib/content-status';
 
 export function buildCourseListSearchParams(params: CourseListParams) {
   const search = new URLSearchParams({

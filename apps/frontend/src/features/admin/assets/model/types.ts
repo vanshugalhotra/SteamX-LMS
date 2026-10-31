@@ -1,10 +1,11 @@
 // TODO: these mirror the backend DTOs by hand. Generate them from Swagger
 // (or share a typed API client) so they cannot drift.
-import type { ContentStatus } from '../../courses/model/types';
+import type { ContentStatus } from '@/lib/content-status';
 
-export type AssetType = 'IMAGE' | 'VIDEO' | 'PDF' | 'PPTX';
+export type AssetType = 'IMAGE' | 'VIDEO' | 'PDF';
 export type AssetFileStatus = 'UPLOADING' | 'UPLOADED' | 'PROCESSING' | 'READY' | 'FAILED';
 export type AssetStatus = Extract<ContentStatus, 'ACTIVE' | 'ARCHIVED'>;
+export type UploadHeaders = Record<'Content-Type' | 'If-None-Match', string>;
 
 export interface AssetFileSummary {
   id: string;
@@ -83,11 +84,6 @@ export interface RequestAssetFileUploadPayload {
   filename: string;
   mimeType: string;
   sizeBytes: number;
-}
-
-export interface UploadHeaders {
-  'Content-Type': string;
-  'If-None-Match': string;
 }
 
 export interface UploadInstructions {

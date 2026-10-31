@@ -1,6 +1,6 @@
 // TODO: these mirror the backend DTOs by hand. Generate them from Swagger
 // (or share a typed API client) so they cannot drift.
-import type { ContentStatus } from '../../courses/model/types';
+import type { ContentStatus } from '@/lib/content-status';
 
 export interface CourseModule {
   id: string;

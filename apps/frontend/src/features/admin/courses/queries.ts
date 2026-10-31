@@ -14,7 +14,8 @@ import {
   updateCourse,
   updateCourseStatus,
 } from './api/api';
-import type { CourseListParams, ContentStatus, UpdateCoursePayload } from './model/types';
+import type { CourseListParams, UpdateCoursePayload } from './model/types';
+import type { ContentStatus } from '@/lib/content-status';
 
 export const courseKeys = {
   all: ['courses'] as const,

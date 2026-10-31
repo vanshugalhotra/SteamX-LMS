@@ -1,6 +1,7 @@
 // TODO: these mirror the backend DTOs by hand. Generate them from Swagger
 // (or share a typed API client) so they cannot drift.
-export type ContentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+import type { ContentStatus } from '@/lib/content-status';
+import type { LessonAudience } from '@/features/admin/modules/lessons/model/types';
 
 export interface Course {
   id: string;
@@ -48,5 +49,3 @@ export interface CourseOutline {
   course: Pick<Course, 'id' | 'title' | 'description' | 'status'>;
   modules: CourseOutlineModule[];
 }
-
-export type LessonAudience = 'TEACHER_ONLY' | 'STUDENT';

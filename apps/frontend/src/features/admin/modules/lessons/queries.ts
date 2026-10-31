@@ -17,7 +17,7 @@ import type {
   SaveLessonContentPayload,
   UpdateLessonPayload,
 } from './model/types';
-import type { ContentStatus } from '../../courses/model/types';
+import type { ContentStatus } from '@/lib/content-status';
 
 export const lessonKeys = {
   all: ['lessons'] as const,

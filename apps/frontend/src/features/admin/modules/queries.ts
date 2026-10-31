@@ -14,7 +14,7 @@ import type {
   ReorderCourseModulesPayload,
   UpdateCourseModulePayload,
 } from './model/types';
-import type { ContentStatus } from '../courses/model/types';
+import type { ContentStatus } from '@/lib/content-status';
 import { courseKeys } from '../courses/queries';
 
 export const courseModuleKeys = {

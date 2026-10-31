@@ -60,6 +60,8 @@ export function useAssetAccess(id: string) {
     enabled: id !== '',
     staleTime: 0,
     gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

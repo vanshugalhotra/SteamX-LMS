@@ -6,7 +6,7 @@ import type {
   ReorderCourseModulesPayload,
   UpdateCourseModulePayload,
 } from '../model/types';
-import type { ContentStatus } from '../../courses/model/types';
+import type { ContentStatus } from '@/lib/content-status';
 
 /** POST /courses/:courseId/modules */
 export function createCourseModule(courseId: string, payload: CreateCourseModulePayload) {

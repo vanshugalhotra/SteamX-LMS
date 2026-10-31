@@ -1,7 +1,9 @@
 // TODO: these mirror the backend DTOs by hand. Generate them from Swagger
 // (or share a typed API client) so they cannot drift.
 import type { AssetFileStatus, AssetType } from '../../../assets/model/types';
-import type { ContentStatus, LessonAudience } from '../../../courses/model/types';
+import type { ContentStatus } from '@/lib/content-status';
+
+export type LessonAudience = 'TEACHER_ONLY' | 'STUDENT';
 
 export interface Lesson {
   id: string;
@@ -33,8 +35,7 @@ export interface ReorderLessonsPayload {
   lessonIds: string[];
 }
 
-export type BlockType =
-  'RICH_TEXT' | 'IMAGE' | 'VIDEO' | 'PDF' | 'PPTX' | 'ACCORDION' | 'TWO_COLUMN';
+export type BlockType = 'RICH_TEXT' | 'IMAGE' | 'VIDEO' | 'PDF' | 'ACCORDION' | 'TWO_COLUMN';
 
 export interface LessonContentBlock {
   id: string;
