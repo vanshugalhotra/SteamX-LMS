@@ -116,13 +116,7 @@ export class DeliveryEnrollmentsService {
       query.status,
       query,
     );
-    const page = paginate(items.map(toDeliveryEnrollmentResponse), query.page, query.limit, total);
-    return {
-      items: page.items,
-      page: page.page,
-      limit: page.limit,
-      total: page.total,
-    };
+    return paginate(items.map(toDeliveryEnrollmentResponse), query.page, query.limit, total);
   }
 
   // ─────────────────────────────────────────
