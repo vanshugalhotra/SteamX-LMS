@@ -498,4 +498,23 @@ describe('Delivery release endpoints (e2e)', () => {
     expectError(await releaseLesson(adminCookie, deliveryId, lessonId), 409, 'DELIVERY_NOT_ACTIVE');
     expectError(await releaseModule(adminCookie, deliveryId, moduleId), 409, 'DELIVERY_NOT_ACTIVE');
   });
+
+  it('allows removing a release after its lesson is archived', async () => {
+    const deliveryId = await createDelivery();
+    const moduleId = await createModule();
+    const lessonId = await createLesson(moduleId);
+    await assignTeacher(deliveryId).expect(201);
+    await releaseLesson(adminCookie, deliveryId, lessonId).expect(200);
+    await prisma.lesson.update({
+      where: { id: lessonId },
+      data: { status: ContentStatus.ARCHIVED },
+    });
+
+    await unreleaseLesson(teacherCookie, deliveryId, lessonId).expect(204);
+    expect(
+      await prisma.deliveryLessonRelease.findUnique({
+        where: { deliveryId_lessonId: { deliveryId, lessonId } },
+      }),
+    ).toBeNull();
+  });
 });
