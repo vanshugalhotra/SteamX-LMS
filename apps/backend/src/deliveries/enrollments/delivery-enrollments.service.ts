@@ -14,7 +14,6 @@ import {
   getPrismaReason,
   isPrismaKnownError,
 } from '../../common/errors/prisma-error.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
 import { CourseAccessService } from '../../subscriptions/course-access.service.js';
 import { DeliveryAccessService } from '../delivery-access.service.js';
 import { toDeliveryEnrollmentResponse } from '../deliveries.mapper.js';
@@ -29,7 +28,6 @@ export class DeliveryEnrollmentsService {
   constructor(
     private readonly deliveryAccess: DeliveryAccessService,
     private readonly enrollments: DeliveryEnrollmentsRepository,
-    private readonly prisma: PrismaService,
     private readonly courseAccess: CourseAccessService,
     private readonly logger: PinoLogger,
   ) {
@@ -74,7 +72,7 @@ export class DeliveryEnrollmentsService {
     await this.assertEnrollmentWritesAllowed(delivery);
     let counts: EnrollmentCountsResponseDto;
     try {
-      counts = await this.prisma.$transaction(async (tx) => {
+      counts = await this.enrollments.transaction(async (tx) => {
         const students = await this.enrollments.findActiveStudentsInClass(
           tx,
           delivery.schoolId,
@@ -212,7 +210,7 @@ export class DeliveryEnrollmentsService {
     actorId: string,
   ): Promise<EnrollmentCountsResponseDto> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await this.enrollments.transaction(async (tx) => {
         const students = await this.enrollments.findStudents(tx, delivery.schoolId, studentIds);
         const byId = new Map(students.map((student) => [student.userId, student]));
         const missingIds = studentIds.filter((studentId) => !byId.has(studentId));
