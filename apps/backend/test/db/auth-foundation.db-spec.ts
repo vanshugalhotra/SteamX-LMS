@@ -98,6 +98,7 @@ describe('Authentication foundation reference data', () => {
       'delivery.manage',
       'delivery.read',
       'enrollment.manage',
+      'release.manage',
       'school.manage',
       'school.read',
       'subscription.manage',
@@ -119,6 +120,7 @@ describe('Authentication foundation reference data', () => {
       { role: 'admin', permission: 'delivery.manage' },
       { role: 'admin', permission: 'delivery.read' },
       { role: 'admin', permission: 'enrollment.manage' },
+      { role: 'admin', permission: 'release.manage' },
       { role: 'admin', permission: 'school.manage' },
       { role: 'admin', permission: 'school.read' },
       { role: 'admin', permission: 'subscription.manage' },
@@ -131,6 +133,7 @@ describe('Authentication foundation reference data', () => {
       { role: 'admin', permission: 'user.update' },
       { role: 'teacher', permission: 'delivery.read' },
       { role: 'teacher', permission: 'enrollment.manage' },
+      { role: 'teacher', permission: 'release.manage' },
     ]);
   });
 

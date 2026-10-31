@@ -352,6 +352,10 @@ describe('Documented API workflows', () => {
           assertStatus(response, 404, 'NOT_FOUND');
           continue;
         }
+        if (session === teacherSession && route.path.includes('/deliveries/:id/releases')) {
+          assertStatus(response, 404, 'NOT_FOUND');
+          continue;
+        }
         if (
           session === teacherSession &&
           route.method === 'GET' &&

@@ -5,7 +5,6 @@ import {
   EnrollmentStatus,
   Prisma,
   UserStatus,
-  UserType,
 } from '../../generated/prisma/client.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
@@ -15,10 +14,9 @@ import {
   getPrismaReason,
   isPrismaKnownError,
 } from '../../common/errors/prisma-error.js';
-import { resolveSchoolScope } from '../../common/tenancy/school-scope.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CourseAccessService } from '../../subscriptions/course-access.service.js';
-import { DeliveriesRepository } from '../deliveries.repository.js';
+import { DeliveryAccessService } from '../delivery-access.service.js';
 import { toDeliveryEnrollmentResponse } from '../deliveries.mapper.js';
 import { DeliveryEnrollmentsRepository } from './delivery-enrollments.repository.js';
 import type { DeliveryEnrollmentListQueryDto } from './dto/delivery-enrollment-list-query.dto.js';
@@ -29,7 +27,7 @@ import type { EnrollmentCountsResponseDto } from './dto/enrollment-counts-respon
 @Injectable()
 export class DeliveryEnrollmentsService {
   constructor(
-    private readonly deliveries: DeliveriesRepository,
+    private readonly deliveryAccess: DeliveryAccessService,
     private readonly enrollments: DeliveryEnrollmentsRepository,
     private readonly prisma: PrismaService,
     private readonly courseAccess: CourseAccessService,
@@ -181,13 +179,7 @@ export class DeliveryEnrollmentsService {
    * @throws NotFoundException when missing, outside school scope, or not assigned to the teacher.
    */
   private async loadDelivery(actor: AuthContext, deliveryId: string) {
-    const scope = resolveSchoolScope(actor);
-    const teacherId = actor.userType === UserType.SCHOOL_STAFF ? actor.userId : undefined;
-    const delivery = await this.deliveries.findById(deliveryId, scope, teacherId);
-    if (!delivery) {
-      throw new NotFoundException(API_ERROR.NOT_FOUND);
-    }
-    return delivery;
+    return this.deliveryAccess.load(actor, deliveryId);
   }
 
   /**
