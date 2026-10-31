@@ -15,6 +15,7 @@ const ADMIN_INPUT = {
   name: '  First Admin  ',
 };
 const REFERENCE_MIGRATION_SUFFIX = '_reference_data';
+const ASSET_PERMISSIONS_MIGRATION = '20261031232300_add_asset_permissions';
 
 type ReferenceDataSnapshot = {
   roles: Array<{ key: string; userType: UserType }>;
@@ -152,6 +153,31 @@ describe('Authentication foundation reference data', () => {
 
     const migrationSql = await readFile(
       new URL(`../../prisma/migrations/${migrationDirectory.name}/migration.sql`, import.meta.url),
+      'utf8',
+    );
+    const statements = migrationSql
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter((statement) => statement.length > 0);
+
+    await withRollback(prisma, async (tx) => {
+      for (const statement of statements) {
+        await tx.$executeRawUnsafe(statement);
+      }
+
+      expect(await snapshotReferenceData(tx)).toEqual(before);
+    });
+
+    expect(await snapshotReferenceData(prisma)).toEqual(before);
+  });
+
+  it('replays the asset-permissions migration idempotently', async () => {
+    const before = await snapshotReferenceData(prisma);
+    const migrationSql = await readFile(
+      new URL(
+        `../../prisma/migrations/${ASSET_PERMISSIONS_MIGRATION}/migration.sql`,
+        import.meta.url,
+      ),
       'utf8',
     );
     const statements = migrationSql
