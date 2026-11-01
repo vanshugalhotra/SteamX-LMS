@@ -36,7 +36,7 @@ function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
 
   if (!item.to) {
     return (
-      <span aria-disabled="true" className={cn(itemClass, 'cursor-not-allowed text-gray-400')}>
+      <span aria-disabled="true" className={cn(itemClass, 'cursor-default text-gray-900')}>
         <Icon className="size-4 shrink-0" aria-hidden="true" />
         {item.label}
       </span>

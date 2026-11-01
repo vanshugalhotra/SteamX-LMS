@@ -2,7 +2,9 @@
 // (or share a typed API client) so they cannot drift.
 import type { ContentStatus } from '@/lib/content-status';
 
-export type AssetType = 'IMAGE' | 'VIDEO' | 'PDF';
+/** Mirrors the backend enum, including legacy PPTX assets that may still exist. */
+export type AssetType = 'IMAGE' | 'VIDEO' | 'PDF' | 'PPTX';
+export type SupportedAssetType = Exclude<AssetType, 'PPTX'>;
 export type AssetFileStatus = 'UPLOADING' | 'UPLOADED' | 'PROCESSING' | 'READY' | 'FAILED';
 export type AssetStatus = Extract<ContentStatus, 'ACTIVE' | 'ARCHIVED'>;
 export type UploadHeaders = Record<'Content-Type' | 'If-None-Match', string>;
@@ -73,7 +75,7 @@ export interface AssetAccess {
 }
 
 export interface CreateAssetPayload {
-  type: AssetType;
+  type: SupportedAssetType;
   title: string;
   filename: string;
   mimeType: string;
