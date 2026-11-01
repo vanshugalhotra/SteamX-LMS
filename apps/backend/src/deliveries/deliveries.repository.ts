@@ -32,7 +32,7 @@ export class DeliveriesRepository {
 
   // -------------------- Section and course lookups --------------------
   /**
-   * Checks whether a class section belongs to the supplied school.
+   * Checks whether the class section ID belongs to the supplied school.
    * @param classSectionId Class section UUID.
    * @param schoolId School UUID.
    * @returns Whether the section exists in that school.
@@ -44,7 +44,7 @@ export class DeliveriesRepository {
   }
 
   /**
-   * Loads the course fields needed for delivery status validation.
+   * Loads the course fields used to validate delivery creation and activation.
    * @param courseId Course UUID.
    * @returns The course summary, or null when it does not exist.
    */
@@ -134,7 +134,8 @@ export class DeliveriesRepository {
   }
 
   /**
-   * Creates a delivery for a school.
+   * Creates a delivery using the resolved school ID and request's course, section, and year.
+   * Database triggers enforce subscription access, capacity, and uniqueness constraints.
    * @param data Delivery fields supplied by the caller.
    * @param schoolId Resolved school UUID.
    * @returns The created delivery record.
@@ -153,6 +154,7 @@ export class DeliveriesRepository {
 
   /**
    * Updates delivery status under school scope and reloads the updated record.
+   * Database triggers enforce activation rules if the subscription changes between service checks and this write.
    * @param id Delivery UUID.
    * @param scope Resolved school UUID, or undefined for platform-wide access.
    * @param status Target status.

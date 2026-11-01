@@ -29,6 +29,7 @@ type UsageLesson = Prisma.LessonGetPayload<{ select: typeof USAGE_LESSON_SELECT 
 export class AssetUsageRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Lists up to 50 lessons referencing the asset and returns the uncapped total count. */
   async findByAssetId(assetId: string): Promise<{ items: UsageLesson[]; total: number }> {
     const where: Prisma.LessonWhereInput = {
       blocks: { some: { assetId } },

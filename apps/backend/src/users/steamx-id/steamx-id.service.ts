@@ -13,6 +13,10 @@ export class SteamxIdService {
   /**
    * Generates a candidate and reruns the operation on SteamX ID uniqueness conflicts.
    * Other database errors propagate; exhaustion throws STEAMX_ID_UNAVAILABLE.
+   * @param identity School code and account name used to build the candidate.
+   * @param run Operation to retry with a candidate ID.
+   * @returns The result of the first successful operation.
+   * @throws ConflictException after all candidate attempts collide on SteamX ID.
    */
   async withUniqueSteamxId<T>(
     identity: { schoolCode: string; name: string },
@@ -32,6 +36,7 @@ export class SteamxIdService {
     throw new ConflictException(API_ERROR.STEAMX_ID_UNAVAILABLE);
   }
 
+  /** Builds one SteamX ID candidate from the school code and account name. */
   private generateCandidate(schoolCode: string, name: string): string {
     return buildSteamxId(schoolCode, name, randomInt);
   }

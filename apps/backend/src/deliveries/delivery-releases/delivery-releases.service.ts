@@ -36,7 +36,13 @@ export class DeliveryReleasesService {
     this.logger.setContext(DeliveryReleasesService.name);
   }
 
-  /** Lists the active course outline and release state for a delivery. */
+  /**
+   * Builds the visible delivery's active course outline and each lesson's release eligibility/state.
+   * @param actor Authenticated actor used to resolve delivery and teacher visibility.
+   * @param deliveryId Delivery whose outline is requested.
+   * @returns Active modules and lessons with aggregate and per-lesson release state.
+   * @throws NotFoundException when the delivery is missing, outside school scope, or unassigned.
+   */
   async findMany(actor: AuthContext, deliveryId: string): Promise<DeliveryReleasesResponseDto> {
     const delivery = await this.deliveryAccess.load(actor, deliveryId);
     const modules = await this.releases.findActiveOutline(delivery.courseId);
@@ -84,7 +90,17 @@ export class DeliveryReleasesService {
     };
   }
 
-  /** Releases one eligible lesson; duplicate requests retain the original timestamp. */
+  /**
+   * Releases one eligible lesson; duplicate requests retain the original timestamp.
+   * The write is rechecked by database constraints to handle concurrent status changes.
+   * @param actor Authenticated actor recording the release.
+   * @param deliveryId Visible delivery to update.
+   * @param lessonId Lesson in the delivery course.
+   * @returns Release state and the persisted timestamp.
+   * @throws NotFoundException when the delivery or lesson is unavailable in scope.
+   * @throws ConflictException when the delivery is inactive or lesson is ineligible.
+   * @throws ForbiddenException when course access has expired.
+   */
   async releaseLesson(
     actor: AuthContext,
     deliveryId: string,
@@ -126,7 +142,13 @@ export class DeliveryReleasesService {
     return { lessonId, released: true, releasedAt: result.releasedAt };
   }
 
-  /** Removes one release without affecting lesson completion records. */
+  /**
+   * Removes one release without changing lesson completion records.
+   * @param actor Authenticated actor recording the removal.
+   * @param deliveryId Visible delivery to update.
+   * @param lessonId Lesson in the delivery course.
+   * @throws NotFoundException when the delivery or lesson is unavailable in scope.
+   */
   async unreleaseLesson(actor: AuthContext, deliveryId: string, lessonId: string): Promise<void> {
     const delivery = await this.deliveryAccess.load(actor, deliveryId);
     const lesson = await this.releases.findLesson(delivery.courseId, lessonId);
@@ -146,7 +168,17 @@ export class DeliveryReleasesService {
     );
   }
 
-  /** Releases all eligible lessons in one module, skipping ineligible content. */
+  /**
+   * Releases eligible lessons in one active module and counts skipped ineligible lessons.
+   * Existing releases remain unchanged; new rows are written in one transaction.
+   * @param actor Authenticated actor recording the releases.
+   * @param deliveryId Visible delivery to update.
+   * @param moduleId Active module in the delivery course.
+   * @returns Counts of inserted, existing, and ineligible lesson releases.
+   * @throws NotFoundException when the delivery or module is unavailable in scope.
+   * @throws ConflictException when the delivery or module is inactive.
+   * @throws ForbiddenException when course access has expired.
+   */
   async releaseModule(
     actor: AuthContext,
     deliveryId: string,
@@ -199,14 +231,22 @@ export class DeliveryReleasesService {
     return counts;
   }
 
-  /** Rejects release writes when the delivery is inactive. */
+  /**
+   * Requires an active delivery before creating releases.
+   * @param status Current delivery status.
+   * @throws ConflictException when the delivery is inactive.
+   */
   private assertDeliveryActive(status: DeliveryStatus): void {
     if (status !== DeliveryStatus.ACTIVE) {
       throw new ConflictException(API_ERROR.DELIVERY_NOT_ACTIVE);
     }
   }
 
-  /** Checks lesson audience and both content statuses before release. */
+  /**
+   * Requires a student-facing lesson and active lesson and parent module.
+   * @param lesson Lesson audience and status with its parent module status.
+   * @throws ConflictException when the lesson is not releasable.
+   */
   private assertLessonReleasable(lesson: {
     status: ContentStatus;
     audience: LessonAudience;
@@ -218,7 +258,12 @@ export class DeliveryReleasesService {
     }
   }
 
-  /** Maps release-trigger races to their documented API errors. */
+  /**
+   * Maps recognized database trigger failures to their release API errors.
+   * @param error Error raised while writing a release.
+   * @throws ConflictException when the delivery or lesson is no longer eligible.
+   * @throws ForbiddenException when course access is no longer current.
+   */
   private mapReleaseWriteError(error: unknown): void {
     const postgresCode = getPostgresCode(error);
     if (

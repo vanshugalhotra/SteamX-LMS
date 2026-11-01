@@ -16,8 +16,13 @@ export type ReorderLessonsResult =
 
 @Injectable()
 export class LessonsRepository {
+  /** Injects Prisma for global lesson queries and writes. */
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Appends a draft lesson using a parent-row lock to serialize position assignment.
+   * Returns null when the module does not exist.
+   */
   async create(moduleId: string, data: CreateLessonDto): Promise<Lesson | null> {
     return this.prisma.$transaction(async (tx) => {
       // Serializes appends so concurrent creates cannot choose the same next position.
@@ -44,6 +49,7 @@ export class LessonsRepository {
     });
   }
 
+  /** Finds lessons for an existing module in position order, or returns null for a missing module. */
   async findManyForModule(moduleId: string): Promise<Lesson[] | null> {
     const module = await this.prisma.module.findUnique({
       where: { id: moduleId },
@@ -58,6 +64,10 @@ export class LessonsRepository {
     });
   }
 
+  /**
+   * Applies a complete position permutation under a module-row lock and one transaction.
+   * Returns not-found or invalid-order without changing any positions.
+   */
   reorder(moduleId: string, lessonIds: readonly string[]): Promise<ReorderLessonsResult> {
     return this.prisma.$transaction(async (tx) => {
       if (!(await lockModule(tx, moduleId))) {
@@ -95,6 +105,7 @@ export class LessonsRepository {
     });
   }
 
+  /** Finds a lesson and its parent module status, or returns null when it is missing. */
   findById(id: string): Promise<LessonWithModule | null> {
     return this.prisma.lesson.findUnique({
       where: { id },
@@ -102,11 +113,13 @@ export class LessonsRepository {
     });
   }
 
+  /** Applies a lesson patch and returns null when the lesson ID did not match. */
   async update(id: string, data: UpdateLessonDto): Promise<LessonWithModule | null> {
     const result = await this.prisma.lesson.updateMany({ where: { id }, data });
     return result.count === 0 ? null : this.findById(id);
   }
 
+  /** Updates status only when it still matches the previously read value. */
   async updateStatus(
     id: string,
     currentStatus: ContentStatus,
@@ -126,6 +139,7 @@ export class LessonsRepository {
     });
   }
 
+  /** Deletes a lesson; foreign-key errors are left for the service to translate. */
   delete(id: string): Promise<{ id: string; title: string }> {
     return this.prisma.lesson.delete({
       where: { id },

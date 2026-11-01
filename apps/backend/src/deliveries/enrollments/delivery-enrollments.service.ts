@@ -39,11 +39,14 @@ export class DeliveryEnrollmentsService {
   // ─────────────────────────────────────────
 
   /**
-   * Validates and enrolls all requested students in one transaction.
+   * Validates every requested student before atomically creating or reactivating enrollments.
    * @param actor Authenticated actor.
    * @param deliveryId Delivery to enroll students into.
    * @param studentIds Student IDs; duplicates are processed only once.
    * @returns Counts of new, reactivated, and already-active enrollments.
+   * @throws NotFoundException when the delivery or a requested same-school student is missing.
+   * @throws ConflictException when the delivery is inactive or a student is inactive/in another class.
+   * @throws ForbiddenException when the delivery's course subscription is not current.
    */
   async enroll(
     actor: AuthContext,
@@ -62,10 +65,13 @@ export class DeliveryEnrollmentsService {
   // ─────────────────────────────────────────
 
   /**
-   * Enrolls every active student currently in the delivery's class section.
+   * Enrolls active students found in the delivery's school and class section in one transaction.
    * @param actor Authenticated actor.
    * @param deliveryId Delivery whose class section will be enrolled.
    * @returns Counts of new, reactivated, and already-active enrollments.
+   * @throws NotFoundException when the delivery is not visible to the actor.
+   * @throws ConflictException when the delivery is inactive or a database class check fails.
+   * @throws ForbiddenException when the delivery's course subscription is not current.
    */
   async enrollClass(actor: AuthContext, deliveryId: string): Promise<EnrollmentCountsResponseDto> {
     const delivery = await this.loadDelivery(actor, deliveryId);
@@ -175,9 +181,10 @@ export class DeliveryEnrollmentsService {
   }
 
   /**
-   * Requires an active delivery and active course subscription before enrollment writes.
+   * Requires an active delivery and current course subscription before enrollment writes.
    * @param delivery Delivery being written.
    * @throws ConflictException when the delivery is inactive.
+   * @throws ForbiddenException when the course subscription is not current.
    */
   private async assertEnrollmentWritesAllowed(delivery: {
     id: string;
@@ -192,11 +199,14 @@ export class DeliveryEnrollmentsService {
   }
 
   /**
-   * Validates all requested student profiles before writing any enrollment.
+   * Validates every requested profile in the delivery's school/class before writing enrollments.
+   * Validation and enrollment writes share one transaction, so invalid input causes no partial writes.
    * @param delivery Delivery being enrolled.
    * @param studentIds Deduplicated student IDs.
    * @param actorId Authenticated actor ID used as enrollment owner.
    * @returns Counts of new, reactivated, and already-active enrollments.
+   * @throws NotFoundException when any requested student profile is missing in the delivery's school.
+   * @throws ConflictException when any student is inactive or belongs to another class.
    */
   private async enrollStudents(
     delivery: { id: string; schoolId: string; classSectionId: string },
@@ -243,7 +253,7 @@ export class DeliveryEnrollmentsService {
   }
 
   /**
-   * Applies new, reactivation, and already-active enrollment behavior in a transaction.
+   * Creates missing rows, reactivates removed/completed rows, and counts active rows as unchanged.
    * @param tx Current transaction.
    * @param delivery Delivery being enrolled.
    * @param studentIds Validated student IDs.
@@ -304,7 +314,7 @@ export class DeliveryEnrollmentsService {
   }
 
   /**
-   * Converts the database class-match trigger error into the API conflict response.
+   * Converts the recognized database class-match trigger failure into a domain conflict.
    * @param error Error raised by Prisma or PostgreSQL.
    * @throws ConflictException when the trigger reports a student-class mismatch.
    */

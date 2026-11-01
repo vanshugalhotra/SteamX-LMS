@@ -53,6 +53,8 @@ export class DeliveryTeachersController {
    * @param id Delivery UUID.
    * @param body Teacher UUID.
    * @returns The created assignment.
+   * @throws NotFoundException when the delivery or same-school teacher profile is unavailable.
+   * @throws ConflictException when the delivery or teacher is inactive, or assignment exists.
    */
   @RequirePermission(PERMISSION.DELIVERY_MANAGE)
   @Post(':id/teachers')
@@ -81,6 +83,7 @@ export class DeliveryTeachersController {
    * @param actor Authenticated administrator.
    * @param id Delivery UUID.
    * @param teacherId Teacher UUID.
+   * @throws NotFoundException when no active assignment exists in the actor's school scope.
    */
   @RequirePermission(PERMISSION.DELIVERY_MANAGE)
   @Delete(':id/teachers/:teacherId')
@@ -108,6 +111,7 @@ export class DeliveryTeachersController {
    * @param id Delivery UUID.
    * @param query Page and removed-history options.
    * @returns Paginated assignment history.
+   * @throws NotFoundException when the delivery is missing or outside school scope.
    */
   @RequirePermission(PERMISSION.DELIVERY_MANAGE)
   @Get(':id/teachers')
