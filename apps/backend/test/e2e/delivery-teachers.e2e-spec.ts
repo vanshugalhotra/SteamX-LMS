@@ -343,15 +343,15 @@ describe('Delivery teacher endpoints (e2e)', () => {
     const deliveryId = await createDelivery();
     const teacherId = fixture.schoolA.teacher.id;
     for (const cookie of [teacherCookie, studentCookie]) {
-      expectError(await listTeachers(cookie, deliveryId), 403, 'FORBIDDEN');
-      expectError(await assign(cookie, deliveryId, teacherId), 403, 'FORBIDDEN');
-      expectError(await remove(cookie, deliveryId, teacherId), 403, 'FORBIDDEN');
+      expectError(await listTeachers(cookie, deliveryId), 403, 'PERMISSION_REQUIRED');
+      expectError(await assign(cookie, deliveryId, teacherId), 403, 'PERMISSION_REQUIRED');
+      expectError(await remove(cookie, deliveryId, teacherId), 403, 'PERMISSION_REQUIRED');
     }
 
     expectError(
       await request(app.getHttpServer()).get(`/api/v1/deliveries/${deliveryId}/teachers`),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await request(app.getHttpServer())
@@ -359,14 +359,14 @@ describe('Delivery teacher endpoints (e2e)', () => {
         .set('Origin', origin)
         .send({ teacherId }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await request(app.getHttpServer())
         .delete(`/api/v1/deliveries/${deliveryId}/teachers/${teacherId}`)
         .set('Origin', origin),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
   });
 });

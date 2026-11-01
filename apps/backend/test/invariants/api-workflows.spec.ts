@@ -125,7 +125,7 @@ describe('Documented API workflows', () => {
       assertStatus(
         await api.send('GET', '/api/v1/schools', { cookie: session.cookie }),
         403,
-        'FORBIDDEN',
+        'PERMISSION_REQUIRED',
       );
     }
   });
@@ -148,7 +148,7 @@ describe('Documented API workflows', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: current.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     const resetLogin = await api.login({ steamxId: teacher.steamxId, password: resetPassword });
     expect(resetLogin.response.body.mustChangePassword).toBe(true);
@@ -160,7 +160,7 @@ describe('Documented API workflows', () => {
     const oldPassword = await api.send('POST', '/api/v1/auth/login', {
       body: { steamxId: teacher.steamxId, password: current.password },
     });
-    assertStatus(oldPassword, 401, 'UNAUTHORIZED');
+    assertStatus(oldPassword, 401, 'AUTHENTICATION_FAILED');
     const forcedChange = await api.send('POST', '/api/v1/auth/change-password', {
       cookie: resetLogin.cookie,
       body: { currentPassword: resetPassword, newPassword: 'After reset workflow 2026!' },
@@ -206,14 +206,14 @@ describe('Documented API workflows', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: session.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('POST', '/api/v1/auth/login', {
         body: { steamxId: teacher.steamxId, password: session.password },
       }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('PATCH', `/api/v1/users/${teacher.id}/status`, {
@@ -305,7 +305,7 @@ describe('Documented API workflows', () => {
         body: { steamxId: oldId, password: oldSession.password },
       }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('POST', '/api/v1/auth/login', {
@@ -365,7 +365,7 @@ describe('Documented API workflows', () => {
           assertStatus(response, route.path.endsWith('/deliveries') ? 200 : 404);
           continue;
         }
-        assertStatus(response, 403, 'FORBIDDEN');
+        assertStatus(response, 403, 'PERMISSION_REQUIRED');
       }
     }
     assertStatus(await api.send('GET', '/api/v1/schools', { cookie: admin }), 200);

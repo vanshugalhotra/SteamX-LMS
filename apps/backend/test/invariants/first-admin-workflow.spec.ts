@@ -35,7 +35,7 @@ describe('First admin login workflow', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: login.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     const newCookie = cookieFrom(changed);
     assertStatus(await api.send('GET', '/api/v1/schools', { cookie: newCookie }), 200);
@@ -56,7 +56,7 @@ describe('First admin login workflow', () => {
     const oldPassword = await api.send('POST', '/api/v1/auth/login', {
       body: { steamxId: api.admin.steamxId, password: api.admin.password },
     });
-    assertStatus(oldPassword, 401, 'UNAUTHORIZED');
+    assertStatus(oldPassword, 401, 'AUTHENTICATION_FAILED');
   });
 });
 

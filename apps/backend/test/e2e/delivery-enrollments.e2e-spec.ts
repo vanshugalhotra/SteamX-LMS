@@ -518,7 +518,7 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       () => removeEnrollment(studentCookie, deliveryId, assignedStudent.id),
     ];
     for (const call of studentCalls) {
-      expectError(await call(), 403, 'FORBIDDEN');
+      expectError(await call(), 403, 'PERMISSION_REQUIRED');
     }
 
     const anonymousCalls = [
@@ -538,7 +538,7 @@ describe('Delivery enrollment endpoints (e2e)', () => {
           .set('Origin', origin),
     ];
     for (const call of anonymousCalls) {
-      expectError(await call(), 401, 'UNAUTHORIZED');
+      expectError(await call(), 401, 'AUTHENTICATION_FAILED');
     }
   });
 

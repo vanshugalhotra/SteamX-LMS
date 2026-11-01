@@ -523,12 +523,12 @@ describe('Deliveries endpoints (e2e)', () => {
     expectError(
       await createDelivery(teacherACookie, { courseId, academicYear: '2032-33' }),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
     expectError(
       await updateDeliveryStatus(teacherACookie, assigned.id, DeliveryStatus.INACTIVE),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
   });
 
@@ -543,14 +543,14 @@ describe('Deliveries endpoints (e2e)', () => {
     expectError(
       await createDelivery(studentCookie, { courseId, academicYear: '2031-32' }),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
-    expectError(await listDeliveries(studentCookie), 403, 'FORBIDDEN');
-    expectError(await getDelivery(studentCookie, delivery.body.id), 403, 'FORBIDDEN');
+    expectError(await listDeliveries(studentCookie), 403, 'PERMISSION_REQUIRED');
+    expectError(await getDelivery(studentCookie, delivery.body.id), 403, 'PERMISSION_REQUIRED');
     expectError(
       await updateDeliveryStatus(studentCookie, delivery.body.id, DeliveryStatus.INACTIVE),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
 
     const anonymousPost = await request(app.getHttpServer())
@@ -562,18 +562,22 @@ describe('Deliveries endpoints (e2e)', () => {
         classSectionId: fixture.schoolA.section.id,
         academicYear: '2032-33',
       });
-    expectError(anonymousPost, 401, 'UNAUTHORIZED');
-    expectError(await request(app.getHttpServer()).get('/api/v1/deliveries'), 401, 'UNAUTHORIZED');
+    expectError(anonymousPost, 401, 'AUTHENTICATION_FAILED');
+    expectError(
+      await request(app.getHttpServer()).get('/api/v1/deliveries'),
+      401,
+      'AUTHENTICATION_FAILED',
+    );
     expectError(
       await request(app.getHttpServer()).get(`/api/v1/deliveries/${delivery.body.id}`),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     const anonymousPatch = await request(app.getHttpServer())
       .patch(`/api/v1/deliveries/${delivery.body.id}/status`)
       .set('Origin', origin)
       .send({ status: DeliveryStatus.INACTIVE });
-    expectError(anonymousPatch, 401, 'UNAUTHORIZED');
+    expectError(anonymousPatch, 401, 'AUTHENTICATION_FAILED');
   });
 
   it('serializes competing creates for the last available delivery slot', async () => {

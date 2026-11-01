@@ -195,7 +195,7 @@ describe('Authentication invariants (e2e)', () => {
     expect(response.status).toBe(401);
     expect(response.body).toEqual({
       statusCode: 401,
-      code: 'UNAUTHORIZED',
+      code: 'AUTHENTICATION_FAILED',
       message: 'Invalid or expired authentication token',
       requestId: expect.any(String),
     });

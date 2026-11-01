@@ -49,7 +49,11 @@ describe('Prisma error helpers', () => {
 
   it.each([
     ['P2002', 409, { code: 'CONFLICT', message: 'Resource already exists' }],
-    ['P2003', 409, { code: 'CONFLICT', message: 'Operation conflicts with related data' }],
+    [
+      'P2003',
+      409,
+      { code: 'RELATED_DATA_CONFLICT', message: 'Operation conflicts with related data' },
+    ],
     ['P2025', 404, { code: 'NOT_FOUND', message: 'Resource not found' }],
   ])('maps %s to its generic HTTP response', (code, status, body) => {
     const mapped = mapPrismaError(createPrismaError(code));

@@ -545,13 +545,17 @@ describe('Schools endpoints (e2e)', () => {
     expectError(
       await request(app.getHttpServer()).post('/api/v1/schools').set('Origin', origin).send({}),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
-    expectError(await request(app.getHttpServer()).get('/api/v1/schools'), 401, 'UNAUTHORIZED');
+    expectError(
+      await request(app.getHttpServer()).get('/api/v1/schools'),
+      401,
+      'AUTHENTICATION_FAILED',
+    );
     expectError(
       await request(app.getHttpServer()).get(`/api/v1/schools/${fixture.schoolA.school.id}`),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await request(app.getHttpServer())
@@ -559,7 +563,7 @@ describe('Schools endpoints (e2e)', () => {
         .set('Origin', origin)
         .send({ name: 'No session' }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await request(app.getHttpServer())
@@ -567,7 +571,7 @@ describe('Schools endpoints (e2e)', () => {
         .set('Origin', origin)
         .send({ status: SchoolStatus.ACTIVE }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
   });
 
@@ -603,7 +607,7 @@ describe('Schools endpoints (e2e)', () => {
     expectError(
       await createSchool(teacherCookie, createBody(`TC${randomUUID().slice(0, 6)}`)),
       403,
-      'FORBIDDEN',
+      'SCHOOL_FORBIDDEN',
     );
   });
 
