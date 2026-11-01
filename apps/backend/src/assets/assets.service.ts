@@ -18,6 +18,7 @@ import type { AuthContext } from '../auth/types/auth-context.js';
 import type { Env } from '../config/env.schema.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
 import { isForeignKeyViolation } from '../common/errors/prisma-error.js';
+import { safeError } from '../common/errors/safe-error.js';
 import { StorageService } from '../storage/storage.service.js';
 import {
   AssetRuleError,
@@ -414,7 +415,12 @@ export class AssetsService {
       ({ playbackKey } = await processor.process(processingFile));
     } catch (error) {
       this.logger.error(
-        { err: error, actorId: actor.userId, assetId: normalizedAssetId, fileId: file.id },
+        {
+          error: safeError(error),
+          actorId: actor.userId,
+          assetId: normalizedAssetId,
+          fileId: file.id,
+        },
         'Asset processing failed',
       );
       return this.failUpload(file.id, AssetFileStatus.PROCESSING, 'PROCESSING_FAILED');
