@@ -83,6 +83,7 @@ export function AssetsPage() {
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* TODO: Add fileStatus filters: Ready, Uploaded, Uploading, Processing, and Failed. */}
         <ListToolbar
           filters={ASSET_TYPE_FILTERS}
           filter={selectedType}

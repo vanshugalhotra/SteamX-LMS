@@ -15,6 +15,14 @@ export interface AssetPutTask {
   abort: () => void;
 }
 
+/**
+ * Uploads a file to its presigned storage URL.
+ *
+ * Resolves when storage returns a 2xx response. Rejects with `AssetPutError`
+ * for HTTP and network failures; HTTP failures include the response status.
+ * Rejects with a `DOMException` named `AbortError` when the caller aborts.
+ * Progress is reported as an integer percentage from 0 to 100.
+ */
 export function putAssetFile(
   upload: UploadInstructions,
   file: File,

@@ -1,45 +1,29 @@
-import { FileText, Image as ImageIcon, Play } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import type { Asset, AssetFileStatus, AssetType } from '../model/types';
-import { formatAssetDate, formatAssetSize } from '../config/assets.config';
-
-const TYPE_PRESENTATION: Record<
-  AssetType,
-  { label: string; className: string; icon: typeof ImageIcon }
-> = {
-  IMAGE: { label: 'Image', className: 'bg-teal-500 text-gray-900', icon: ImageIcon },
-  VIDEO: { label: 'MP4', className: 'bg-gray-900 text-white', icon: Play },
-  PDF: { label: 'PDF', className: 'bg-magenta-800 text-white', icon: FileText },
-  PPTX: { label: 'Unsupported type', className: 'bg-gray-600 text-white', icon: FileText },
-};
-
-const FILE_STATUS_PRESENTATION: Record<
-  AssetFileStatus,
-  { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }
-> = {
-  UPLOADING: { label: 'Uploading', variant: 'warning' },
-  UPLOADED: { label: 'Uploaded', variant: 'warning' },
-  PROCESSING: { label: 'Processing', variant: 'warning' },
-  READY: { label: 'Ready', variant: 'success' },
-  FAILED: { label: 'Failed', variant: 'danger' },
-};
+import {
+  FILE_STATUS_PRESENTATION,
+  formatAssetDate,
+  formatAssetSize,
+  IMAGE_MIME_PRESENTATION,
+  TYPE_PRESENTATION,
+} from '../config/assets.config';
+import type { Asset } from '../model/types';
 
 export function AssetCard({ asset }: { asset: Asset }) {
   const mimeType = asset.file?.mimeType?.toLowerCase();
   const presentation =
-    asset.type === 'IMAGE' && mimeType === 'image/jpeg'
-      ? { label: 'JPG', className: 'bg-coral-500 text-gray-900', icon: ImageIcon }
-      : asset.type === 'IMAGE' && mimeType === 'image/webp'
-        ? { label: 'WebP', className: 'bg-yellow-500 text-gray-900', icon: ImageIcon }
-        : asset.type === 'IMAGE' && mimeType === 'image/png'
-          ? { label: 'PNG', className: 'bg-teal-500 text-gray-900', icon: ImageIcon }
-          : TYPE_PRESENTATION[asset.type];
+    asset.type === 'IMAGE' && mimeType
+      ? (IMAGE_MIME_PRESENTATION[mimeType] ?? TYPE_PRESENTATION[asset.type])
+      : TYPE_PRESENTATION[asset.type];
   const TypeIcon = presentation.icon;
 
   return (
     <article className="flex min-w-0 flex-col overflow-hidden rounded-3xl bg-white shadow-md">
       <div
-        className={`relative grid h-36 place-items-center overflow-hidden ${presentation.className}`}
+        className={cn(
+          'relative grid h-36 place-items-center overflow-hidden',
+          presentation.className,
+        )}
       >
         <span
           aria-hidden="true"
@@ -79,6 +63,8 @@ export function AssetCard({ asset }: { asset: Asset }) {
             {asset.status === 'ACTIVE' ? 'Active' : 'Archived'}
           </Badge>
         </div>
+        {/* TODO: Will confirm these colors with @shreya against the reference design. */}
+        {/* TODO: Add a replace-file button to the asset card. */}
       </div>
     </article>
   );
