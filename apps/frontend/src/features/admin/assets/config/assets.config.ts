@@ -1,5 +1,6 @@
 import { FileText, Image as ImageIcon, Play } from 'lucide-react';
 import type { AssetFileStatus, AssetStatus, AssetType } from '../model/types';
+import type { ErrorOverrides } from '@/lib/api-errors';
 
 export const ASSETS_PAGE_SIZE = 12;
 export const ASSETS_SEARCH_MAX_LENGTH = 100;
@@ -71,3 +72,22 @@ export function formatAssetDate(date: string): string {
     timeZone: 'UTC',
   }).format(new Date(date));
 }
+
+export function getAssetPresentation(type: AssetType, mimeType: string | null | undefined) {
+  const mime = mimeType?.toLowerCase();
+  if (type === 'IMAGE' && mime) return IMAGE_MIME_PRESENTATION[mime] ?? TYPE_PRESENTATION[type];
+  return TYPE_PRESENTATION[type];
+}
+
+/** File picker filter for a replacement. Keep in sync with upload-validation.ts. */
+export const ASSET_ACCEPT: Record<AssetType, string> = {
+  IMAGE: '.jpg,.jpeg,.png,.webp',
+  VIDEO: '.mp4',
+  PDF: '.pdf',
+  PPTX: '',
+};
+
+/** Asset-specific wording on top of the default messages. */
+export const ASSET_ERRORS: ErrorOverrides = {
+  RESOURCE_IN_USE: 'This asset is used in lessons. Remove it from them first.',
+};
