@@ -134,6 +134,21 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: PATHS.admin.assets,
+            lazy: async () => {
+              const { AssetsPage } = await import('@/features/admin/assets/pages/AssetsPage');
+              return { Component: AssetsPage };
+            },
+          },
+          {
+            path: PATHS.admin.assetUpload,
+            lazy: async () => {
+              const { AssetUploadPage } =
+                await import('@/features/admin/assets/pages/AssetUploadPage');
+              return { Component: AssetUploadPage };
+            },
+          },
+          {
             path: PATHS.admin.admins,
             lazy: async () => {
               const { AdminsPage } = await import('@/features/admin/admins/pages/AdminsPage');

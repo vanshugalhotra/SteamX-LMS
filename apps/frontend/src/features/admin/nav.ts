@@ -2,6 +2,7 @@ import {
   BookOpen,
   ClipboardList,
   CreditCard,
+  FileImage,
   GraduationCap,
   KeyRound,
   LayoutGrid,
@@ -77,6 +78,7 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Content',
     items: [
       { label: 'Courses & Lessons', icon: BookOpen },
+      { label: 'Asset Library', icon: FileImage, to: PATHS.admin.assets },
       { label: 'Curriculum Access', icon: KeyRound },
       { label: 'Assignments', icon: ClipboardList },
     ],
