@@ -546,6 +546,7 @@ describe('Delivery enrollment endpoints (e2e)', () => {
     const deliveryId = await createDelivery();
     const existingStudent = await createStudent();
     const newStudent = await createStudent();
+    await createStudent();
     await assignTeacher(deliveryId, fixture.schoolA.teacher.id).expect(201);
     await enroll(adminCookie, deliveryId, [existingStudent.id]).expect(200);
     const [yesterday] = await prisma.$queryRaw<{ yesterday: string }[]>`
@@ -569,6 +570,8 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       403,
       'SUBSCRIPTION_EXPIRED',
     );
+    expectError(await enrollClass(adminCookie, deliveryId), 403, 'SUBSCRIPTION_EXPIRED');
+    expectError(await enrollClass(teacherCookie, deliveryId), 403, 'SUBSCRIPTION_EXPIRED');
     await listEnrollments(adminCookie, deliveryId).expect(200);
     await listEnrollments(teacherCookie, deliveryId).expect(200);
     await removeEnrollment(teacherCookie, deliveryId, existingStudent.id).expect(204);
@@ -581,6 +584,7 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       .expect(201);
     expect(renewed.body.id).not.toBe(subscriptionId);
     await enroll(adminCookie, deliveryId, [newStudent.id]).expect(200);
+    await enrollClass(adminCookie, deliveryId).expect(200);
   });
 
   it('rejects enrollment on an inactive delivery but permits removal', async () => {

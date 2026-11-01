@@ -71,40 +71,36 @@ Key rules:
 - Class-section creation resolves the selected school with `ActiveSchoolService`, so it requires a
   school ID for platform staff and an active in-scope school for every caller.
 
-## Subscriptions
+## Subscription gating
 
-- `subscription.manage` is restricted to platform staff; grants and renewals require an active school and course, and status is derived from subscription dates and the database business date.
-- Revoke deletes a term starting today or later; an earlier-started current term ends yesterday. Renewal creates a new row without changing deliveries.
-- `retainedUntil` is informational and derived from the latest school-course end date plus two calendar years. The subscription module does not enforce a purge window.
+- School-user authentication checks school status in `AuthGuard`; workflows that resolve a school
+  also use `ActiveSchoolService`. Subscription checks run in the service layer against
+  `business_today()` from PostgreSQL.
+- Subscription management routes require platform staff with `subscription.manage`. Their reads
+  are available regardless of term status. Status and `retainedUntil` are derived from dates.
+- `CourseAccessService.assertCourseAccess(actor, schoolId, courseId)` is the content-access check:
+  school-bound actors must match the loaded resource's school, then have a current subscription;
+  foreign resources return 404. Platform staff bypass the subscription check in this method only.
+- `assertSubscriptionActive(schoolId, courseId)` always checks the current subscription, including
+  for platform staff. Subscription-gated writes return `403 SUBSCRIPTION_EXPIRED`.
+- `getAccessibleCourseIds(actor)` filters school-bound course lists using the actor's school;
+  platform staff use an explicit school filter instead.
+- A teacher can access a delivery only while an active `delivery_teachers` stint exists. This is
+  checked on every request; a delivery that exists but is not assigned to that teacher returns 404.
 
-### Subscription gating
+| Operation                                                 | Subscription-gated?                                                         |
+| --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Grant, list, get, update, revoke, or renew a subscription | No; platform staff permission still applies                                 |
+| Create a delivery or reactivate an inactive delivery      | Yes, including for platform staff                                           |
+| Read/list deliveries or deactivate a delivery             | No                                                                          |
+| Assign/remove/list delivery teachers                      | No                                                                          |
+| Add students individually or enroll the delivery class    | Yes, including for platform staff                                           |
+| Read or remove an enrollment                              | No                                                                          |
+| Release a lesson or all eligible lessons in a module      | Yes, including for platform staff                                           |
+| Read the release outline or remove a release              | No                                                                          |
+| Milestone 5 student/teacher content reads                 | Yes, through `assertCourseAccess`; platform staff bypass applies only there |
 
-- `CourseAccessService.assertCourseAccess(actor, schoolId, courseId)` checks school scope and the
-  current subscription. Pass the school ID from the loaded resource, not client input; school-bound
-  actors are checked against that resource school and foreign resources return 404. Platform staff
-  bypass the subscription check inside the service.
-- Use `getAccessibleCourseIds(actor)` to filter a school-bound actor's course list to currently
-  valid subscriptions; the service takes the school from the actor. Platform staff should use
-  their explicit school filter directly instead. Subscription dates use database
-  `business_today()`; inactive courses are not checked here.
-- School status is checked by `AuthGuard`; subscription status is checked by this service.
-- Denied course access returns `403 SUBSCRIPTION_EXPIRED`.
-
-### Delivery access
-
-- Delivery creation and reactivation call `assertSubscriptionActive`; this check applies to admins
-  as well as school staff and returns `403 SUBSCRIPTION_EXPIRED` when access is not current.
-- Delivery reads are not gated by subscription status; `subscriptionActive` is informational.
-- Teachers see only deliveries with their active `delivery_teachers` assignment; admins see all rows in
-  their resolved school scope.
-- Teacher access to a delivery equals having an active assignment.
-- Removal takes effect immediately because the active assignment is checked on every request.
-- Enrollment writes require a current subscription, including for platform admins.
-- Enrollment reads and removals are not subscription-gated.
-- Teacher enrollment access requires an active teacher stint on that delivery.
-
-See the [school and class-section API cases](./api-testing.md#schools) and
-[architecture flow](./architecture.md#schools-and-class-sections) for implementation owners.
+See the [subscription and delivery API cases](./api-testing.md#subscriptions) for route behavior.
 
 ## Auth and user lifecycle
 
