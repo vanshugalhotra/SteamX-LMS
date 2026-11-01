@@ -498,19 +498,19 @@ describe('Class sections endpoints (e2e)', () => {
         className: 'No session',
       }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await request(app.getHttpServer()).get('/api/v1/class-sections'),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await request(app.getHttpServer()).get(
         `/api/v1/class-sections/${fixture.schoolA.section.id}`,
       ),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await request(app.getHttpServer())
@@ -518,9 +518,13 @@ describe('Class sections endpoints (e2e)', () => {
         .set('Origin', origin)
         .send({ className: 'No session' }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
-    expectError(await removeWithoutSession(fixture.schoolA.section.id), 401, 'UNAUTHORIZED');
+    expectError(
+      await removeWithoutSession(fixture.schoolA.section.id),
+      401,
+      'AUTHENTICATION_FAILED',
+    );
   });
 
   it('hides foreign sections for a read-only teacher and keeps foreign and missing IDs alike', async () => {

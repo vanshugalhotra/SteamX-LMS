@@ -94,6 +94,7 @@ script across workspace packages.
 - [Access control](./docs/access-control.md)
 - [Database](./docs/database.md)
 - [Decisions](./docs/decisions.md)
+- [API errors](./docs/api-errors.md)
 - [Backend environment variables](./apps/backend/.env.example)
 - [Frontend setup and structure](./apps/frontend/README.md)
 - [Backend setup reference](./apps/backend/README.md)

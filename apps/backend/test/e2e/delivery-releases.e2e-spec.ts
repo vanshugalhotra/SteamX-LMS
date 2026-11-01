@@ -234,11 +234,23 @@ describe('Delivery release endpoints (e2e)', () => {
       },
       select: { id: true },
     });
-    expectError(await getReleases('', deliveryId), 401, 'UNAUTHORIZED');
-    expectError(await getReleases(studentCookie, deliveryId), 403, 'FORBIDDEN');
-    expectError(await releaseLesson(studentCookie, deliveryId, randomUUID()), 403, 'FORBIDDEN');
-    expectError(await unreleaseLesson(studentCookie, deliveryId, randomUUID()), 403, 'FORBIDDEN');
-    expectError(await releaseModule(studentCookie, deliveryId, randomUUID()), 403, 'FORBIDDEN');
+    expectError(await getReleases('', deliveryId), 401, 'AUTHENTICATION_FAILED');
+    expectError(await getReleases(studentCookie, deliveryId), 403, 'PERMISSION_REQUIRED');
+    expectError(
+      await releaseLesson(studentCookie, deliveryId, randomUUID()),
+      403,
+      'PERMISSION_REQUIRED',
+    );
+    expectError(
+      await unreleaseLesson(studentCookie, deliveryId, randomUUID()),
+      403,
+      'PERMISSION_REQUIRED',
+    );
+    expectError(
+      await releaseModule(studentCookie, deliveryId, randomUUID()),
+      403,
+      'PERMISSION_REQUIRED',
+    );
     expectError(await getReleases(peerTeacherCookie, deliveryId), 404, 'NOT_FOUND');
     await getReleases(adminCookie, otherSchoolDelivery.id).expect(200);
     expectError(await getReleases(teacherCookie, otherSchoolDelivery.id), 404, 'NOT_FOUND');

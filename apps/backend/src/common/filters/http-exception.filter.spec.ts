@@ -43,7 +43,7 @@ describe('HttpExceptionFilter', () => {
 
   // Foreign-key and missing-record Prisma errors map to stable API conflict/not-found codes.
   it.each([
-    ['P2003', 409, 'CONFLICT'],
+    ['P2003', 409, 'RELATED_DATA_CONFLICT'],
     ['P2025', 404, 'NOT_FOUND'],
   ])('maps Prisma error %s to its safe status and code', (code, statusCode, publicCode) => {
     const { filter, json, status } = createFilter();

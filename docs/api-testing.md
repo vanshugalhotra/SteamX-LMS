@@ -1,7 +1,8 @@
 # API testing checklist
 
 This checklist records endpoint-level API cases and expected outcomes. Start with the section for
-the route you changed; use [workflow testing](./workflows-testing.md) for multi-request scenarios.
+the route you changed; use [workflow testing](./workflows-testing.md) for multi-request scenarios
+and [API errors](./api-errors.md) for the error-code contract.
 
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
 health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; malformed path UUIDs rejected

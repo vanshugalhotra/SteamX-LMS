@@ -350,7 +350,11 @@ export class AssetsService {
       return toAssetFileDto(file);
     }
     if (!isSupportedAssetType(file.asset.type)) {
-      return this.failUpload(file.id, AssetFileStatus.UPLOADING, 'ASSET_TYPE_NOT_SUPPORTED');
+      return this.failUpload(
+        file.id,
+        AssetFileStatus.UPLOADING,
+        API_ERROR.ASSET_TYPE_NOT_SUPPORTED.code,
+      );
     }
 
     const head = await this.storage.head(file.storageKey);

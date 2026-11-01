@@ -18,8 +18,12 @@ describe('User read endpoints (e2e)', () => {
   afterAll(async () => ctx?.close());
 
   it('requires authentication for listing and viewing users', async () => {
-    expectError(await ctx.listUsers(''), 401, 'UNAUTHORIZED');
-    expectError(await ctx.getUser('', ctx.fixture.schoolA.teacher.id), 401, 'UNAUTHORIZED');
+    expectError(await ctx.listUsers(''), 401, 'AUTHENTICATION_FAILED');
+    expectError(
+      await ctx.getUser('', ctx.fixture.schoolA.teacher.id),
+      401,
+      'AUTHENTICATION_FAILED',
+    );
   });
 
   it('lets platform staff list users with and without a school filter', async () => {
@@ -162,8 +166,12 @@ describe('User read endpoints (e2e)', () => {
     ]);
 
     const studentCookie = await loginAs(ctx.app, ctx.fixture.schoolA.student);
-    expectError(await ctx.listUsers(studentCookie), 403, 'FORBIDDEN');
-    expectError(await ctx.getUser(studentCookie, ctx.fixture.schoolA.student.id), 403, 'FORBIDDEN');
+    expectError(await ctx.listUsers(studentCookie), 403, 'PERMISSION_REQUIRED');
+    expectError(
+      await ctx.getUser(studentCookie, ctx.fixture.schoolA.student.id),
+      403,
+      'PERMISSION_REQUIRED',
+    );
   });
 
   it('rejects malformed IDs and invalid user list filters', async () => {

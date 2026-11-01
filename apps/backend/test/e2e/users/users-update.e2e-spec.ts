@@ -22,7 +22,7 @@ describe('User update endpoint (e2e)', () => {
     expectError(
       await ctx.updateUser('', ctx.fixture.schoolA.teacher.id, { name: 'Unauthorized' }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
   });
 
@@ -129,9 +129,9 @@ describe('User update endpoint (e2e)', () => {
       { primaryAssignment: 'A'.repeat(121) },
       { classSectionId: 'not-a-uuid' },
     ];
-    for (const body of invalidBodies) {
+    for (const [index, body] of invalidBodies.entries()) {
       const response = await ctx.updateUser(adminCookie, teacher.body.id, body).expect(400);
-      expect(response.body.code).toBe('VALIDATION_ERROR');
+      expect(response.body.code).toBe(index === 0 ? 'EMPTY_UPDATE' : 'VALIDATION_ERROR');
       expect(JSON.stringify(response.body)).not.toContain('passwordHash');
     }
   });
@@ -310,7 +310,7 @@ describe('User update endpoint (e2e)', () => {
         name: 'Student update',
       }),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
   });
 

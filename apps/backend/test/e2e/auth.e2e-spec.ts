@@ -209,7 +209,7 @@ describe('Authentication endpoints (e2e)', () => {
     ];
 
     for (const response of responses) {
-      expectError(response, 401, 'UNAUTHORIZED');
+      expectError(response, 401, 'AUTHENTICATION_FAILED');
       expect(response.body.message).toBe('Invalid or expired authentication token');
     }
     expect(new Set(responses.map(({ body }) => body.message))).toHaveLength(1);
@@ -225,7 +225,7 @@ describe('Authentication endpoints (e2e)', () => {
     }
 
     for (const response of responses) {
-      expectError(response, 401, 'UNAUTHORIZED');
+      expectError(response, 401, 'AUTHENTICATION_FAILED');
     }
   });
 
@@ -278,7 +278,7 @@ describe('Authentication endpoints (e2e)', () => {
       .set('Origin', origin)
       .expect(401);
 
-    expectError(response, 401, 'UNAUTHORIZED');
+    expectError(response, 401, 'AUTHENTICATION_FAILED');
   });
 
   // Logout clears only the browser cookie; a copied stateless token remains valid until expiry.
@@ -299,7 +299,7 @@ describe('Authentication endpoints (e2e)', () => {
   it('rejects /auth/me without a cookie', async () => {
     const response = await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
 
-    expectError(response, 401, 'UNAUTHORIZED');
+    expectError(response, 401, 'AUTHENTICATION_FAILED');
   });
 
   // Malformed, expired, and tampered sessions are rejected by the real profile endpoint.
@@ -320,7 +320,7 @@ describe('Authentication endpoints (e2e)', () => {
 
     const response = await withCookie('/api/v1/auth/me', `steamx_session=${token}`).expect(401);
 
-    expectError(response, 401, 'UNAUTHORIZED');
+    expectError(response, 401, 'AUTHENTICATION_FAILED');
   });
 
   // A GET profile request does not require Origin when a valid session cookie is present.
@@ -349,7 +349,7 @@ describe('Authentication endpoints (e2e)', () => {
     const cookie = getCookie(await login(user.steamxId, TEST_PASSWORD).expect(200));
     await prisma.user.update({ where: { id: user.id }, data: { status: UserStatus.INACTIVE } });
 
-    expectError(await withCookie('/api/v1/auth/me', cookie), 401, 'UNAUTHORIZED');
+    expectError(await withCookie('/api/v1/auth/me', cookie), 401, 'AUTHENTICATION_FAILED');
     await prisma.user.update({ where: { id: user.id }, data: { status: UserStatus.ACTIVE } });
     await withCookie('/api/v1/auth/me', cookie).expect(200);
   });
@@ -366,7 +366,7 @@ describe('Authentication endpoints (e2e)', () => {
       data: { status: SchoolStatus.INACTIVE },
     });
 
-    expectError(await withCookie('/api/v1/auth/me', cookie), 401, 'UNAUTHORIZED');
+    expectError(await withCookie('/api/v1/auth/me', cookie), 401, 'AUTHENTICATION_FAILED');
     await prisma.school.update({
       where: { id: user.schoolId },
       data: { status: SchoolStatus.ACTIVE },
@@ -530,7 +530,7 @@ describe('Authentication endpoints (e2e)', () => {
     }).expect(200);
     vi.useRealTimers();
 
-    expectError(await withCookie('/api/v1/auth/me', oldCookie), 401, 'UNAUTHORIZED');
+    expectError(await withCookie('/api/v1/auth/me', oldCookie), 401, 'AUTHENTICATION_FAILED');
   });
 
   // A token issued in the same timestamp second remains valid under the documented guard rule.
@@ -571,7 +571,7 @@ describe('Authentication endpoints (e2e)', () => {
     }).expect(200);
 
     await login(user.steamxId, 'Fresh change password 2026!').expect(200);
-    expectError(await login(user.steamxId, TEST_PASSWORD), 401, 'UNAUTHORIZED');
+    expectError(await login(user.steamxId, TEST_PASSWORD), 401, 'AUTHENTICATION_FAILED');
   });
 
   // State-changing authentication requests require an allowed Origin before processing the cookie.
@@ -671,6 +671,6 @@ describe('Authentication endpoints (e2e)', () => {
   it('checks a whitespace-only password as supplied', async () => {
     const user = await createUser();
 
-    expectError(await login(user.steamxId, '        '), 401, 'UNAUTHORIZED');
+    expectError(await login(user.steamxId, '        '), 401, 'AUTHENTICATION_FAILED');
   });
 });

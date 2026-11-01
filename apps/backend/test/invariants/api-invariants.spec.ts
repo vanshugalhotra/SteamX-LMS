@@ -151,7 +151,7 @@ describe('Black-box API invariants', () => {
         expect(response.status, `${route.method} ${route.path} is public`).not.toBe(401);
       } else {
         try {
-          assertStatus(response, 401, 'UNAUTHORIZED');
+          assertStatus(response, 401, 'AUTHENTICATION_FAILED');
         } catch (error) {
           throw new Error(`${route.method} ${route.path} did not require authentication.`, {
             cause: error,
@@ -168,7 +168,7 @@ describe('Black-box API invariants', () => {
     );
     expect(swaggerRoutes.length).toBeGreaterThan(0);
     for (const route of swaggerRoutes) {
-      assertStatus(await api.send(route.method, concretePath(route)), 401, 'UNAUTHORIZED');
+      assertStatus(await api.send(route.method, concretePath(route)), 401, 'AUTHENTICATION_FAILED');
     }
   });
 
@@ -195,7 +195,7 @@ describe('Black-box API invariants', () => {
           : {}),
       });
       try {
-        assertStatus(response, 403, 'FORBIDDEN');
+        assertStatus(response, 403, 'PERMISSION_REQUIRED');
       } catch (error) {
         throw new Error(`${route.method} ${route.path} did not require a permission.`, {
           cause: error,
@@ -422,7 +422,7 @@ describe('Black-box API invariants', () => {
           : {}),
       });
       try {
-        assertStatus(response, 401, 'UNAUTHORIZED');
+        assertStatus(response, 401, 'AUTHENTICATION_FAILED');
       } catch (error) {
         throw new Error(
           `${route.method} ${route.path} did not reject the ${invalidation} account.`,
@@ -449,12 +449,12 @@ describe('Black-box API invariants', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: oldSession.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: secondOldSession.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
 
     const changedSession = cookieFrom(changed);
@@ -477,12 +477,12 @@ describe('Black-box API invariants', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: resetLogin.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: secondResetLogin.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     const newLogin = await api.login({
       steamxId: teacher.steamxId,
