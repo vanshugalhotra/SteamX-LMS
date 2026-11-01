@@ -13,7 +13,8 @@ scenario you need; API field requirements and individual endpoint cases are in S
    `pnpm install`, then `pnpm --filter @steamx/backend prisma:generate`.
 4. Apply committed schema/reference data with `pnpm --filter @steamx/backend migrate:deploy`.
    The reference migration creates `admin`, `teacher`, and `student` roles; current permissions
-   are granted to admin, with `enrollment.manage` also granted to teacher. There is no Prisma seed
+   are granted to admin, and teacher also receives `delivery.read`, `enrollment.manage`, and
+   `release.manage`. There is no Prisma seed
    script and no default admin account.
 5. Set `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD`, then run
    `pnpm --filter @steamx/backend admin:create`. This creates the first admin and sets
@@ -281,11 +282,31 @@ email, names, and creation times.
 - `GET /health/live` does not query the database; `GET /health/ready` returns `503` when its
   database check fails.
 
-## Planned workflow areas
+## Subscription expiry and renewal
 
-- Lesson release and progress. Delivery setup, teacher assignment history, enrollment, and
-  re-enrollment are covered by the [delivery API cases](./api-testing.md#deliveries).
-- Assignment template publishing, student submission, file upload, grading, and regrading.
+**Goal:** Verify subscription-gated delivery setup, enrollment, and lesson release through expiry
+and renewal.
+
+**Preconditions:** Platform staff with `subscription.manage`; admin with `delivery.manage`,
+`enrollment.manage`, and `release.manage`; active school, course, and class section; active students;
+active module with at least one ACTIVE STUDENT-audience lesson. Use an isolated test database.
+
+1. As platform staff, grant the school/course a current subscription with `POST /api/v1/subscriptions`.
+2. As admin, create an ACTIVE delivery for the class and course with `POST /api/v1/deliveries`.
+3. Assign a same-school active teacher with `POST /api/v1/deliveries/:id/teachers`.
+4. Enroll active students in that class with `POST /api/v1/deliveries/:id/enrollments/class`.
+5. Release an eligible lesson with `PUT /api/v1/deliveries/:id/releases/lessons/:lessonId` or
+   release its module with `POST /api/v1/deliveries/:id/releases/modules/:moduleId`.
+6. End the subscription yesterday in the isolated database, or set its end date to yesterday
+   through the subscription API. Use the database `business_today()` date.
+7. Attempt delivery creation/reactivation, explicit/class enrollment, and lesson/module release.
+   Expect `403 SUBSCRIPTION_EXPIRED`, including for platform admin. Delivery, enrollment, and
+   release management reads remain available.
+8. Renew the expired term with `POST /api/v1/subscriptions/:id/renew`; expect a new subscription
+   row. Retry a gated operation and expect access to be restored.
+
+See the [API checklist](./api-testing.md#subscriptions) for the individual route contracts and
+covered cases.
 
 ## Course authoring and lesson content
 

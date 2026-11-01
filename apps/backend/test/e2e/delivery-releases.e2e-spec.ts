@@ -251,7 +251,36 @@ describe('Delivery release endpoints (e2e)', () => {
       403,
       'PERMISSION_REQUIRED',
     );
-    expectError(await getReleases(peerTeacherCookie, deliveryId), 404, 'NOT_FOUND');
+    const notAssignedCalls = [
+      () => getReleases(teacherCookie, deliveryId),
+      () => releaseLesson(teacherCookie, deliveryId, randomUUID()),
+      () => unreleaseLesson(teacherCookie, deliveryId, randomUUID()),
+      () => releaseModule(teacherCookie, deliveryId, randomUUID()),
+    ];
+    for (const call of notAssignedCalls) {
+      expectError(await call(), 404, 'NOT_FOUND');
+    }
+
+    const crossSchoolCalls = [
+      () => getReleases(peerTeacherCookie, deliveryId),
+      () => releaseLesson(peerTeacherCookie, deliveryId, randomUUID()),
+      () => unreleaseLesson(peerTeacherCookie, deliveryId, randomUUID()),
+      () => releaseModule(peerTeacherCookie, deliveryId, randomUUID()),
+    ];
+    for (const call of crossSchoolCalls) {
+      expectError(await call(), 404, 'NOT_FOUND');
+    }
+
+    const anonymousCalls = [
+      () => getReleases('', deliveryId),
+      () => releaseLesson('', deliveryId, randomUUID()),
+      () => unreleaseLesson('', deliveryId, randomUUID()),
+      () => releaseModule('', deliveryId, randomUUID()),
+    ];
+    for (const call of anonymousCalls) {
+      expectError(await call(), 401, 'AUTHENTICATION_FAILED');
+    }
+
     await getReleases(adminCookie, otherSchoolDelivery.id).expect(200);
     expectError(await getReleases(teacherCookie, otherSchoolDelivery.id), 404, 'NOT_FOUND');
     await assignTeacher(deliveryId).expect(201);
