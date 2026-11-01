@@ -446,6 +446,7 @@ export class AssetsService {
     return this.assets.makeReady(fileId, input);
   }
 
+  /** Marks the expected upload state as failed and returns the persisted file state. */
   private async failUpload(
     fileId: string,
     from: AssetFileStatus,
@@ -455,6 +456,7 @@ export class AssetsService {
     return this.getCurrentFileState(fileId);
   }
 
+  /** Loads and maps the latest file state, throwing 404 if the attempt no longer exists. */
   private async getCurrentFileState(fileId: string): Promise<AssetFileDto> {
     const file = await this.assets.findFileById(fileId);
     if (!file) {
@@ -463,6 +465,7 @@ export class AssetsService {
     return toAssetFileDto(file);
   }
 
+  /** Applies configured type, MIME, and size rules, translating known rule failures to HTTP 400. */
   private validateUpload(type: string, mimeType: string, sizeBytes: number): SupportedAssetType {
     try {
       return validateAssetUpload(
@@ -479,6 +482,7 @@ export class AssetsService {
     }
   }
 
+  /** Creates a signed upload URL, logs the attempt, and maps the upload response. */
   private async createUploadResponse(
     actor: AuthContext,
     asset: Asset,
@@ -511,6 +515,7 @@ export class AssetsService {
     return UUID_SCHEMA.safeParse(value).success ? value.toLowerCase() : null;
   }
 
+  /** Normalizes a UUID or throws 404 so malformed IDs share the missing-resource response. */
   private normalizeAssetId(value: string): string {
     const id = this.normalizeUuid(value);
     if (!id) {

@@ -16,8 +16,13 @@ export type ReorderCourseModulesResult =
 
 @Injectable()
 export class CourseModulesRepository {
+  /** Injects Prisma for global module queries and writes. */
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Appends a draft module using a parent-row lock to serialize position assignment.
+   * Returns null when the course does not exist.
+   */
   async create(courseId: string, data: CreateCourseModuleDto): Promise<CourseModuleRecord | null> {
     return this.prisma.$transaction(async (tx) => {
       // Serializes appends so concurrent creates cannot choose the same next position.
@@ -41,6 +46,7 @@ export class CourseModulesRepository {
     });
   }
 
+  /** Finds modules for an existing course in position order, or returns null for a missing course. */
   async findManyForCourse(courseId: string): Promise<CourseModuleRecord[] | null> {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
@@ -55,6 +61,10 @@ export class CourseModulesRepository {
     });
   }
 
+  /**
+   * Applies a complete position permutation under a course-row lock and one transaction.
+   * Returns not-found or invalid-order without changing any positions.
+   */
   reorder(courseId: string, moduleIds: readonly string[]): Promise<ReorderCourseModulesResult> {
     return this.prisma.$transaction(async (tx) => {
       if (!(await lockCourse(tx, courseId))) {
@@ -93,6 +103,7 @@ export class CourseModulesRepository {
     });
   }
 
+  /** Finds a module and its parent course status, or returns null when it is missing. */
   findById(id: string): Promise<CourseModuleWithCourse | null> {
     return this.prisma.module.findUnique({
       where: { id },
@@ -100,11 +111,13 @@ export class CourseModulesRepository {
     });
   }
 
+  /** Applies a module patch and returns null when the module ID did not match. */
   async update(id: string, data: UpdateCourseModuleDto): Promise<CourseModuleWithCourse | null> {
     const result = await this.prisma.module.updateMany({ where: { id }, data });
     return result.count === 0 ? null : this.findById(id);
   }
 
+  /** Updates status only when it still matches the previously read value. */
   async updateStatus(
     id: string,
     currentStatus: ContentStatus,
@@ -124,6 +137,7 @@ export class CourseModulesRepository {
     });
   }
 
+  /** Deletes a module; foreign-key errors are left for the service to translate. */
   delete(id: string): Promise<{ id: string; title: string }> {
     return this.prisma.module.delete({
       where: { id },

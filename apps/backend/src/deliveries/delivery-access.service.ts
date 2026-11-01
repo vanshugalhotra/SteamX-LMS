@@ -11,7 +11,7 @@ export class DeliveryAccessService {
   constructor(private readonly deliveries: DeliveriesRepository) {}
 
   /**
-   * Loads the delivery in actor scope and applies the active teacher-stint filter.
+   * Loads the delivery in resolved school scope; school staff also need a current teacher assignment.
    * @param actor Authenticated actor.
    * @param deliveryId Requested delivery ID.
    * @returns The delivery if it is visible to the actor.

@@ -45,7 +45,13 @@ export class DeliveryReleasesController {
   // GET /deliveries/:id/releases — List release outline
   // ─────────────────────────────────────────
 
-  /** Lists active modules and lessons without returning lesson content. */
+  /**
+   * Lists the visible delivery's active course outline and release state, without lesson content.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @returns Active modules and lessons with their release state.
+   * @throws NotFoundException when the delivery is missing, foreign, or not assigned to the teacher.
+   */
   @RequirePermission(PERMISSION.RELEASE_MANAGE)
   @Get(':id/releases')
   @ApiOperation({ summary: 'List the release outline for a delivery' })
@@ -66,7 +72,16 @@ export class DeliveryReleasesController {
   // PUT /deliveries/:id/releases/lessons/:lessonId — Release a lesson
   // ─────────────────────────────────────────
 
-  /** Releases a single eligible student lesson. */
+  /**
+   * Releases one eligible lesson for the visible delivery; an existing release keeps its timestamp.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @param lessonId Lesson UUID in the delivery course.
+   * @returns The released lesson and its original release timestamp.
+   * @throws NotFoundException when the delivery or lesson is unavailable in scope.
+   * @throws ConflictException when the delivery is inactive or the lesson is not releasable.
+   * @throws ForbiddenException when the course subscription is not current.
+   */
   @RequirePermission(PERMISSION.RELEASE_MANAGE)
   @Put(':id/releases/lessons/:lessonId')
   @HttpCode(HttpStatus.OK)
@@ -91,7 +106,13 @@ export class DeliveryReleasesController {
   // DELETE /deliveries/:id/releases/lessons/:lessonId — Un-release a lesson
   // ─────────────────────────────────────────
 
-  /** Removes a lesson release; repeated removals still succeed. */
+  /**
+   * Removes a lesson release without changing completions; repeated removals are a no-op.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @param lessonId Lesson UUID in the delivery course.
+   * @throws NotFoundException when the delivery or lesson is unavailable in scope.
+   */
   @RequirePermission(PERMISSION.RELEASE_MANAGE)
   @Delete(':id/releases/lessons/:lessonId')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -112,7 +133,16 @@ export class DeliveryReleasesController {
   // POST /deliveries/:id/releases/modules/:moduleId — Release a module
   // ─────────────────────────────────────────
 
-  /** Releases all eligible student lessons in a module in one transaction. */
+  /**
+   * Releases all currently eligible lessons in one active module.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @param moduleId Module UUID in the delivery course.
+   * @returns Counts of newly released, already released, and skipped lessons.
+   * @throws NotFoundException when the delivery or module is unavailable in scope.
+   * @throws ConflictException when the delivery or module is inactive.
+   * @throws ForbiddenException when the course subscription is not current.
+   */
   @RequirePermission(PERMISSION.RELEASE_MANAGE)
   @Post(':id/releases/modules/:moduleId')
   @HttpCode(HttpStatus.OK)

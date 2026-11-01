@@ -282,7 +282,7 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
     return deletedCount;
   }
 
-  /** Closes the S3 client when Nest shuts down. */
+  /** Closes the shared S3 client when Nest shuts down. */
   async onModuleDestroy(): Promise<void> {
     this.client.destroy();
   }

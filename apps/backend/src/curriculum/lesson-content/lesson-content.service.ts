@@ -1,4 +1,4 @@
-// Coordinates lesson-content reads and full-tree saves.
+/** Coordinates lesson-content reads, validation, asset checks, and full-tree saves. */
 import {
   BadRequestException,
   ConflictException,

@@ -119,7 +119,7 @@ export class UsersController {
   // GET /users/:id — Get a user
   // ─────────────────────────────────────────
 
-  /** Returns one visible user; foreign and nonexistent IDs share the same 404 response. */
+  /** Returns one visible user; foreign and nonexistent IDs share the same NotFoundException. */
   @RequirePermission(PERMISSION.USER_READ)
   @Get(':id')
   @ApiOperation({ summary: 'Get a user' })

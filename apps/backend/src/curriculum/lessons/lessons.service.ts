@@ -26,6 +26,7 @@ import { LessonsRepository } from './lessons.repository.js';
 
 @Injectable()
 export class LessonsService {
+  /** Injects lesson persistence and the structured logger. */
   constructor(
     private readonly lessons: LessonsRepository,
     private readonly logger: PinoLogger,

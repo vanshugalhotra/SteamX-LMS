@@ -28,6 +28,7 @@ import { CoursesRepository } from './courses.repository.js';
 
 @Injectable()
 export class CoursesService {
+  /** Injects course persistence and the structured logger. */
   constructor(
     private readonly courses: CoursesRepository,
     private readonly logger: PinoLogger,
@@ -39,7 +40,7 @@ export class CoursesService {
   // POST /courses — Create a course
   // ─────────────────────────────────────────
 
-  /** Creates global curriculum content in DRAFT status. */
+  /** Creates global curriculum content in DRAFT status for platform staff. */
   async create(actor: AuthContext, body: CreateCourseDto): Promise<CourseResponseDto> {
     assertPlatformStaff(actor);
     const course = await this.courses.create(body);
@@ -70,7 +71,7 @@ export class CoursesService {
   // GET /courses/:id — Get a course
   // ─────────────────────────────────────────
 
-  /** Returns a global course; malformed IDs are rejected by the controller's UUID pipe. */
+  /** Returns a global course or throws 404 when it does not exist. */
   async findById(actor: AuthContext, id: string): Promise<CourseResponseDto> {
     assertPlatformStaff(actor);
     const course = await this.courses.findById(id);
@@ -103,7 +104,7 @@ export class CoursesService {
   // PATCH /courses/:id/status — Update status
   // ─────────────────────────────────────────
 
-  /** Changes course status; database triggers remain the backstop for status rules. */
+  /** Changes course status, preserving concurrent transitions and database status constraints. */
   async updateStatus(
     actor: AuthContext,
     id: string,
@@ -159,7 +160,7 @@ export class CoursesService {
   // DELETE /courses/:id — Delete an unused course
   // ─────────────────────────────────────────
 
-  /** Deletes a course only when no database records reference it. */
+  /** Deletes a course or throws 409 when database records still reference it. */
   async delete(actor: AuthContext, id: string): Promise<void> {
     assertPlatformStaff(actor);
     try {

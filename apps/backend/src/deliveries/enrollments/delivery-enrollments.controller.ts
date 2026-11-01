@@ -45,7 +45,13 @@ export class DeliveryEnrollmentsController {
   // POST /deliveries/:id/enrollments — Enroll students
   // ─────────────────────────────────────────
 
-  /** Enrolls the supplied students after validating the full request. */
+  /**
+   * Enrolls the supplied students after service validation of every requested profile.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @param body Student IDs to enroll.
+   * @returns Counts of newly enrolled, reactivated, and already-active students.
+   */
   @RequirePermission(PERMISSION.ENROLLMENT_MANAGE)
   @Post(':id/enrollments')
   @HttpCode(HttpStatus.OK)
@@ -68,7 +74,12 @@ export class DeliveryEnrollmentsController {
   // POST /deliveries/:id/enrollments/class — Enroll a class
   // ─────────────────────────────────────────
 
-  /** Enrolls every active student currently in the delivery's class section. */
+  /**
+   * Enrolls all active students currently found in the delivery's school and class section.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @returns Counts of newly enrolled, reactivated, and already-active students.
+   */
   @RequirePermission(PERMISSION.ENROLLMENT_MANAGE)
   @Post(':id/enrollments/class')
   @HttpCode(HttpStatus.OK)
@@ -88,7 +99,13 @@ export class DeliveryEnrollmentsController {
   // GET /deliveries/:id/enrollments — List enrollments
   // ─────────────────────────────────────────
 
-  /** Lists delivery enrollments, defaulting to all statuses and sorting newest first. */
+  /**
+   * Lists delivery enrollments, defaulting to all statuses and sorting newest first.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @param query Optional status filter and page settings.
+   * @returns The paginated enrollment list.
+   */
   @RequirePermission(PERMISSION.ENROLLMENT_MANAGE)
   @Get(':id/enrollments')
   @ApiOperation({ summary: 'List delivery enrollments' })
@@ -110,7 +127,12 @@ export class DeliveryEnrollmentsController {
   // DELETE /deliveries/:id/enrollments/:studentId — Remove an enrollment
   // ─────────────────────────────────────────
 
-  /** Removes one active enrollment without deleting its record. */
+  /**
+   * Removes an active enrollment without deleting its record; an already removed row is a no-op.
+   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
+   * @param id Delivery UUID.
+   * @param studentId Student UUID.
+   */
   @RequirePermission(PERMISSION.ENROLLMENT_MANAGE)
   @Delete(':id/enrollments/:studentId')
   @HttpCode(HttpStatus.NO_CONTENT)

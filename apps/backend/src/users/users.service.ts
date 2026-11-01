@@ -54,8 +54,14 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   /**
-   * Creates a teacher and profile for an active school visible to the actor.
-   * Returns the public user response; invalid passwords, missing schools, and conflicts are errors.
+   * Creates a teacher and profile for the active school resolved from the actor and request.
+   * @param actor Authenticated actor used to resolve the school scope.
+   * @param body Teacher account and profile fields.
+   * @returns The created public user response.
+   * @throws BadRequestException when the password violates policy.
+   * @throws NotFoundException when the requested school is unavailable to the actor.
+   * @throws ConflictException when the school is inactive or SteamX ID allocation is exhausted.
+   * @throws InternalServerErrorException when the teacher role seed is invalid.
    */
   async createTeacher(actor: AuthContext, body: CreateTeacherDto): Promise<UserResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
@@ -90,8 +96,14 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   /**
-   * Creates a student and profile after checking school and class-section ownership.
-   * Returns the public user response; invalid passwords, missing resources, and conflicts are errors.
+   * Creates a student after checking that the class section belongs to the resolved school.
+   * @param actor Authenticated actor used to resolve the school scope.
+   * @param body Student account and profile fields.
+   * @returns The created public user response.
+   * @throws BadRequestException when the password violates policy.
+   * @throws NotFoundException when the school or class section is unavailable in scope.
+   * @throws ConflictException when the school is inactive or SteamX ID allocation is exhausted.
+   * @throws InternalServerErrorException when the student role seed is invalid.
    */
   async createStudent(actor: AuthContext, body: CreateStudentDto): Promise<UserResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
@@ -127,8 +139,12 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   /**
-   * Returns a paginated list using school scope and user visibility before querying.
-   * An explicitly requested school outside the actor's scope is not found.
+   * Lists users after applying school scope and caller visibility in the repository predicate.
+   * Non-platform actors see only their own account.
+   * @param actor Authenticated actor defining school and record visibility.
+   * @param query Filters and page settings.
+   * @returns The matching paginated user list.
+   * @throws NotFoundException when an explicitly requested school is outside the actor's scope.
    */
   async findMany(
     actor: AuthContext,
@@ -159,8 +175,11 @@ export class UsersService {
   // ─────────────────────────────────────────
 
   /**
-   * Returns one user under school scope and role-specific visibility.
-   * Missing, foreign, or invisible IDs throw 404.
+   * Loads one user using combined school-scope and caller-visibility predicates.
+   * @param actor Authenticated actor defining school and record visibility.
+   * @param id User UUID.
+   * @returns The visible user's public response.
+   * @throws NotFoundException when the user is missing, outside school scope, or invisible.
    */
   async findById(actor: AuthContext, id: string): Promise<UserResponseDto> {
     const scope = resolveSchoolScope(actor);
@@ -176,9 +195,15 @@ export class UsersService {
   }
 
   /**
-   * Renames a visible school user's login ID after validating its school prefix and format.
-   * Missing or invisible IDs throw 404; invalid IDs throw 400 and duplicates throw 409.
+   * Validates and renames a visible school user's SteamX ID under the existing school scope.
    * The repository enables the database guard only inside the rename transaction.
+   * @param actor Authenticated actor defining school and record visibility.
+   * @param id User UUID.
+   * @param body Requested SteamX ID.
+   * @returns The renamed user's public response, or the unchanged response for a no-op.
+   * @throws BadRequestException when the user is not a school user or the ID fails validation.
+   * @throws NotFoundException when the user is missing or invisible.
+   * @throws ConflictException when the SteamX ID is already in use.
    */
   async renameSteamxId(
     actor: AuthContext,
@@ -228,7 +253,14 @@ export class UsersService {
 
   /**
    * Updates applicable account and profile fields together for a visible school user.
-   * Invalid fields or platform-staff targets throw 400; invisible IDs throw 404.
+   * Changing a student's class completes active enrollments for deliveries in other classes.
+   * @param actor Authenticated actor defining school and record visibility.
+   * @param id User UUID.
+   * @param body Account and profile changes.
+   * @returns The updated user's public response.
+   * @throws BadRequestException for empty, inapplicable, or unmanageable changes.
+   * @throws NotFoundException when the user or requested class section is unavailable in scope.
+   * @throws ConflictException when an account field conflicts with another user.
    */
   async update(actor: AuthContext, id: string, body: UpdateUserDto): Promise<UserResponseDto> {
     const { user, where } = await this.findVisibleTarget(actor, id);
@@ -311,8 +343,13 @@ export class UsersService {
   }
 
   /**
-   * Changes the status of a visible school user; rejects self-changes and platform staff.
-   * The next authenticated request observes deactivation; invisible IDs throw 404.
+   * Changes a visible school user's status; rejects self-changes and platform-staff targets.
+   * @param actor Authenticated actor defining school and record visibility.
+   * @param id User UUID.
+   * @param body Target status.
+   * @returns The updated user's public response.
+   * @throws BadRequestException when the actor targets themself or a platform-staff account.
+   * @throws NotFoundException when the user is missing or invisible.
    */
   async updateStatus(
     actor: AuthContext,
@@ -346,7 +383,11 @@ export class UsersService {
 
   /**
    * Resets another visible user's password and requires a change at next login.
-   * Self-reset throws 400, invisible IDs throw 404, and success updates password-change time.
+   * @param actor Authenticated actor defining school and record visibility.
+   * @param userId Target user UUID.
+   * @param newPassword Replacement password in plaintext, validated before hashing.
+   * @throws BadRequestException for a self-reset or a password-policy violation.
+   * @throws NotFoundException when the target user is missing or invisible.
    */
   async resetPassword(actor: AuthContext, userId: string, newPassword: string): Promise<void> {
     const { user, where } = await this.findVisibleTarget(actor, userId);
@@ -364,8 +405,12 @@ export class UsersService {
   }
 
   /**
-   * Builds the combined ownership and visibility predicate used by user mutations.
-   * Returning 404 for foreign or invisible IDs prevents callers from probing account existence.
+   * Loads a mutation target using combined ID, school-scope, and visibility predicates.
+   * This returns the same not-found error for missing, foreign, and invisible users.
+   * @param actor Authenticated actor defining school and record visibility.
+   * @param id Target user UUID.
+   * @returns The visible user and predicate reused by the mutation.
+   * @throws NotFoundException when the user is missing, foreign, or invisible.
    */
   private async findVisibleTarget(
     actor: AuthContext,
@@ -382,7 +427,11 @@ export class UsersService {
     return { user, where };
   }
 
-  /** Prevents this management API from mutating platform staff accounts. */
+  /**
+   * Prevents this management API from mutating platform-staff accounts.
+   * @param user User record to check.
+   * @throws BadRequestException when the user has no school scope.
+   */
   private assertSchoolUser(
     user: UserDetailRecord,
   ): asserts user is UserDetailRecord & { schoolId: string } {
@@ -391,7 +440,13 @@ export class UsersService {
     }
   }
 
-  /** Treats missing or mismatched role seed data as a server configuration error. */
+  /**
+   * Treats missing or mismatched role seed data as a server configuration error.
+   * @param roleKey Role key required for the account.
+   * @param userType Expected account type for the role.
+   * @returns The matching role ID.
+   * @throws InternalServerErrorException when role configuration is missing or inconsistent.
+   */
   private async resolveRole(roleKey: UserRoleKey, userType: UserType): Promise<{ id: number }> {
     const role = await this.users.findRole(roleKey);
     if (!role || role.userType !== userType) {
@@ -400,7 +455,12 @@ export class UsersService {
     return { id: role.id };
   }
 
-  /** Reuses the shared password policy for account creation and administrative resets. */
+  /**
+   * Applies the shared password policy for account creation and administrative resets.
+   * @param password Plaintext password to validate.
+   * @param steamxId Account ID checked by the password policy.
+   * @throws BadRequestException when the password violates policy.
+   */
   private validatePassword(password: string, steamxId: string): void {
     const violations = getPasswordPolicyViolations(password, steamxId);
     if (violations.length > 0) {
