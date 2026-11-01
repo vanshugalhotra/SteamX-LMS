@@ -29,6 +29,15 @@ export type DeliveryEnrollmentRecord = Prisma.DeliveryEnrollmentGetPayload<{
 export class DeliveryEnrollmentsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Runs enrollment reads and writes in one database transaction.
+   * @param operation Work to execute with the transaction-scoped Prisma client.
+   * @returns The operation result.
+   */
+  transaction<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction(operation);
+  }
+
   // -------------------- Student lookups --------------------
   /**
    * Loads requested student profiles in the delivery's school.

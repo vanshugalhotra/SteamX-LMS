@@ -3,6 +3,7 @@ import type { PrismaClient } from '../../../src/generated/prisma/client.js';
 import type { AssetSeed } from './assets.js';
 
 export type CurriculumSeed = {
+  lesson: string;
   courses: {
     active: string;
     expired: string;
@@ -231,6 +232,7 @@ export async function seedCurriculum(
   });
 
   return {
+    lesson: IDS.studentLesson,
     courses: {
       active: IDS.activeCourse,
       expired: IDS.expiredCourse,
