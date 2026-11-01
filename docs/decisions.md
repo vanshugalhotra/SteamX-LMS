@@ -1,6 +1,6 @@
 # Decisions
 
-This page records current design decisions and their consequences. It does not describe planned behavior.
+This page records decisions and their consequences, including constraints on planned work.
 
 ## Infrastructure
 

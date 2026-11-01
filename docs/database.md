@@ -1,8 +1,8 @@
 # Database
 
-The Prisma schema defines the tables and migrations enforce PostgreSQL rules. Subscription and
-delivery APIs are implemented; teacher assignments, releases, enrollments, and assignments remain
-schema-only. Use this page to check persistence constraints before changing a workflow.
+The Prisma schema defines the tables and migrations enforce PostgreSQL rules. Subscriptions,
+deliveries, teacher assignments, enrollments, and lesson releases have API implementations. Use
+this page to check persistence constraints before changing a workflow.
 
 ## Tables
 
@@ -55,15 +55,23 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 - SteamX ID changes blocked unless `steamx.allow_steamx_id_change` is set in the transaction.
 - Class/section names: nonblank, no surrounding whitespace. Case-insensitive unique per school. `section_name` defaults to `All`; each row represents a class/section pair.
 
-### Subscription & delivery rules
+### Subscription and delivery rules
 
-- Subscription terms require `end_date >= start_date`, `max_deliveries > 0`, and cannot overlap for the same school and course (inclusive ranges; exclusion is deferred to commit).
-- `business_today()` currently uses the hard-coded `Asia/Kolkata` timezone; the migration comment says it should match a `BUSINESS_TIMEZONE` default, but the backend does not define that setting. `has_course_access()` checks subscription dates only.
-- Subscriptions can be created only for ACTIVE courses; their school/course identity is immutable, and the delivery cap cannot be lowered below the active delivery count.
-- Delivery creation and INACTIVE-to-ACTIVE transitions require an ACTIVE course and a current subscription. The trigger locks the current subscription row while enforcing the school-course active-delivery cap.
-- Delivery school, course, class section, and academic year are immutable; academic year must match `YYYY-NN`.
-- Enrollment identity is immutable; dates and status must agree, and enrollment/reactivation requires a matching student and delivery class section, an ACTIVE student and delivery, and current course access.
-- Lesson-release identity is immutable; releases require an ACTIVE STUDENT lesson in an ACTIVE module, an ACTIVE delivery, current course access, and an in-scope release actor.
+- **SQL function:** `has_course_access(school_id, course_id, date)` checks inclusive subscription start/end dates; the service calls it for current access.
+- **SQL function:** `business_today()` derives the business date in the database; its current timezone is hard-coded as `Asia/Kolkata`.
+- **Service layer:** subscription-gated workflows check current access with `business_today()`; database triggers repeat checks for delivery, enrollment, and release writes.
+- **SQL exclusion constraint:** subscription date ranges cannot overlap per school/course; it is deferred, so a conflict can surface when the transaction commits.
+- **SQL triggers:** subscription school/course, delivery school/course/class/year, enrollment school/delivery/student, and release school/course/delivery/lesson identity are immutable.
+- **Service and SQL:** subscription grants/renewals and delivery activation require an ACTIVE course; the delivery trigger also enforces this for inserts and reactivation.
+- **SQL trigger:** the active-delivery cap locks the current subscription row while counting ACTIVE deliveries, serializing concurrent use of the cap.
+- **SQL trigger:** enrollment insert/reactivation requires a same-school active student, a matching delivery class section, an ACTIVE delivery, and current course access; status/end-date consistency is also constrained.
+- **SQL trigger:** a release requires an in-scope actor, ACTIVE delivery and module, an ACTIVE STUDENT-audience lesson, and current course access.
+- **SQL partial unique index:** only one active teacher stint is allowed per delivery/teacher pair; removed stints remain as history.
+- **Seeded permission keys:** `subscription.manage`, `delivery.manage`, `delivery.read`, `enrollment.manage`, and `release.manage`; the reference migration grants all to admin and grants `delivery.read`, `enrollment.manage`, and `release.manage` to teacher.
+- **Service-derived state:** subscription `status`/expired state and `retainedUntil` are calculated from dates and are never stored as subscription columns.
+
+`business_today()` currently uses the hard-coded `Asia/Kolkata` timezone. The migration comment says
+it should match a `BUSINESS_TIMEZONE` default, but the backend does not define that setting.
 
 For route-level behavior, see the [subscription and delivery API cases](./api-testing.md#subscriptions).
 

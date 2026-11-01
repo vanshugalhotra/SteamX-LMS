@@ -170,8 +170,9 @@ Caller: platform `admin` with `curriculum.write`; deletes an unused global cours
 
 ## Subscriptions
 
-All six endpoints require platform staff with `subscription.manage`. Dates are date-only
-`YYYY-MM-DD`; status, active-delivery count, and retention date are derived per response.
+All six endpoints require platform staff with `subscription.manage`; missing authentication returns
+`401 AUTHENTICATION_FAILED`, and missing permission returns `403 PERMISSION_REQUIRED`. Dates are
+date-only `YYYY-MM-DD`; subscription status, active-delivery count, and retention date are derived.
 
 ### `POST /subscriptions`
 
