@@ -21,6 +21,7 @@ export const PATHS = {
     classSectionEdit: (id: string) => `${ADMIN_BASE}/class-sections/${id}/edit`,
     assets: `${ADMIN_BASE}/assets`,
     assetUpload: `${ADMIN_BASE}/assets/upload`,
+    assetView: (id: string) => `${ADMIN_BASE}/assets/${id}`,
     admins: `${ADMIN_BASE}/admins`,
     adminView: (id: string) => `${ADMIN_BASE}/admins/${id}`,
   },
