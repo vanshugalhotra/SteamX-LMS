@@ -22,6 +22,7 @@ import { SchoolsRepository } from './schools.repository.js';
 /** Enforces school access rules, applies school lifecycle behavior, and maps results to API responses. */
 @Injectable()
 export class SchoolsService {
+  /** Injects school persistence and the structured logger. */
   constructor(
     private readonly schools: SchoolsRepository,
     private readonly logger: PinoLogger,

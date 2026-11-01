@@ -41,7 +41,12 @@ export class AssetAccessService {
     this.logger.setContext(AssetAccessService.name);
   }
 
-  /** Issues a URL for the newest READY file; non-platform actors are forbidden. */
+  /**
+   * Issues a temporary URL for the newest READY file.
+   * @throws ForbiddenException when the actor is not platform staff.
+   * @throws NotFoundException when the asset is missing.
+   * @throws ConflictException when the asset has no READY file.
+   */
   async issueForAuthor(assetId: string, actor: AuthContext): Promise<AssetAccessResponseDto> {
     assertPlatformStaff(actor);
     // This lookup filters files to READY and takes the newest one, excluding in-progress replacements.
@@ -63,7 +68,12 @@ export class AssetAccessService {
     return access;
   }
 
-  /** Issues the signed URL for a selected READY file, using the content-type access TTL. */
+  /**
+   * Signs the supplied file's playback object or original object using its asset-type TTL.
+   * This method trusts the caller to select an eligible file; it does not check file status.
+   * @returns The temporary URL, expiry, asset type, and MIME type.
+   * @throws Error when the file has no MIME type or its asset type cannot be served.
+   */
   async issueForFile(
     file: AssetFileForSigning,
     assetType: AssetType,

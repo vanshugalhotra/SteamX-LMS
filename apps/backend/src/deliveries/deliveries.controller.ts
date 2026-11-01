@@ -36,11 +36,13 @@ export class DeliveriesController {
   // POST /deliveries — Create a delivery
   // ─────────────────────────────────────────
   /**
-   * Creates an ACTIVE delivery in an active school.
+   * Creates an ACTIVE delivery after validating the requested school, course, and class section.
    * @param actor Authenticated actor with delivery.manage.
-   * @param body School, course, class-section, and academic year.
+   * @param body Requested school, course, class section, and academic year.
    * @returns The created delivery with derived fields.
-   * @throws NotFoundException for out-of-scope records; ConflictException for inactive course, duplicate, or cap; ForbiddenException without current access.
+   * @throws NotFoundException for unavailable or out-of-scope records.
+   * @throws ConflictException for an inactive course, duplicate delivery, or reached delivery cap.
+   * @throws ForbiddenException when the school has no current course subscription.
    */
   @RequirePermission(PERMISSION.DELIVERY_MANAGE)
   @Post()
@@ -111,7 +113,9 @@ export class DeliveriesController {
    * @param id Delivery UUID.
    * @param body Target delivery status.
    * @returns The updated delivery with current subscription state.
-   * @throws NotFoundException if missing; ConflictException for inactive course or cap; ForbiddenException without current access.
+   * @throws NotFoundException when missing or outside school scope.
+   * @throws ConflictException for an inactive course or reached delivery cap.
+   * @throws ForbiddenException when the school has no current course subscription.
    */
   @RequirePermission(PERMISSION.DELIVERY_MANAGE)
   @Patch(':id/status')

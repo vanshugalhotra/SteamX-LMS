@@ -77,12 +77,12 @@ export class DeliveryTeachersRepository {
   }
 
   /**
-   * Marks the active assignment removed in one school-scoped database update.
+   * Ends active assignment history in one update restricted to the delivery school scope.
    * @param deliveryId Delivery UUID.
    * @param teacherId Teacher UUID.
    * @param scope Resolved school UUID, or undefined for platform-wide access.
    * @param removedById Actor UUID recording the removal.
-   * @returns The school ID of each updated assignment; empty when none was active.
+   * @returns School IDs of updated rows; empty when no active assignment matched.
    */
   removeActiveTeacherAssignment(
     deliveryId: string,
@@ -103,7 +103,7 @@ export class DeliveryTeachersRepository {
   }
 
   /**
-   * Lists assignments for one delivery in newest-first order.
+   * Lists assignments for one delivery in newest-first order, optionally including removed history.
    * @param deliveryId Delivery UUID.
    * @param scope Resolved school UUID, or undefined for platform-wide access.
    * @param includeRemoved Whether to include removed assignments.

@@ -1,4 +1,4 @@
-// HTTP routes for reading and saving lesson content.
+/** Declares authenticated routes for reading and replacing lesson content. */
 import { Body, Controller, Get, Param, ParseUUIDPipe, Put } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -30,7 +30,7 @@ export class LessonContentController {
   /** Inject the service that handles lesson-content rules and database work. */
   constructor(private readonly lessonContent: LessonContentService) {}
 
-  /** Read the lesson tree and asset summaries for an authorized curriculum reader. */
+  /** Reads the lesson tree and referenced asset summaries for an authorized curriculum reader. */
   @RequirePermission(PERMISSION.CURRICULUM_READ)
   @Get('lessons/:id/content')
   @ApiOperation({ summary: 'Get lesson content' })

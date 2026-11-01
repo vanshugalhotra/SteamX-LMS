@@ -210,6 +210,7 @@ export class DeliveriesService {
     }
   }
 
+  /** Adds current subscription activity to a delivery response. */
   private async toResponse(delivery: Parameters<typeof toDeliveryResponse>[0]) {
     const [activity] = await this.courseAccess.getSubscriptionActivity([
       { schoolId: delivery.schoolId, courseId: delivery.courseId },
@@ -220,6 +221,13 @@ export class DeliveriesService {
     return toDeliveryResponse(delivery, activity.active);
   }
 
+  /**
+   * Requires a current term and checks its active-delivery cap.
+   * @param schoolId School that owns the delivery.
+   * @param courseId Course whose delivery cap applies.
+   * @throws ForbiddenException when no current subscription exists.
+   * @throws ConflictException when the active-delivery cap is reached.
+   */
   private async assertDeliveryCapacity(schoolId: string, courseId: string): Promise<void> {
     const max = await this.courseAccess.getCurrentDeliveryLimit(schoolId, courseId);
     if (max === null) {
@@ -234,6 +242,14 @@ export class DeliveriesService {
     }
   }
 
+  /**
+   * Converts recognized database trigger failures to delivery domain errors.
+   * @param error Error raised by the delivery write.
+   * @param schoolId School that owns the delivery.
+   * @param courseId Course whose subscription rules apply.
+   * @throws ConflictException when the course is inactive or its delivery cap is reached.
+   * @throws ForbiddenException when the subscription is no longer current.
+   */
   private async mapDeliveryWriteError(
     error: unknown,
     schoolId: string,

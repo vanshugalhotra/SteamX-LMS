@@ -9,15 +9,17 @@ import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import type { CreateSchoolDto } from './dto/create-school.dto.js';
 import type { UpdateSchoolDto } from './dto/update-school.dto.js';
 
-/** Runs Prisma queries with school scope applied in the database predicate. */
-// A school is scoped by its own id, not a schoolId foreign key. Combine ID and scope with AND;
-// spreading both predicates would overwrite one and could drop the scope condition.
+/**
+ * Builds a scope predicate for the school row itself, whose tenant key is its ID.
+ * The repository combines this with a target ID using AND to preserve both conditions.
+ */
 function selfScopeFilter(scope: string | undefined): Prisma.SchoolWhereInput {
   return scope === undefined ? {} : { id: scope };
 }
 
 @Injectable()
 export class SchoolsRepository {
+  /** Injects Prisma for school queries and writes. */
   constructor(private readonly prisma: PrismaService) {}
 
   /** Inserts the validated school fields; duplicate codes propagate for SchoolsService translation. */

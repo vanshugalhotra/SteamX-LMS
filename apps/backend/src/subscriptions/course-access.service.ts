@@ -18,8 +18,12 @@ export class CourseAccessService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Checks school scope and subscription dates before course access.
-   * @throws NotFoundException for a foreign-school resource and ForbiddenException without access.
+   * Allows platform staff directly; other actors must match the resource school and have a current term.
+   * @param actor Authenticated actor establishing school and platform-staff scope.
+   * @param schoolId School that owns the resource.
+   * @param courseId Course whose subscription grants access.
+   * @throws NotFoundException when a non-platform actor's school differs from the resource school.
+   * @throws ForbiddenException when no subscription covers the database business date.
    */
   async assertCourseAccess(actor: AuthContext, schoolId: string, courseId: string): Promise<void> {
     if (actor.userType === UserType.PLATFORM_STAFF) {
@@ -33,7 +37,7 @@ export class CourseAccessService {
   }
 
   /**
-   * Checks whether a term covers the database business date.
+   * Checks whether a subscription for this school-course pair covers the database business date.
    * @param schoolId School that owns the access.
    * @param courseId Course to check.
    * @throws ForbiddenException when no current term exists.
@@ -48,7 +52,7 @@ export class CourseAccessService {
   }
 
   /**
-   * Reads the current term's delivery cap.
+   * Reads the cap from a term covering the database business date.
    * @param schoolId School that owns the access.
    * @param courseId Course to check.
    * @returns The current cap, or null when no term covers the business date.

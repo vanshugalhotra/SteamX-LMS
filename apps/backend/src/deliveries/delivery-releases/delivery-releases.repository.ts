@@ -25,7 +25,11 @@ const RELEASE_MODULE_SELECT = {
 export class DeliveryReleasesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Loads active modules and their active lessons in course position order. */
+  /**
+   * Loads active modules and active lessons in course position order.
+   * @param courseId Course whose outline is requested.
+   * @returns Modules and selected lesson release-eligibility fields.
+   */
   findActiveOutline(courseId: string) {
     return this.prisma.module.findMany({
       where: { courseId, status: ContentStatus.ACTIVE },
@@ -34,7 +38,12 @@ export class DeliveryReleasesRepository {
     });
   }
 
-  /** Loads release timestamps for outline lessons in one query. */
+  /**
+   * Loads existing release timestamps for the requested lessons in a delivery.
+   * @param deliveryId Delivery whose releases are read.
+   * @param lessonIds Lesson IDs in the active course outline.
+   * @returns Existing lesson IDs and their original release timestamps.
+   */
   findMany(deliveryId: string, lessonIds: string[]) {
     return this.prisma.deliveryLessonRelease.findMany({
       where: { deliveryId, lessonId: { in: lessonIds } },
@@ -42,7 +51,12 @@ export class DeliveryReleasesRepository {
     });
   }
 
-  /** Finds a lesson only when it belongs to the delivery's course. */
+  /**
+   * Finds lesson release-eligibility fields only within the delivery's course.
+   * @param courseId Course that owns the delivery.
+   * @param lessonId Lesson being checked.
+   * @returns The lesson and parent-module statuses, or null when it is outside the course.
+   */
   findLesson(courseId: string, lessonId: string) {
     return this.prisma.lesson.findFirst({
       where: { id: lessonId, courseId },
@@ -54,7 +68,12 @@ export class DeliveryReleasesRepository {
     });
   }
 
-  /** Finds a module and all lesson eligibility fields under the delivery course. */
+  /**
+   * Finds a module and its lesson eligibility fields within the delivery's course.
+   * @param courseId Course that owns the delivery.
+   * @param moduleId Module being checked.
+   * @returns The module and lesson fields, or null when it is outside the course.
+   */
   findModule(courseId: string, moduleId: string) {
     return this.prisma.module.findFirst({
       where: { id: moduleId, courseId },
@@ -63,8 +82,9 @@ export class DeliveryReleasesRepository {
   }
 
   /**
-   * Ensures the lesson is released for the delivery and returns its stored timestamp.
-   * @returns The existing or newly created release timestamp and whether this call created it.
+   * Inserts one release idempotently and reads back its persisted timestamp in the same transaction.
+   * @param data Release owner IDs and the actor recording the release.
+   * @returns The original or new release timestamp and insert count (zero or one).
    */
   async createRelease(data: {
     deliveryId: string;
@@ -91,12 +111,21 @@ export class DeliveryReleasesRepository {
     });
   }
 
-  /** Deletes an existing release row without touching lesson completions. */
+  /**
+   * Deletes a release row without changing lesson completions.
+   * @param deliveryId Delivery whose release is removed.
+   * @param lessonId Lesson whose release is removed.
+   * @returns Number of deleted rows; zero when no release existed.
+   */
   deleteRelease(deliveryId: string, lessonId: string): Promise<{ count: number }> {
     return this.prisma.deliveryLessonRelease.deleteMany({ where: { deliveryId, lessonId } });
   }
 
-  /** Inserts all eligible module releases in one transaction, skipping existing rows. */
+  /**
+   * Inserts eligible lesson releases atomically and skips rows already released.
+   * @param data Delivery, school, course, actor, and eligible lesson IDs.
+   * @returns Number of release rows inserted; zero for an empty list.
+   */
   async createManyReleases(data: {
     deliveryId: string;
     schoolId: string;

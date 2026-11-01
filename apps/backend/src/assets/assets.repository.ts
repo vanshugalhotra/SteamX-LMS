@@ -98,15 +98,21 @@ export class AssetsRepository {
     });
   }
 
+  /** Loads only the asset identity and type needed to validate a replacement upload. */
   findAssetTypeById(id: string): Promise<Pick<Asset, 'id' | 'type'> | null> {
     return this.prisma.asset.findUnique({ where: { id }, select: { id: true, type: true } });
   }
 
+  /** Updates the title and returns null when no asset has that ID. */
   async updateTitle(id: string, title: string): Promise<Asset | null> {
     const updated = await this.prisma.asset.updateMany({ where: { id }, data: { title } });
     return updated.count === 0 ? null : this.prisma.asset.findUnique({ where: { id } });
   }
 
+  /**
+   * Locks the asset row in a transaction before reading or changing its status.
+   * Returns null when the asset is missing and reports unchanged status without writing.
+   */
   updateStatus(id: string, status: ContentStatus): Promise<UpdateAssetStatusResult | null> {
     return this.prisma.$transaction(async (tx) => {
       const lockedAssets = await tx.$queryRaw<Array<{ id: string }>>`
@@ -207,7 +213,7 @@ export class AssetsRepository {
         return { status: 'not_found' };
       }
 
-      // UPLOADED and PROCESSING belong to complete's conditional transitions;
+      // UPLOADED and PROCESSING belong to complete's conditional transitions.
       const inFlightCount = await tx.assetFile.count({
         where: {
           assetId: input.assetId,

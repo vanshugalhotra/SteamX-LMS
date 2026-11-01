@@ -26,13 +26,13 @@ export class DeliveryTeachersService {
   }
 
   /**
-   * Assigns an active teacher from the delivery's school.
+   * Assigns an active teacher profile from the delivery's school to an active delivery.
    * @param actor Authenticated administrator.
    * @param deliveryId Delivery UUID.
    * @param body Teacher UUID.
    * @returns The newly created assignment.
    * @throws NotFoundException for a missing delivery or a teacher outside its school.
-   * @throws ConflictException for inactive records or an existing active assignment.
+   * @throws ConflictException when the delivery or teacher is inactive, or the teacher is already assigned.
    */
   async assign(
     actor: AuthContext,
@@ -84,7 +84,7 @@ export class DeliveryTeachersService {
   }
 
   /**
-   * Ends the active assignment in one database update.
+   * Ends the active assignment without deleting its history row.
    * @param actor Authenticated administrator.
    * @param deliveryId Delivery UUID.
    * @param teacherId Teacher UUID.
@@ -115,7 +115,7 @@ export class DeliveryTeachersService {
   }
 
   /**
-   * Lists assignments for an existing delivery, optionally including removed assignments.
+   * Lists assignment history for an existing delivery, optionally including removed rows.
    * @param actor Authenticated administrator.
    * @param deliveryId Delivery UUID.
    * @param query Pagination and history options.

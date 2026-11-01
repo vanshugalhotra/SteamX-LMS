@@ -30,7 +30,7 @@ export class DeliveryEnrollmentsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Runs enrollment reads and writes in one database transaction.
+   * Runs enrollment reads and writes using one transaction-scoped Prisma client.
    * @param operation Work to execute with the transaction-scoped Prisma client.
    * @returns The operation result.
    */
@@ -40,7 +40,7 @@ export class DeliveryEnrollmentsRepository {
 
   // -------------------- Student lookups --------------------
   /**
-   * Loads requested student profiles in the delivery's school.
+   * Loads requested student profiles in the delivery's school, excluding all other schools.
    * @param tx Current transaction.
    * @param schoolId School that owns the delivery.
    * @param studentIds Requested student IDs.
@@ -58,7 +58,7 @@ export class DeliveryEnrollmentsRepository {
   }
 
   /**
-   * Loads active students in a delivery's class.
+   * Loads only active student accounts in the specified school and class.
    * @param tx Current transaction.
    * @param schoolId School that owns the delivery.
    * @param classSectionId Delivery class-section ID.
@@ -177,7 +177,7 @@ export class DeliveryEnrollmentsRepository {
   }
 
   /**
-   * Reactivates existing removed or completed rows without changing their IDs.
+   * Reactivates removed or completed rows without changing their IDs, refreshing enrollment metadata.
    * @param tx Current transaction.
    * @param deliveryId Delivery ID.
    * @param schoolId School that owns the delivery.

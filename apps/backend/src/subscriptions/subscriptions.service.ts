@@ -144,7 +144,8 @@ export class SubscriptionsService {
    * @param id Subscription UUID.
    * @param body End date and/or delivery cap.
    * @returns The updated term with derived fields.
-   * @throws BadRequestException for an empty or invalid update; NotFoundException if missing; ConflictException for overlap or a cap below active use.
+   * @throws BadRequestException for an empty or invalid update; NotFoundException if missing.
+   * @throws ConflictException for an inactive course, overlap, or a cap below active use.
    */
   async update(
     actor: AuthContext,
@@ -239,7 +240,8 @@ export class SubscriptionsService {
    * @param id Source subscription UUID.
    * @param body New end date and optional start date or delivery cap.
    * @returns The new term with derived fields.
-   * @throws NotFoundException if the source is missing; ConflictException for ineligible records or overlap.
+   * @throws BadRequestException for an invalid date range; NotFoundException if the source is missing.
+   * @throws ConflictException for inactive records or overlapping terms.
    */
   async renew(
     actor: AuthContext,
@@ -283,6 +285,7 @@ export class SubscriptionsService {
     }
   }
 
+  /** Loads the business date used for subscription lifecycle decisions. */
   private async today(): Promise<string> {
     const [row] = await this.subscriptions.getBusinessToday();
     if (!row) {
@@ -291,6 +294,12 @@ export class SubscriptionsService {
     return row.today;
   }
 
+  /**
+   * Converts a repository eligibility result to its corresponding API exception.
+   * @param result Created term or failed school/course eligibility result.
+   * @throws NotFoundException when the school or course is missing.
+   * @throws ConflictException when the school or course is inactive.
+   */
   private throwEligibilityError(
     result: SubscriptionRecord | SubscriptionEligibilityError,
   ): asserts result is SubscriptionRecord {
@@ -308,12 +317,24 @@ export class SubscriptionsService {
     }
   }
 
+  /**
+   * Rejects a term whose end date precedes its start date.
+   * @param startDate Inclusive term start date.
+   * @param endDate Inclusive term end date.
+   * @throws BadRequestException when the dates are reversed.
+   */
   private assertDateRange(startDate: string, endDate: string): void {
     if (endDate < startDate) {
       throw new BadRequestException(API_ERROR.SUBSCRIPTION_INVALID_DATE_RANGE);
     }
   }
 
+  /**
+   * Adds pair-level summary fields and derives response status from the business date.
+   * @param subscription Stored term and related display names.
+   * @param today Database business date.
+   * @returns The subscription response.
+   */
   private async toResponse(
     subscription: Parameters<typeof toSubscriptionResponse>[0],
     today: string,
@@ -330,6 +351,11 @@ export class SubscriptionsService {
     });
   }
 
+  /**
+   * Maps recognized database constraint failures to subscription domain conflicts.
+   * @param error Error raised by a subscription write.
+   * @throws ConflictException for overlapping terms, inactive courses, or a cap below active use.
+   */
   private throwWriteError(error: unknown): void {
     if (!isPrismaKnownError(error) && getPostgresCode(error) === undefined) {
       return;

@@ -20,12 +20,15 @@ export class LessonContentRepository {
   /** Inject Prisma so this repository can query the database. */
   constructor(private readonly prisma: PrismaService) {}
 
-  // Run related database work together; an error rolls back all changes in the callback.
+  /** Runs related database work in one transaction with a 15-second timeout. */
   transaction<T>(callback: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(callback, { timeout: 15_000 });
   }
 
-  // Lock the lesson row so two saves for the same lesson run one after the other.
+  /**
+   * Locks the lesson row so concurrent content saves for that lesson serialize.
+   * @returns The locked lesson ID and version, or null when the lesson is missing.
+   */
   async lockLesson(
     tx: Prisma.TransactionClient,
     lessonId: string,
@@ -36,7 +39,10 @@ export class LessonContentRepository {
     return rows[0] ?? null;
   }
 
-  // Read the version and blocks from one PostgreSQL snapshot for the builder response.
+  /**
+   * Reads the lesson version and ordered blocks from one repeatable-read transaction.
+   * @returns An empty block list and null version when the lesson is missing.
+   */
   findSnapshot(lessonId: string): Promise<{
     lessonVersion: { contentVersion: number } | null;
     blocks: LessonContentBlockRow[];
@@ -63,9 +69,11 @@ export class LessonContentRepository {
     );
   }
 
-  /** Reads a lesson's saved block rows from the supplied save transaction when present. */
+  /**
+   * Reads a lesson's ordered block rows from the supplied transaction when present.
+   * @param tx Uses the active save transaction when supplied; otherwise uses Prisma directly.
+   */
   findBlocks(lessonId: string, tx?: Prisma.TransactionClient): Promise<LessonContentBlockRow[]> {
-    // Use the save transaction when given one; otherwise use the regular Prisma client.
     return (tx ?? this.prisma).lessonBlock.findMany({
       where: { lessonId },
       orderBy: [{ position: 'asc' }, { columnIndex: 'asc' }],
@@ -73,8 +81,9 @@ export class LessonContentRepository {
     });
   }
 
-  // Find incoming block IDs that already belong to a different lesson.
-  // Reusing an ID from this lesson is allowed; taking another lesson's ID is not.
+  /**
+   * Finds requested block IDs owned by another lesson; IDs already in this lesson are allowed.
+   */
   findForeignBlockIds(
     tx: Prisma.TransactionClient,
     lessonId: string,
@@ -86,8 +95,7 @@ export class LessonContentRepository {
     });
   }
 
-  // Remove children first because each child points to its parent layout.
-  // Then remove all remaining blocks so the new tree can be inserted from scratch.
+  /** Removes child blocks before all remaining lesson blocks for a full-tree replacement. */
   async deleteBlocks(tx: Prisma.TransactionClient, lessonId: string): Promise<void> {
     await tx.lessonBlock.deleteMany({
       where: { lessonId, parentBlockId: { not: null } },
@@ -95,7 +103,7 @@ export class LessonContentRepository {
     await tx.lessonBlock.deleteMany({ where: { lessonId } });
   }
 
-  // Insert parent blocks first so column children can refer to their layout rows.
+  /** Inserts top-level blocks before column children in the replacement transaction. */
   async createTopLevelBlocks(
     tx: Prisma.TransactionClient,
     data: ReturnType<typeof import('./tree/walk-blocks.js').flattenBlocks>['topLevel'],
@@ -103,7 +111,7 @@ export class LessonContentRepository {
     if (data.length > 0) await tx.lessonBlock.createMany({ data });
   }
 
-  // Insert the blocks inside filled columns after their parent layouts exist.
+  /** Inserts column children after their parent layout blocks exist. */
   async createChildBlocks(
     tx: Prisma.TransactionClient,
     data: ReturnType<typeof import('./tree/walk-blocks.js').flattenBlocks>['children'],

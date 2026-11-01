@@ -54,7 +54,8 @@ export class SubscriptionsController {
    * @param actor Authenticated platform staff.
    * @param body School, course, date range, and delivery cap.
    * @returns The created term with derived status and summary fields.
-   * @throws BadRequestException for an invalid range; 404 for missing records; 409 for ineligible records or overlap.
+   * @throws BadRequestException for an invalid date range; NotFoundException for missing records.
+   * @throws ConflictException for inactive records or overlapping terms.
    */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Post()
@@ -123,7 +124,8 @@ export class SubscriptionsController {
    * @param id Subscription UUID.
    * @param body New end date and/or delivery cap.
    * @returns The updated term with derived fields.
-   * @throws BadRequestException for an empty or invalid update; 404 if missing; 409 for overlap or a cap below active use.
+   * @throws BadRequestException for an empty or invalid update; NotFoundException if missing.
+   * @throws ConflictException for an inactive course, overlap, or a cap below active deliveries.
    */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Patch(':id')
@@ -173,7 +175,8 @@ export class SubscriptionsController {
    * @param id Source subscription UUID.
    * @param body End date and optional start date or delivery cap.
    * @returns The new term with derived fields.
-   * @throws NotFoundException if the source is missing; ConflictException for ineligible records or overlap.
+   * @throws BadRequestException for an invalid date range; NotFoundException if the source is missing.
+   * @throws ConflictException for inactive records or overlapping terms.
    */
   @RequirePermission(PERMISSION.SUBSCRIPTION_MANAGE)
   @Post(':id/renew')

@@ -26,6 +26,7 @@ import { CourseModulesRepository } from './course-modules.repository.js';
 
 @Injectable()
 export class CourseModulesService {
+  /** Injects module persistence and the structured logger. */
   constructor(
     private readonly modules: CourseModulesRepository,
     private readonly logger: PinoLogger,
