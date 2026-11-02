@@ -1,6 +1,6 @@
 import type { AssetFileStatus, AssetStatus, AssetType } from './types';
 
-const IN_FLIGHT: readonly AssetFileStatus[] = ['UPLOADED', 'PROCESSING'];
+const IN_FLIGHT: readonly AssetFileStatus[] = ['UPLOADING', 'UPLOADED', 'PROCESSING'];
 const PROCESSING_MESSAGE = 'A file is still being processed. Try again in a moment.';
 
 export function isFileInFlight(status: AssetFileStatus | undefined): boolean {

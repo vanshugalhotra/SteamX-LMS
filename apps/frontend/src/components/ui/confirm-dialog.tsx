@@ -18,7 +18,7 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   pending,
-  pendingLabel = 'Deleting…',
+  pendingLabel = 'Working…',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {

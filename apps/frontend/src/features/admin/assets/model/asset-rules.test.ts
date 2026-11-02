@@ -14,8 +14,9 @@ describe('deleteBlockedReason', () => {
     );
     expect(deleteBlockedReason({ usedInTotal: 3 })).toContain('3 lessons');
   });
-  it('blocks delete while a file is processing', () => {
+  it('blocks delete while a file is in flight', () => {
     expect(deleteBlockedReason({ usedInTotal: 0, fileStatus: 'PROCESSING' })).not.toBeNull();
+    expect(deleteBlockedReason({ usedInTotal: 0, fileStatus: 'UPLOADING' })).not.toBeNull();
   });
   it('allows delete otherwise', () => {
     expect(deleteBlockedReason({ usedInTotal: 0, fileStatus: 'READY' })).toBeNull();
@@ -24,8 +25,10 @@ describe('deleteBlockedReason', () => {
 });
 
 describe('replace, preview and status rules', () => {
-  it('blocks replace only while processing', () => {
+  it('blocks replace while a file is in flight', () => {
+    expect(replaceBlockedReason('UPLOADING')).not.toBeNull();
     expect(replaceBlockedReason('UPLOADED')).not.toBeNull();
+    expect(replaceBlockedReason('PROCESSING')).not.toBeNull();
     expect(replaceBlockedReason('FAILED')).toBeNull();
     expect(replaceBlockedReason('READY', 'PPTX')).toContain('PPTX');
   });

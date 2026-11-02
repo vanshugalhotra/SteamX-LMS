@@ -22,6 +22,7 @@ export function DeleteAssetDialog({
       description={`"${title}" will be permanently removed from the library. This can't be undone.`}
       confirmLabel="Delete asset"
       pending={pending}
+      pendingLabel="Deleting…"
       onConfirm={onConfirm}
       onCancel={onCancel}
     />
