@@ -22,8 +22,10 @@ export interface FieldOption {
 export interface FieldConfig<T extends FieldValues> {
   name: Path<T>;
   label: string;
-  type?: 'text' | 'email' | 'tel' | 'password' | 'select' | 'async-select';
+  type?: 'text' | 'email' | 'tel' | 'password' | 'select' | 'async-select' | 'textarea';
   placeholder?: string;
+  maxLength?: number;
+  rows?: number;
   required?: boolean;
   readOnly?: boolean;
   autoComplete?: string;
@@ -150,12 +152,30 @@ export function FormRenderer<T extends FieldValues>({
                     </Select>
                   );
                 }
+                if (field.type === 'textarea') {
+                  return (
+                    <textarea
+                      {...aria}
+                      {...register(field.name)}
+                      rows={field.rows ?? 4}
+                      maxLength={field.maxLength}
+                      placeholder={field.placeholder}
+                      disabled={disabled}
+                      readOnly={field.readOnly}
+                      className={cn(
+                        'w-full rounded-xl border-[1.5px] border-input bg-white px-4 py-3 text-sm text-foreground transition outline-none placeholder:text-muted-foreground hover:border-ring/50 focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30 aria-invalid:border-danger-line aria-invalid:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-60',
+                        field.readOnly && 'border-dashed bg-gray-50 text-gray-600',
+                      )}
+                    />
+                  );
+                }
                 if (field.type === 'password') {
                   return (
                     <PasswordInput
                       {...aria}
                       {...register(field.name)}
                       placeholder={field.placeholder}
+                      maxLength={field.maxLength}
                       className="h-10.5"
                       autoComplete={field.autoComplete ?? 'new-password'}
                       disabled={disabled}
@@ -168,6 +188,7 @@ export function FormRenderer<T extends FieldValues>({
                     {...register(field.name)}
                     type={field.type ?? 'text'}
                     placeholder={field.placeholder}
+                    maxLength={field.maxLength}
                     readOnly={field.readOnly}
                     className={cn(
                       'h-10.5',

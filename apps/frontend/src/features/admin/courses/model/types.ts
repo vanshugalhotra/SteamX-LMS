@@ -19,6 +19,8 @@ export interface CourseListParams {
   status?: ContentStatus;
 }
 
+export type CourseStatusFilter = ContentStatus | 'ALL';
+
 export interface CreateCoursePayload {
   title: string;
   description?: string | null;
