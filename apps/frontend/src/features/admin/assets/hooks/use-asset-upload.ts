@@ -9,8 +9,13 @@ import {
   validateAssetUploadFile,
   type ValidatedAssetFile,
 } from '../config/upload-validation';
-import type { AssetFile, AssetUploadRequest } from '../model/types';
+import type { AssetFile, AssetType, AssetUploadRequest } from '../model/types';
 import { useCompleteAssetFileUpload, useCreateAsset, useRequestAssetFileUpload } from '../queries';
+
+interface UseAssetUploadOptions {
+  /** Replace the file of this asset instead of creating a new asset. */
+  existingAsset?: { id: string; type: AssetType };
+}
 
 export type AssetUploadPhase =
   'idle' | 'preparing' | 'uploading' | 'completing' | 'ready' | 'failed';
@@ -51,7 +56,7 @@ function getPutFailureMessage(error: unknown): string {
   return 'The upload could not be completed. Retry to request a fresh upload link.';
 }
 
-export function useAssetUpload() {
+export function useAssetUpload({ existingAsset }: UseAssetUploadOptions = {}) {
   const navigate = useNavigate();
   const createAsset = useCreateAsset();
   const requestFile = useRequestAssetFileUpload();
@@ -94,7 +99,9 @@ export function useAssetUpload() {
 
   const showUploadSuccess = () => {
     setPhase('ready');
-    toast.success('Asset uploaded and ready');
+    toast.success(existingAsset ? 'File replaced' : 'Asset uploaded and ready');
+    // A replacement stays on the details page; the caller shows the result.
+    if (existingAsset) return;
     readyTimeout.current = window.setTimeout(() => {
       void navigate(PATHS.admin.assets);
     }, 850);
@@ -116,13 +123,13 @@ export function useAssetUpload() {
     setError(null);
     setIsValidating(true);
 
+    const expectedType = retryingExistingAsset ? uploadRequest.asset.type : existingAsset?.type;
+
     try {
       const validated = await validateAssetUploadFile(selected);
       if (validationRun.current !== currentRun) return;
-      if (retryingExistingAsset && validated.type !== uploadRequest.asset.type) {
-        setFileError(
-          'A retry must use the same file type as the asset. Choose another file or cancel.',
-        );
+      if (expectedType !== undefined && validated.type !== expectedType) {
+        setFileError('The file must be the same type as the asset. Choose another file or cancel.');
         return;
       }
       setValidatedFile(validated);
@@ -199,12 +206,13 @@ export function useAssetUpload() {
   };
 
   const requestReplacement = async () => {
-    if (!file || !validatedFile || !uploadRequest) return;
+    const assetId = uploadRequest?.asset.id ?? existingAsset?.id;
+    if (!file || !validatedFile || assetId === undefined) return;
     setPhase('preparing');
     setError(null);
     try {
       const request = await requestFile.mutateAsync({
-        id: uploadRequest.asset.id,
+        id: assetId,
         body: {
           filename: file.name,
           mimeType: validatedFile.mimeType,
@@ -222,6 +230,10 @@ export function useAssetUpload() {
 
   const startUpload = async () => {
     if (!file || !validatedFile || busy) return;
+    if (existingAsset) {
+      await requestReplacement();
+      return;
+    }
     const normalizedTitle = title.trim();
     if (!normalizedTitle) {
       setError('Enter a title for this asset.');
@@ -286,6 +298,20 @@ export function useAssetUpload() {
     putTask.current?.abort();
   };
 
+  const reset = () => {
+    putTask.current?.abort();
+    validationRun.current += 1;
+    setFile(null);
+    setValidatedFile(null);
+    setFileError(null);
+    setIsValidating(false);
+    setPhase('idle');
+    setProgress(0);
+    setError(null);
+    setRetryStep('create');
+    setUploadRequest(null);
+  };
+
   const removeSelectedFile = () => {
     validationRun.current += 1;
     setFile(null);
@@ -315,5 +341,6 @@ export function useAssetUpload() {
     startUpload,
     retryUpload,
     cancelUpload,
+    reset,
   };
 }

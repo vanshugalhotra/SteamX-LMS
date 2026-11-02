@@ -94,6 +94,7 @@ export function ClassSectionEditPage() {
           description={`"${classSectionLabel(section)}" will be removed permanently.`}
           confirmLabel="Delete"
           pending={remove.isPending}
+          pendingLabel="Deleting…"
           onConfirm={onDelete}
           onCancel={() => {
             setConfirming(false);

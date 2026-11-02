@@ -149,6 +149,14 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: PATHS.admin.assetView(':id'),
+            lazy: async () => {
+              const { AssetDetailPage } =
+                await import('@/features/admin/assets/pages/AssetDetailPage');
+              return { Component: AssetDetailPage };
+            },
+          },
+          {
             path: PATHS.admin.admins,
             lazy: async () => {
               const { AdminsPage } = await import('@/features/admin/admins/pages/AdminsPage');

@@ -4,6 +4,7 @@ import { Pagination } from '@/components/ui/pagination';
 import type { Paginated } from '@/lib/pagination';
 import type { Asset } from '../model/types';
 import { AssetCard } from './AssetCard';
+import { useToggleAssetStatus } from '../hooks/use-asset-actions';
 
 interface AssetGridProps {
   data: Paginated<Asset> | undefined;
@@ -28,6 +29,8 @@ function AssetGridSkeleton() {
 }
 
 export function AssetGrid({ data, isPending, isError, onRetry, onPageChange }: AssetGridProps) {
+  const { toggleStatus, statusPendingId } = useToggleAssetStatus();
+
   if (isPending) return <AssetGridSkeleton />;
 
   if (isError) {
@@ -52,9 +55,13 @@ export function AssetGrid({ data, isPending, isError, onRetry, onPageChange }: A
   return (
     <section aria-label="Assets">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {/* TODO: Link each asset card to its detail page for preview, usage, and management actions. */}
         {data.items.map((asset) => (
-          <AssetCard key={asset.id} asset={asset} />
+          <AssetCard
+            key={asset.id}
+            asset={asset}
+            onToggleStatus={toggleStatus}
+            statusPending={statusPendingId === asset.id}
+          />
         ))}
       </div>
       <div className="mt-2 rounded-2xl bg-gray-50 pb-3">
