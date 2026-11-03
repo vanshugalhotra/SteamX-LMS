@@ -1,7 +1,7 @@
 # Access Control
 
 This guide explains authentication, permission checks, and user visibility. Use it when adding a
-protected route or changing account-management behavior; see the [API test checklist](./api-testing.md)
+protected route or changing account-management behavior; see the [API test checklist](../testing/api-testing.md)
 for endpoint cases.
 
 ## Glossary
@@ -100,7 +100,7 @@ Key rules:
 | Read the release outline or remove a release              | No                                                                          |
 | Milestone 5 student/teacher content reads                 | Yes, through `assertCourseAccess`; platform staff bypass applies only there |
 
-See the [subscription and delivery API cases](./api-testing.md#subscriptions) for route behavior.
+See the [subscription and delivery API cases](../testing/api-testing.md#subscriptions) for route behavior.
 
 ## Auth and user lifecycle
 
@@ -114,7 +114,7 @@ See the [subscription and delivery API cases](./api-testing.md#subscriptions) fo
 
 User creation takes an initial password and stores its hash. Student profiles require a class
 section from the same school. Profile, status, and SteamX ID changes are limited to school users;
-password reset is a separate operation and rejects self-reset. See [workflow testing](./workflows-testing.md)
+password reset is a separate operation and rejects self-reset. See [workflow testing](../testing/workflows-testing.md)
 for end-to-end account scenarios and [database rules](./database.md#identity--users) for enforced
 identity constraints.
 

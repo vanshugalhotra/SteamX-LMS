@@ -78,7 +78,7 @@ school staff and students currently see only their own record. See [access contr
   represents a class and one of its sections.
 - School status is checked by authentication for school users and by `ActiveSchoolService` in
   workflows that require an active school. See [database constraints](./database.md#identity--users),
-  [access control](./access-control.md), and the [API test checklist](./api-testing.md).
+  [access control](./access-control.md), and the [API test checklist](../testing/api-testing.md).
 
 ## Subscriptions and deliveries
 
@@ -94,7 +94,7 @@ school staff and students currently see only their own record. See [access contr
   current-state information. Teacher visibility is limited to deliveries with an active assignment.
 
 See [access control](./access-control.md) for scope rules, [database rules](./database.md) for
-constraints, and the [API test checklist](./api-testing.md#subscriptions) for route cases.
+constraints, and the [API test checklist](../testing/api-testing.md#subscriptions) for route cases.
 
 ## HTTP request path
 
@@ -118,11 +118,11 @@ Rate limiting is not configured. The API prefix is `/api/v1`; Swagger is at `/ap
    transactionally makes the file `READY`. Current processors do not transform files.
 4. Deleting file rows queues their S3 prefixes through a PostgreSQL trigger. The in-process cleanup
    scheduler drains the queue and removes stale non-READY files; details and limits are in
-   [infrastructure](./infrastructure.md).
+   [infrastructure](../operations/infrastructure.md).
 
 ## Related guides
 
 - [Database schema and constraints](./database.md)
 - [Access control](./access-control.md)
-- [Infrastructure and storage operations](./infrastructure.md)
+- [Infrastructure and storage operations](../operations/infrastructure.md)
 - [Lesson content contract](./lesson-content.md)

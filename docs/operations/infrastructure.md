@@ -97,7 +97,7 @@ Asset upload is direct to S3: the API creates an `UPLOADING` row and returns a p
 the client uploads with the returned headers and calls the completion route. Completion checks S3
 metadata and a 16-byte signature sample before the processor marks the file `READY`. Supported
 uploads are JPEG/PNG/WEBP images, PDF, and MP4 video; PPTX is present in the database enum but
-rejected by upload validation. See the [API test checklist](./api-testing.md#assets) for endpoint cases.
+rejected by upload validation. See the [API test checklist](../testing/api-testing.md#assets) for endpoint cases.
 
 File deletion queues a prefix from a PostgreSQL trigger; the queue worker waits for the upload URL
 TTL plus a 5-minute late-PUT grace period before deleting it. Submission-file deletion currently
