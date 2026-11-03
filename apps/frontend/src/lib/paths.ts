@@ -22,6 +22,7 @@ export const PATHS = {
     courses: `${ADMIN_BASE}/courses`,
     courseNew: `${ADMIN_BASE}/courses/new`,
     courseEdit: (id: string) => `${ADMIN_BASE}/courses/${id}/edit`,
+    courseCurriculum: (id: string) => `${ADMIN_BASE}/courses/${id}/curriculum`,
     assets: `${ADMIN_BASE}/assets`,
     assetUpload: `${ADMIN_BASE}/assets/upload`,
     assetView: (id: string) => `${ADMIN_BASE}/assets/${id}`,

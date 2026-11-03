@@ -157,6 +157,14 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: PATHS.admin.courseCurriculum(':id'),
+            lazy: async () => {
+              const { CourseCurriculumPage } =
+                await import('@/features/admin/courses/pages/CourseCurriculumPage');
+              return { Component: CourseCurriculumPage };
+            },
+          },
+          {
             path: PATHS.admin.assets,
             lazy: async () => {
               const { AssetsPage } = await import('@/features/admin/assets/pages/AssetsPage');
