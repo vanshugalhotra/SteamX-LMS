@@ -1,20 +1,23 @@
 import { BookOpen } from 'lucide-react';
 import { ButtonLink } from '@/components/ui/button-link';
 import { PATHS } from '@/lib/paths';
+import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/date-helper';
 import type { Course } from '../model/types';
 import { courseStatuses } from '../config/courses.config';
 import { CourseStatusBadge } from './CourseStatusBadge';
 
 export function CourseCard({ course }: { course: Course }) {
-  const updatedAt = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
-    new Date(course.updatedAt),
-  );
+  const updatedAt = formatDate(course.updatedAt);
 
   return (
     <article className="overflow-hidden rounded-3xl bg-white shadow-md transition-shadow hover:shadow-lg">
       <div
         aria-hidden="true"
-        className={`relative grid h-24 place-items-center overflow-hidden ${courseStatuses[course.status].bannerClass}`}
+        className={cn(
+          'relative grid h-24 place-items-center overflow-hidden',
+          courseStatuses[course.status].bannerClass,
+        )}
       >
         <span className="absolute -left-5 top-8 size-20 rounded-full bg-white/25" />
         <span className="absolute -right-3 -top-4 size-14 rounded-full bg-white/20" />

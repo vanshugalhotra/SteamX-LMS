@@ -7,10 +7,10 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getErrorMessage, getFieldErrors } from '@/lib/api-errors';
 import type { Course } from '../model/types';
-import { courseCreationStatuses, courseFields } from '../config/courses.config';
+import { courseFields } from '../config/courses.config';
 import { CourseStatusSection } from './CourseStatusSection';
 import { courseSchema, type CourseFormValues } from '../model/schemas';
-import { useCreateCourse, useUpdateCourse, useUpdateCourseStatus } from '../queries';
+import { useCreateCourse, useUpdateCourse } from '../queries';
 
 interface CourseFormProps {
   course?: Course;
@@ -21,9 +21,7 @@ interface CourseFormProps {
 export function CourseForm({ course, onDone, onCancel }: CourseFormProps) {
   const create = useCreateCourse();
   const update = useUpdateCourse();
-  const updateStatus = useUpdateCourseStatus();
   const [formError, setFormError] = useState<string | null>(null);
-  const [initialStatus, setInitialStatus] = useState<'DRAFT' | 'ACTIVE'>('DRAFT');
   const {
     register,
     control,
@@ -38,7 +36,7 @@ export function CourseForm({ course, onDone, onCancel }: CourseFormProps) {
     },
   });
 
-  const busy = isSubmitting || create.isPending || update.isPending || updateStatus.isPending;
+  const busy = isSubmitting || create.isPending || update.isPending;
   const showError = (error: unknown) => {
     const fieldErrors = getFieldErrors(error);
     let hasMappedFieldError = false;
@@ -69,16 +67,7 @@ export function CourseForm({ course, onDone, onCancel }: CourseFormProps) {
         onDone();
       } else {
         const createdCourse = await create.mutateAsync(body);
-        if (initialStatus === 'ACTIVE') {
-          try {
-            await updateStatus.mutateAsync({ id: createdCourse.id, status: 'ACTIVE' });
-          } catch (error) {
-            toast.error(`Course was created as a draft. ${getErrorMessage(error)}`);
-            onDone(createdCourse.id);
-            return;
-          }
-        }
-        toast.success(`Course created as ${initialStatus === 'ACTIVE' ? 'active' : 'a draft'}`);
+        toast.success('Course created as a draft');
         onDone(createdCourse.id);
       }
     } catch (error) {
@@ -103,38 +92,6 @@ export function CourseForm({ course, onDone, onCancel }: CourseFormProps) {
           control={control}
           disabled={busy}
         />
-        {!course && (
-          <fieldset disabled={busy} className="space-y-2">
-            <legend className="mb-2 text-xs font-medium">Initial status</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {courseCreationStatuses.map(({ value: status, label, description }) => (
-                <label
-                  key={status}
-                  className={`flex cursor-pointer gap-3 rounded-2xl border p-3 transition-colors ${
-                    initialStatus === status
-                      ? 'border-teal-500 bg-teal-50'
-                      : 'border-gray-200 bg-white'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="initialStatus"
-                    value={status}
-                    checked={initialStatus === status}
-                    onChange={() => {
-                      setInitialStatus(status);
-                    }}
-                    className="mt-1 accent-teal-700"
-                  />
-                  <span>
-                    <span className="block text-xs font-semibold">{label}</span>
-                    <span className="block text-[11px] text-gray-600">{description}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        )}
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-5">
           <Button type="button" variant="secondary" disabled={busy} onClick={onCancel}>
             Cancel

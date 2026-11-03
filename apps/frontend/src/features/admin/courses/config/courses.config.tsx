@@ -1,9 +1,15 @@
 import type { FieldConfig } from '@/components/form/FormRenderer';
+import type { ContentStatus } from '@/lib/content-status';
 import type { CourseFormValues } from '../model/schemas';
 import type { CourseStatusFilter } from '../model/types';
 
 export const COURSES_PAGE_SIZE = 6;
 export const COURSES_SEARCH_MAX_LENGTH = 120;
+export const COURSE_STATUSES = [
+  'DRAFT',
+  'ACTIVE',
+  'ARCHIVED',
+] as const satisfies readonly ContentStatus[];
 
 export const courseStatuses = {
   DRAFT: {
@@ -28,24 +34,11 @@ export const courseStatuses = {
 
 export const COURSE_STATUS_FILTERS = [
   { value: 'ALL', label: 'All' },
-  ...(['DRAFT', 'ACTIVE', 'ARCHIVED'] as const).map((value) => ({
+  ...COURSE_STATUSES.map((value) => ({
     value,
     label: courseStatuses[value].label,
   })),
 ] satisfies { value: CourseStatusFilter; label: string }[];
-
-export const courseCreationStatuses = [
-  {
-    value: 'DRAFT',
-    label: 'Draft',
-    description: 'Hidden from students while you build it.',
-  },
-  {
-    value: 'ACTIVE',
-    label: 'Active',
-    description: 'Ready to use for subscriptions.',
-  },
-] as const;
 
 export const courseFields: FieldConfig<CourseFormValues>[] = [
   {

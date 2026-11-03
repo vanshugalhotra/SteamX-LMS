@@ -12,6 +12,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 export interface FieldOption {
@@ -154,7 +155,7 @@ export function FormRenderer<T extends FieldValues>({
                 }
                 if (field.type === 'textarea') {
                   return (
-                    <textarea
+                    <Textarea
                       {...aria}
                       {...register(field.name)}
                       rows={field.rows ?? 4}
@@ -162,10 +163,7 @@ export function FormRenderer<T extends FieldValues>({
                       placeholder={field.placeholder}
                       disabled={disabled}
                       readOnly={field.readOnly}
-                      className={cn(
-                        'w-full rounded-xl border-[1.5px] border-input bg-white px-4 py-3 text-sm text-foreground transition outline-none placeholder:text-muted-foreground hover:border-ring/50 focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/30 aria-invalid:border-danger-line aria-invalid:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-60',
-                        field.readOnly && 'border-dashed bg-gray-50 text-gray-600',
-                      )}
+                      className={cn(field.readOnly && 'border-dashed bg-gray-50 text-gray-600')}
                     />
                   );
                 }

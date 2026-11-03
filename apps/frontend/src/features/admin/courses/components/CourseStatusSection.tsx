@@ -13,7 +13,7 @@ import {
 } from '../model/status-transitions';
 import { useUpdateCourseStatus } from '../queries';
 import { CourseStatusBadge } from './CourseStatusBadge';
-import { courseStatuses } from '../config/courses.config';
+import { COURSE_STATUSES, courseStatuses } from '../config/courses.config';
 
 const actionLabel: Record<CourseStatusTransition, string> = {
   ACTIVE: 'Publish',
@@ -69,7 +69,7 @@ export function CourseStatusSection({ course }: { course?: Course }) {
         <CourseStatusBadge status={currentStatus} />
       </div>
       <ul className="space-y-3">
-        {(['DRAFT', 'ACTIVE', 'ARCHIVED'] as const).map((status) => (
+        {COURSE_STATUSES.map((status) => (
           <li key={status} className="flex items-start gap-2.5 text-xs text-gray-600">
             <CourseStatusBadge status={status} />
             <span className="pt-0.5">{courseStatuses[status].description}</span>
@@ -113,8 +113,7 @@ export function CourseStatusSection({ course }: { course?: Course }) {
         </p>
       ) : (
         <p className="border-t border-gray-200 pt-4 text-xs text-gray-600">
-          Courses are created as drafts. Choosing Active publishes the course immediately after
-          creation.
+          Courses are created as drafts. Publish when the course is ready.
         </p>
       )}
       <ConfirmDialog

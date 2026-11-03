@@ -4,17 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api-client';
 import type { Course } from '../model/types';
 
-const { createMutateAsync, updateMutateAsync, updateStatusMutateAsync, toastError, toastSuccess } =
-  vi.hoisted(() => ({
-    createMutateAsync: vi.fn(),
-    updateMutateAsync: vi.fn(),
-    updateStatusMutateAsync: vi.fn(),
-    toastError: vi.fn(),
-    toastSuccess: vi.fn(),
-  }));
+const { createMutateAsync, updateMutateAsync, updateStatusMutateAsync, toastSuccess } = vi.hoisted(
+  () => ({
+  createMutateAsync: vi.fn(),
+  updateMutateAsync: vi.fn(),
+  updateStatusMutateAsync: vi.fn(),
+  toastSuccess: vi.fn(),
+  }),
+);
 
 vi.mock('sonner', () => ({
-  toast: { error: toastError, success: toastSuccess },
+  toast: { success: toastSuccess },
 }));
 
 vi.mock('../queries', () => ({
@@ -44,7 +44,6 @@ describe('CourseForm', () => {
     createMutateAsync.mockReset();
     updateMutateAsync.mockReset();
     updateStatusMutateAsync.mockReset();
-    toastError.mockReset();
     toastSuccess.mockReset();
   });
 
@@ -52,6 +51,8 @@ describe('CourseForm', () => {
     const user = userEvent.setup();
     const onDone = renderCourseForm();
     createMutateAsync.mockResolvedValue(createdCourse);
+
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox', { name: /Course title/ }), 'Robotics');
     await user.click(screen.getByRole('button', { name: 'Add course' }));
@@ -62,25 +63,9 @@ describe('CourseForm', () => {
         description: null,
       });
     });
+    expect(updateStatusMutateAsync).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalledWith('course-1');
     expect(toastSuccess).toHaveBeenCalledWith('Course created as a draft');
-  });
-
-  it('publishes the course after creation when Active is selected', async () => {
-    const user = userEvent.setup();
-    const onDone = renderCourseForm();
-    createMutateAsync.mockResolvedValue(createdCourse);
-    updateStatusMutateAsync.mockResolvedValue({ ...createdCourse, status: 'ACTIVE' });
-
-    await user.type(screen.getByRole('textbox', { name: /Course title/ }), 'Robotics');
-    await user.click(screen.getByRole('radio', { name: /Active/ }));
-    await user.click(screen.getByRole('button', { name: 'Add course' }));
-
-    await waitFor(() => {
-      expect(updateStatusMutateAsync).toHaveBeenCalledWith({ id: 'course-1', status: 'ACTIVE' });
-    });
-    expect(onDone).toHaveBeenCalledWith('course-1');
-    expect(toastSuccess).toHaveBeenCalledWith('Course created as active');
   });
 
   it('reports a field-specific backend validation error', async () => {
@@ -97,25 +82,5 @@ describe('CourseForm', () => {
     await user.click(screen.getByRole('button', { name: 'Add course' }));
 
     expect(await screen.findByText('Title is already reserved.')).toBeInTheDocument();
-  });
-
-  it('keeps the created course as draft if its follow-up publish fails', async () => {
-    const user = userEvent.setup();
-    const onDone = renderCourseForm();
-    createMutateAsync.mockResolvedValue(createdCourse);
-    updateStatusMutateAsync.mockRejectedValue(
-      new ApiError(409, 'Transition not allowed', { code: 'INVALID_STATUS_TRANSITION' }),
-    );
-
-    await user.type(screen.getByRole('textbox', { name: /Course title/ }), 'Robotics');
-    await user.click(screen.getByRole('radio', { name: /Active/ }));
-    await user.click(screen.getByRole('button', { name: 'Add course' }));
-
-    await waitFor(() => {
-      expect(toastError).toHaveBeenCalledWith(
-        'Course was created as a draft. This status change is not allowed.',
-      );
-    });
-    expect(onDone).toHaveBeenCalledWith('course-1');
   });
 });

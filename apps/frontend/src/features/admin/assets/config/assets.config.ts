@@ -1,6 +1,7 @@
 import { FileText, Image as ImageIcon, Play } from 'lucide-react';
 import type { AssetFileStatus, AssetStatus, AssetType } from '../model/types';
 import type { ErrorOverrides } from '@/lib/api-errors';
+import { formatDate } from '@/lib/date-helper';
 
 export const ASSETS_PAGE_SIZE = 12;
 export const ASSETS_SEARCH_MAX_LENGTH = 100;
@@ -65,12 +66,12 @@ export function formatAssetSize(sizeBytes: number | null): string {
 }
 
 export function formatAssetDate(date: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+  return formatDate(date, 'en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     timeZone: 'UTC',
-  }).format(new Date(date));
+  });
 }
 
 export function getAssetPresentation(type: AssetType, mimeType: string | null | undefined) {

@@ -67,4 +67,20 @@ describe('CourseStatusSection', () => {
     expect(updateStatusMutateAsync).toHaveBeenCalledWith({ id: 'course-1', status: 'ARCHIVED' });
     expect(toastSuccess).toHaveBeenCalledWith('Course status updated');
   });
+
+  it('confirms before publishing a draft course', async () => {
+    const user = userEvent.setup();
+    const draftCourse = { ...course, status: 'DRAFT' as const };
+    updateStatusMutateAsync.mockResolvedValue({ ...draftCourse, status: 'ACTIVE' });
+
+    render(<CourseStatusSection course={draftCourse} />);
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(updateStatusMutateAsync).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Confirm Publish' }));
+
+    expect(updateStatusMutateAsync).toHaveBeenCalledWith({ id: 'course-1', status: 'ACTIVE' });
+    expect(toastSuccess).toHaveBeenCalledWith('Course published');
+  });
 });
