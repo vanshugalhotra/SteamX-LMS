@@ -73,7 +73,7 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 `business_today()` currently uses the hard-coded `Asia/Kolkata` timezone. The migration comment says
 it should match a `BUSINESS_TIMEZONE` default, but the backend does not define that setting.
 
-For route-level behavior, see the [subscription and delivery API cases](./api-testing.md#subscriptions).
+For route-level behavior, see the [subscription and delivery API cases](../testing/api-testing.md#subscriptions).
 
 ### Curriculum & assets
 

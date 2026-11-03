@@ -40,7 +40,7 @@ scenario you need; API field requirements and individual endpoint cases are in S
 - **Replacement:** Keep the old READY file serving while a replacement is UPLOADING. Successful completion swaps files and queues the old prefix; failed completion preserves the old file. UPLOADED/PROCESSING work blocks another replacement; older UPLOADING attempts are superseded.
 - **Manage:** Rename and verify the trimmed title. Archive and verify default-list hiding while detail/access remain available; unarchive and confirm the default listing returns.
 - **Delete and cleanup:** Delete an unused asset and verify file rows are removed and prefixes queued. A lesson-block reference returns `409 RESOURCE_IN_USE`; after saving lesson content without that reference, deletion succeeds. Backdate stale files and queued prefixes in the isolated database, run cleanup, and verify abandoned rows and objects are removed while READY objects remain.
-- For real browser uploads and access, use the [asset upload and access smoke tests](./infrastructure.md).
+- For real browser uploads and access, use the [asset upload and access smoke tests](../operations/infrastructure.md).
 
 ## First admin login and password change
 

@@ -2,7 +2,7 @@
 
 This checklist records endpoint-level API cases and expected outcomes. Start with the section for
 the route you changed; use [workflow testing](./workflows-testing.md) for multi-request scenarios
-and [API errors](./api-errors.md) for the error-code contract.
+and [API errors](../api/api-errors.md) for the error-code contract.
 
 Use Swagger at `/api/docs` for the API contract. Routes below use the `/api/v1` prefix, except
 health checks. A `400` from DTO validation uses `VALIDATION_ERROR`; malformed path UUIDs rejected
@@ -468,7 +468,7 @@ and `blocks` is an array. A valid unknown lesson returns `404`; a malformed UUID
 
 Block shapes, the TipTap whitelist, per-document limits (100 blocks, 50,000 text characters,
 5,000 rich-text nodes, depth 20, and 50 issues), and validation issue codes are specified in
-[lesson-content.md](./lesson-content.md). Saves are whole-lesson replacements in one transaction;
+[lesson-content.md](../architecture/lesson-content.md). Saves are whole-lesson replacements in one transaction;
 there is no per-block endpoint or content history.
 
 ### `DELETE /lessons/:id`
