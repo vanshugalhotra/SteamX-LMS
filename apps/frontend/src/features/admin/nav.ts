@@ -77,7 +77,11 @@ export const ADMIN_NAV: NavGroup[] = [
     id: 'content',
     label: 'Content',
     items: [
-      { label: 'Courses & Lessons', icon: BookOpen },
+      {
+        label: 'Courses & Lessons',
+        icon: BookOpen,
+        to: PATHS.admin.courses,
+      },
       { label: 'Asset Library', icon: FileImage, to: PATHS.admin.assets },
       { label: 'Curriculum Access', icon: KeyRound },
       { label: 'Assignments', icon: ClipboardList },

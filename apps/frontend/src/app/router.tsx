@@ -134,6 +134,29 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: PATHS.admin.courses,
+            lazy: async () => {
+              const { CoursesPage } = await import('@/features/admin/courses/pages/CoursesPage');
+              return { Component: CoursesPage };
+            },
+          },
+          {
+            path: PATHS.admin.courseNew,
+            lazy: async () => {
+              const { CourseCreatePage } =
+                await import('@/features/admin/courses/pages/CourseCreatePage');
+              return { Component: CourseCreatePage };
+            },
+          },
+          {
+            path: PATHS.admin.courseEdit(':id'),
+            lazy: async () => {
+              const { CourseEditPage } =
+                await import('@/features/admin/courses/pages/CourseEditPage');
+              return { Component: CourseEditPage };
+            },
+          },
+          {
             path: PATHS.admin.assets,
             lazy: async () => {
               const { AssetsPage } = await import('@/features/admin/assets/pages/AssetsPage');

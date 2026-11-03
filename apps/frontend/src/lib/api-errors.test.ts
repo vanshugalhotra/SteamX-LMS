@@ -37,6 +37,24 @@ describe('getErrorMessage', () => {
     );
   });
 
+  it('maps curriculum error codes to their default messages', () => {
+    expect(getErrorMessage(apiError(400, API_ERROR_CODE.INVALID_ORDER))).toBe(
+      'The order is not valid. Please refresh and try again.',
+    );
+    expect(getErrorMessage(apiError(409, API_ERROR_CODE.PARENT_NOT_ACTIVE))).toBe(
+      'The parent item must be active.',
+    );
+    expect(getErrorMessage(apiError(409, API_ERROR_CODE.INVALID_STATUS_TRANSITION))).toBe(
+      'This status change is not allowed.',
+    );
+    expect(getErrorMessage(apiError(404, API_ERROR_CODE.LESSON_NOT_FOUND))).toBe(
+      "We couldn't find this lesson.",
+    );
+    expect(getErrorMessage(apiError(404, API_ERROR_CODE.MODULE_NOT_FOUND))).toBe(
+      "We couldn't find this module.",
+    );
+  });
+
   it('prefers a feature-specific override for the code', () => {
     const error = apiError(401, 'UNAUTHORIZED');
     expect(getErrorMessage(error, { UNAUTHORIZED: 'Wrong SteamX ID or password.' })).toBe(
