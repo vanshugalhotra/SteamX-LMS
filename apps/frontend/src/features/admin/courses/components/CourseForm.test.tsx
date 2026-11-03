@@ -6,10 +6,10 @@ import type { Course } from '../model/types';
 
 const { createMutateAsync, updateMutateAsync, updateStatusMutateAsync, toastSuccess } = vi.hoisted(
   () => ({
-  createMutateAsync: vi.fn(),
-  updateMutateAsync: vi.fn(),
-  updateStatusMutateAsync: vi.fn(),
-  toastSuccess: vi.fn(),
+    createMutateAsync: vi.fn(),
+    updateMutateAsync: vi.fn(),
+    updateStatusMutateAsync: vi.fn(),
+    toastSuccess: vi.fn(),
   }),
 );
 
