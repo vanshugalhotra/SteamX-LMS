@@ -111,7 +111,7 @@ Login needs the backend, a database and an admin user. One-time setup:
 
 ### Trying the forced password change
 
-The admin you created has `mustChangePassword: true`, so the first login lands on `/change-password`. To reset the admin and try it again, follow the runbook in [docs/runbooks/admin-recovery.md](../../docs/runbooks/admin-recovery.md).
+The admin you created has `mustChangePassword: true`, so the first login lands on `/change-password`. To reset the admin and try it again, follow the [admin recovery runbook](../../docs/operations/runbooks/admin-recovery.md).
 
 On `/change-password`:
 
