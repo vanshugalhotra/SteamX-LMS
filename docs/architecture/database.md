@@ -66,6 +66,7 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 - **SQL trigger:** the active-delivery cap locks the current subscription row while counting ACTIVE deliveries, serializing concurrent use of the cap.
 - **SQL trigger:** enrollment insert/reactivation requires a same-school active student, a matching delivery class section, an ACTIVE delivery, and current course access; status/end-date consistency is also constrained.
 - **SQL trigger:** a release requires an in-scope actor, ACTIVE delivery and module, an ACTIVE STUDENT-audience lesson, and current course access.
+- **SQL triggers:** lesson completions require an ACTIVE enrollment, a release, an ACTIVE or ARCHIVED STUDENT lesson, and current course access; completions are insert-only, with deletes handled by `purge_student()` in the retention issue.
 - **SQL partial unique index:** only one active teacher stint is allowed per delivery/teacher pair; removed stints remain as history.
 - **Seeded permission keys:** `subscription.manage`, `delivery.manage`, `delivery.read`, `enrollment.manage`, and `release.manage`; the reference migration grants all to admin and grants `delivery.read`, `enrollment.manage`, and `release.manage` to teacher.
 - **Service-derived state:** subscription `status`/expired state and `retainedUntil` are calculated from dates and are never stored as subscription columns.

@@ -337,6 +337,82 @@ BEFORE UPDATE OF school_id, course_id, delivery_id, lesson_id ON delivery_lesson
 FOR EACH ROW
 EXECUTE FUNCTION reject_column_change('school_id', 'course_id', 'delivery_id', 'lesson_id');
 
+CREATE FUNCTION guard_lesson_completion()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  enrollment_status text;
+  lesson_status text;
+  lesson_audience text;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    RAISE EXCEPTION 'lesson_completions are insert-only'
+      USING ERRCODE = 'integrity_constraint_violation',
+        CONSTRAINT = 'lesson_completions_insert_only';
+  END IF;
+
+  SELECT e.status::text
+  INTO enrollment_status
+  FROM delivery_enrollments e
+  WHERE e.delivery_id = NEW.delivery_id
+    AND e.student_id = NEW.student_id
+    AND e.school_id = NEW.school_id
+  FOR SHARE;
+
+  IF enrollment_status IS DISTINCT FROM 'ACTIVE' THEN
+    RAISE EXCEPTION 'lesson_completions require an ACTIVE enrollment'
+      USING ERRCODE = 'integrity_constraint_violation',
+        CONSTRAINT = 'lesson_completions_active_enrollment';
+  END IF;
+
+  SELECT l.status::text, l.audience::text
+  INTO lesson_status, lesson_audience
+  FROM lessons l
+  WHERE l.id = NEW.lesson_id
+    AND l.course_id = NEW.course_id
+  FOR SHARE;
+
+  IF lesson_status NOT IN ('ACTIVE', 'ARCHIVED')
+     OR lesson_audience IS DISTINCT FROM 'STUDENT' THEN
+    RAISE EXCEPTION 'lesson_completions require an ACTIVE or ARCHIVED STUDENT lesson'
+      USING ERRCODE = 'integrity_constraint_violation',
+        CONSTRAINT = 'lesson_completions_student_lesson';
+  END IF;
+
+  PERFORM 1
+  FROM delivery_lesson_releases r
+  WHERE r.delivery_id = NEW.delivery_id
+    AND r.lesson_id = NEW.lesson_id
+  FOR SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'lesson_completions require a released lesson'
+      USING ERRCODE = 'integrity_constraint_violation',
+        CONSTRAINT = 'lesson_completions_released_lesson';
+  END IF;
+
+  IF NOT has_course_access(NEW.school_id, NEW.course_id, business_today()) THEN
+    RAISE EXCEPTION 'lesson_completions require current course access'
+      USING ERRCODE = 'integrity_constraint_violation',
+        CONSTRAINT = 'lesson_completions_course_access';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_lesson_completions_validate
+BEFORE INSERT ON lesson_completions
+FOR EACH ROW
+EXECUTE FUNCTION guard_lesson_completion();
+
+CREATE TRIGGER trg_lesson_completions_no_update
+BEFORE UPDATE ON lesson_completions
+FOR EACH ROW
+EXECUTE FUNCTION guard_lesson_completion();
+
+
 CREATE UNIQUE INDEX "delivery_teacher_active_unique"
   ON "delivery_teachers" ("delivery_id", "teacher_id")
   WHERE "removed_at" IS NULL;
