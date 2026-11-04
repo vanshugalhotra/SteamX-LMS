@@ -35,9 +35,10 @@ for endpoint cases.
   in memory — **restart after changing grants**.
 - **Curriculum** is global (no school scope). Routes need `curriculum.read`/`curriculum.write` and services also require platform-staff user type. School staff/students are denied even with permissions.
 - **Assets** are global (no school scope). List, detail, file-state, and preview routes require `asset.read`; create, replace, complete, update, status, and delete routes require `asset.write`. Both permissions are granted to `admin` by default; `teacher` and `student` receive neither. Preview URLs additionally require `PLATFORM_STAFF`, even if another role is granted `asset.read`.
+- `learning.read` is granted to `teacher` and `student`; `lesson.complete` is granted to `student`. Platform staff use curriculum routes instead.
 
-An asset ID alone never grants access to non-admins. A future student path must check lesson,
-delivery, and subscription access before requesting a URL.
+An asset ID alone never grants access to non-admins. A learning read must check lesson, delivery,
+and subscription access before requesting a URL.
 
 ## School scope vs. user visibility
 
@@ -88,19 +89,26 @@ Key rules:
 - A teacher can access a delivery only while an active `delivery_teachers` stint exists. This is
   checked on every request; a delivery that exists but is not assigned to that teacher returns 404.
 
-| Operation                                                 | Subscription-gated?                                                         |
-| --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Grant, list, get, update, revoke, or renew a subscription | No; platform staff permission still applies                                 |
-| Create a delivery or reactivate an inactive delivery      | Yes, including for platform staff                                           |
-| Read/list deliveries or deactivate a delivery             | No                                                                          |
-| Assign/remove/list delivery teachers                      | No                                                                          |
-| Add students individually or enroll the delivery class    | Yes, including for platform staff                                           |
-| Read or remove an enrollment                              | No                                                                          |
-| Release a lesson or all eligible lessons in a module      | Yes, including for platform staff                                           |
-| Read the release outline or remove a release              | No                                                                          |
-| Milestone 5 student/teacher content reads                 | Yes, through `assertCourseAccess`; platform staff bypass applies only there |
+| Operation                                                 | Subscription-gated?                                             |
+| --------------------------------------------------------- | --------------------------------------------------------------- |
+| Grant, list, get, update, revoke, or renew a subscription | No; platform staff permission still applies                     |
+| Create a delivery or reactivate an inactive delivery      | Yes, including for platform staff                               |
+| Read/list deliveries or deactivate a delivery             | No                                                              |
+| Assign/remove/list delivery teachers                      | No                                                              |
+| Add students individually or enroll the delivery class    | Yes, including for platform staff                               |
+| Read or remove an enrollment                              | No                                                              |
+| Release a lesson or all eligible lessons in a module      | Yes, including for platform staff                               |
+| Read the release outline or remove a release              | No                                                              |
+| Milestone 5 student/teacher content reads                 | Yes, through `LearningAccessService`; platform staff are denied |
 
 See the [subscription and delivery API cases](../testing/api-testing.md#subscriptions) for route behavior.
+
+## Learning reads
+
+- Students can read only an ACTIVE delivery in their authenticated school where they have an ACTIVE enrollment. A lesson must have a release for that delivery and be STUDENT audience with ACTIVE or ARCHIVED status.
+- Teachers can read only an ACTIVE delivery in their authenticated school while their active teacher assignment exists. A lesson must belong to the delivery course and be ACTIVE; release and audience do not restrict teacher reads.
+- Both roles require current course subscription access, checked after delivery and lesson visibility. Hidden, inactive, unenrolled, unassigned, unreleased, teacher-only-for-students, and draft resources return the same 404; only a failed subscription check returns `403 SUBSCRIPTION_EXPIRED`.
+- Authenticated school and user status is already rechecked by `AuthGuard`; learning reads use the trusted school ID from that auth context.
 
 ## Auth and user lifecycle
 
