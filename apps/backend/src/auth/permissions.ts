@@ -20,6 +20,8 @@ export const PERMISSION = {
   DELIVERY_MANAGE: 'delivery.manage',
   ENROLLMENT_MANAGE: 'enrollment.manage',
   RELEASE_MANAGE: 'release.manage',
+  LEARNING_READ: 'learning.read',
+  LESSON_COMPLETE: 'lesson.complete',
 } as const;
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION];

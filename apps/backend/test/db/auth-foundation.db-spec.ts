@@ -98,6 +98,8 @@ describe('Authentication foundation reference data', () => {
       'delivery.manage',
       'delivery.read',
       'enrollment.manage',
+      'learning.read',
+      'lesson.complete',
       'release.manage',
       'school.manage',
       'school.read',
@@ -131,8 +133,11 @@ describe('Authentication foundation reference data', () => {
       { role: 'admin', permission: 'user.read' },
       { role: 'admin', permission: 'user.steamx-id.update' },
       { role: 'admin', permission: 'user.update' },
+      { role: 'student', permission: 'learning.read' },
+      { role: 'student', permission: 'lesson.complete' },
       { role: 'teacher', permission: 'delivery.read' },
       { role: 'teacher', permission: 'enrollment.manage' },
+      { role: 'teacher', permission: 'learning.read' },
       { role: 'teacher', permission: 'release.manage' },
     ]);
   });
