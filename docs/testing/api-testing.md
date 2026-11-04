@@ -339,6 +339,31 @@ deleting history or changing submissions/completions.
 - [auto] Removal is allowed on an inactive delivery and with an expired subscription.
 - [auto] When delivery is missing, foreign, or has no active teacher stint -> expect `404 NOT_FOUND`; student -> `403 FORBIDDEN`; no cookie -> `401 UNAUTHORIZED`.
 
+## Learning
+
+### `GET /learning/courses`
+
+Caller: a student with `learning.read`; returns a paginated list of the student's ACTIVE
+enrollments in ACTIVE deliveries, ordered by course title and academic year.
+
+- [auto] Each item includes only delivery ID, course ID/title/description, class and section names, academic year, eligible lesson/completion counts, and `subscriptionActive`.
+- [auto] Counts include only released STUDENT lessons with ACTIVE or ARCHIVED status; completed lessons are limited to that same set.
+- [auto] COMPLETED or REMOVED enrollments, INACTIVE deliveries, and another student's or another school's enrollments are omitted.
+- [auto] An expired subscription does not hide a course; it returns `subscriptionActive: false`.
+- [auto] When page and limit are supplied -> expect the correct page and total; invalid paging values -> expect `400 VALIDATION_ERROR`.
+- [auto] When teacher or platform staff calls -> expect `403 FORBIDDEN`; without a session cookie -> expect `401 UNAUTHORIZED`.
+
+### `GET /learning/deliveries/:id/outline`
+
+Caller: an enrolled student with `learning.read`; returns the delivery's released student lessons in
+module and lesson position order.
+
+- [auto] Only released STUDENT lessons with ACTIVE or ARCHIVED status are returned; DRAFT, unreleased, and TEACHER_ONLY lessons are omitted.
+- [auto] Modules without an eligible lesson are omitted, regardless of module status; `completed` is true only when this student has a completion for that delivery and lesson.
+- [auto] Response contains only delivery ID, course ID/title, module ID/title/position, and lesson ID/title/position/completed; status, audience, release metadata, and teacher or storage fields are absent.
+- [auto] When delivery belongs to another school or the student's enrollment is missing/inactive -> expect `404 NOT_FOUND`; when its subscription has expired -> expect `403 SUBSCRIPTION_EXPIRED`.
+- [auto] When teacher or platform staff calls -> expect `403 FORBIDDEN`; malformed delivery IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
+
 ## Course modules
 
 ### `POST /courses/:courseId/modules`
