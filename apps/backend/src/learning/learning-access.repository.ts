@@ -43,12 +43,7 @@ export class LearningAccessRepository {
   }
 
   /** Loads a readable active or archived lesson with student-only release and audience filters. */
-  findLesson(
-    deliveryId: string,
-    courseId: string,
-    lessonId: string,
-    role: 'STUDENT' | 'TEACHER',
-  ) {
+  findLesson(deliveryId: string, courseId: string, lessonId: string, role: 'STUDENT' | 'TEACHER') {
     const where: Prisma.LessonWhereInput = {
       id: lessonId,
       courseId,

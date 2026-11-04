@@ -89,17 +89,17 @@ Key rules:
 - A teacher can access a delivery only while an active `delivery_teachers` stint exists. This is
   checked on every request; a delivery that exists but is not assigned to that teacher returns 404.
 
-| Operation                                                 | Subscription-gated?                                                         |
-| --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Grant, list, get, update, revoke, or renew a subscription | No; platform staff permission still applies                                 |
-| Create a delivery or reactivate an inactive delivery      | Yes, including for platform staff                                           |
-| Read/list deliveries or deactivate a delivery             | No                                                                          |
-| Assign/remove/list delivery teachers                      | No                                                                          |
-| Add students individually or enroll the delivery class    | Yes, including for platform staff                                           |
-| Read or remove an enrollment                              | No                                                                          |
-| Release a lesson or all eligible lessons in a module      | Yes, including for platform staff                                           |
-| Read the release outline or remove a release              | No                                                                          |
-| Milestone 5 student/teacher content reads                 | Yes, through `LearningAccessService`; platform staff are denied            |
+| Operation                                                 | Subscription-gated?                                             |
+| --------------------------------------------------------- | --------------------------------------------------------------- |
+| Grant, list, get, update, revoke, or renew a subscription | No; platform staff permission still applies                     |
+| Create a delivery or reactivate an inactive delivery      | Yes, including for platform staff                               |
+| Read/list deliveries or deactivate a delivery             | No                                                              |
+| Assign/remove/list delivery teachers                      | No                                                              |
+| Add students individually or enroll the delivery class    | Yes, including for platform staff                               |
+| Read or remove an enrollment                              | No                                                              |
+| Release a lesson or all eligible lessons in a module      | Yes, including for platform staff                               |
+| Read the release outline or remove a release              | No                                                              |
+| Milestone 5 student/teacher content reads                 | Yes, through `LearningAccessService`; platform staff are denied |
 
 See the [subscription and delivery API cases](../testing/api-testing.md#subscriptions) for route behavior.
 
