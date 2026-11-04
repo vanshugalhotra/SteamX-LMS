@@ -95,9 +95,8 @@ describe('subscription and delivery database rules', () => {
     values: unknown[],
     code: string,
     constraint: string,
-    message?: string,
   ): Promise<void> {
-    await db.expectFailure(sql, values, { code, constraint, message });
+    await db.expectFailure(sql, values, { code, constraint });
   }
 
   async function createStudent(
@@ -725,8 +724,7 @@ describe('subscription and delivery database rules', () => {
           fixture.courseId,
         ],
         '23000',
-        'trg_lesson_completions_validate',
-        'lesson_completions require an ACTIVE enrollment',
+        'lesson_completions_active_enrollment',
       );
     }
 
@@ -744,8 +742,7 @@ describe('subscription and delivery database rules', () => {
         unreleasedFixture.courseId,
       ],
       '23000',
-      'trg_lesson_completions_validate',
-      'lesson_completions require a released lesson',
+      'lesson_completions_released_lesson',
     );
 
     for (const options of [
@@ -766,8 +763,7 @@ describe('subscription and delivery database rules', () => {
           fixture.courseId,
         ],
         '23000',
-        'trg_lesson_completions_validate',
-        'lesson_completions require an ACTIVE or ARCHIVED STUDENT lesson',
+        'lesson_completions_student_lesson',
       );
     }
 
@@ -791,8 +787,7 @@ describe('subscription and delivery database rules', () => {
         expiredFixture.courseId,
       ],
       '23000',
-      'trg_lesson_completions_validate',
-      'lesson_completions require current course access',
+      'lesson_completions_course_access',
     );
   });
 
@@ -804,8 +799,7 @@ describe('subscription and delivery database rules', () => {
       'UPDATE lesson_completions SET completed_at = now() WHERE delivery_id = $1',
       [fixture.deliveryId],
       '23000',
-      'trg_lesson_completions_no_update',
-      'lesson_completions are insert-only',
+      'lesson_completions_insert_only',
     );
     await expectFailure(
       `INSERT INTO lesson_completions

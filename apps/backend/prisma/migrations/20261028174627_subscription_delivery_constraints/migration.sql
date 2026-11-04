@@ -349,7 +349,7 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     RAISE EXCEPTION 'lesson_completions are insert-only'
       USING ERRCODE = 'integrity_constraint_violation',
-        CONSTRAINT = TG_NAME;
+        CONSTRAINT = 'lesson_completions_insert_only';
   END IF;
 
   SELECT e.status::text
@@ -363,7 +363,7 @@ BEGIN
   IF enrollment_status IS DISTINCT FROM 'ACTIVE' THEN
     RAISE EXCEPTION 'lesson_completions require an ACTIVE enrollment'
       USING ERRCODE = 'integrity_constraint_violation',
-        CONSTRAINT = TG_NAME;
+        CONSTRAINT = 'lesson_completions_active_enrollment';
   END IF;
 
   SELECT l.status::text, l.audience::text
@@ -377,7 +377,7 @@ BEGIN
      OR lesson_audience IS DISTINCT FROM 'STUDENT' THEN
     RAISE EXCEPTION 'lesson_completions require an ACTIVE or ARCHIVED STUDENT lesson'
       USING ERRCODE = 'integrity_constraint_violation',
-        CONSTRAINT = TG_NAME;
+        CONSTRAINT = 'lesson_completions_student_lesson';
   END IF;
 
   PERFORM 1
@@ -389,13 +389,13 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'lesson_completions require a released lesson'
       USING ERRCODE = 'integrity_constraint_violation',
-        CONSTRAINT = TG_NAME;
+        CONSTRAINT = 'lesson_completions_released_lesson';
   END IF;
 
   IF NOT has_course_access(NEW.school_id, NEW.course_id, business_today()) THEN
     RAISE EXCEPTION 'lesson_completions require current course access'
       USING ERRCODE = 'integrity_constraint_violation',
-        CONSTRAINT = TG_NAME;
+        CONSTRAINT = 'lesson_completions_course_access';
   END IF;
 
   RETURN NEW;
