@@ -55,17 +55,17 @@ All accounts use the password **`testing-password`**. The seed prints this login
 | SOUTH / `Robot Math and Measurement` older and current terms                                             | Adjacent, non-overlapping renewal ranges                                             |
 | NORTH / `Robotics Design Studio` and its one ACTIVE delivery                                             | Subscription cap reached and delivery-limit behavior                                 |
 | NORTH / `Foundations of Robotics` active and inactive deliveries; SOUTH active delivery                  | Delivery status, school isolation, and empty teacher-assignment list                 |
-| NORTH / `Foundations of Robotics` has four active deliveries across Grade 5 Blue/Green and Grade 6        | Multiple academic years and subscription delivery cap                                |
+| NORTH / `Foundations of Robotics` has four active deliveries across Grade 5 Blue/Green and Grade 6       | Multiple academic years and subscription delivery cap                                |
 | Ava has an active assignment; Theo has only an ended assignment on the NORTH active delivery             | Assigned, unassigned, and ended-assignment teacher access                            |
-| Alex and Riley have active enrollments in NORTH; Taylor is enrolled in SOUTH                              | Own-school course listing, enrollment visibility, and school isolation               |
-| Drew has a COMPLETED enrollment; Casey has a REMOVED enrollment                                           | Inactive enrollment exclusion from student course lists and access                   |
-| Casey is enrolled in the NORTH expired-subscription delivery                                              | Course remains listed with `subscriptionActive: false`; outline access is forbidden   |
+| Alex and Riley have active enrollments in NORTH; Taylor is enrolled in SOUTH                             | Own-school course listing, enrollment visibility, and school isolation               |
+| Drew has a COMPLETED enrollment; Casey has a REMOVED enrollment                                          | Inactive enrollment exclusion from student course lists and access                   |
+| Casey is enrolled in the NORTH expired-subscription delivery                                             | Course remains listed with `subscriptionActive: false`; outline access is forbidden  |
 | NORTH active delivery releases three STUDENT lessons; one is archived after release                      | Active/archived lesson visibility, student outline, and lesson counts                |
 | NORTH active delivery has completions for Alex on one ACTIVE and one ARCHIVED lesson                     | Completion flags and grouped progress counts                                         |
-| NORTH 2025-26 Grade 5 Blue delivery has an active enrollment but no releases                              | A valid empty outline and zero lesson counts                                         |
-| Active STUDENT lesson in `No Released Lessons` module is not released                                     | Modules without released lessons are hidden from the outline                         |
-| `Teacher Robotics Lab Notes` is TEACHER_ONLY; draft and unreleased lessons also exist                      | Audience, draft, and release filtering for learning reads                            |
-| `Build a Line-Following Robot` released in NORTH and SOUTH active deliveries                               | Release state across schools and deliveries                                          |
+| NORTH 2025-26 Grade 5 Blue delivery has an active enrollment but no releases                             | A valid empty outline and zero lesson counts                                         |
+| Active STUDENT lesson in `No Released Lessons` module is not released                                    | Modules without released lessons are hidden from the outline                         |
+| `Teacher Robotics Lab Notes` is TEACHER_ONLY; draft and unreleased lessons also exist                    | Audience, draft, and release filtering for learning reads                            |
+| `Build a Line-Following Robot` released in NORTH and SOUTH active deliveries                             | Release state across schools and deliveries                                          |
 
 Assignment and submission records are not seeded. Enrollment, release, and completion rows are
 created while their school/course subscriptions are active, then the expired-subscription scenario
