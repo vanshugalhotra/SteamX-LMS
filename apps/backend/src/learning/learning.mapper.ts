@@ -33,14 +33,10 @@ export function toLearningOutline(rows: LearningOutlineRecord[]): LearningOutlin
 
   const modules = new Map<string, LearningOutlineModuleDto>();
   for (const row of rows) {
-    if (
-      row.moduleId === null ||
-      row.moduleTitle === null ||
-      row.modulePosition === null ||
-      row.lessonId === null ||
-      row.lessonTitle === null ||
-      row.lessonPosition === null
-    ) {
+    if (row.lessonId === null || row.lessonTitle === null || row.lessonPosition === null) {
+      continue;
+    }
+    if (row.moduleId === null || row.moduleTitle === null || row.modulePosition === null) {
       continue;
     }
 

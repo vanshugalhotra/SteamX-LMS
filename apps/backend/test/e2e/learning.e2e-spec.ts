@@ -616,6 +616,37 @@ describe('Student learning navigation (e2e)', () => {
     }
   });
 
+  it('returns an empty outline when the delivery has no released student lessons', async () => {
+    const courseId = await createCourse('LRN-2 Empty Outline');
+    await createSubscription(fixture.schoolA.school.id, courseId);
+    const deliveryId = await createDelivery(
+      fixture.schoolA.school.id,
+      courseId,
+      fixture.schoolA.section.id,
+      '2026-27',
+    );
+    await enroll(deliveryId, fixture.schoolA.student.id, fixture.schoolA.school.id);
+    await prisma.module.create({
+      data: {
+        courseId,
+        title: 'No released lessons',
+        position: 1,
+        status: ContentStatus.ACTIVE,
+        lessons: {
+          create: {
+            title: 'Unreleased lesson',
+            position: 1,
+            status: ContentStatus.ACTIVE,
+            audience: LessonAudience.STUDENT,
+          },
+        },
+      },
+    });
+
+    const response = await getOutline(studentCookie, deliveryId).expect(200);
+    expect(response.body.modules).toEqual([]);
+  });
+
   it('returns not found for foreign, another-class, and unenrolled deliveries', async () => {
     await getOutline(studentCookie, deliveries.foreign).expect(404);
     await getOutline(studentCookie, deliveries.anotherClass).expect(404);
