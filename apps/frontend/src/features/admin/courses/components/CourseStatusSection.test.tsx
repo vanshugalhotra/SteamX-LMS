@@ -20,16 +20,21 @@ vi.mock('@/components/ui/confirm-dialog', () => ({
   ConfirmDialog: ({
     open,
     confirmLabel,
+    title,
     onConfirm,
   }: {
     open: boolean;
     confirmLabel: string;
+    title: string;
     onConfirm: () => void;
   }) =>
     open ? (
-      <button type="button" onClick={onConfirm}>
-        Confirm {confirmLabel}
-      </button>
+      <>
+        <p>{title}</p>
+        <button type="button" onClick={onConfirm}>
+          Confirm {confirmLabel}
+        </button>
+      </>
     ) : null,
 }));
 
@@ -65,7 +70,7 @@ describe('CourseStatusSection', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm Archive' }));
 
     expect(updateStatusMutateAsync).toHaveBeenCalledWith({ id: 'course-1', status: 'ARCHIVED' });
-    expect(toastSuccess).toHaveBeenCalledWith('Course status updated');
+    expect(toastSuccess).toHaveBeenCalledWith('Course archived');
   });
 
   it('confirms before publishing a draft course', async () => {
@@ -82,5 +87,33 @@ describe('CourseStatusSection', () => {
 
     expect(updateStatusMutateAsync).toHaveBeenCalledWith({ id: 'course-1', status: 'ACTIVE' });
     expect(toastSuccess).toHaveBeenCalledWith('Course published');
+  });
+
+  it('uses the publish-again label when restoring an archived course', async () => {
+    const user = userEvent.setup();
+    const archivedCourse = { ...course, status: 'ARCHIVED' as const };
+    updateStatusMutateAsync.mockResolvedValue({ ...archivedCourse, status: 'ACTIVE' });
+
+    render(<CourseStatusSection course={archivedCourse} compact />);
+
+    await user.click(screen.getByRole('button', { name: 'Publish again' }));
+    expect(screen.getByText('Publish course again?')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Confirm Publish again' }));
+
+    expect(updateStatusMutateAsync).toHaveBeenCalledWith({ id: 'course-1', status: 'ACTIVE' });
+    expect(toastSuccess).toHaveBeenCalledWith('Course published');
+  });
+
+  it('shows compact-mode errors on a separate full-width row', async () => {
+    const user = userEvent.setup();
+    updateStatusMutateAsync.mockRejectedValue(new Error('Request failed'));
+
+    render(<CourseStatusSection course={course} compact />);
+
+    await user.click(screen.getByRole('button', { name: 'Archive' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm Archive' }));
+
+    expect(screen.getByRole('alert')).toHaveClass('basis-full');
   });
 });
