@@ -5,9 +5,17 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Course } from '../model/types';
 
-const { useCoursesMock } = vi.hoisted(() => ({ useCoursesMock: vi.fn() }));
+const { useCoursesMock, updateCourseStatusMock, useCourseOutlineMock } = vi.hoisted(() => ({
+  useCoursesMock: vi.fn(),
+  updateCourseStatusMock: vi.fn(),
+  useCourseOutlineMock: vi.fn(),
+}));
 
-vi.mock('../queries', () => ({ useCourses: useCoursesMock }));
+vi.mock('../queries', () => ({
+  useCourses: useCoursesMock,
+  useCourseOutline: useCourseOutlineMock,
+  useUpdateCourseStatus: () => ({ mutateAsync: updateCourseStatusMock, isPending: false }),
+}));
 vi.mock('@/features/admin/components/HeaderSlot', () => ({
   HeaderSlot: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
@@ -26,6 +34,12 @@ const course: Course = {
 describe('CoursesPage', () => {
   beforeEach(() => {
     useCoursesMock.mockReset();
+    updateCourseStatusMock.mockReset();
+    useCourseOutlineMock.mockReturnValue({
+      data: { modules: [{ lessons: [{}, {}, {}, {}, {}] }, { lessons: [] }] },
+      isPending: false,
+      isError: false,
+    });
     useCoursesMock.mockReturnValue({
       data: { items: [course], page: 1, limit: 6, total: 1 },
       isPending: false,
@@ -59,5 +73,18 @@ describe('CoursesPage', () => {
       },
       { timeout: 1000 },
     );
+  });
+
+  it('links each course card to its curriculum page', () => {
+    render(
+      <MemoryRouter>
+        <CoursesPage />
+      </MemoryRouter>,
+    );
+
+    const curriculumLink = screen.getByRole('link', { name: 'View curriculum' });
+    expect(curriculumLink).toHaveAttribute('href', '/steamx/admin/courses/course-1/curriculum');
+    expect(curriculumLink).toHaveClass('bg-transparent', 'text-indigo-950');
+    expect(screen.getByText('2 modules · 5 lessons')).toBeInTheDocument();
   });
 });
