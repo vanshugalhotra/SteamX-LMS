@@ -4,10 +4,13 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module.js';
 import { LearningAccessRepository } from './learning-access.repository.js';
 import { LearningAccessService } from './learning-access.service.js';
+import { LearningController } from './learning.controller.js';
+import { LearningService } from './learning.service.js';
 
 @Module({
   imports: [PrismaModule, SubscriptionsModule, DeliveriesModule],
-  providers: [LearningAccessRepository, LearningAccessService],
+  controllers: [LearningController],
+  providers: [LearningAccessRepository, LearningAccessService, LearningService],
   exports: [LearningAccessService],
 })
 export class LearningModule {}

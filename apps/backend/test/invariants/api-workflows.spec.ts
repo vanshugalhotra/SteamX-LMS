@@ -348,6 +348,16 @@ describe('Documented API workflows', () => {
           cookie: session.cookie,
           ...options,
         });
+        if (route.path.startsWith('/api/v1/learning')) {
+          if (session === teacherSession) {
+            assertStatus(response, 403, 'FORBIDDEN');
+          } else if (route.path.endsWith('/courses')) {
+            assertStatus(response, 200);
+          } else {
+            assertStatus(response, 404, 'NOT_FOUND');
+          }
+          continue;
+        }
         if (session === teacherSession && route.path.includes('/deliveries/:id/enrollments')) {
           assertStatus(response, 404, 'NOT_FOUND');
           continue;

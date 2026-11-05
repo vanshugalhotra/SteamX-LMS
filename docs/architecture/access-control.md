@@ -106,7 +106,7 @@ See the [subscription and delivery API cases](../testing/api-testing.md#subscrip
 ## Learning reads
 
 - Students can read only an ACTIVE delivery in their authenticated school where they have an ACTIVE enrollment. A lesson must have a release for that delivery and be STUDENT audience with ACTIVE or ARCHIVED status.
-- Teachers can read only an ACTIVE delivery in their authenticated school while their active teacher assignment exists. A lesson must belong to the delivery course and be ACTIVE; release and audience do not restrict teacher reads.
+- Teachers can read only an ACTIVE delivery in their authenticated school while their active teacher assignment exists. A lesson must belong to the delivery course and be ACTIVE or ARCHIVED; release and audience do not restrict teacher reads.
 - Both roles require current course subscription access, checked after delivery and lesson visibility. Hidden, inactive, unenrolled, unassigned, unreleased, teacher-only-for-students, and draft resources return the same 404; only a failed subscription check returns `403 SUBSCRIPTION_EXPIRED`.
 - Authenticated school and user status is already rechecked by `AuthGuard`; learning reads use the trusted school ID from that auth context.
 
