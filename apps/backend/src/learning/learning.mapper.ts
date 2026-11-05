@@ -5,7 +5,7 @@ import type {
   LearningOutlineResponseDto,
 } from './dto/learning-outline-response.dto.js';
 import type { LearningOutlineRecord, StudentCourseRecord } from './learning-access.repository.js';
-import type { LessonContentTree } from '../curriculum/lesson-content/lesson-content.service.js';
+import type { LessonContentTree } from '../curriculum/lesson-content/lesson-content.types.js';
 
 /** Maps one enrollment and its aggregated state to the student course-list response. */
 export function toLearningCourseResponse(

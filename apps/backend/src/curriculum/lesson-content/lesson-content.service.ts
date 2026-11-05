@@ -8,7 +8,6 @@ import {
 import { isDeepStrictEqual } from 'node:util';
 import { PinoLogger } from 'nestjs-pino';
 import { AssetsService } from '../../assets/assets.service.js';
-import type { AssetSummary } from '../../assets/assets.types.js';
 import { assertPlatformStaff } from '../../auth/assert-platform-staff.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
@@ -20,14 +19,8 @@ import { flattenBlocks, walkBlocks } from './tree/walk-blocks.js';
 import { collectAssetIds, validateLessonContent } from './validation/validate-lesson-content.js';
 import { toLessonContentResponse } from './lesson-content.mapper.js';
 import { LessonContentRepository } from './lesson-content.repository.js';
-import type { Issue, NormalizedBlock } from './validation/types.js';
-
-export type LessonContentTree = {
-  title: string;
-  contentVersion: number;
-  blocks: NormalizedBlock[];
-  assets: Map<string, AssetSummary>;
-};
+import type { Issue } from './validation/types.js';
+import type { LessonContentTree } from './lesson-content.types.js';
 
 /**
  * Two rare save races are deliberately not handled: another lesson can claim a colliding block
