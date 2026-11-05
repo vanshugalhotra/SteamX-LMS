@@ -38,7 +38,9 @@ for endpoint cases.
 - `learning.read` is granted to `teacher` and `student`; `lesson.complete` is granted to `student`. Platform staff use curriculum routes instead.
 
 An asset ID alone never grants access to non-admins. A learning read must check lesson, delivery,
-and subscription access before requesting a URL.
+and subscription access before requesting a URL. Serving also requires a block reference from that
+lesson and a READY file on an ACTIVE or ARCHIVED asset; students have no asset-ID-only path.
+Learning and author asset links use the same configured per-type TTL (`ASSET_ACCESS_TTL_*_SECONDS`).
 
 ## School scope vs. user visibility
 

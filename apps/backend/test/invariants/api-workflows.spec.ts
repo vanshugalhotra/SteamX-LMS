@@ -350,7 +350,10 @@ describe('Documented API workflows', () => {
         });
         if (route.path.startsWith('/api/v1/learning')) {
           if (session === teacherSession) {
-            if (route.path.endsWith('/lessons/:lessonId/content')) {
+            if (
+              route.path.endsWith('/lessons/:lessonId/content') ||
+              route.path.endsWith('/lessons/:lessonId/assets/:assetId/access')
+            ) {
               assertStatus(response, 404, 'NOT_FOUND');
             } else {
               assertStatus(response, 403, 'FORBIDDEN');
