@@ -8,6 +8,7 @@ import {
 import { isDeepStrictEqual } from 'node:util';
 import { PinoLogger } from 'nestjs-pino';
 import { AssetsService } from '../../assets/assets.service.js';
+import type { AssetSummary } from '../../assets/assets.types.js';
 import { assertPlatformStaff } from '../../auth/assert-platform-staff.js';
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
@@ -19,7 +20,14 @@ import { flattenBlocks, walkBlocks } from './tree/walk-blocks.js';
 import { collectAssetIds, validateLessonContent } from './validation/validate-lesson-content.js';
 import { toLessonContentResponse } from './lesson-content.mapper.js';
 import { LessonContentRepository } from './lesson-content.repository.js';
-import type { Issue } from './validation/types.js';
+import type { Issue, NormalizedBlock } from './validation/types.js';
+
+export type LessonContentTree = {
+  title: string;
+  contentVersion: number;
+  blocks: NormalizedBlock[];
+  assets: Map<string, AssetSummary>;
+};
 
 /**
  * Two rare save races are deliberately not handled: another lesson can claim a colliding block
@@ -43,14 +51,24 @@ export class LessonContentService {
   async findByLessonId(actor: AuthContext, id: string): Promise<LessonContentResponseDto> {
     assertPlatformStaff(actor);
 
+    const tree = await this.findTreeByLessonId(id);
+    return toLessonContentResponse(tree.contentVersion, tree.blocks, tree.assets);
+  }
+
+  /** Loads the ordered block tree and summaries used by trusted learning reads. */
+  async findTreeByLessonId(id: string): Promise<LessonContentTree> {
     const { lessonVersion, blocks: blockRows } = await this.content.findSnapshot(id);
     if (!lessonVersion) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     const blocks = buildBlockTree(blockRows);
-    const assetIds = collectAssetIds(blocks);
-    const summaries = await this.assets.getSummaries(assetIds);
-    return toLessonContentResponse(lessonVersion.contentVersion, blocks, summaries);
+    const assets = await this.assets.getSummaries(collectAssetIds(blocks));
+    return {
+      title: lessonVersion.title,
+      contentVersion: lessonVersion.contentVersion,
+      blocks,
+      assets,
+    };
   }
 
   /** Validate and replace all lesson blocks, or return the current content for an unchanged save. */

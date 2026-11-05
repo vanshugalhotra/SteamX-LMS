@@ -364,6 +364,17 @@ module and lesson position order.
 - [auto] When delivery belongs to another school or the student's enrollment is missing/inactive -> expect `404 NOT_FOUND`; when its subscription has expired -> expect `403 SUBSCRIPTION_EXPIRED`.
 - [auto] When teacher or platform staff calls -> expect `403 FORBIDDEN`; malformed delivery IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
+### `GET /learning/deliveries/:id/lessons/:lessonId/content`
+
+Caller: a student enrolled in the delivery or a teacher actively assigned to it, with `learning.read`.
+
+- [auto] An enrolled student reads a released STUDENT lesson; response includes ordered blocks, nested TWO_COLUMN children, accordion and rich-text content, and summaries only for referenced assets. Asset blocks remain present when an asset has no READY file.
+- [auto] Student reads of unreleased, TEACHER_ONLY, or DRAFT lessons; lessons outside the delivery/course or school; and lessons in a delivery without an active enrollment -> expect `404 NOT_FOUND`. An expired course subscription -> expect `403 SUBSCRIPTION_EXPIRED`.
+- [auto] ARCHIVED lessons remain readable when they were released; removing the release makes the student's next read return `404 NOT_FOUND`.
+- [auto] An assigned teacher can read ACTIVE or ARCHIVED STUDENT and TEACHER_ONLY lessons, including unreleased lessons. DRAFT lessons, unassigned or removed assignments, and another school's delivery -> expect `404 NOT_FOUND`.
+- [auto] Platform staff -> expect `403 FORBIDDEN`; malformed IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
+- [auto] The successful response contains only lesson ID/title, blocks, and `{ id, type, title, mimeType }` asset summaries; hidden fields are absent throughout the JSON and the response has `Cache-Control: private, no-store`.
+
 ## Course modules
 
 ### `POST /courses/:courseId/modules`
