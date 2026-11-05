@@ -74,7 +74,7 @@ export function AssetsPage() {
           </dl>
           <ButtonLink
             to={PATHS.admin.assetUpload}
-            className="rounded-full bg-gray-900 text-white hover:bg-gray-800"
+            className="rounded-full bg-brand-navy text-white hover:bg-brand-navy/90"
           >
             <Plus className="size-4" aria-hidden="true" />
             Upload asset

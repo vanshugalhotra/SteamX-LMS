@@ -94,7 +94,7 @@ export function AssetPreview({ asset }: { asset: PreviewAsset }) {
           controls
           preload="metadata"
           onError={onError}
-          className="w-full rounded-2xl bg-black"
+          className="w-full rounded-2xl bg-ink"
         />
       )}
       {asset.type === 'PDF' && (
