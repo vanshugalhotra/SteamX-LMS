@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
@@ -9,9 +10,13 @@ import {
   ContentStatus,
   DeliveryStatus,
   EnrollmentStatus,
+  AssetFileStatus,
+  AssetType,
+  BlockType,
   LessonAudience,
   PrismaClient,
 } from '../../src/generated/prisma/client.js';
+import type { Env } from '../../src/config/env.schema.js';
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import { PasswordService } from '../../src/auth/services/password.service.js';
 import {
@@ -25,6 +30,8 @@ import {
 import { cleanupFixtures } from '../support/setup/cleanup.js';
 import { createTestApp } from '../support/create-test-app.js';
 import { loginAsCookie } from '../support/login.js';
+import { createTestAsset, createTestAssetFile } from '../support/factories/assets.js';
+import { createTestAssetWithReadyFile } from '../support/factories/curriculum.js';
 
 type LearningDeliverySet = {
   firstYear: string;
@@ -36,6 +43,7 @@ type LearningDeliverySet = {
   anotherClass: string;
   expired: string;
   foreign: string;
+  noRelease: string;
 };
 
 describe('Student learning navigation (e2e)', () => {
@@ -46,11 +54,13 @@ describe('Student learning navigation (e2e)', () => {
   let fixture: TwoSchoolFixture;
   let studentCookie: string;
   let teacherCookie: string;
+  let peerTeacherCookie: string;
   let adminCookie: string;
   let unenrolledCookie: string;
   let unenrolledStudent: TestUserFixture;
   let otherClassStudent: TestUserFixture;
   let otherClassSectionId: string;
+  let origin: string;
   let alphaCourseId: string;
   let betaCourseId: string;
   let foreignCourseId: string;
@@ -62,9 +72,13 @@ describe('Student learning navigation (e2e)', () => {
   let teacherOnlyLessonId: string;
   let unreleasedLessonId: string;
   let draftLessonId: string;
+  let expiredLessonId: string;
+  let readyAssetId: string;
+  let failedAssetId: string;
   let deliveries: LearningDeliverySet;
   const createdCourseIds: string[] = [];
   const createdDeliveryIds: string[] = [];
+  const createdAssetIds: string[] = [];
   const createdUserIds: string[] = [];
   const createdSectionIds: string[] = [];
 
@@ -79,6 +93,12 @@ describe('Student learning navigation (e2e)', () => {
 
     app = await createTestApp(AppModule);
     prisma = app.get(PrismaService);
+    origin =
+      app.get<ConfigService<Env, true>>(ConfigService).get('CORS_ORIGINS', { infer: true })[0] ??
+      '';
+    if (!origin) {
+      throw new Error('Learning e2e tests require a configured CORS_ORIGINS entry.');
+    }
     fixture = await createTwoSchoolFixture(prisma);
 
     const testPasswordHash = await new PasswordService().hash(TENANCY_TEST_PASSWORD);
@@ -114,19 +134,29 @@ describe('Student learning navigation (e2e)', () => {
     createdUserIds.push(unenrolledStudent.id, otherClassStudent.id);
     createdSectionIds.push(otherClassSectionId);
 
-    [studentCookie, teacherCookie, adminCookie, unenrolledCookie] = await Promise.all([
-      loginAsCookie(app, fixture.schoolA.student),
-      loginAsCookie(app, fixture.schoolA.teacher),
-      loginAsCookie(app, fixture.admin),
-      loginAsCookie(app, unenrolledStudent),
-    ]);
+    [studentCookie, teacherCookie, peerTeacherCookie, adminCookie, unenrolledCookie] =
+      await Promise.all([
+        loginAsCookie(app, fixture.schoolA.student),
+        loginAsCookie(app, fixture.schoolA.teacher),
+        loginAsCookie(app, fixture.schoolB.teacher),
+        loginAsCookie(app, fixture.admin),
+        loginAsCookie(app, unenrolledStudent),
+      ]);
 
     await createLearningFixtures();
+    await assignTeacher(deliveries.firstYear).expect(201);
   });
 
   afterAll(async () => {
     if (prisma && createdDeliveryIds.length > 0) {
       await prisma.$transaction(async (tx) => {
+        const lessonIds = (
+          await tx.lesson.findMany({
+            where: { courseId: { in: createdCourseIds } },
+            select: { id: true },
+          })
+        ).map(({ id }) => id);
+        await tx.lessonBlock.deleteMany({ where: { lessonId: { in: lessonIds } } });
         await tx.lessonCompletion.deleteMany({
           where: { deliveryId: { in: createdDeliveryIds } },
         });
@@ -134,6 +164,9 @@ describe('Student learning navigation (e2e)', () => {
           where: { deliveryId: { in: createdDeliveryIds } },
         });
         await tx.deliveryEnrollment.deleteMany({
+          where: { deliveryId: { in: createdDeliveryIds } },
+        });
+        await tx.deliveryTeacher.deleteMany({
           where: { deliveryId: { in: createdDeliveryIds } },
         });
         await tx.delivery.deleteMany({ where: { id: { in: createdDeliveryIds } } });
@@ -147,6 +180,10 @@ describe('Student learning navigation (e2e)', () => {
         await tx.module.deleteMany({ where: { courseId: { in: createdCourseIds } } });
         await tx.course.deleteMany({ where: { id: { in: createdCourseIds } } });
       });
+    }
+    if (createdAssetIds.length > 0) {
+      await prisma.assetFile.deleteMany({ where: { assetId: { in: createdAssetIds } } });
+      await prisma.asset.deleteMany({ where: { id: { in: createdAssetIds } } });
     }
     if (fixture) {
       await cleanupFixtures(
@@ -227,6 +264,12 @@ describe('Student learning navigation (e2e)', () => {
       fixture.schoolB.section.id,
       '2026-27',
     );
+    const noReleaseDelivery = await createDelivery(
+      fixture.schoolA.school.id,
+      alphaCourseId,
+      fixture.schoolA.section.id,
+      '2020-21',
+    );
     deliveries = {
       firstYear: alphaDeliveries[0]!,
       secondYear: alphaDeliveries[1]!,
@@ -237,6 +280,7 @@ describe('Student learning navigation (e2e)', () => {
       anotherClass: alphaDeliveries[6]!,
       expired: expiredDelivery,
       foreign: foreignDelivery,
+      noRelease: noReleaseDelivery,
     };
 
     await Promise.all([
@@ -304,7 +348,121 @@ describe('Student learning navigation (e2e)', () => {
       where: { id: archivedModuleId },
       data: { status: ContentStatus.ARCHIVED },
     });
+    const expiredModule = await prisma.module.create({
+      data: {
+        courseId: betaCourseId,
+        title: 'Expired subscription module',
+        position: 1,
+        status: ContentStatus.ACTIVE,
+        lessons: {
+          create: {
+            title: 'Expired subscription lesson',
+            position: 1,
+            status: ContentStatus.ACTIVE,
+            audience: LessonAudience.STUDENT,
+          },
+        },
+      },
+      select: { lessons: { select: { id: true } } },
+    });
+    expiredLessonId = expiredModule.lessons[0]!.id;
+    await prisma.deliveryLessonRelease.create({
+      data: {
+        deliveryId: deliveries.expired,
+        lessonId: expiredLessonId,
+        schoolId: fixture.schoolA.school.id,
+        courseId: betaCourseId,
+      },
+    });
+    await createLessonContentFixtures();
     await expireSubscription(fixture.schoolA.school.id, betaCourseId);
+  }
+
+  async function createLessonContentFixtures(): Promise<void> {
+    const readyAsset = await createTestAssetWithReadyFile(prisma, AssetType.IMAGE, {
+      title: 'Ready learning image',
+      sizeBytes: 1024,
+    });
+    readyAssetId = readyAsset.assetId;
+    createdAssetIds.push(readyAssetId);
+    const failedAsset = await createTestAsset(prisma, {
+      type: AssetType.IMAGE,
+      title: 'Failed learning image',
+    });
+    failedAssetId = failedAsset;
+    createdAssetIds.push(failedAssetId);
+    await createTestAssetFile(prisma, failedAsset, AssetFileStatus.FAILED, 'image/png', {
+      lastError: 'Hidden processing detail',
+    });
+
+    const richText = {
+      format: 'tiptap',
+      doc: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Lesson text' }] }],
+      },
+    };
+    const layout = await prisma.lessonBlock.create({
+      data: {
+        lessonId: activeLessonId,
+        type: BlockType.TWO_COLUMN,
+        content: {},
+        position: 2,
+      },
+      select: { id: true },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: activeLessonId,
+        type: BlockType.RICH_TEXT,
+        content: richText,
+        position: 1,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: activeLessonId,
+        type: BlockType.IMAGE,
+        assetId: readyAssetId,
+        content: { alt: 'Two-column image' },
+        parentBlockId: layout.id,
+        columnIndex: 0,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: activeLessonId,
+        type: BlockType.RICH_TEXT,
+        content: richText,
+        parentBlockId: layout.id,
+        columnIndex: 1,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: activeLessonId,
+        type: BlockType.ACCORDION,
+        content: { title: 'More details', body: richText },
+        position: 3,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: activeLessonId,
+        type: BlockType.IMAGE,
+        assetId: failedAssetId,
+        content: { alt: 'Image without a ready file' },
+        position: 4,
+      },
+    });
+    await prisma.lessonBlock.create({
+      data: {
+        lessonId: archivedLessonId,
+        type: BlockType.RICH_TEXT,
+        content: richText,
+        position: 1,
+      },
+    });
   }
 
   async function createOutlineLessons(): Promise<{
@@ -499,6 +657,87 @@ describe('Student learning navigation (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  function getLessonContent(cookie: string, deliveryId: string, lessonId: string) {
+    return request(app.getHttpServer())
+      .get(`/api/v1/learning/deliveries/${deliveryId}/lessons/${lessonId}/content`)
+      .set('Cookie', cookie);
+  }
+
+  function getReleaseOutline(cookie: string, deliveryId: string) {
+    return request(app.getHttpServer())
+      .get(`/api/v1/deliveries/${deliveryId}/releases`)
+      .set('Cookie', cookie);
+  }
+
+  function assignTeacher(deliveryId: string) {
+    return request(app.getHttpServer())
+      .post(`/api/v1/deliveries/${deliveryId}/teachers`)
+      .set('Origin', origin)
+      .set('Cookie', adminCookie)
+      .send({ teacherId: fixture.schoolA.teacher.id });
+  }
+
+  function removeTeacher(deliveryId: string) {
+    return request(app.getHttpServer())
+      .delete(`/api/v1/deliveries/${deliveryId}/teachers/${fixture.schoolA.teacher.id}`)
+      .set('Origin', origin)
+      .set('Cookie', adminCookie);
+  }
+
+  function unreleaseLesson(deliveryId: string, lessonId: string) {
+    return request(app.getHttpServer())
+      .delete(`/api/v1/deliveries/${deliveryId}/releases/lessons/${lessonId}`)
+      .set('Origin', origin)
+      .set('Cookie', adminCookie);
+  }
+
+  function allJsonKeys(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value.flatMap(allJsonKeys);
+    }
+    if (value !== null && typeof value === 'object') {
+      return Object.entries(value).flatMap(([key, child]) => [key, ...allJsonKeys(child)]);
+    }
+    return [];
+  }
+
+  function expectNoHiddenContentFields(body: unknown): void {
+    const hidden = new Set([
+      'audience',
+      'contentVersion',
+      'createdAt',
+      'error',
+      'errorCode',
+      'errorMessage',
+      'file',
+      'fileId',
+      'fileIds',
+      'fileStatus',
+      'lastError',
+      'originalFilename',
+      'playbackKey',
+      'position',
+      'processing',
+      'processingJobId',
+      'processingStatus',
+      'releasable',
+      'release',
+      'releaseInfo',
+      'releaseState',
+      'released',
+      'releasedById',
+      'releasedAt',
+      'releasedOn',
+      'size',
+      'sizeBytes',
+      'status',
+      'storageKey',
+      'updatedAt',
+      'uploadId',
+    ]);
+    expect(allJsonKeys(body).filter((key) => hidden.has(key))).toEqual([]);
+  }
+
   it('lists only active own enrollments with scoped counts and subscription state', async () => {
     const response = await getCourses(studentCookie).expect(200);
     expect(response.body.items.map((item: { academicYear: string }) => item.academicYear)).toEqual([
@@ -528,7 +767,7 @@ describe('Student learning navigation (e2e)', () => {
     });
     expect(response.body.items[2]).toMatchObject({
       deliveryId: deliveries.expired,
-      totalLessons: 0,
+      totalLessons: 1,
       completedLessons: 0,
       subscriptionActive: false,
     });
@@ -647,6 +886,118 @@ describe('Student learning navigation (e2e)', () => {
     expect(response.body.modules).toEqual([]);
   });
 
+  it('returns the minimal content tree and safe asset summaries to an enrolled student', async () => {
+    const response = await getLessonContent(studentCookie, deliveries.firstYear, activeLessonId)
+      .expect(200)
+      .expect('Cache-Control', 'private, no-store');
+
+    expect(Object.keys(response.body).sort()).toEqual(
+      ['assets', 'blocks', 'lessonId', 'title'].sort(),
+    );
+    expect(response.body).toMatchObject({
+      lessonId: activeLessonId,
+      title: 'Completed student lesson',
+    });
+    expect(response.body.blocks.map((block: { type: BlockType }) => block.type)).toEqual([
+      BlockType.RICH_TEXT,
+      BlockType.TWO_COLUMN,
+      BlockType.ACCORDION,
+      BlockType.IMAGE,
+    ]);
+    expect(response.body.blocks[0].content.doc.content[0].content[0].text).toBe('Lesson text');
+    expect(
+      response.body.blocks[1].columns.map(
+        (block: { type: BlockType } | null) => block?.type ?? null,
+      ),
+    ).toEqual([BlockType.IMAGE, BlockType.RICH_TEXT]);
+    expect(response.body.blocks[1].columns[0].assetId).toBe(readyAssetId);
+    expect(response.body.blocks[2].content).toEqual({
+      title: 'More details',
+      body: {
+        format: 'tiptap',
+        doc: {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Lesson text' }] }],
+        },
+      },
+    });
+    expect(response.body.blocks[3].assetId).toBe(failedAssetId);
+    expect(response.body.assets).toHaveLength(2);
+    expect(response.body.assets.map((asset: { id: string }) => asset.id).sort()).toEqual(
+      [readyAssetId, failedAssetId].sort(),
+    );
+    for (const asset of response.body.assets) {
+      expect(Object.keys(asset).sort()).toEqual(['id', 'mimeType', 'title', 'type'].sort());
+      expect(asset).toMatchObject({
+        type: AssetType.IMAGE,
+        mimeType: 'image/png',
+      });
+    }
+    expectNoHiddenContentFields(response.body);
+
+    const archived = await getLessonContent(studentCookie, deliveries.firstYear, archivedLessonId)
+      .expect(200)
+      .expect('Cache-Control', 'private, no-store');
+    expect(archived.body.title).toBe('Archived student lesson');
+    expect(archived.body.blocks).toHaveLength(1);
+    expectNoHiddenContentFields(archived.body);
+  });
+
+  it('hides unreleased, teacher-only, draft, cross-delivery, cross-school, and unenrolled lessons', async () => {
+    await getLessonContent(studentCookie, deliveries.firstYear, unreleasedLessonId).expect(404);
+    await getLessonContent(studentCookie, deliveries.firstYear, teacherOnlyLessonId).expect(404);
+    await getLessonContent(studentCookie, deliveries.firstYear, draftLessonId).expect(404);
+
+    await enroll(deliveries.noRelease, fixture.schoolA.student.id, fixture.schoolA.school.id);
+    await getLessonContent(studentCookie, deliveries.noRelease, activeLessonId).expect(404);
+    await prisma.deliveryEnrollment.updateMany({
+      where: { deliveryId: deliveries.noRelease, studentId: fixture.schoolA.student.id },
+      data: { status: EnrollmentStatus.REMOVED, endedAt: new Date() },
+    });
+
+    await getLessonContent(studentCookie, deliveries.foreign, activeLessonId).expect(404);
+    await getLessonContent(studentCookie, deliveries.removed, activeLessonId).expect(404);
+    await getLessonContent(unenrolledCookie, deliveries.firstYear, activeLessonId).expect(404);
+  });
+
+  it('returns the subscription error only after the student lesson passes visibility checks', async () => {
+    const response = await getLessonContent(
+      studentCookie,
+      deliveries.expired,
+      expiredLessonId,
+    ).expect(403);
+    expect(response.body.code).toBe('SUBSCRIPTION_EXPIRED');
+  });
+
+  it('lets assigned teachers read active student and teacher-only lessons without student release', async () => {
+    const releaseOutline = await getReleaseOutline(teacherCookie, deliveries.firstYear).expect(200);
+    const listedLessonIds = releaseOutline.body.modules.flatMap(
+      (module: { lessons: Array<{ id: string }> }) => module.lessons.map(({ id }) => id),
+    );
+    expect(listedLessonIds).toContain(teacherOnlyLessonId);
+
+    for (const lessonId of [activeLessonId, teacherOnlyLessonId]) {
+      const response = await getLessonContent(teacherCookie, deliveries.firstYear, lessonId)
+        .expect(200)
+        .expect('Cache-Control', 'private, no-store');
+      expect(response.body.lessonId).toBe(lessonId);
+      expectNoHiddenContentFields(response.body);
+    }
+    await getLessonContent(teacherCookie, deliveries.firstYear, draftLessonId).expect(404);
+    await getLessonContent(peerTeacherCookie, deliveries.firstYear, activeLessonId).expect(404);
+    await getLessonContent(teacherCookie, deliveries.noRelease, activeLessonId).expect(404);
+
+    await assignTeacher(deliveries.noRelease).expect(201);
+    await getLessonContent(teacherCookie, deliveries.noRelease, activeLessonId).expect(200);
+    await removeTeacher(deliveries.noRelease).expect(204);
+    await getLessonContent(teacherCookie, deliveries.noRelease, activeLessonId).expect(404);
+  });
+
+  it('rejects platform staff and unauthenticated callers on the lesson content route', async () => {
+    await getLessonContent(adminCookie, deliveries.firstYear, activeLessonId).expect(403);
+    await getLessonContent('', deliveries.firstYear, activeLessonId).expect(401);
+  });
+
   it('returns not found for foreign, another-class, and unenrolled deliveries', async () => {
     await getOutline(studentCookie, deliveries.foreign).expect(404);
     await getOutline(studentCookie, deliveries.anotherClass).expect(404);
@@ -662,5 +1013,10 @@ describe('Student learning navigation (e2e)', () => {
     await getOutline(teacherCookie, deliveries.firstYear).expect(403);
     await getOutline(adminCookie, deliveries.firstYear).expect(403);
     await getOutline('', deliveries.firstYear).expect(401);
+  });
+
+  it('hides student content immediately after the lesson release is removed', async () => {
+    await unreleaseLesson(deliveries.firstYear, activeLessonId).expect(204);
+    await getLessonContent(studentCookie, deliveries.firstYear, activeLessonId).expect(404);
   });
 });

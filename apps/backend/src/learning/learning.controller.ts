@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Controller, Get, Header, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiForbiddenResponse,
@@ -14,12 +14,13 @@ import type { AuthContext } from '../auth/types/auth-context.js';
 import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
 import { PaginationQueryDto } from '../common/pagination/pagination-query.dto.js';
 import { LearningCourseListResponseDto } from './dto/learning-course-list-response.dto.js';
+import { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import { LearningOutlineResponseDto } from './dto/learning-outline-response.dto.js';
 import { LearningService } from './learning.service.js';
 
 @ApiTags('Learning')
 @ApiProtectedController()
-@ApiForbiddenResponse({ description: 'The caller must be a student with learning.read.' })
+@ApiForbiddenResponse({ description: 'The caller must have learning.read for their role.' })
 @Controller({ path: 'learning' })
 export class LearningController {
   constructor(private readonly learning: LearningService) {}
@@ -65,5 +66,30 @@ export class LearningController {
     @Param('id', ParseUUIDPipe) deliveryId: string,
   ): Promise<LearningOutlineResponseDto> {
     return this.learning.getStudentOutline(auth, deliveryId);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /learning/deliveries/:id/lessons/:lessonId/content — Read lesson content
+  // ─────────────────────────────────────────
+  /** Returns the gated lesson tree and safe asset summaries to an authorized student or teacher. */
+  @RequirePermission(PERMISSION.LEARNING_READ)
+  @Get('deliveries/:id/lessons/:lessonId/content')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Read lesson content for a delivery' })
+  @ApiOkResponse({
+    description: 'Lesson content and summaries for assets referenced by its blocks.',
+    type: LearningLessonContentResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'The delivery or lesson ID is not a UUID.' })
+  @ApiNotFoundResponse({ description: 'Lesson not found or not visible to the caller.' })
+  @ApiForbiddenResponse({
+    description: 'The caller is not a student or teacher, or the course subscription is inactive.',
+  })
+  getLessonContent(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) deliveryId: string,
+    @Param('lessonId', ParseUUIDPipe) lessonId: string,
+  ): Promise<LearningLessonContentResponseDto> {
+    return this.learning.getLessonContent(auth, deliveryId, lessonId);
   }
 }

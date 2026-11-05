@@ -1,9 +1,11 @@
 import type { LearningCourseResponseDto } from './dto/learning-course-response.dto.js';
+import type { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import type {
   LearningOutlineModuleDto,
   LearningOutlineResponseDto,
 } from './dto/learning-outline-response.dto.js';
 import type { LearningOutlineRecord, StudentCourseRecord } from './learning-access.repository.js';
+import type { LessonContentTree } from '../curriculum/lesson-content/lesson-content.types.js';
 
 /** Maps one enrollment and its aggregated state to the student course-list response. */
 export function toLearningCourseResponse(
@@ -62,5 +64,25 @@ export function toLearningOutline(rows: LearningOutlineRecord[]): LearningOutlin
     deliveryId: first.deliveryId,
     course: { id: first.courseId, title: first.courseTitle },
     modules: [...modules.values()],
+  };
+}
+
+/** Maps shared lesson content to the minimal student/teacher read response. */
+export function toLearningLessonContent(
+  lessonId: string,
+  tree: LessonContentTree,
+): LearningLessonContentResponseDto {
+  return {
+    lessonId,
+    title: tree.title,
+    blocks: tree.blocks,
+    assets: [...tree.assets.values()]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map(({ id, type, title, file }) => ({
+        id,
+        type,
+        title,
+        mimeType: file?.mimeType ?? null,
+      })),
   };
 }

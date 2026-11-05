@@ -7,19 +7,26 @@ import type { PaginationQueryDto } from '../common/pagination/pagination-query.d
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
 import { resolveSchoolScope } from '../common/tenancy/school-scope.js';
 import { CourseAccessService } from '../subscriptions/course-access.service.js';
+import { LessonContentService } from '../curriculum/lesson-content/lesson-content.service.js';
 import { LearningAccessService } from './learning-access.service.js';
 import type { LearningCourseResponseDto } from './dto/learning-course-response.dto.js';
+import type { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import type { LearningOutlineResponseDto } from './dto/learning-outline-response.dto.js';
-import { toLearningCourseResponse, toLearningOutline } from './learning.mapper.js';
+import {
+  toLearningCourseResponse,
+  toLearningLessonContent,
+  toLearningOutline,
+} from './learning.mapper.js';
 import { LearningAccessRepository } from './learning-access.repository.js';
 
-/** Provides student-only course navigation and released lesson outlines. */
+/** Provides learning navigation and access-checked student/teacher lesson content. */
 @Injectable()
 export class LearningService {
   constructor(
     private readonly learning: LearningAccessRepository,
     private readonly access: LearningAccessService,
     private readonly courseAccess: CourseAccessService,
+    private readonly lessonContent: LessonContentService,
   ) {}
 
   /** Lists the student's active enrollments with page-level progress and subscription state. */
@@ -81,6 +88,20 @@ export class LearningService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toLearningOutline(rows);
+  }
+
+  /** Returns a lesson tree only after the shared delivery and lesson access check succeeds. */
+  async getLessonContent(
+    auth: AuthContext,
+    deliveryId: string,
+    lessonId: string,
+  ): Promise<LearningLessonContentResponseDto> {
+    const result = await this.access.assertLessonAccess(auth, deliveryId, lessonId);
+    if (!result.lesson) {
+      throw new Error('Expected lesson access details for a lesson content read.');
+    }
+    const tree = await this.lessonContent.findTreeByLessonId(result.lesson.id);
+    return toLearningLessonContent(result.lesson.id, tree);
   }
 
   private getStudentSchoolId(auth: AuthContext): string {

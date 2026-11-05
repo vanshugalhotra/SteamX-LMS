@@ -20,6 +20,7 @@ import { collectAssetIds, validateLessonContent } from './validation/validate-le
 import { toLessonContentResponse } from './lesson-content.mapper.js';
 import { LessonContentRepository } from './lesson-content.repository.js';
 import type { Issue } from './validation/types.js';
+import type { LessonContentTree } from './lesson-content.types.js';
 
 /**
  * Two rare save races are deliberately not handled: another lesson can claim a colliding block
@@ -43,14 +44,24 @@ export class LessonContentService {
   async findByLessonId(actor: AuthContext, id: string): Promise<LessonContentResponseDto> {
     assertPlatformStaff(actor);
 
+    const tree = await this.findTreeByLessonId(id);
+    return toLessonContentResponse(tree.contentVersion, tree.blocks, tree.assets);
+  }
+
+  /** Loads the ordered block tree and summaries used by trusted learning reads. */
+  async findTreeByLessonId(id: string): Promise<LessonContentTree> {
     const { lessonVersion, blocks: blockRows } = await this.content.findSnapshot(id);
     if (!lessonVersion) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     const blocks = buildBlockTree(blockRows);
-    const assetIds = collectAssetIds(blocks);
-    const summaries = await this.assets.getSummaries(assetIds);
-    return toLessonContentResponse(lessonVersion.contentVersion, blocks, summaries);
+    const assets = await this.assets.getSummaries(collectAssetIds(blocks));
+    return {
+      title: lessonVersion.title,
+      contentVersion: lessonVersion.contentVersion,
+      blocks,
+      assets,
+    };
   }
 
   /** Validate and replace all lesson blocks, or return the current content for an unchanged save. */

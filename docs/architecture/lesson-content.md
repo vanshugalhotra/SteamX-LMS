@@ -64,8 +64,7 @@ empty optional alt text and captions are omitted.
 asset side table:
 
 This is the platform-admin builder read. It returns content regardless of lesson status or audience.
-Grant `curriculum.read` only to platform admins: teacher/student delivery reads need a separate
-endpoint that checks lesson release and access rules.
+Teacher and student delivery reads use the gated endpoint described below.
 
 ```json
 {
@@ -93,6 +92,15 @@ endpoint that checks lesson release and access rules.
 and contains metadata/current file state, not URLs or storage identifiers. Keep this side table
 separate from editable blocks; request temporary URLs from the asset-access endpoint when needed.
 Render rich-text `text` as text, never executable HTML. `version` is the concurrency token.
+
+## Reading content as a student or teacher
+
+`GET /learning/deliveries/:id/lessons/:lessonId/content` requires `learning.read` and an active
+delivery access: students need an active enrollment and a released STUDENT lesson; assigned teachers
+can read ACTIVE or ARCHIVED STUDENT and TEACHER_ONLY lessons, whether released or not. DRAFT lessons
+are hidden. The response includes the same block tree and only `{ id, type, title, mimeType }` asset
+summaries; it omits lesson status, audience, position, release/version/timestamp data and asset file,
+processing, storage, and size details. A referenced asset without a READY file is still summarized.
 
 ## Saving content
 
