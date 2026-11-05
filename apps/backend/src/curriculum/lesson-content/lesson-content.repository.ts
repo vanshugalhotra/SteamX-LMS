@@ -15,6 +15,12 @@ const LESSON_CONTENT_BLOCK_SELECT = {
   columnIndex: true,
 } satisfies Prisma.LessonBlockSelect;
 
+const LESSON_CONTENT_LESSON_SELECT = {
+  id: true,
+  title: true,
+  contentVersion: true,
+} satisfies Prisma.LessonSelect;
+
 @Injectable()
 export class LessonContentRepository {
   /** Inject Prisma so this repository can query the database. */
@@ -44,14 +50,14 @@ export class LessonContentRepository {
    * @returns An empty block list and null version when the lesson is missing.
    */
   findSnapshot(lessonId: string): Promise<{
-    lessonVersion: { contentVersion: number } | null;
+    lessonVersion: { id: string; title: string; contentVersion: number } | null;
     blocks: LessonContentBlockRow[];
   }> {
     return this.prisma.$transaction(
       async (tx) => {
         const lessonVersion = await tx.lesson.findUnique({
           where: { id: lessonId },
-          select: { contentVersion: true },
+          select: LESSON_CONTENT_LESSON_SELECT,
         });
         if (!lessonVersion) return { lessonVersion, blocks: [] };
 

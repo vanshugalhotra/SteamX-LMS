@@ -189,7 +189,8 @@ describe('Black-box API invariants', () => {
         continue;
       }
       const response = await api.send(route.method, concretePath(route), {
-        cookie: studentSession.cookie,
+        // Students have learning.read by design, so use an admin without it to verify the route declares a permission.
+        cookie: route.path.startsWith('/api/v1/learning') ? admin : studentSession.cookie,
         ...(route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE'
           ? { body: {} }
           : {}),

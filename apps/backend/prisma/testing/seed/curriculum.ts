@@ -4,6 +4,10 @@ import type { AssetSeed } from './assets.js';
 
 export type CurriculumSeed = {
   lesson: string;
+  learningLessons: {
+    activeStudent: string;
+    archivedAfterRelease: string;
+  };
   courses: {
     active: string;
     expired: string;
@@ -24,11 +28,15 @@ const IDS = {
   activeModule: '019a0000-0000-7000-8000-000000000411',
   draftModule: '019a0000-0000-7000-8000-000000000412',
   archivedModule: '019a0000-0000-7000-8000-000000000413',
+  unreleasedModule: '019a0000-0000-7000-8000-000000000414',
   studentLesson: '019a0000-0000-7000-8000-000000000421',
   teacherLesson: '019a0000-0000-7000-8000-000000000422',
   draftLesson: '019a0000-0000-7000-8000-000000000423',
   nestedDraftLesson: '019a0000-0000-7000-8000-000000000424',
   archivedLesson: '019a0000-0000-7000-8000-000000000425',
+  activeStudentLesson: '019a0000-0000-7000-8000-000000000440',
+  archivedAfterReleaseLesson: '019a0000-0000-7000-8000-000000000441',
+  unreleasedStudentLesson: '019a0000-0000-7000-8000-000000000442',
   richTextBlock: '019a0000-0000-7000-8000-000000000431',
   imageBlock: '019a0000-0000-7000-8000-000000000432',
   videoBlock: '019a0000-0000-7000-8000-000000000433',
@@ -91,6 +99,13 @@ export async function seedCurriculum(
           position: 3,
           status: 'ARCHIVED',
         },
+        {
+          id: IDS.unreleasedModule,
+          courseId: IDS.activeCourse,
+          title: 'No Released Lessons',
+          position: 4,
+          status: 'ACTIVE',
+        },
       ],
     });
 
@@ -140,6 +155,33 @@ export async function seedCurriculum(
           title: 'Archived Lesson Example',
           position: 1,
           status: 'ARCHIVED',
+          audience: 'STUDENT',
+        },
+        {
+          id: IDS.activeStudentLesson,
+          moduleId: IDS.activeModule,
+          courseId: IDS.activeCourse,
+          title: 'Calibrate the Robot Sensors',
+          position: 4,
+          status: 'ACTIVE',
+          audience: 'STUDENT',
+        },
+        {
+          id: IDS.archivedAfterReleaseLesson,
+          moduleId: IDS.activeModule,
+          courseId: IDS.activeCourse,
+          title: 'Review the Sensor Results',
+          position: 5,
+          status: 'ACTIVE',
+          audience: 'STUDENT',
+        },
+        {
+          id: IDS.unreleasedStudentLesson,
+          moduleId: IDS.unreleasedModule,
+          courseId: IDS.activeCourse,
+          title: 'Unreleased Student Lesson',
+          position: 1,
+          status: 'ACTIVE',
           audience: 'STUDENT',
         },
       ],
@@ -233,6 +275,10 @@ export async function seedCurriculum(
 
   return {
     lesson: IDS.studentLesson,
+    learningLessons: {
+      activeStudent: IDS.activeStudentLesson,
+      archivedAfterRelease: IDS.archivedAfterReleaseLesson,
+    },
     courses: {
       active: IDS.activeCourse,
       expired: IDS.expiredCourse,

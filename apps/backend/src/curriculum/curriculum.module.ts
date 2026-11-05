@@ -38,5 +38,6 @@ import { LessonContentService } from './lesson-content/lesson-content.service.js
     LessonContentRepository,
     LessonContentService,
   ],
+  exports: [LessonContentService],
 })
 export class CurriculumModule {}

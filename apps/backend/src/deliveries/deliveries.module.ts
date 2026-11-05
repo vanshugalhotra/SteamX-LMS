@@ -35,5 +35,6 @@ import { DeliveryReleasesService } from './delivery-releases/delivery-releases.s
     DeliveryReleasesRepository,
     DeliveryReleasesService,
   ],
+  exports: [DeliveryAccessService],
 })
 export class DeliveriesModule {}
