@@ -14,6 +14,7 @@ import type { AuthContext } from '../auth/types/auth-context.js';
 import { ApiProtectedController } from '../common/decorators/api-protected-controller.decorator.js';
 import { PaginationQueryDto } from '../common/pagination/pagination-query.dto.js';
 import { LearningCourseListResponseDto } from './dto/learning-course-list-response.dto.js';
+import { LearningAssetAccessResponseDto } from './dto/learning-asset-access-response.dto.js';
 import { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import { LearningOutlineResponseDto } from './dto/learning-outline-response.dto.js';
 import { LearningService } from './learning.service.js';
@@ -91,5 +92,31 @@ export class LearningController {
     @Param('lessonId', ParseUUIDPipe) lessonId: string,
   ): Promise<LearningLessonContentResponseDto> {
     return this.learning.getLessonContent(auth, deliveryId, lessonId);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /learning/deliveries/:id/lessons/:lessonId/assets/:assetId/access — Serve lesson asset
+  // ─────────────────────────────────────────
+  /** Issues a short-lived asset URL and identity data for the lesson watermark overlay. */
+  @RequirePermission(PERMISSION.LEARNING_READ)
+  @Get('deliveries/:id/lessons/:lessonId/assets/:assetId/access')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Get a lesson asset access URL' })
+  @ApiOkResponse({
+    description: 'Short-lived URL and viewer data for a READY asset referenced by the lesson.',
+    type: LearningAssetAccessResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'A delivery, lesson, or asset ID is not a UUID.' })
+  @ApiNotFoundResponse({ description: 'Asset not found or not visible in this lesson.' })
+  @ApiForbiddenResponse({
+    description: 'The caller lacks learning.read, or the course subscription is inactive.',
+  })
+  getLessonAssetAccess(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) deliveryId: string,
+    @Param('lessonId', ParseUUIDPipe) lessonId: string,
+    @Param('assetId', ParseUUIDPipe) assetId: string,
+  ): Promise<LearningAssetAccessResponseDto> {
+    return this.learning.getLessonAssetAccess(auth, deliveryId, lessonId, assetId);
   }
 }

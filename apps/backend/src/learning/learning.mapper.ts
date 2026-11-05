@@ -1,4 +1,5 @@
 import type { LearningCourseResponseDto } from './dto/learning-course-response.dto.js';
+import type { LearningAssetAccessResponseDto } from './dto/learning-asset-access-response.dto.js';
 import type { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import type {
   LearningOutlineModuleDto,
@@ -6,6 +7,7 @@ import type {
 } from './dto/learning-outline-response.dto.js';
 import type { LearningOutlineRecord, StudentCourseRecord } from './learning-access.repository.js';
 import type { LessonContentTree } from '../curriculum/lesson-content/lesson-content.types.js';
+import type { AssetAccessResponseDto } from '../assets/dto/asset-access-response.dto.js';
 
 /** Maps one enrollment and its aggregated state to the student course-list response. */
 export function toLearningCourseResponse(
@@ -84,5 +86,19 @@ export function toLearningLessonContent(
         title,
         mimeType: file?.mimeType ?? null,
       })),
+  };
+}
+
+/** Maps a signed asset URL and trusted identity fields to the learning response. */
+export function toLearningAssetAccess(
+  access: AssetAccessResponseDto,
+  viewer: LearningAssetAccessResponseDto['viewer'],
+): LearningAssetAccessResponseDto {
+  return {
+    url: access.url,
+    expiresAt: access.expiresAt.toISOString(),
+    type: access.type,
+    mimeType: access.mimeType,
+    viewer,
   };
 }

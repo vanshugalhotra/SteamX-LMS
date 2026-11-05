@@ -69,7 +69,7 @@ export class AssetAccessService {
   }
 
   /**
-   * Signs the supplied file's playback object or original object using its asset-type TTL.
+   * Signs the supplied file's playback object or original object using its configured type TTL.
    * This method trusts the caller to select an eligible file; it does not check file status.
    * @returns The temporary URL, expiry, asset type, and MIME type.
    * @throws Error when the file has no MIME type or its asset type cannot be served.

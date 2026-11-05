@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AssetsModule } from '../assets/assets.module.js';
 import { CurriculumModule } from '../curriculum/curriculum.module.js';
 import { DeliveriesModule } from '../deliveries/deliveries.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
@@ -9,7 +10,7 @@ import { LearningController } from './learning.controller.js';
 import { LearningService } from './learning.service.js';
 
 @Module({
-  imports: [PrismaModule, SubscriptionsModule, DeliveriesModule, CurriculumModule],
+  imports: [PrismaModule, SubscriptionsModule, DeliveriesModule, CurriculumModule, AssetsModule],
   controllers: [LearningController],
   providers: [LearningAccessRepository, LearningAccessService, LearningService],
   exports: [LearningAccessService],

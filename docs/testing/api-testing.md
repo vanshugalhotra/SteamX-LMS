@@ -375,6 +375,17 @@ Caller: a student enrolled in the delivery or a teacher actively assigned to it,
 - [auto] Platform staff -> expect `403 FORBIDDEN`; malformed IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
 - [auto] The successful response contains only lesson ID/title, blocks, and `{ id, type, title, mimeType }` asset summaries; hidden fields are absent throughout the JSON and the response has `Cache-Control: private, no-store`.
 
+### `GET /learning/deliveries/:id/lessons/:lessonId/assets/:assetId/access`
+
+Caller: a student enrolled in the delivery or a teacher actively assigned to it, with `learning.read`.
+
+- [auto] A referenced asset with a READY file on an ACTIVE or ARCHIVED asset returns a short-lived URL, type, MIME type, and viewer watermark data; the response has `Cache-Control: private, no-store`.
+- [auto] PDF, image, video, top-level, and TWO_COLUMN child assets are served; each type uses its configured author-access TTL, and no storage keys, file IDs, bucket names, or permanent URLs appear anywhere in the response.
+- [auto] An asset not referenced by this lesson (including one used by another lesson in the same delivery), an asset with no READY file, an unknown asset ID, or an asset from another school's lesson -> expect `404 NOT_FOUND`.
+- [auto] Student reads of unreleased or TEACHER_ONLY lessons, another school's delivery, and unenrolled or removed enrollments -> expect `404 NOT_FOUND`; removing a lesson release makes the next access request return `404 NOT_FOUND`.
+- [auto] An assigned teacher can access assets in student and TEACHER_ONLY lessons; an unassigned teacher -> expect `404 NOT_FOUND`.
+- [auto] An expired course subscription -> expect `403 SUBSCRIPTION_EXPIRED`; platform staff -> expect `403 FORBIDDEN`; malformed IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
+
 ## Course modules
 
 ### `POST /courses/:courseId/modules`

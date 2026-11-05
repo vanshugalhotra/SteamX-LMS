@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  AssetFileStatus,
   ContentStatus,
   DeliveryStatus,
   EnrollmentStatus,
@@ -30,6 +31,23 @@ const LEARNING_LESSON_SELECT = {
   status: true,
   audience: true,
 } satisfies Prisma.LessonSelect;
+
+const LEARNING_SERVABLE_ASSET_SELECT = {
+  type: true,
+  files: {
+    where: { status: AssetFileStatus.READY },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 1,
+    select: {
+      id: true,
+      assetId: true,
+      storageKey: true,
+      playbackKey: true,
+      originalFilename: true,
+      mimeType: true,
+    },
+  },
+} satisfies Prisma.AssetSelect;
 
 const STUDENT_COURSE_SELECT = {
   deliveryId: true,
@@ -99,6 +117,29 @@ export class LearningAccessRepository {
     return this.prisma.lesson.findFirst({
       where,
       select: LEARNING_LESSON_SELECT,
+    });
+  }
+
+  /** Loads a READY asset only when the requested lesson contains its block reference. */
+  async findServableAsset(lessonId: string, assetId: string) {
+    const asset = await this.prisma.asset.findFirst({
+      where: {
+        id: assetId,
+        status: { in: [ContentStatus.ACTIVE, ContentStatus.ARCHIVED] },
+        blocks: { some: { lessonId } },
+        files: { some: { status: AssetFileStatus.READY } },
+      },
+      select: LEARNING_SERVABLE_ASSET_SELECT,
+    });
+    const file = asset?.files[0];
+    return asset && file ? { type: asset.type, file } : null;
+  }
+
+  /** Reads the authenticated actor's school name for the learning watermark. */
+  findSchoolNameById(schoolId: string): Promise<{ name: string } | null> {
+    return this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true },
     });
   }
 
