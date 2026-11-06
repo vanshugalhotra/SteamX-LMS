@@ -25,15 +25,15 @@ in `apps/backend/src/common/`; feature rules stay in their feature modules.
 | `TenancyModule`                                 | Resolves active schools for scoped workflows.                                                     |
 | `CurriculumModule`                              | Global course/module/lesson authoring, ordering, outline reads, and lesson content.               |
 | `SubscriptionsModule`                           | Platform-managed school-course terms and shared course-access checks.                             |
-| `DeliveriesModule`                              | School course deliveries, scoped reads, and status changes.                                       |
+| `DeliveriesModule`                              | School course deliveries, teacher assignments, enrollments, lesson releases, and scoped reads.    |
+| `LearningModule`                                | Student course lists, outlines, progress, completion, lesson content, and lesson asset access.    |
 | `AssetsModule`                                  | Asset/file lifecycle, validation, processing, and author preview.                                 |
 | `StorageModule`                                 | S3 storage contract, presigned URLs, and queued object cleanup.                                   |
 | `PrismaModule`                                  | Configured Prisma client.                                                                         |
 | `HealthModule`, `LoggingModule`, `ConfigModule` | Liveness/readiness, request logging, and validated environment configuration.                     |
 
-Delivery APIs currently cover delivery creation, listing, detail reads, and status changes.
-Teacher assignments, lesson releases, enrollments, and assignments have schema tables but no API
-modules yet.
+Curriculum `Assignment` and `AssignmentTemplate` APIs are not implemented; their schema tables are
+present.
 
 ## Curriculum authoring
 
@@ -44,8 +44,9 @@ modules yet.
 - `CourseOutlineController` is a read-only aggregate over courses, modules, and lessons. It returns
   all statuses and lesson audiences; it is not the teacher/student delivery view.
 - `LessonContentController` serves the admin authoring read/write path. Reads return a block tree,
-  version, and asset summaries; saves validate and replace the full tree transactionally. Asset
-  summaries come from `AssetsService`; student-facing lesson reads are not implemented.
+  version, and asset summaries; saves validate and replace the full tree transactionally.
+- `LearningController` serves student course navigation, completion and progress, plus gated lesson
+  content and temporary asset access for enrolled students and assigned teachers.
 - The schema permits moving a lesson between modules in its current course, but there is no public
   API route for moving lessons.
 

@@ -308,6 +308,70 @@ active module with at least one ACTIVE STUDENT-audience lesson. Use an isolated 
 See the [API checklist](./api-testing.md#subscriptions) for the individual route contracts and
 covered cases.
 
+## Student learning session
+
+**Goal:** Verify a student can move through an enrolled course and that progress reflects completion.
+
+**Preconditions:** Active course subscription, ACTIVE delivery, active student with an ACTIVE
+enrollment, released ACTIVE STUDENT lesson with a READY asset referenced in its content.
+
+1. As the student, call `GET /api/v1/learning/courses`; confirm the delivery appears with
+   `subscriptionActive: true` and its eligible lesson counts.
+2. Read `GET /api/v1/learning/deliveries/:id/outline`; confirm the released lesson appears.
+3. Read `GET /api/v1/learning/deliveries/:id/lessons/:lessonId/content`; confirm its blocks and
+   safe asset summary.
+4. Request the referenced asset through
+   `GET /api/v1/learning/deliveries/:id/lessons/:lessonId/assets/:assetId/access`; confirm a
+   temporary URL with an expiry.
+5. Mark the lesson complete with
+   `PUT /api/v1/learning/deliveries/:id/lessons/:lessonId/completion`; reread progress and the
+   course list. Their counts must match, with completed lessons no greater than total lessons.
+
+## Lesson un-released during a student session
+
+**Goal:** Verify lesson visibility changes immediately without deleting a student's completion.
+
+**Preconditions:** The student session above has completed a released lesson. The teacher is
+actively assigned to the delivery and can manage releases.
+
+1. While the student session remains active, have the teacher remove the lesson release with
+   `DELETE /api/v1/deliveries/:id/releases/lessons/:lessonId`.
+2. The student's next content, asset-access, and completion requests for that lesson must each
+   return `404 NOT_FOUND`.
+3. Reread progress and the course list. Both totals and completed counts must drop for the hidden
+   lesson, while `completedLessons` remains no greater than `totalLessons`.
+4. Release the lesson again. The lesson returns to the total and its previous completion counts
+   again; the completion was retained while the lesson was hidden.
+
+## Subscription expires during a student session
+
+**Goal:** Verify read access stops on expiry and returns after renewal without losing progress.
+
+**Preconditions:** An active student enrollment in a delivery with released lessons and at least
+one recorded completion.
+
+1. Let the school-course subscription expire using the database business date, without changing
+   the student's session or enrollment.
+2. `GET /api/v1/learning/courses` must still list the enrolled course with
+   `subscriptionActive: false`.
+3. Requests for the delivery outline, lesson content, and referenced lesson asset must each return
+   `403 SUBSCRIPTION_EXPIRED`.
+4. Renew the subscription with `POST /api/v1/subscriptions/:id/renew`.
+5. Repeat the outline, content, and asset requests; expect normal access. Progress and the course
+   list must retain their pre-expiry totals and completion counts.
+
+## Student removed from a delivery
+
+**Goal:** Verify ending enrollment immediately removes access for the existing student session.
+
+**Preconditions:** An active student session with an ACTIVE enrollment in an ACTIVE delivery that
+has a released student lesson.
+
+1. As an authorized administrator, remove the student's enrollment with
+   `DELETE /api/v1/deliveries/:id/enrollments/:studentId`.
+2. On the next request, the student's course list must omit the delivery. Outline, progress,
+   content, asset-access, and completion requests for that delivery must return `404 NOT_FOUND`.
+
 ## Course authoring and lesson content
 
 **Preconditions:** Platform admin with `curriculum.read`, `curriculum.write`, `asset.read`, and
