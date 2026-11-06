@@ -121,7 +121,7 @@ export function CurriculumModulesSection({
               count={outline.modules.length}
               expanded={!collapsedModules.has(module.id)}
               reordering={reorderModules.isPending}
-              archiving={updateModuleStatus.isPending}
+              statusUpdating={updateModuleStatus.isPending}
               onToggle={() => {
                 toggleModule(module.id);
               }}
@@ -129,6 +129,10 @@ export function CurriculumModulesSection({
                 setModuleDialog(module);
               }}
               onMove={(direction) => moveModule(index, direction)}
+              onPublish={async () => {
+                await updateModuleStatus.mutateAsync({ id: module.id, status: 'ACTIVE' });
+                toast.success('Module published');
+              }}
               onArchive={async () => {
                 await updateModuleStatus.mutateAsync({ id: module.id, status: 'ARCHIVED' });
                 toast.success('Module archived');

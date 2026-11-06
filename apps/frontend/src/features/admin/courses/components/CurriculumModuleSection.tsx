@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, ArrowDown, ArrowUp, ChevronDown, Pencil } from 'lucide-react';
+import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, Pencil } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getErrorMessage } from '@/lib/api-errors';
@@ -14,10 +14,11 @@ interface CurriculumModuleSectionProps {
   count: number;
   expanded: boolean;
   reordering: boolean;
-  archiving: boolean;
+  statusUpdating: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onMove: (direction: -1 | 1) => Promise<void>;
+  onPublish: () => Promise<void>;
   onArchive: () => Promise<void>;
 }
 
@@ -27,15 +28,24 @@ export function CurriculumModuleSection({
   count,
   expanded,
   reordering,
-  archiving,
+  statusUpdating,
   onToggle,
   onEdit,
   onMove,
+  onPublish,
   onArchive,
 }: CurriculumModuleSectionProps) {
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmStatus, setConfirmStatus] = useState<'ACTIVE' | 'ARCHIVED' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const canArchive = module.status !== 'ARCHIVED';
+  const canPublish = module.status !== 'ACTIVE';
+  const publishLabel = module.status === 'ARCHIVED' ? 'Publish module again' : 'Publish module';
+  const confirmationTitle = confirmStatus === 'ACTIVE' ? 'Publish module?' : 'Archive module?';
+  const confirmationDescription =
+    confirmStatus === 'ACTIVE'
+      ? `“${module.title}” will be activated. The course must also be active before this module can be published.`
+      : `“${module.title}” and its active lessons will be archived. They will no longer be available for new use.`;
+  const confirmLabel = confirmStatus === 'ACTIVE' ? publishLabel : 'Archive module';
 
   const move = async (direction: -1 | 1) => {
     setActionError(null);
@@ -46,13 +56,15 @@ export function CurriculumModuleSection({
     }
   };
 
-  const archive = async () => {
+  const updateStatus = async () => {
+    if (!confirmStatus) return;
     setActionError(null);
     try {
-      await onArchive();
-      setConfirmArchive(false);
+      if (confirmStatus === 'ACTIVE') await onPublish();
+      else await onArchive();
+      setConfirmStatus(null);
     } catch (error) {
-      setConfirmArchive(false);
+      setConfirmStatus(null);
       setActionError(getErrorMessage(error));
     }
   };
@@ -92,6 +104,17 @@ export function CurriculumModuleSection({
           label={`Actions for module ${module.title}`}
           actions={[
             { label: 'Edit module', icon: Pencil, onSelect: onEdit },
+            ...(canPublish
+              ? [
+                  {
+                    label: publishLabel,
+                    icon: Check,
+                    onSelect: () => {
+                      setConfirmStatus('ACTIVE');
+                    },
+                  },
+                ]
+              : []),
             {
               label: 'Move up',
               icon: ArrowUp,
@@ -115,7 +138,7 @@ export function CurriculumModuleSection({
                     icon: Archive,
                     danger: true,
                     onSelect: () => {
-                      setConfirmArchive(true);
+                      setConfirmStatus('ARCHIVED');
                     },
                   },
                 ]
@@ -139,17 +162,17 @@ export function CurriculumModuleSection({
         )}
       </ol>
       <ConfirmDialog
-        open={confirmArchive}
-        title="Archive module?"
-        description={`“${module.title}” and its active lessons will be archived. They will no longer be available for new use.`}
-        confirmLabel="Archive module"
-        pending={archiving}
-        pendingLabel="Archiving…"
+        open={confirmStatus !== null}
+        title={confirmationTitle}
+        description={confirmationDescription}
+        confirmLabel={confirmLabel}
+        pending={statusUpdating}
+        pendingLabel={confirmStatus === 'ACTIVE' ? 'Publishing…' : 'Archiving…'}
         onConfirm={() => {
-          void archive();
+          void updateStatus();
         }}
         onCancel={() => {
-          if (!archiving) setConfirmArchive(false);
+          if (!statusUpdating) setConfirmStatus(null);
         }}
       />
     </section>

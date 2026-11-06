@@ -135,7 +135,7 @@ describe('CourseCurriculumPage', () => {
       '2',
     );
     expect(screen.getByText('How plants make food')).toBeInTheDocument();
-    expect(screen.getByText('Students')).toBeInTheDocument();
+    expect(screen.queryByText('Students')).not.toBeInTheDocument();
     expect(screen.getByText('Teachers only')).toBeInTheDocument();
   });
 
@@ -318,6 +318,30 @@ describe('CourseCurriculumPage', () => {
       id: 'module-1',
       status: 'ARCHIVED',
     });
+  });
+
+  it('publishes a draft module after confirmation', async () => {
+    const user = userEvent.setup();
+    mockOutline({
+      data: {
+        ...outline,
+        modules: [{ ...outline.modules[0], status: 'DRAFT' }],
+      },
+    });
+    updateModuleStatusMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Actions for module Plants & Energy' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Publish module' }));
+
+    expect(screen.getByText('Publish module?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm Publish module' }));
+
+    expect(updateModuleStatusMutateAsync).toHaveBeenCalledWith({
+      id: 'module-1',
+      status: 'ACTIVE',
+    });
+    expect(toastSuccess).toHaveBeenCalledWith('Module published');
   });
 
   it('shows a loading state while the outline is loading', () => {
