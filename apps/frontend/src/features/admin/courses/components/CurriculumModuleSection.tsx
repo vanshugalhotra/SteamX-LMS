@@ -51,16 +51,22 @@ export function CurriculumModuleSection({
   lessonStatusUpdating,
 }: CurriculumModuleSectionProps) {
   const [confirmStatus, setConfirmStatus] = useState<'ACTIVE' | 'ARCHIVED' | null>(null);
+  const [lessonStatusAction, setLessonStatusAction] = useState<{
+    lesson: CourseOutlineLesson;
+    status: 'ACTIVE' | 'ARCHIVED';
+  } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const canArchive = module.status !== 'ARCHIVED';
   const canPublish = module.status !== 'ACTIVE';
   const publishLabel = module.status === 'ARCHIVED' ? 'Publish module again' : 'Publish module';
+  const lessonStatusTitle = lessonStatusAction ? lessonStatusAction.lesson.title : '';
   const confirmationTitle = confirmStatus === 'ACTIVE' ? 'Publish module?' : 'Archive module?';
   const confirmationDescription =
     confirmStatus === 'ACTIVE'
       ? `“${module.title}” will be activated. The course must also be active before this module can be published.`
       : `“${module.title}” and its active lessons will be archived. They will no longer be available for new use.`;
   const confirmLabel = confirmStatus === 'ACTIVE' ? publishLabel : 'Archive module';
+  const isLessonPublishing = lessonStatusAction?.status === 'ACTIVE';
 
   const move = async (direction: -1 | 1) => {
     setActionError(null);
@@ -80,6 +86,19 @@ export function CurriculumModuleSection({
       setConfirmStatus(null);
     } catch (error) {
       setConfirmStatus(null);
+      setActionError(getErrorMessage(error));
+    }
+  };
+
+  const updateLessonStatus = async () => {
+    if (!lessonStatusAction) return;
+    setActionError(null);
+    try {
+      if (isLessonPublishing) await onPublishLesson(lessonStatusAction.lesson);
+      else await onArchiveLesson(lessonStatusAction.lesson);
+      setLessonStatusAction(null);
+    } catch (error) {
+      setLessonStatusAction(null);
       setActionError(getErrorMessage(error));
     }
   };
@@ -189,17 +208,15 @@ export function CurriculumModuleSection({
               index={lessonIndex}
               count={module.lessons.length}
               reordering={lessonReordering}
-              statusUpdating={lessonStatusUpdating}
               onEdit={() => {
                 onEditLesson(lesson);
               }}
               onMove={async (direction) => {
                 await onMoveLesson(lessonIndex, direction);
               }}
-              onPublish={async () => {
-                await onPublishLesson(lesson);
+              onRequestStatus={(status) => {
+                setLessonStatusAction({ lesson, status });
               }}
-              onArchive={() => onArchiveLesson(lesson)}
             />
           ))
         )}
@@ -216,6 +233,24 @@ export function CurriculumModuleSection({
         }}
         onCancel={() => {
           if (!statusUpdating) setConfirmStatus(null);
+        }}
+      />
+      <ConfirmDialog
+        open={lessonStatusAction !== null}
+        title={isLessonPublishing ? 'Publish lesson?' : 'Archive lesson?'}
+        description={
+          isLessonPublishing
+            ? `“${lessonStatusTitle}” will be activated. Its module must also be active before this lesson can be published.`
+            : `“${lessonStatusTitle}” will be archived and no longer available for new use.`
+        }
+        confirmLabel={isLessonPublishing ? 'Publish lesson' : 'Archive lesson'}
+        pending={lessonStatusUpdating}
+        pendingLabel={isLessonPublishing ? 'Publishing…' : 'Archiving…'}
+        onConfirm={() => {
+          void updateLessonStatus();
+        }}
+        onCancel={() => {
+          if (!lessonStatusUpdating) setLessonStatusAction(null);
         }}
       />
     </section>
