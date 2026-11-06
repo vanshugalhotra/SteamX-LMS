@@ -57,9 +57,7 @@ export function CourseStatusSection({
         variant="secondary"
         className={
           compact
-            ? status === 'ACTIVE'
-              ? 'rounded-full bg-gray-900 text-white hover:bg-gray-800'
-              : 'rounded-full border border-white bg-white text-indigo-950 hover:bg-gray-100'
+            ? 'rounded-full border border-white bg-white text-brand-navy hover:bg-gray-100'
             : 'w-full justify-center rounded-full'
         }
         disabled={updateStatus.isPending}

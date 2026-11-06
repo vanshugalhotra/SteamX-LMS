@@ -16,27 +16,10 @@ vi.mock('../queries', () => ({
   useUpdateCourseStatus: () => ({ mutateAsync: updateStatusMutateAsync, isPending: false }),
 }));
 
-vi.mock('@/components/ui/confirm-dialog', () => ({
-  ConfirmDialog: ({
-    open,
-    confirmLabel,
-    title,
-    onConfirm,
-  }: {
-    open: boolean;
-    confirmLabel: string;
-    title: string;
-    onConfirm: () => void;
-  }) =>
-    open ? (
-      <>
-        <p>{title}</p>
-        <button type="button" onClick={onConfirm}>
-          Confirm {confirmLabel}
-        </button>
-      </>
-    ) : null,
-}));
+vi.mock('@/components/ui/confirm-dialog', async () => {
+  const { ConfirmDialogMock } = await import('@/test/mocks/confirm-dialog');
+  return { ConfirmDialog: ConfirmDialogMock };
+});
 
 import { CourseStatusSection } from './CourseStatusSection';
 
@@ -105,7 +88,7 @@ describe('CourseStatusSection', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Course published');
   });
 
-  it('shows compact-mode errors on a separate full-width row', async () => {
+  it('shows compact-mode errors', async () => {
     const user = userEvent.setup();
     updateStatusMutateAsync.mockRejectedValue(new Error('Request failed'));
 
@@ -114,6 +97,6 @@ describe('CourseStatusSection', () => {
     await user.click(screen.getByRole('button', { name: 'Archive' }));
     await user.click(screen.getByRole('button', { name: 'Confirm Archive' }));
 
-    expect(screen.getByRole('alert')).toHaveClass('basis-full');
+    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
   });
 });

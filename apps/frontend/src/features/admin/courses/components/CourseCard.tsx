@@ -108,7 +108,7 @@ export function CourseCard({ course }: { course: Course }) {
               onClick={() => {
                 setMenuOpen(false);
               }}
-              className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium text-gray-800 outline-none hover:bg-gray-100 focus:bg-gray-100"
+              className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium text-brand-navy outline-none hover:bg-gray-100 focus:bg-gray-100"
             >
               <Pencil className="size-3.5" aria-hidden="true" />
               Edit course
@@ -127,7 +127,7 @@ export function CourseCard({ course }: { course: Course }) {
                     'flex h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium outline-none',
                     status === 'ARCHIVED'
                       ? 'text-danger hover:bg-danger-soft focus:bg-danger-soft'
-                      : 'text-gray-800 hover:bg-gray-100 focus:bg-gray-100',
+                      : 'text-brand-navy hover:bg-gray-100 focus:bg-gray-100',
                   )}
                 >
                   <Icon className="size-3.5" aria-hidden="true" />
