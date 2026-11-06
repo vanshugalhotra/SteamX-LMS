@@ -28,7 +28,7 @@ export function ActionMenu({ label, actions }: { label: string; actions: MenuAct
                 key={actionLabel}
                 disabled={disabled}
                 onClick={onSelect}
-                className={`flex h-9 cursor-default items-center gap-2 rounded-lg px-3 text-xs font-medium outline-none data-[highlighted]:bg-brand-chip data-[disabled]:opacity-50 ${
+                className={`flex h-9 cursor-default items-center gap-2 rounded-lg px-3 text-xs font-medium outline-none data-highlighted:bg-brand-chip data-disabled:opacity-50 ${
                   danger ? 'text-danger' : 'text-brand-navy'
                 }`}
               >

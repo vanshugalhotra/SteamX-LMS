@@ -2,14 +2,21 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import type { CourseOutline, CourseOutlineModule } from '../model/types';
+import type { CourseOutline, CourseOutlineModule, CourseOutlineLesson } from '../model/types';
 import {
   useCreateCourseModule,
   useReorderCourseModules,
   useUpdateCourseModule,
   useUpdateCourseModuleStatus,
 } from '@/features/admin/modules/queries';
+import {
+  useCreateLesson,
+  useReorderLessons,
+  useUpdateLesson,
+  useUpdateLessonStatus,
+} from '@/features/admin/modules/lessons/queries';
 import { CurriculumModuleSection } from './CurriculumModuleSection';
+import { LessonFormDialog } from './LessonFormDialog';
 import { ModuleFormDialog } from './ModuleFormDialog';
 
 function moveItem<T>(items: readonly T[], from: number, to: number): T[] {
@@ -31,13 +38,22 @@ export function CurriculumModulesSection({
   setModuleDialog: (dialog: CourseOutlineModule | 'new' | null) => void;
 }) {
   const [collapsedModules, setCollapsedModules] = useState(() => new Set<string>());
+  const [lessonDialog, setLessonDialog] = useState<{
+    moduleId: string;
+    lesson: CourseOutlineLesson | null;
+  } | null>(null);
   const createModule = useCreateCourseModule();
   const updateModule = useUpdateCourseModule();
   const updateModuleStatus = useUpdateCourseModuleStatus();
   const reorderModules = useReorderCourseModules();
+  const updateLesson = useUpdateLesson();
+  const createLesson = useCreateLesson();
+  const updateLessonStatus = useUpdateLessonStatus();
+  const reorderLessons = useReorderLessons();
   const allExpanded = outline.modules.every((module) => !collapsedModules.has(module.id));
   const moduleMutationPending =
     createModule.isPending || updateModule.isPending || updateModuleStatus.isPending;
+  const lessonMutationPending = updateLesson.isPending || createLesson.isPending;
 
   const toggleModule = (moduleId: string) => {
     setCollapsedModules((current) => {
@@ -69,6 +85,36 @@ export function CurriculumModulesSection({
     await reorderModules.mutateAsync({
       courseId: outline.course.id,
       body: { moduleIds: reordered.map((module) => module.id) },
+    });
+  };
+
+  const saveLesson = async (title: string, audience: CourseOutlineLesson['audience']) => {
+    if (!lessonDialog) return;
+    if (lessonDialog.lesson) {
+      await updateLesson.mutateAsync({
+        id: lessonDialog.lesson.id,
+        body: { title, audience },
+      });
+      toast.success('Lesson updated');
+    } else {
+      await createLesson.mutateAsync({
+        moduleId: lessonDialog.moduleId,
+        body: { title, audience },
+      });
+      toast.success('Lesson added as Draft');
+    }
+  };
+
+  const moveLesson = async (
+    moduleId: string,
+    lessons: CourseOutlineLesson[],
+    index: number,
+    direction: -1 | 1,
+  ) => {
+    const reordered = moveItem(lessons, index, index + direction);
+    await reorderLessons.mutateAsync({
+      moduleId,
+      body: { lessonIds: reordered.map((lesson) => lesson.id) },
     });
   };
 
@@ -128,6 +174,9 @@ export function CurriculumModulesSection({
               onEdit={() => {
                 setModuleDialog(module);
               }}
+              onAddLesson={() => {
+                setLessonDialog({ moduleId: module.id, lesson: null });
+              }}
               onMove={(direction) => moveModule(index, direction)}
               onPublish={async () => {
                 await updateModuleStatus.mutateAsync({ id: module.id, status: 'ACTIVE' });
@@ -137,6 +186,22 @@ export function CurriculumModulesSection({
                 await updateModuleStatus.mutateAsync({ id: module.id, status: 'ARCHIVED' });
                 toast.success('Module archived');
               }}
+              onEditLesson={(lesson) => {
+                setLessonDialog({ moduleId: module.id, lesson });
+              }}
+              onMoveLesson={(lessonIndex, direction) =>
+                moveLesson(module.id, module.lessons, lessonIndex, direction)
+              }
+              onPublishLesson={async (lesson) => {
+                await updateLessonStatus.mutateAsync({ id: lesson.id, status: 'ACTIVE' });
+                toast.success('Lesson published');
+              }}
+              onArchiveLesson={async (lesson) => {
+                await updateLessonStatus.mutateAsync({ id: lesson.id, status: 'ARCHIVED' });
+                toast.success('Lesson archived');
+              }}
+              lessonReordering={reorderLessons.isPending}
+              lessonStatusUpdating={updateLessonStatus.isPending}
             />
           ))}
         </div>
@@ -148,6 +213,17 @@ export function CurriculumModulesSection({
           onSave={saveModule}
           onClose={() => {
             setModuleDialog(null);
+          }}
+        />
+      )}
+      {lessonDialog && (
+        <LessonFormDialog
+          key={lessonDialog.lesson?.id ?? lessonDialog.moduleId}
+          lesson={lessonDialog.lesson}
+          pending={lessonMutationPending}
+          onSave={saveLesson}
+          onClose={() => {
+            setLessonDialog(null);
           }}
         />
       )}
