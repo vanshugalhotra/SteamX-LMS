@@ -657,6 +657,19 @@ describe('Student learning navigation (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  function getProgress(cookie: string, deliveryId: string) {
+    return request(app.getHttpServer())
+      .get(`/api/v1/learning/deliveries/${deliveryId}/progress`)
+      .set('Cookie', cookie);
+  }
+
+  function completeLesson(cookie: string, deliveryId: string, lessonId: string) {
+    return request(app.getHttpServer())
+      .put(`/api/v1/learning/deliveries/${deliveryId}/lessons/${lessonId}/completion`)
+      .set('Origin', origin)
+      .set('Cookie', cookie);
+  }
+
   function getLessonContent(cookie: string, deliveryId: string, lessonId: string) {
     return request(app.getHttpServer())
       .get(`/api/v1/learning/deliveries/${deliveryId}/lessons/${lessonId}/content`)
@@ -687,6 +700,13 @@ describe('Student learning navigation (e2e)', () => {
   function unreleaseLesson(deliveryId: string, lessonId: string) {
     return request(app.getHttpServer())
       .delete(`/api/v1/deliveries/${deliveryId}/releases/lessons/${lessonId}`)
+      .set('Origin', origin)
+      .set('Cookie', adminCookie);
+  }
+
+  function releaseLesson(deliveryId: string, lessonId: string) {
+    return request(app.getHttpServer())
+      .put(`/api/v1/deliveries/${deliveryId}/releases/lessons/${lessonId}`)
       .set('Origin', origin)
       .set('Cookie', adminCookie);
   }
@@ -811,6 +831,246 @@ describe('Student learning navigation (e2e)', () => {
     expect(second.body).toMatchObject({ page: 2, limit: 1, total: 3 });
     expect(first.body.items[0].deliveryId).toBe(deliveries.firstYear);
     expect(second.body.items[0].deliveryId).toBe(deliveries.secondYear);
+  });
+
+  it('returns released lesson progress grouped by module and consistent with course counts', async () => {
+    const progress = await getProgress(studentCookie, deliveries.firstYear).expect(200);
+    expect(Object.keys(progress.body).sort()).toEqual(
+      ['completedLessons', 'deliveryId', 'modules', 'totalLessons'].sort(),
+    );
+    expect(progress.body).toMatchObject({
+      deliveryId: deliveries.firstYear,
+      totalLessons: 3,
+      completedLessons: 1,
+    });
+    expect(progress.body.modules).toEqual([
+      {
+        moduleId: outlineModuleId,
+        title: 'Visible module',
+        position: 2,
+        totalLessons: 2,
+        completedLessons: 1,
+      },
+      {
+        moduleId: archivedModuleId,
+        title: 'Archived module',
+        position: 4,
+        totalLessons: 1,
+        completedLessons: 0,
+      },
+    ]);
+    expect(
+      progress.body.modules.some((module: { title: string }) => module.title === 'Empty module'),
+    ).toBe(false);
+    for (const module of progress.body.modules) {
+      expect(Object.keys(module).sort()).toEqual(
+        ['completedLessons', 'moduleId', 'position', 'title', 'totalLessons'].sort(),
+      );
+    }
+
+    const courseList = await getCourses(studentCookie).expect(200);
+    const course = courseList.body.items.find(
+      (item: { deliveryId: string }) => item.deliveryId === deliveries.firstYear,
+    );
+    expect(course).toMatchObject({
+      totalLessons: progress.body.totalLessons,
+      completedLessons: progress.body.completedLessons,
+    });
+
+    await enroll(deliveries.firstYear, unenrolledStudent.id, fixture.schoolA.school.id);
+    try {
+      await prisma.lessonCompletion.create({
+        data: {
+          schoolId: fixture.schoolA.school.id,
+          deliveryId: deliveries.firstYear,
+          studentId: unenrolledStudent.id,
+          lessonId: archivedLessonId,
+          courseId: alphaCourseId,
+        },
+      });
+      const afterPeerCompletion = await getProgress(studentCookie, deliveries.firstYear).expect(
+        200,
+      );
+      expect(afterPeerCompletion.body.completedLessons).toBe(1);
+    } finally {
+      await prisma.lessonCompletion.deleteMany({
+        where: {
+          deliveryId: deliveries.firstYear,
+          studentId: unenrolledStudent.id,
+        },
+      });
+      await prisma.deliveryEnrollment.deleteMany({
+        where: { deliveryId: deliveries.firstYear, studentId: unenrolledStudent.id },
+      });
+    }
+  });
+
+  it('keeps completion rows while un-released lessons stop counting in progress', async () => {
+    try {
+      await unreleaseLesson(deliveries.firstYear, activeLessonId).expect(204);
+      const afterCompletedUnrelease = await getProgress(studentCookie, deliveries.firstYear).expect(
+        200,
+      );
+      expect(afterCompletedUnrelease.body).toMatchObject({
+        totalLessons: 2,
+        completedLessons: 0,
+      });
+      expect(
+        await prisma.lessonCompletion.count({
+          where: {
+            deliveryId: deliveries.firstYear,
+            studentId: fixture.schoolA.student.id,
+            lessonId: activeLessonId,
+          },
+        }),
+      ).toBe(1);
+      await releaseLesson(deliveries.firstYear, activeLessonId).expect(200);
+      const afterRerelease = await getProgress(studentCookie, deliveries.firstYear).expect(200);
+      expect(afterRerelease.body).toMatchObject({ totalLessons: 3, completedLessons: 1 });
+
+      await releaseLesson(deliveries.firstYear, unreleasedLessonId).expect(200);
+      const afterIncompleteRelease = await getProgress(studentCookie, deliveries.firstYear).expect(
+        200,
+      );
+      expect(afterIncompleteRelease.body).toMatchObject({
+        totalLessons: 4,
+        completedLessons: 1,
+      });
+      await unreleaseLesson(deliveries.firstYear, unreleasedLessonId).expect(204);
+      const afterIncompleteUnrelease = await getProgress(
+        studentCookie,
+        deliveries.firstYear,
+      ).expect(200);
+      expect(afterIncompleteUnrelease.body).toMatchObject({
+        totalLessons: 3,
+        completedLessons: 1,
+      });
+    } finally {
+      const activeRelease = await prisma.deliveryLessonRelease.findUnique({
+        where: {
+          deliveryId_lessonId: {
+            deliveryId: deliveries.firstYear,
+            lessonId: activeLessonId,
+          },
+        },
+        select: { lessonId: true },
+      });
+      if (!activeRelease) {
+        await releaseLesson(deliveries.firstYear, activeLessonId).expect(200);
+      }
+      const temporaryRelease = await prisma.deliveryLessonRelease.findUnique({
+        where: {
+          deliveryId_lessonId: {
+            deliveryId: deliveries.firstYear,
+            lessonId: unreleasedLessonId,
+          },
+        },
+        select: { lessonId: true },
+      });
+      if (temporaryRelease) {
+        await unreleaseLesson(deliveries.firstYear, unreleasedLessonId).expect(204);
+      }
+    }
+  });
+
+  it('creates completions once, preserves the first timestamp, and supports concurrent and archived calls', async () => {
+    try {
+      await releaseLesson(deliveries.firstYear, unreleasedLessonId).expect(200);
+      const first = await completeLesson(
+        studentCookie,
+        deliveries.firstYear,
+        archivedLessonId,
+      ).expect(200);
+      const repeated = await completeLesson(
+        studentCookie,
+        deliveries.firstYear,
+        archivedLessonId,
+      ).expect(200);
+      expect(Object.keys(first.body).sort()).toEqual(
+        ['completed', 'completedAt', 'lessonId'].sort(),
+      );
+      expect(first.body).toEqual({
+        lessonId: archivedLessonId,
+        completed: true,
+        completedAt: repeated.body.completedAt,
+      });
+      expect(
+        await prisma.lessonCompletion.count({
+          where: {
+            deliveryId: deliveries.firstYear,
+            studentId: fixture.schoolA.student.id,
+            lessonId: archivedLessonId,
+          },
+        }),
+      ).toBe(1);
+
+      const parallel = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          completeLesson(studentCookie, deliveries.firstYear, unreleasedLessonId).expect(200),
+        ),
+      );
+      expect(new Set(parallel.map(({ body }) => body.completedAt)).size).toBe(1);
+      expect(
+        await prisma.lessonCompletion.count({
+          where: {
+            deliveryId: deliveries.firstYear,
+            studentId: fixture.schoolA.student.id,
+            lessonId: unreleasedLessonId,
+          },
+        }),
+      ).toBe(1);
+    } finally {
+      await prisma.lessonCompletion.deleteMany({
+        where: {
+          deliveryId: deliveries.firstYear,
+          studentId: fixture.schoolA.student.id,
+          lessonId: { in: [archivedLessonId, unreleasedLessonId] },
+        },
+      });
+      await unreleaseLesson(deliveries.firstYear, unreleasedLessonId).expect(204);
+    }
+  });
+
+  it('applies student visibility, subscription, permission, and authentication checks to progress and completion', async () => {
+    try {
+      await enroll(deliveries.noRelease, fixture.schoolA.student.id, fixture.schoolA.school.id);
+      const emptyProgress = await getProgress(studentCookie, deliveries.noRelease).expect(200);
+      expect(emptyProgress.body).toMatchObject({
+        deliveryId: deliveries.noRelease,
+        totalLessons: 0,
+        completedLessons: 0,
+        modules: [],
+      });
+      await completeLesson(studentCookie, deliveries.firstYear, unreleasedLessonId).expect(404);
+      await completeLesson(studentCookie, deliveries.firstYear, teacherOnlyLessonId).expect(404);
+      await completeLesson(studentCookie, deliveries.firstYear, draftLessonId).expect(404);
+      await completeLesson(studentCookie, deliveries.noRelease, activeLessonId).expect(404);
+      await completeLesson(studentCookie, deliveries.foreign, activeLessonId).expect(404);
+      await completeLesson(studentCookie, deliveries.removed, activeLessonId).expect(404);
+      await completeLesson(unenrolledCookie, deliveries.firstYear, activeLessonId).expect(404);
+      const expired = await completeLesson(
+        studentCookie,
+        deliveries.expired,
+        expiredLessonId,
+      ).expect(403);
+      expect(expired.body.code).toBe('SUBSCRIPTION_EXPIRED');
+      await completeLesson(teacherCookie, deliveries.firstYear, activeLessonId).expect(403);
+      await completeLesson(adminCookie, deliveries.firstYear, activeLessonId).expect(403);
+      await completeLesson('', deliveries.firstYear, activeLessonId).expect(401);
+
+      await getProgress(studentCookie, deliveries.foreign).expect(404);
+      await getProgress(studentCookie, deliveries.removed).expect(404);
+      await getProgress(unenrolledCookie, deliveries.firstYear).expect(404);
+      const expiredProgress = await getProgress(studentCookie, deliveries.expired).expect(403);
+      expect(expiredProgress.body.code).toBe('SUBSCRIPTION_EXPIRED');
+      await getProgress(teacherCookie, deliveries.firstYear).expect(403);
+      await getProgress(adminCookie, deliveries.firstYear).expect(403);
+      await getProgress('', deliveries.firstYear).expect(401);
+    } finally {
+      await prisma.deliveryEnrollment.deleteMany({
+        where: { deliveryId: deliveries.noRelease, studentId: fixture.schoolA.student.id },
+      });
+    }
   });
 
   it('returns 403 for teacher and platform staff, and 401 without authentication', async () => {
