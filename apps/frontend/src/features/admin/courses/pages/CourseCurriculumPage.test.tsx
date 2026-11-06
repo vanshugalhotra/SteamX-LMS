@@ -12,6 +12,10 @@ const {
   updateModuleMutateAsync,
   updateModuleStatusMutateAsync,
   reorderModulesMutateAsync,
+  updateLessonMutateAsync,
+  createLessonMutateAsync,
+  updateLessonStatusMutateAsync,
+  reorderLessonsMutateAsync,
   toastSuccess,
 } = vi.hoisted(() => ({
   useCourseOutlineMock: vi.fn(),
@@ -20,6 +24,10 @@ const {
   updateModuleMutateAsync: vi.fn(),
   updateModuleStatusMutateAsync: vi.fn(),
   reorderModulesMutateAsync: vi.fn(),
+  updateLessonMutateAsync: vi.fn(),
+  createLessonMutateAsync: vi.fn(),
+  updateLessonStatusMutateAsync: vi.fn(),
+  reorderLessonsMutateAsync: vi.fn(),
   toastSuccess: vi.fn(),
 }));
 
@@ -36,6 +44,15 @@ vi.mock('@/features/admin/modules/queries', () => ({
     isPending: false,
   }),
   useReorderCourseModules: () => ({ mutateAsync: reorderModulesMutateAsync, isPending: false }),
+}));
+vi.mock('@/features/admin/modules/lessons/queries', () => ({
+  useCreateLesson: () => ({ mutateAsync: createLessonMutateAsync, isPending: false }),
+  useUpdateLesson: () => ({ mutateAsync: updateLessonMutateAsync, isPending: false }),
+  useUpdateLessonStatus: () => ({
+    mutateAsync: updateLessonStatusMutateAsync,
+    isPending: false,
+  }),
+  useReorderLessons: () => ({ mutateAsync: reorderLessonsMutateAsync, isPending: false }),
 }));
 vi.mock('@/components/ui/confirm-dialog', async () => {
   const { ConfirmDialogMock } = await import('@/test/mocks/confirm-dialog');
@@ -119,6 +136,10 @@ describe('CourseCurriculumPage', () => {
     updateModuleMutateAsync.mockReset();
     updateModuleStatusMutateAsync.mockReset();
     reorderModulesMutateAsync.mockReset();
+    updateLessonMutateAsync.mockReset();
+    createLessonMutateAsync.mockReset();
+    updateLessonStatusMutateAsync.mockReset();
+    reorderLessonsMutateAsync.mockReset();
     toastSuccess.mockReset();
   });
 
@@ -301,6 +322,166 @@ describe('CourseCurriculumPage', () => {
       courseId: 'course-1',
       body: { moduleIds: ['module-2', 'module-1'] },
     });
+  });
+
+  it('offers lesson-specific actions in each lesson menu', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+
+    renderPage();
+
+    expect(
+      screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Actions for lesson Teaching notes: lab setup' }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Edit lesson' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Move down' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Archive lesson' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Publish lesson' })).not.toBeInTheDocument();
+  });
+
+  it('publishes a draft lesson after confirmation', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+    updateLessonStatusMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for lesson Teaching notes: lab setup' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Publish lesson' }));
+
+    expect(screen.getByText('Publish lesson?')).toBeInTheDocument();
+    expect(screen.getByText(/module must also be active/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm Publish lesson' }));
+
+    expect(updateLessonStatusMutateAsync).toHaveBeenCalledWith({
+      id: 'lesson-2',
+      status: 'ACTIVE',
+    });
+    expect(toastSuccess).toHaveBeenCalledWith('Lesson published');
+  });
+
+  it('allows archived lessons to be published again', async () => {
+    const user = userEvent.setup();
+    mockOutline({
+      data: {
+        ...outline,
+        modules: [
+          {
+            ...outline.modules[0],
+            lessons: [{ ...outline.modules[0].lessons[0], status: 'ARCHIVED' }],
+          },
+        ],
+      },
+    });
+
+    renderPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
+    );
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'Publish lesson again' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Archive lesson' })).not.toBeInTheDocument();
+  });
+
+  it('edits a lesson title and audience from its action menu', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+    updateLessonMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit lesson' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Title' }));
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Plant energy');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Audience' }), 'TEACHER_ONLY');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(updateLessonMutateAsync).toHaveBeenCalledWith({
+      id: 'lesson-1',
+      body: { title: 'Plant energy', audience: 'TEACHER_ONLY' },
+    });
+    expect(toastSuccess).toHaveBeenCalledWith('Lesson updated');
+  });
+
+  it('adds a draft lesson to the selected module', async () => {
+    const user = userEvent.setup();
+    mockOutline({
+      data: {
+        ...outline,
+        modules: [{ ...outline.modules[0], lessons: [] }],
+      },
+    });
+    createLessonMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Add lesson' }));
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Plant energy');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Audience' }), 'TEACHER_ONLY');
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Add lesson' }),
+    );
+
+    expect(createLessonMutateAsync).toHaveBeenCalledWith({
+      moduleId: 'module-1',
+      body: { title: 'Plant energy', audience: 'TEACHER_ONLY' },
+    });
+    expect(toastSuccess).toHaveBeenCalledWith('Lesson added as Draft');
+  });
+
+  it('reorders lessons using the complete module lesson order', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+    reorderLessonsMutateAsync.mockResolvedValue([]);
+
+    renderPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Move down' }));
+
+    expect(reorderLessonsMutateAsync).toHaveBeenCalledWith({
+      moduleId: 'module-1',
+      body: { lessonIds: ['lesson-2', 'lesson-1'] },
+    });
+  });
+
+  it('confirms before archiving a lesson', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+    updateLessonStatusMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive lesson' }));
+    expect(screen.getByText('Archive lesson?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm Archive lesson' }));
+
+    expect(updateLessonStatusMutateAsync).toHaveBeenCalledWith({
+      id: 'lesson-1',
+      status: 'ARCHIVED',
+    });
+    expect(toastSuccess).toHaveBeenCalledWith('Lesson archived');
   });
 
   it('confirms before archiving a module', async () => {

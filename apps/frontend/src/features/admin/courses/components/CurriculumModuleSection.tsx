@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, Pencil } from 'lucide-react';
+import { Archive, ArrowDown, ArrowUp, Check, ChevronDown, Pencil, Plus } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getErrorMessage } from '@/lib/api-errors';
-import type { CourseOutlineModule } from '../model/types';
+import type { CourseOutlineModule, CourseOutlineLesson } from '../model/types';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { CurriculumLessonRow } from './CurriculumLessonRow';
 import { CourseStatusBadge } from './CourseStatusBadge';
@@ -17,9 +18,16 @@ interface CurriculumModuleSectionProps {
   statusUpdating: boolean;
   onToggle: () => void;
   onEdit: () => void;
+  onAddLesson: () => void;
   onMove: (direction: -1 | 1) => Promise<void>;
   onPublish: () => Promise<void>;
   onArchive: () => Promise<void>;
+  onEditLesson: (lesson: CourseOutlineLesson) => void;
+  onMoveLesson: (lessonIndex: number, direction: -1 | 1) => Promise<void>;
+  onPublishLesson: (lesson: CourseOutlineLesson) => Promise<void>;
+  onArchiveLesson: (lesson: CourseOutlineLesson) => Promise<void>;
+  lessonReordering: boolean;
+  lessonStatusUpdating: boolean;
 }
 
 export function CurriculumModuleSection({
@@ -31,9 +39,16 @@ export function CurriculumModuleSection({
   statusUpdating,
   onToggle,
   onEdit,
+  onAddLesson,
   onMove,
   onPublish,
   onArchive,
+  onEditLesson,
+  onMoveLesson,
+  onPublishLesson,
+  onArchiveLesson,
+  lessonReordering,
+  lessonStatusUpdating,
 }: CurriculumModuleSectionProps) {
   const [confirmStatus, setConfirmStatus] = useState<'ACTIVE' | 'ARCHIVED' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -100,6 +115,17 @@ export function CurriculumModuleSection({
           </p>
         </div>
         <CourseStatusBadge status={module.status} />
+        {module.status !== 'ARCHIVED' && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={onAddLesson}
+            className="rounded-full flex items-center gap-1.5 border border-gray-200 bg-white text-brand-navy hover:bg-gray-100"
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+            Add lesson
+          </Button>
+        )}
         <ActionMenu
           label={`Actions for module ${module.title}`}
           actions={[
@@ -157,7 +183,24 @@ export function CurriculumModuleSection({
           </li>
         ) : (
           module.lessons.map((lesson, lessonIndex) => (
-            <CurriculumLessonRow key={lesson.id} lesson={lesson} index={lessonIndex} />
+            <CurriculumLessonRow
+              key={lesson.id}
+              lesson={lesson}
+              index={lessonIndex}
+              count={module.lessons.length}
+              reordering={lessonReordering}
+              statusUpdating={lessonStatusUpdating}
+              onEdit={() => {
+                onEditLesson(lesson);
+              }}
+              onMove={async (direction) => {
+                await onMoveLesson(lessonIndex, direction);
+              }}
+              onPublish={async () => {
+                await onPublishLesson(lesson);
+              }}
+              onArchive={() => onArchiveLesson(lesson)}
+            />
           ))
         )}
       </ol>
