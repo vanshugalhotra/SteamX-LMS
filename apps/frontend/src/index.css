@@ -4,19 +4,31 @@
   --color-*: initial;
   --color-white: #ffffff;
   --color-ink: #111118;
+  --color-brand-navy: #231d54;
+  --color-brand-teal: var(--color-teal-500);
+  --color-brand-coral: var(--color-coral-500);
+  --color-brand-sun: var(--color-yellow-500);
+  --color-brand-active-ink: #1f6b5b;
+  --color-brand-side: #f8f8fa;
+  --color-brand-chip: #f3f4f6;
+  --color-brand-line: #e4e5ee;
+  --color-brand-student: #e9e6fa;
+  --color-brand-student-ink: #4a3fb0;
+  --color-brand-draft: #fdf1cc;
+  --color-brand-draft-ink: #8a6100;
 
   --color-gray-50: #f8f8f8;
   --color-gray-100: #f1f1f4;
   --color-gray-200: #e8e8ee;
   --color-gray-400: #a8a8b5;
   --color-gray-600: #65647c;
-  --color-gray-900: #1f1b4e;
+  --color-gray-900: var(--color-brand-navy);
 
   --color-coral-100: #fde9e5;
   --color-coral-200: #fad2ca;
   --color-coral-300: #f6b5a8;
   --color-coral-400: #f29887;
-  --color-coral-500: #ee7b65;
+  --color-coral-500: #ee7357;
   --color-coral-600: #dc6550;
   --color-coral-700: #c9503a;
   --color-coral-800: #a33b26;
@@ -26,7 +38,7 @@
   --color-teal-200: #cbe8e1;
   --color-teal-300: #aedacf;
   --color-teal-400: #8cc9bc;
-  --color-teal-500: #6db8a8;
+  --color-teal-500: #6dbaa9;
   --color-teal-600: #4f9a8a;
   --color-teal-700: #3a7f70;
   --color-teal-800: #2b6357;
@@ -36,7 +48,7 @@
   --color-yellow-200: #fbe8b7;
   --color-yellow-300: #f8d98e;
   --color-yellow-400: #f5c964;
-  --color-yellow-500: #f2b93b;
+  --color-yellow-500: #f2c13e;
   --color-yellow-600: #d79e22;
   --color-yellow-700: #b8800f;
   --color-yellow-800: #8f6409;

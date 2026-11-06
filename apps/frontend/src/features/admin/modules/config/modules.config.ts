@@ -1,0 +1,1 @@
+export const COURSE_MODULE_TITLE_MAX_LENGTH = 200;

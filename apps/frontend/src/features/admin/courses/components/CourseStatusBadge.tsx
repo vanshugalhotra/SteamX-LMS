@@ -4,5 +4,9 @@ import { courseStatuses } from '../config/courses.config';
 
 export function CourseStatusBadge({ status }: { status: ContentStatus }) {
   const presentation = courseStatuses[status];
-  return <Badge variant={presentation.badgeVariant}>{presentation.label}</Badge>;
+  return (
+    <Badge variant="neutral" className={presentation.badgeClassName}>
+      {presentation.label}
+    </Badge>
+  );
 }

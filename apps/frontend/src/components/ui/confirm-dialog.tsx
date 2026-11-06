@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { Button } from './button';
+import { useNativeDialog } from './use-native-dialog';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -22,20 +22,16 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+  const { dialogRef } = useNativeDialog(open);
 
   return (
     <dialog
-      ref={ref}
+      ref={dialogRef}
       onClose={onCancel}
-      className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-gray-200 bg-white p-6 text-foreground shadow-2xl backdrop:bg-black/40"
+      onCancel={(event) => {
+        if (pending) event.preventDefault();
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-gray-200 bg-white p-6 text-foreground shadow-2xl backdrop:bg-ink/40"
     >
       <h2 className="text-lg font-semibold">{title}</h2>
       <p className="mt-1.5 text-sm text-gray-600">{description}</p>

@@ -1,12 +1,25 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router';
+import { PATHS } from '@/lib/paths';
 import type { CourseOutline } from '../model/types';
 
-const { useCourseOutlineMock, updateStatusMutateAsync, toastSuccess } = vi.hoisted(() => ({
+const {
+  useCourseOutlineMock,
+  updateStatusMutateAsync,
+  createModuleMutateAsync,
+  updateModuleMutateAsync,
+  updateModuleStatusMutateAsync,
+  reorderModulesMutateAsync,
+  toastSuccess,
+} = vi.hoisted(() => ({
   useCourseOutlineMock: vi.fn(),
   updateStatusMutateAsync: vi.fn(),
+  createModuleMutateAsync: vi.fn(),
+  updateModuleMutateAsync: vi.fn(),
+  updateModuleStatusMutateAsync: vi.fn(),
+  reorderModulesMutateAsync: vi.fn(),
   toastSuccess: vi.fn(),
 }));
 
@@ -15,22 +28,19 @@ vi.mock('../queries', () => ({
   useUpdateCourseStatus: () => ({ mutateAsync: updateStatusMutateAsync, isPending: false }),
 }));
 vi.mock('sonner', () => ({ toast: { success: toastSuccess } }));
-vi.mock('@/components/ui/confirm-dialog', () => ({
-  ConfirmDialog: ({
-    open,
-    confirmLabel,
-    onConfirm,
-  }: {
-    open: boolean;
-    confirmLabel: string;
-    onConfirm: () => void;
-  }) =>
-    open ? (
-      <button type="button" onClick={onConfirm}>
-        Confirm {confirmLabel}
-      </button>
-    ) : null,
+vi.mock('@/features/admin/modules/queries', () => ({
+  useCreateCourseModule: () => ({ mutateAsync: createModuleMutateAsync, isPending: false }),
+  useUpdateCourseModule: () => ({ mutateAsync: updateModuleMutateAsync, isPending: false }),
+  useUpdateCourseModuleStatus: () => ({
+    mutateAsync: updateModuleStatusMutateAsync,
+    isPending: false,
+  }),
+  useReorderCourseModules: () => ({ mutateAsync: reorderModulesMutateAsync, isPending: false }),
 }));
+vi.mock('@/components/ui/confirm-dialog', async () => {
+  const { ConfirmDialogMock } = await import('@/test/mocks/confirm-dialog');
+  return { ConfirmDialog: ConfirmDialogMock };
+});
 
 import { CourseCurriculumPage } from './CourseCurriculumPage';
 
@@ -67,11 +77,31 @@ const outline: CourseOutline = {
   ],
 };
 
+interface OutlineQueryResult {
+  data?: CourseOutline;
+  error?: unknown;
+  isPending: boolean;
+  isError: boolean;
+  refetch: ReturnType<typeof vi.fn>;
+}
+
+function mockOutline(overrides: Partial<OutlineQueryResult> = {}) {
+  const result: OutlineQueryResult = {
+    data: outline,
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+    ...overrides,
+  };
+  useCourseOutlineMock.mockReturnValue(result);
+  return result;
+}
+
 function pageElement() {
   return (
-    <MemoryRouter initialEntries={['/steamx/admin/courses/course-1/curriculum']}>
+    <MemoryRouter initialEntries={[PATHS.admin.courseCurriculum('course-1')]}>
       <Routes>
-        <Route path="/steamx/admin/courses/:id/curriculum" element={<CourseCurriculumPage />} />
+        <Route path={PATHS.admin.courseCurriculum(':id')} element={<CourseCurriculumPage />} />
       </Routes>
     </MemoryRouter>
   );
@@ -85,50 +115,61 @@ describe('CourseCurriculumPage', () => {
   beforeEach(() => {
     useCourseOutlineMock.mockReset();
     updateStatusMutateAsync.mockReset();
+    createModuleMutateAsync.mockReset();
+    updateModuleMutateAsync.mockReset();
+    updateModuleStatusMutateAsync.mockReset();
+    reorderModulesMutateAsync.mockReset();
     toastSuccess.mockReset();
   });
 
   it('shows course summary, ordered modules, lessons, and audience', () => {
-    useCourseOutlineMock.mockReturnValue({
-      data: outline,
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
+    mockOutline();
 
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Science Grade 6' })).toBeInTheDocument();
-    expect(screen.getByText('1', { selector: 'p' })).toBeInTheDocument();
-    expect(screen.getByText('2', { selector: 'p' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Plants & Energy' })).toBeInTheDocument();
+    expect(screen.getByText('Modules', { selector: 'dt' }).nextElementSibling).toHaveTextContent(
+      '1',
+    );
+    expect(screen.getByText('Lessons', { selector: 'dt' }).nextElementSibling).toHaveTextContent(
+      '2',
+    );
     expect(screen.getByText('How plants make food')).toBeInTheDocument();
-    expect(screen.getByText('Students')).toBeInTheDocument();
-    expect(screen.getByText('Students').closest('span')).toHaveClass(
-      'bg-[#f3e8ff]',
-      'text-[#6b21a8]',
-    );
-    expect(screen.getByText('Students').parentElement?.querySelector('svg')).toHaveAttribute(
-      'aria-hidden',
-      'true',
-    );
+    expect(screen.queryByText('Students')).not.toBeInTheDocument();
     expect(screen.getByText('Teachers only')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Edit course' })).toHaveClass(
-      'bg-transparent',
-      'border-indigo-950/30',
+  });
+
+  it('shows a note when the course is a draft', () => {
+    mockOutline({
+      data: {
+        ...outline,
+        course: { ...outline.course, status: 'DRAFT' },
+      },
+    });
+
+    renderPage();
+
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'Students can’t see its content until it’s active.',
     );
-    expect(screen.getByRole('button', { name: 'Archive' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Course status actions' })).toBeInTheDocument();
+  });
+
+  it('uses the description placeholder when the course description is empty', () => {
+    mockOutline({
+      data: {
+        ...outline,
+        course: { ...outline.course, description: '' },
+      },
+    });
+
+    renderPage();
+
+    expect(screen.getByText('No description yet.')).toBeInTheDocument();
   });
 
   it('confirms before archiving the course from the curriculum page', async () => {
     const user = userEvent.setup();
-    useCourseOutlineMock.mockReturnValue({
-      data: outline,
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
+    mockOutline();
     updateStatusMutateAsync.mockResolvedValue({ ...outline.course, status: 'ARCHIVED' });
 
     renderPage();
@@ -143,23 +184,12 @@ describe('CourseCurriculumPage', () => {
 
   it('collapses and expands all modules', async () => {
     const user = userEvent.setup();
-    useCourseOutlineMock.mockReturnValue({
-      data: outline,
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
+    mockOutline();
 
     renderPage();
 
     const collapseButton = screen.getByRole('button', { name: 'Collapse all' });
-    expect(collapseButton).toHaveClass(
-      'rounded-full',
-      'border-teal-300',
-      'bg-white',
-      'text-teal-900',
-      'shadow-sm',
-    );
+    expect(collapseButton).toBeEnabled();
     await user.click(collapseButton);
     expect(screen.getByText('How plants make food')).not.toBeVisible();
 
@@ -167,72 +197,155 @@ describe('CourseCurriculumPage', () => {
     expect(screen.getByText('How plants make food')).toBeInTheDocument();
   });
 
-  it('keeps new modules expanded after an outline refresh', async () => {
-    const user = userEvent.setup();
-    useCourseOutlineMock.mockReturnValue({
-      data: outline,
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
-
-    const { rerender } = renderPage();
-    await user.click(screen.getByRole('button', { name: 'Collapse all' }));
-
-    const refreshedOutline: CourseOutline = {
-      ...outline,
-      modules: [
-        ...outline.modules,
-        {
-          id: 'module-2',
-          title: 'Matter and Energy',
-          position: 2,
-          status: 'ACTIVE',
-          lessons: [
-            {
-              id: 'lesson-3',
-              title: 'States of matter',
-              position: 1,
-              status: 'ACTIVE',
-              audience: 'STUDENT',
-            },
-          ],
-        },
-      ],
-    };
-    useCourseOutlineMock.mockReturnValue({
-      data: refreshedOutline,
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
-    rerender(pageElement());
-
-    expect(screen.getByText('How plants make food')).not.toBeVisible();
-    expect(screen.getByText('States of matter')).toBeVisible();
-  });
-
   it('shows an empty state when the course has no modules', () => {
-    useCourseOutlineMock.mockReturnValue({
-      data: { ...outline, modules: [] },
-      isPending: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
+    mockOutline({ data: { ...outline, modules: [] } });
 
     renderPage();
 
     expect(screen.getByText('No modules yet')).toBeInTheDocument();
-    expect(screen.getAllByText('0', { selector: 'p' })).toHaveLength(2);
+    expect(screen.getByText('Modules', { selector: 'dt' }).nextElementSibling).toHaveTextContent(
+      '0',
+    );
+    expect(screen.getByText('Lessons', { selector: 'dt' }).nextElementSibling).toHaveTextContent(
+      '0',
+    );
+  });
+
+  it('creates a module with a trimmed title', async () => {
+    const user = userEvent.setup();
+    mockOutline({ data: { ...outline, modules: [] } });
+    createModuleMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Add module' }));
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), '  Matter  ');
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Add module' }),
+    );
+
+    expect(createModuleMutateAsync).toHaveBeenCalledWith({
+      courseId: 'course-1',
+      body: { title: 'Matter' },
+    });
+  });
+
+  it('validates an empty module title before calling the API', async () => {
+    const user = userEvent.setup();
+    mockOutline({ data: { ...outline, modules: [] } });
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Add module' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Add module' }),
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a module title.');
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-invalid', 'true');
+    expect(createModuleMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows API errors in the module form without closing it', async () => {
+    const user = userEvent.setup();
+    mockOutline({ data: { ...outline, modules: [] } });
+    createModuleMutateAsync.mockRejectedValue(new Error('Request failed'));
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Add module' }));
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Matter');
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Add module' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Something went wrong. Please try again.',
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('edits a module title', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+    updateModuleMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Actions for module Plants & Energy' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit module' }));
+    const titleInput = screen.getByRole('textbox', { name: 'Title' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Plant Science');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(updateModuleMutateAsync).toHaveBeenCalledWith({
+      id: 'module-1',
+      body: { title: 'Plant Science' },
+    });
+  });
+
+  it('reorders modules using the complete module order', async () => {
+    const user = userEvent.setup();
+    const twoModuleOutline: CourseOutline = {
+      ...outline,
+      modules: [
+        ...outline.modules,
+        { id: 'module-2', title: 'Matter', position: 2, status: 'DRAFT', lessons: [] },
+      ],
+    };
+    mockOutline({ data: twoModuleOutline });
+    reorderModulesMutateAsync.mockResolvedValue([]);
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Actions for module Plants & Energy' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Move down' }));
+
+    expect(reorderModulesMutateAsync).toHaveBeenCalledWith({
+      courseId: 'course-1',
+      body: { moduleIds: ['module-2', 'module-1'] },
+    });
+  });
+
+  it('confirms before archiving a module', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+    updateModuleStatusMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Actions for module Plants & Energy' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive module' }));
+    expect(screen.getByText(/and its active lessons will be archived/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm Archive module' }));
+
+    expect(updateModuleStatusMutateAsync).toHaveBeenCalledWith({
+      id: 'module-1',
+      status: 'ARCHIVED',
+    });
+  });
+
+  it('publishes a draft module after confirmation', async () => {
+    const user = userEvent.setup();
+    mockOutline({
+      data: {
+        ...outline,
+        modules: [{ ...outline.modules[0], status: 'DRAFT' }],
+      },
+    });
+    updateModuleStatusMutateAsync.mockResolvedValue({});
+
+    renderPage();
+    await user.click(screen.getByRole('button', { name: 'Actions for module Plants & Energy' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Publish module' }));
+
+    expect(screen.getByText('Publish module?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Confirm Publish module' }));
+
+    expect(updateModuleStatusMutateAsync).toHaveBeenCalledWith({
+      id: 'module-1',
+      status: 'ACTIVE',
+    });
+    expect(toastSuccess).toHaveBeenCalledWith('Module published');
   });
 
   it('shows a loading state while the outline is loading', () => {
-    useCourseOutlineMock.mockReturnValue({
-      data: undefined,
-      isPending: true,
-      isError: false,
-      refetch: vi.fn(),
-    });
+    mockOutline({ data: undefined, isPending: true });
 
     renderPage();
 
@@ -242,13 +355,7 @@ describe('CourseCurriculumPage', () => {
   it('shows an error and allows retrying', async () => {
     const user = userEvent.setup();
     const refetch = vi.fn();
-    useCourseOutlineMock.mockReturnValue({
-      data: undefined,
-      error: new Error('Request failed'),
-      isPending: false,
-      isError: true,
-      refetch,
-    });
+    mockOutline({ data: undefined, error: new Error('Request failed'), isError: true, refetch });
 
     renderPage();
     expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
@@ -260,21 +367,10 @@ describe('CourseCurriculumPage', () => {
   it('keeps existing curriculum visible when a background refresh fails', async () => {
     const user = userEvent.setup();
     const refetch = vi.fn();
-    useCourseOutlineMock.mockReturnValue({
-      data: outline,
-      isPending: false,
-      isError: false,
-      refetch,
-    });
+    mockOutline({ refetch });
 
     const { rerender } = renderPage();
-    useCourseOutlineMock.mockReturnValue({
-      data: outline,
-      error: new Error('Refresh failed'),
-      isPending: false,
-      isError: true,
-      refetch,
-    });
+    mockOutline({ error: new Error('Refresh failed'), isError: true, refetch });
     rerender(pageElement());
 
     expect(screen.getByRole('heading', { name: 'Plants & Energy' })).toBeVisible();

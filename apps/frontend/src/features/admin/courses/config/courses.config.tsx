@@ -14,19 +14,19 @@ export const COURSE_STATUSES = [
 export const courseStatuses = {
   DRAFT: {
     label: 'Draft',
-    badgeVariant: 'warning',
-    bannerClass: 'bg-yellow-400',
+    badgeClassName: 'bg-brand-draft text-brand-draft-ink',
+    bannerClass: 'bg-brand-sun',
     description: 'Not visible to students. Build and review here.',
   },
   ACTIVE: {
     label: 'Active',
-    badgeVariant: 'success',
-    bannerClass: 'bg-teal-500',
+    badgeClassName: 'bg-teal-100 text-brand-active-ink',
+    bannerClass: 'bg-brand-teal',
     description: 'Usable. Students see its active modules and lessons.',
   },
   ARCHIVED: {
     label: 'Archived',
-    badgeVariant: 'neutral',
+    badgeClassName: 'bg-brand-chip text-gray-600',
     bannerClass: 'bg-gray-200',
     description: 'Retired from new use. Released content stays until it expires.',
   },
