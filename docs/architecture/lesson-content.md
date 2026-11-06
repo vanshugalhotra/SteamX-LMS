@@ -96,11 +96,14 @@ Render rich-text `text` as text, never executable HTML. `version` is the concurr
 ## Reading content as a student or teacher
 
 `GET /learning/deliveries/:id/lessons/:lessonId/content` requires `learning.read` and an active
-delivery access: students need an active enrollment and a released STUDENT lesson; assigned teachers
+delivery access. Students need an active enrollment and a released STUDENT lesson. Assigned teachers
 can read ACTIVE or ARCHIVED STUDENT and TEACHER_ONLY lessons, whether released or not. DRAFT lessons
-are hidden. The response includes the same block tree and only `{ id, type, title, mimeType }` asset
-summaries; it omits lesson status, audience, position, release/version/timestamp data and asset file,
-processing, storage, and size details. A referenced asset without a READY file is still summarized.
+are hidden from both roles.
+
+The response includes the block tree and only `{ id, type, title, mimeType }` asset summaries. It
+omits lesson status, audience, position, release metadata, version and timestamps, plus asset file,
+processing, storage, and size details. A referenced asset without a READY file remains in the tree
+and has a summary with `mimeType: null`.
 
 ## Saving content
 
