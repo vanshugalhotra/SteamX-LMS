@@ -92,6 +92,10 @@ school staff and students currently see only their own record. See [access contr
   current subscription while checking capacity to serialize concurrent activations.
 - Delivery reads remain available after subscription expiry and include `subscriptionActive` as
   current-state information. Teacher visibility is limited to deliveries with an active assignment.
+- Student progress counts released STUDENT lessons with ACTIVE or ARCHIVED status, grouped by module;
+  completed counts include only the authenticated student.
+- Un-releasing a lesson keeps its completion row but removes it from both totals while unreleased.
+  Re-releasing it makes the retained completion count again.
 
 See [access control](./access-control.md) for scope rules, [database rules](./database.md) for
 constraints, and the [API test checklist](../testing/api-testing.md#subscriptions) for route cases.

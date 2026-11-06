@@ -1,11 +1,21 @@
 import type { LearningCourseResponseDto } from './dto/learning-course-response.dto.js';
+import type { LearningLessonCompletionResponseDto } from './dto/learning-lesson-completion-response.dto.js';
+import type {
+  LearningProgressModuleDto,
+  LearningProgressResponseDto,
+} from './dto/learning-progress-response.dto.js';
 import type { LearningAssetAccessResponseDto } from './dto/learning-asset-access-response.dto.js';
 import type { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import type {
   LearningOutlineModuleDto,
   LearningOutlineResponseDto,
 } from './dto/learning-outline-response.dto.js';
-import type { LearningOutlineRecord, StudentCourseRecord } from './learning-access.repository.js';
+import type {
+  LearningLessonCompletionRecord,
+  LearningOutlineRecord,
+  LearningProgressModuleRecord,
+  StudentCourseRecord,
+} from './learning-access.repository.js';
 import type { LessonContentTree } from '../curriculum/lesson-content/lesson-content.types.js';
 import type { AssetAccessResponseDto } from '../assets/dto/asset-access-response.dto.js';
 
@@ -25,6 +35,37 @@ export function toLearningCourseResponse(
     totalLessons,
     completedLessons,
     subscriptionActive,
+  };
+}
+
+/** Maps the persisted completion to the stable lesson completion response. */
+export function toLearningLessonCompletion(
+  completion: LearningLessonCompletionRecord,
+): LearningLessonCompletionResponseDto {
+  return {
+    lessonId: completion.lessonId,
+    completed: true,
+    completedAt: completion.completedAt.toISOString(),
+  };
+}
+
+/** Maps grouped module progress to an aggregate delivery response. */
+export function toLearningProgress(
+  deliveryId: string,
+  modules: LearningProgressModuleRecord[],
+): LearningProgressResponseDto {
+  const mappedModules: LearningProgressModuleDto[] = modules.map((module) => ({
+    moduleId: module.moduleId,
+    title: module.title,
+    position: module.position,
+    totalLessons: module.totalLessons,
+    completedLessons: module.completedLessons,
+  }));
+  return {
+    deliveryId,
+    totalLessons: mappedModules.reduce((total, module) => total + module.totalLessons, 0),
+    completedLessons: mappedModules.reduce((total, module) => total + module.completedLessons, 0),
+    modules: mappedModules,
   };
 }
 

@@ -364,6 +364,25 @@ module and lesson position order.
 - [auto] When delivery belongs to another school or the student's enrollment is missing/inactive -> expect `404 NOT_FOUND`; when its subscription has expired -> expect `403 SUBSCRIPTION_EXPIRED`.
 - [auto] When teacher or platform staff calls -> expect `403 FORBIDDEN`; malformed delivery IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
 
+### `PUT /learning/deliveries/:id/lessons/:lessonId/completion`
+
+Caller: an enrolled student with `lesson.complete`; records completion for one released lesson.
+
+- [auto] The first call inserts one completion; repeated or parallel calls -> expect `200` with the same original `completedAt` and exactly one row. An ARCHIVED lesson remains completable if it is released.
+- [auto] Unreleased, TEACHER_ONLY, DRAFT, cross-delivery or cross-school lessons, inactive or missing enrollment -> expect `404 NOT_FOUND`; expired subscription -> expect `403 SUBSCRIPTION_EXPIRED`.
+- [auto] Teacher or platform staff -> expect `403 FORBIDDEN`; malformed IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
+- [auto] The response contains only lesson ID, `completed: true`, and the original completion timestamp; there is no un-complete route.
+
+### `GET /learning/deliveries/:id/progress`
+
+Caller: an enrolled student with `learning.read`; returns progress for released lessons in the delivery.
+
+- [auto] Counts include only released STUDENT lessons with ACTIVE or ARCHIVED status, grouped by module position; completed counts include only this student, modules without eligible lessons are omitted, and completed never exceeds total.
+- [auto] Un-releasing a completed lesson preserves its completion row but removes it from both counts; re-releasing it restores both counts. Un-releasing an incomplete lesson reduces only the total.
+- [auto] Overall totals match the same student's course-list counts. Empty deliveries return zero totals and no modules.
+- [auto] Another school, missing delivery, or inactive enrollment -> expect `404 NOT_FOUND`; expired subscription -> expect `403 SUBSCRIPTION_EXPIRED`; teacher or platform staff -> expect `403 FORBIDDEN`; malformed IDs -> expect `400 BAD_REQUEST`; without a session cookie -> expect `401 UNAUTHORIZED`.
+- [auto] The response contains only delivery ID, overall lesson totals, and module ID/title/position with each module's lesson totals.
+
 ### `GET /learning/deliveries/:id/lessons/:lessonId/content`
 
 Caller: a student enrolled in the delivery or a teacher actively assigned to it, with `learning.read`.

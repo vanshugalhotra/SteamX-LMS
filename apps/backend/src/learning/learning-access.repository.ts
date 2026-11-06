@@ -82,6 +82,19 @@ export type LearningOutlineRecord = {
   completed: boolean;
 };
 
+export type LearningProgressModuleRecord = {
+  moduleId: string;
+  title: string;
+  position: number;
+  totalLessons: number;
+  completedLessons: number;
+};
+
+export type LearningLessonCompletionRecord = {
+  lessonId: string;
+  completedAt: Date;
+};
+
 /** Queries delivery and lesson visibility for student and teacher learning reads. */
 @Injectable()
 export class LearningAccessRepository {
@@ -207,6 +220,71 @@ export class LearningAccessRepository {
     ]);
 
     return { totals, completions };
+  }
+
+  /** Inserts a completion once and returns its original timestamp when it already exists. */
+  async completeStudentLesson(input: {
+    schoolId: string;
+    deliveryId: string;
+    studentId: string;
+    lessonId: string;
+    courseId: string;
+  }): Promise<LearningLessonCompletionRecord | null> {
+    const inserted = await this.prisma.$queryRaw<LearningLessonCompletionRecord[]>(Prisma.sql`
+      INSERT INTO lesson_completions
+        (id, school_id, delivery_id, student_id, lesson_id, course_id)
+      VALUES
+        (gen_random_uuid(), ${input.schoolId}::uuid, ${input.deliveryId}::uuid,
+         ${input.studentId}::uuid, ${input.lessonId}::uuid, ${input.courseId}::uuid)
+      ON CONFLICT (delivery_id, student_id, lesson_id) DO NOTHING
+      RETURNING lesson_id::text AS "lessonId", completed_at AS "completedAt"
+    `);
+    const completion = inserted[0];
+    if (completion) {
+      return completion;
+    }
+
+    const existing = await this.prisma.$queryRaw<LearningLessonCompletionRecord[]>(Prisma.sql`
+      SELECT lesson_id::text AS "lessonId", completed_at AS "completedAt"
+      FROM lesson_completions
+      WHERE delivery_id = ${input.deliveryId}::uuid
+        AND student_id = ${input.studentId}::uuid
+        AND lesson_id = ${input.lessonId}::uuid
+    `);
+    return existing[0] ?? null;
+  }
+
+  /** Groups a student's released lesson totals and completions by module. */
+  findStudentProgress(
+    deliveryId: string,
+    courseId: string,
+    studentId: string,
+  ): Promise<LearningProgressModuleRecord[]> {
+    const lessonFilter = releasedStudentLessonFilter();
+    return this.prisma.$queryRaw<LearningProgressModuleRecord[]>(Prisma.sql`
+      SELECT
+        m.id::text AS "moduleId",
+        m.title AS title,
+        m.position AS position,
+        COUNT(*)::int AS "totalLessons",
+        COUNT(lc.lesson_id)::int AS "completedLessons"
+      FROM delivery_lesson_releases r
+      JOIN lessons l
+        ON l.id = r.lesson_id
+       AND l.course_id = r.course_id
+      JOIN modules m
+        ON m.id = l.module_id
+       AND m.course_id = l.course_id
+      LEFT JOIN lesson_completions lc
+        ON lc.delivery_id = r.delivery_id
+       AND lc.student_id = ${studentId}::uuid
+       AND lc.lesson_id = l.id
+      WHERE r.delivery_id = ${deliveryId}::uuid
+        AND r.course_id = ${courseId}::uuid
+        AND ${lessonFilter}
+      GROUP BY m.id, m.title, m.position
+      ORDER BY m.position ASC, m.id ASC
+    `);
   }
 
   /** Loads a delivery's filtered student outline as ordered rows for one student. */

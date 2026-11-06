@@ -1,4 +1,14 @@
-import { Controller, Get, Header, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Put,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiForbiddenResponse,
@@ -17,6 +27,8 @@ import { LearningCourseListResponseDto } from './dto/learning-course-list-respon
 import { LearningAssetAccessResponseDto } from './dto/learning-asset-access-response.dto.js';
 import { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import { LearningOutlineResponseDto } from './dto/learning-outline-response.dto.js';
+import { LearningLessonCompletionResponseDto } from './dto/learning-lesson-completion-response.dto.js';
+import { LearningProgressResponseDto } from './dto/learning-progress-response.dto.js';
 import { LearningService } from './learning.service.js';
 
 @ApiTags('Learning')
@@ -67,6 +79,55 @@ export class LearningController {
     @Param('id', ParseUUIDPipe) deliveryId: string,
   ): Promise<LearningOutlineResponseDto> {
     return this.learning.getStudentOutline(auth, deliveryId);
+  }
+
+  // ─────────────────────────────────────────
+  // PUT /learning/deliveries/:id/lessons/:lessonId/completion — Complete a lesson
+  // ─────────────────────────────────────────
+  /** Records the authenticated student's completion of a released lesson. */
+  @RequirePermission(PERMISSION.LESSON_COMPLETE)
+  @Put('deliveries/:id/lessons/:lessonId/completion')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete a released lesson' })
+  @ApiOkResponse({
+    description: 'The original completion timestamp, including for repeated requests.',
+    type: LearningLessonCompletionResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'The delivery or lesson ID is not a UUID.' })
+  @ApiNotFoundResponse({ description: 'Lesson not found or not visible to the student.' })
+  @ApiForbiddenResponse({
+    description: 'The caller lacks lesson.complete, or the course subscription is inactive.',
+  })
+  completeLesson(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) deliveryId: string,
+    @Param('lessonId', ParseUUIDPipe) lessonId: string,
+  ): Promise<LearningLessonCompletionResponseDto> {
+    return this.learning.completeStudentLesson(auth, deliveryId, lessonId);
+  }
+
+  // ─────────────────────────────────────────
+  // GET /learning/deliveries/:id/progress — Get student progress
+  // ─────────────────────────────────────────
+  /** Returns released student lesson counts for this delivery and the authenticated student. */
+  @RequirePermission(PERMISSION.LEARNING_READ)
+  @Get('deliveries/:id/progress')
+  @ApiOperation({ summary: 'Get student delivery progress' })
+  @ApiOkResponse({
+    description: 'Released student lesson totals and completions grouped by module.',
+    type: LearningProgressResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'The delivery ID is not a UUID.' })
+  @ApiNotFoundResponse({ description: 'Delivery not found or not visible to the student.' })
+  @ApiForbiddenResponse({
+    description:
+      'The caller lacks learning.read, is not a student, or the subscription is inactive.',
+  })
+  getStudentProgress(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) deliveryId: string,
+  ): Promise<LearningProgressResponseDto> {
+    return this.learning.getStudentProgress(auth, deliveryId);
   }
 
   // ─────────────────────────────────────────

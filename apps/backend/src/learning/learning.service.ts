@@ -2,6 +2,11 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { UserType } from '../generated/prisma/client.js';
 import type { AuthContext } from '../auth/types/auth-context.js';
 import { API_ERROR } from '../common/errors/api-errors.js';
+import {
+  getPostgresCode,
+  getPrismaReason,
+  isPrismaKnownError,
+} from '../common/errors/prisma-error.js';
 import { paginate } from '../common/pagination/paginate.js';
 import type { PaginationQueryDto } from '../common/pagination/pagination-query.dto.js';
 import type { PaginationResponseDto } from '../common/pagination/pagination-response.dto.js';
@@ -12,13 +17,18 @@ import { LearningAccessService } from './learning-access.service.js';
 import type { LearningCourseResponseDto } from './dto/learning-course-response.dto.js';
 import type { LearningLessonContentResponseDto } from './dto/learning-lesson-content-response.dto.js';
 import type { LearningOutlineResponseDto } from './dto/learning-outline-response.dto.js';
+import type { LearningLessonCompletionResponseDto } from './dto/learning-lesson-completion-response.dto.js';
+import type { LearningProgressResponseDto } from './dto/learning-progress-response.dto.js';
 import {
   toLearningCourseResponse,
   toLearningAssetAccess,
+  toLearningLessonCompletion,
   toLearningLessonContent,
   toLearningOutline,
+  toLearningProgress,
 } from './learning.mapper.js';
 import { LearningAccessRepository } from './learning-access.repository.js';
+import type { LearningLessonCompletionRecord } from './learning-access.repository.js';
 import { AssetAccessService } from '../assets/asset-access.service.js';
 import type { LearningAssetAccessResponseDto } from './dto/learning-asset-access-response.dto.js';
 
@@ -92,6 +102,60 @@ export class LearningService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toLearningOutline(rows);
+  }
+
+  /** Records a student's completion after checking the released lesson and subscription. */
+  async completeStudentLesson(
+    auth: AuthContext,
+    deliveryId: string,
+    lessonId: string,
+  ): Promise<LearningLessonCompletionResponseDto> {
+    const access = await this.access.assertLessonAccess(auth, deliveryId, lessonId);
+    if (access.studentId === undefined || access.lesson === undefined) {
+      throw new ForbiddenException(API_ERROR.FORBIDDEN);
+    }
+
+    let completion: LearningLessonCompletionRecord | null;
+    try {
+      completion = await this.learning.completeStudentLesson({
+        schoolId: access.schoolId,
+        deliveryId: access.deliveryId,
+        studentId: access.studentId,
+        lessonId: access.lesson.id,
+        courseId: access.courseId,
+      });
+    } catch (error) {
+      const reason = getPrismaReason(error).toLowerCase();
+      if (
+        isPrismaKnownError(error) &&
+        (error.code === 'P2004' || getPostgresCode(error) === '23000') &&
+        reason.includes('lesson_completions require')
+      ) {
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
+      }
+      throw error;
+    }
+    if (!completion) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+    return toLearningLessonCompletion(completion);
+  }
+
+  /** Returns released lesson totals and this student's completions grouped by module. */
+  async getStudentProgress(
+    auth: AuthContext,
+    deliveryId: string,
+  ): Promise<LearningProgressResponseDto> {
+    const access = await this.access.assertDeliveryAccess(auth, deliveryId);
+    if (access.studentId === undefined) {
+      throw new ForbiddenException(API_ERROR.FORBIDDEN);
+    }
+    const modules = await this.learning.findStudentProgress(
+      access.deliveryId,
+      access.courseId,
+      access.studentId,
+    );
+    return toLearningProgress(access.deliveryId, modules);
   }
 
   /** Returns a lesson tree only after the shared delivery and lesson access check succeeds. */
