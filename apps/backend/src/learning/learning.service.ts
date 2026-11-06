@@ -14,10 +14,13 @@ import type { LearningLessonContentResponseDto } from './dto/learning-lesson-con
 import type { LearningOutlineResponseDto } from './dto/learning-outline-response.dto.js';
 import {
   toLearningCourseResponse,
+  toLearningAssetAccess,
   toLearningLessonContent,
   toLearningOutline,
 } from './learning.mapper.js';
 import { LearningAccessRepository } from './learning-access.repository.js';
+import { AssetAccessService } from '../assets/asset-access.service.js';
+import type { LearningAssetAccessResponseDto } from './dto/learning-asset-access-response.dto.js';
 
 /** Provides learning navigation and access-checked student/teacher lesson content. */
 @Injectable()
@@ -27,6 +30,7 @@ export class LearningService {
     private readonly access: LearningAccessService,
     private readonly courseAccess: CourseAccessService,
     private readonly lessonContent: LessonContentService,
+    private readonly assetAccess: AssetAccessService,
   ) {}
 
   /** Lists the student's active enrollments with page-level progress and subscription state. */
@@ -102,6 +106,34 @@ export class LearningService {
     }
     const tree = await this.lessonContent.findTreeByLessonId(result.lesson.id);
     return toLearningLessonContent(result.lesson.id, tree);
+  }
+
+  /** Issues a short-lived URL only for a READY asset referenced by an accessible lesson. */
+  async getLessonAssetAccess(
+    auth: AuthContext,
+    deliveryId: string,
+    lessonId: string,
+    assetId: string,
+  ): Promise<LearningAssetAccessResponseDto> {
+    const access = await this.access.assertLessonAccess(auth, deliveryId, lessonId);
+    const asset = await this.learning.findServableAsset(lessonId, assetId);
+    if (!asset) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+
+    const school = await this.learning.findSchoolNameById(access.schoolId);
+    if (!school) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+
+    const issuedAt = new Date();
+    const signedAccess = await this.assetAccess.issueForFile(asset.file, asset.type);
+    return toLearningAssetAccess(signedAccess, {
+      name: auth.name,
+      steamxId: auth.steamxId,
+      schoolName: school.name,
+      issuedAt: issuedAt.toISOString(),
+    });
   }
 
   private getStudentSchoolId(auth: AuthContext): string {
