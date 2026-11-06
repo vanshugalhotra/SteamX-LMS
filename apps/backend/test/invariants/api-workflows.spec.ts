@@ -355,6 +355,10 @@ describe('Documented API workflows', () => {
               route.path.endsWith('/lessons/:lessonId/assets/:assetId/access')
             ) {
               assertStatus(response, 404, 'NOT_FOUND');
+            } else if (route.path.endsWith('/lessons/:lessonId/completion')) {
+              assertStatus(response, 403, 'PERMISSION_REQUIRED');
+            } else if (route.path.endsWith('/progress')) {
+              assertStatus(response, 404, 'NOT_FOUND');
             } else {
               assertStatus(response, 403, 'FORBIDDEN');
             }
