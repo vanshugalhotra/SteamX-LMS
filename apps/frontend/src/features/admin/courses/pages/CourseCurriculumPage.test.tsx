@@ -119,6 +119,7 @@ function pageElement() {
     <MemoryRouter initialEntries={[PATHS.admin.courseCurriculum('course-1')]}>
       <Routes>
         <Route path={PATHS.admin.courseCurriculum(':id')} element={<CourseCurriculumPage />} />
+        <Route path={PATHS.admin.lessonEdit(':id')} element={<div>Lesson editor route</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -330,6 +331,10 @@ describe('CourseCurriculumPage', () => {
 
     renderPage();
 
+    expect(screen.getByRole('link', { name: 'How plants make food' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/lessons\/lesson-1\/edit$/),
+    );
     expect(
       screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
     ).toBeInTheDocument();
@@ -341,6 +346,7 @@ describe('CourseCurriculumPage', () => {
       screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
     );
     expect(await screen.findByRole('menuitem', { name: 'Edit lesson' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Edit content' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
       'aria-disabled',
       'true',
@@ -351,6 +357,19 @@ describe('CourseCurriculumPage', () => {
     );
     expect(screen.getByRole('menuitem', { name: 'Archive lesson' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Publish lesson' })).not.toBeInTheDocument();
+  });
+
+  it('opens the content editor from the lesson action menu', async () => {
+    const user = userEvent.setup();
+    mockOutline();
+
+    renderPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit content' }));
+
+    expect(await screen.findByText('Lesson editor route')).toBeInTheDocument();
   });
 
   it('publishes a draft lesson after confirmation', async () => {

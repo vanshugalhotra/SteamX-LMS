@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Archive, ArrowDown, ArrowUp, Check, Pencil, Presentation } from 'lucide-react';
+import { Archive, ArrowDown, ArrowUp, Check, FileText, Pencil, Presentation } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { getErrorMessage } from '@/lib/api-errors';
+import { PATHS } from '@/lib/paths';
 import type { CourseOutlineLesson } from '../model/types';
 import { CourseStatusBadge } from './CourseStatusBadge';
 
@@ -25,6 +27,7 @@ export function CurriculumLessonRow({
   onRequestStatus: (status: 'ACTIVE' | 'ARCHIVED') => void;
 }) {
   const [actionError, setActionError] = useState<string | null>(null);
+  const navigate = useNavigate();
   const canPublish = lesson.status !== 'ACTIVE';
   const canArchive = lesson.status !== 'ARCHIVED';
 
@@ -45,7 +48,12 @@ export function CurriculumLessonRow({
     >
       {actionError && <Alert className="w-full">{actionError}</Alert>}
       <span className="w-5 text-center text-[11px] text-gray-600">{index + 1}</span>
-      <span className="min-w-0 flex-1 text-[13px] font-medium">{lesson.title}</span>
+      <Link
+        to={PATHS.admin.lessonEdit(lesson.id)}
+        className="min-w-0 flex-1 truncate rounded text-[13px] font-medium text-brand-navy outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {lesson.title}
+      </Link>
       {lesson.audience === 'TEACHER_ONLY' && (
         <Badge variant="neutral" className="bg-gray-100 text-gray-600">
           <Presentation className="size-3" aria-hidden="true" />
@@ -57,6 +65,13 @@ export function CurriculumLessonRow({
         label={`Actions for lesson ${lesson.title}`}
         actions={[
           { label: 'Edit lesson', icon: Pencil, onSelect: onEdit },
+          {
+            label: 'Edit content',
+            icon: FileText,
+            onSelect: () => {
+              void navigate(PATHS.admin.lessonEdit(lesson.id));
+            },
+          },
           ...(canPublish
             ? [
                 {

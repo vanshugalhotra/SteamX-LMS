@@ -165,6 +165,14 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: PATHS.admin.lessonEdit(':id'),
+            lazy: async () => {
+              const { LessonEditorPage } =
+                await import('@/features/admin/modules/lessons/pages/LessonEditorPage');
+              return { Component: LessonEditorPage };
+            },
+          },
+          {
             path: PATHS.admin.assets,
             lazy: async () => {
               const { AssetsPage } = await import('@/features/admin/assets/pages/AssetsPage');
