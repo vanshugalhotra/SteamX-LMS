@@ -1,145 +1,72 @@
-# Access Control
+# Access control
 
-This guide explains authentication, permission checks, and user visibility. Use it when adding a
-protected route or changing account-management behavior; see the [API test checklist](../testing/api-testing.md)
-for endpoint cases.
+This guide explains route authorization and school scoping; use it when adding a protected route
+or changing who can see a resource.
 
-## Glossary
+## Request authorization
 
-| Term           | Meaning                                                                       |
-| -------------- | ----------------------------------------------------------------------------- |
-| User type      | `PLATFORM_STAFF`, `SCHOOL_STAFF`, or `STUDENT`.                               |
-| Role           | Database role (`admin`, `teacher`, `student`); one per user.                  |
-| Permission     | Named capability (e.g. `user.read`) granted to a role via `role_permissions`. |
-| School scope   | Which school's records a caller can query.                                    |
-| Platform staff | No `school_id`; may act across schools when authorized.                       |
-| School staff   | Bound to one school. Current role: `teacher`.                                 |
+For HTTP requests, the global guards run in this order:
 
-## Sessions
+1. `OriginGuard` requires a configured Origin for POST, PUT, PATCH, and DELETE.
+2. `AuthGuard` checks the session cookie and reloads current user, role, and school state.
+3. `PermissionGuard` requires `@Public`, `@AuthenticatedOnly`, or `@RequirePermission`.
 
-- Login normalizes the SteamX ID, verifies the password, checks active user/school status, then sets a JWT in the `steamx_session` cookie.
-- Cookie: `httpOnly`, `SameSite=Lax`, `Secure` in production. TTL from `AUTH_TOKEN_TTL_SECONDS` (default: 1 day).
-- Each protected request loads current user, role, and school from PostgreSQL — deactivation takes effect immediately.
-- Password changes update `passwordChangedAt` and issue a fresh cookie. Tokens issued before that
-  timestamp are rejected; tokens issued in the same whole second are not distinguished and may
-  remain valid until expiry.
-- State-changing requests require an allowed `Origin`.
+Missing route-policy metadata fails with 403. Permission grants are loaded at startup, so restart
+the API after changing grants. State-changing requests without an allowed Origin fail before
+authentication. Health routes are public.
 
-## Permission checks
+## Sessions and account state
 
-`PermissionGuard` runs after authentication:
+- Login sets the `steamx_session` JWT cookie. It is `httpOnly`, `SameSite=Lax`, and `Secure` in
+  production; its lifetime is `AUTH_TOKEN_TTL_SECONDS` (default 86,400).
+- Every protected request loads current account and school status. Deactivation applies on the next
+  request.
+- Password changes invalidate tokens issued before `passwordChangedAt`. Token timestamps use
+  whole seconds, so a token issued in the same second may remain valid.
+- New and reset accounts must change their password before using protected routes. The auth profile
+  and logout routes remain available.
 
-- Routes must declare `@RequirePermission`, `@AuthenticatedOnly`, or `@Public`. Missing metadata → 403.
-- A declared permission requires auth + a matching role grant.
-- Permission keys: `apps/backend/src/auth/permissions.ts`. Grants are loaded at startup and cached
-  in memory — **restart after changing grants**.
-- **Curriculum** is global (no school scope). Routes need `curriculum.read`/`curriculum.write` and services also require platform-staff user type. School staff/students are denied even with permissions.
-- **Assets** are global (no school scope). List, detail, file-state, and preview routes require `asset.read`; create, replace, complete, update, status, and delete routes require `asset.write`. Both permissions are granted to `admin` by default; `teacher` and `student` receive neither. Preview URLs additionally require `PLATFORM_STAFF`, even if another role is granted `asset.read`.
-- `learning.read` is granted to `teacher` and `student`; `lesson.complete` is granted to `student`. Platform staff use curriculum routes instead.
+## Permission, school scope, and visibility
 
-## School scope vs. user visibility
+Roles (`admin`, `teacher`, `student`) receive named permissions through `role_permissions`.
+Permission names are defined in `apps/backend/src/auth/permissions.ts`; default grants are seeded
+by migrations.
 
-Two separate filters:
+| Actor                   | School scope                                                | User records visible          |
+| ----------------------- | ----------------------------------------------------------- | ----------------------------- |
+| Platform staff          | Any school, or all schools if no school filter is supplied. | All users.                    |
+| School staff or student | Only the authenticated user's school.                       | The caller's own user record. |
 
-| Helper                              | Question it answers                                               |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| `resolveSchoolScope`                | Which school's records can this caller query?                     |
-| `schoolFilter`                      | Turns resolved scope into a Prisma `where` predicate.             |
-| `ActiveSchoolService.resolveSchool` | Requires a concrete in-scope school and checks that it is active. |
-| `userVisibility`                    | Which user records can this caller see?                           |
+Resolve scope with `resolveSchoolScope` and apply it in the repository query with the target ID.
+Do not fetch a record and check its school afterward. Foreign or invisible IDs return the same 404
+as missing IDs.
 
-Key rules:
+School-owned workflows that require an active school use `ActiveSchoolService`. Authentication
+rejects school users while their school is inactive; it does not change their stored user status.
 
-- Platform staff may request any school or go unscoped. School users are fixed to their own `schoolId`.
-- Repositories combine target ID + scope + visibility in a single query — never fetch-then-check.
-- Foreign or invisible IDs return 404 (same as nonexistent) to prevent cross-school discovery.
-- School status does not alter a school user's `schoolId`; authentication rejects that user while
-  the school is inactive. Workflows that create school-owned records also require an active school.
-- Platform staff can see all user records. School staff and students currently see only their own
-  user record, even when they have `user.read`.
+## Learning and subscription access
 
-## School and class-section access
+- Curriculum and asset-management data are global. Curriculum services also require platform staff;
+  an assigned permission alone does not grant school users authoring access.
+- Students need an active enrollment in an active delivery. They can see ACTIVE or ARCHIVED
+  STUDENT lessons released to that delivery.
+- Assigned teachers need an active assignment in an active delivery. They can read ACTIVE or
+  ARCHIVED lessons, including TEACHER_ONLY and unreleased lessons. DRAFT lessons are hidden.
+- School-bound learning actors must match the loaded resource's school and have a current course
+  subscription. Hidden or foreign learning resources return 404; expired subscription access
+  returns 403 after visibility checks.
+- Platform staff bypass subscription checks in `CourseAccessService.assertCourseAccess`, but
+  subscription-gated writes call `assertSubscriptionActive` and still require an active term.
+- Asset access is through a visible lesson reference, not an asset ID alone. The returned URL is
+  temporary.
 
-- `school.read` and `school.manage` guard school read and management routes. School creation has an
-  additional service rule: only `PLATFORM_STAFF` can create schools.
-- School staff can read or manage only their own school when granted the route permission.
-  Platform staff can work across schools; an explicit `schoolId` narrows the query.
-- `classsection.read` and `classsection.manage` guard section reads and writes. Section queries
-  always include resolved school scope; foreign IDs return the same 404 as missing IDs.
-- Class-section creation resolves the selected school with `ActiveSchoolService`, so it requires a
-  school ID for platform staff and an active in-scope school for every caller.
+See [database constraints](./database.md) and [API test cases](../testing/api-testing.md) for
+persistence and route-level rules.
 
-## Subscription gating
+## Adding a protected route
 
-- School-user authentication checks school status in `AuthGuard`; workflows that resolve a school
-  also use `ActiveSchoolService`. Subscription checks run in the service layer against
-  `business_today()` from PostgreSQL.
-- Subscription management routes require platform staff with `subscription.manage`. Their reads
-  are available regardless of term status. Status and `retainedUntil` are derived from dates.
-- `CourseAccessService.assertCourseAccess(actor, schoolId, courseId)` is the content-access check:
-  school-bound actors must match the loaded resource's school, then have a current subscription;
-  foreign resources return 404. Platform staff bypass the subscription check in this method only.
-- `assertSubscriptionActive(schoolId, courseId)` always checks the current subscription, including
-  for platform staff. Subscription-gated writes return `403 SUBSCRIPTION_EXPIRED`.
-- `getAccessibleCourseIds(actor)` filters school-bound course lists using the actor's school;
-  platform staff use an explicit school filter instead.
-- A teacher can access a delivery only while an active `delivery_teachers` stint exists. This is
-  checked on every request; a delivery that exists but is not assigned to that teacher returns 404.
-
-| Operation                                                 | Subscription-gated?                         |
-| --------------------------------------------------------- | ------------------------------------------- |
-| Grant, list, get, update, revoke, or renew a subscription | No; platform staff permission still applies |
-| Create a delivery or reactivate an inactive delivery      | Yes, including for platform staff           |
-| Read/list deliveries or deactivate a delivery             | No                                          |
-| Assign/remove/list delivery teachers                      | No                                          |
-| Enroll students individually                              | Yes, including for platform staff           |
-| Read or remove an enrollment                              | No                                          |
-| Release a lesson or all eligible lessons in a module      | Yes, including for platform staff           |
-| Read the release outline or remove a release              | No                                          |
-
-See the [subscription and delivery API cases](../testing/api-testing.md#subscriptions) for route behavior.
-
-## Learning access
-
-- Students can use an ACTIVE delivery only in their authenticated school while their enrollment is
-  ACTIVE. They see and complete only ACTIVE or ARCHIVED STUDENT lessons released to that delivery.
-- Enrollment grants delivery access; a student's current class section is informational only and
-  neither grants nor removes access. Changing class does not alter enrollment.
-- Teachers can use an ACTIVE delivery only in their authenticated school while their assignment is
-  active. They can read ACTIVE or ARCHIVED lessons, including TEACHER_ONLY and unreleased lessons;
-  DRAFT lessons are hidden.
-- Both roles need a current course subscription. A resource hidden by school, delivery, enrollment,
-  assignment, lesson status, audience, or release rules returns the same `404 NOT_FOUND` as a
-  missing resource. Return `403 SUBSCRIPTION_EXPIRED` only after the caller and requested learning
-  resource have passed visibility checks.
-- Asset access requires a READY file on an ACTIVE or ARCHIVED asset referenced by a block in that
-  accessible lesson. The response is a temporary URL using the configured per-type TTL
-  (`ASSET_ACCESS_TTL_*_SECONDS`). An asset ID alone never grants access; students have no
-  asset-ID-only path.
-- Learning reads use the school ID from the authenticated actor. Authentication rechecks current
-  school and user status on every request.
-
-## Auth and user lifecycle
-
-| Workflow               | Route or owner                                 | Behavior                                                                                                                                                                                                                                 |
-| ---------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign in / sign out     | `POST /auth/login`, `POST /auth/logout`        | Login verifies an active user and school, then sets the `steamx_session` cookie. Logout clears the browser cookie; it does not revoke a copied token.                                                                                    |
-| Current profile        | `GET /auth/me`                                 | Returns the profile loaded for the current request; password hashes are not returned.                                                                                                                                                    |
-| Change password        | `POST /auth/change-password`                   | Verifies the current password, applies the shared policy, updates the password timestamp, and issues a new cookie.                                                                                                                       |
-| Create teacher/student | `POST /users/teachers`, `POST /users/students` | Checks active school scope, generates a school-prefixed SteamX ID, and creates the user and required profile in one transaction. New accounts require a password change.                                                                 |
-| Manage account         | `/users/:id` routes                            | Reads and writes apply both school scope and user visibility. Deactivation blocks the next authenticated request; a password reset forces a change at login and revokes older sessions subject to the whole-second timestamp rule above. |
-
-User creation takes an initial password and stores its hash. Student profiles require a class
-section from the same school. Profile, status, and SteamX ID changes are limited to school users;
-password reset is a separate operation and rejects self-reset. See [workflow testing](../testing/workflows-testing.md)
-for end-to-end account scenarios and [database rules](./database.md#identity--users) for enforced
-identity constraints.
-
-## Adding a new protected route
-
-1. Declare route policy: `@RequirePermission`, `@AuthenticatedOnly`, or `@Public`.
-2. Resolve caller school scope in the service — never trust a request-supplied school ID.
-3. Combine ID + scope + visibility predicates in the query.
-4. Return 404 for foreign and nonexistent resources alike.
-5. Add a cross-school e2e test (school A user → school B resource → 404).
-6. Apply `userVisibility` if user records are involved.
+1. Declare the route policy.
+2. Resolve school scope from the authenticated actor, not an untrusted school ID.
+3. Apply target ID, scope, and visibility in the same repository query.
+4. Return 404 for foreign and missing resources alike.
+5. Add an end-to-end test for the in-scope and cross-school cases.

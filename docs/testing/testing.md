@@ -1,49 +1,46 @@
 # Testing
 
-## Test types
+This guide helps you choose and run the test suite for a change; start with the narrowest relevant
+suite, then run broader checks before handover.
 
-- **Unit** tests live beside the code in `apps/backend/src/**/*.spec.ts`. They test one class or
-  function without a database.
-- **Database** tests live in `apps/backend/test/db/*.db-spec.ts`. They test PostgreSQL constraints,
-  triggers, migrations, and persistence behavior against the test database.
-- **End-to-end (e2e)** tests live in `apps/backend/test/e2e/*.e2e-spec.ts`. They make HTTP requests
-  through the real Nest application and database.
-- **Invariant** tests live in `apps/backend/test/invariants/*.spec.ts`. They verify behavior that
-  must hold across features, such as revoking a session after an account change.
+## Test suites
 
-Shared helpers and fixtures belong in `apps/backend/test/support/`.
+| Suite      | Location                        | What it checks                                                 |
+| ---------- | ------------------------------- | -------------------------------------------------------------- |
+| Unit       | `apps/backend/src/**/*.spec.ts` | A class or function without a database.                        |
+| Database   | `apps/backend/test/db/`         | PostgreSQL migrations, constraints, triggers, and persistence. |
+| End-to-end | `apps/backend/test/e2e/`        | HTTP behavior through the Nest app and database.               |
+| Invariant  | `apps/backend/test/invariants/` | Rules that span feature modules.                               |
+| Frontend   | `apps/frontend/src/**/*.test.*` | React components and frontend utilities with mocked API calls. |
 
-## Running tests
+Backend database-backed tests need an isolated PostgreSQL database whose name ends in `_test`.
+They apply migrations and clear test-created rows. See [API testing](./api-testing.md) and
+[workflow testing](./workflows-testing.md) before changing externally visible behavior.
 
-Use `pnpm test` to run every backend test suite in order. To run one suite:
+## Commands
 
-- `pnpm test:unit`
-- `pnpm test:db`
-- `pnpm test:e2e`
-- `pnpm test:invariants`
+Run from the repository root:
 
-Database-backed suites require `apps/backend/.env.test`, a reachable PostgreSQL test database, and
-Prisma migrations. Test setup deploys migrations and clears test-created rows before each file.
-The database URL must target a PostgreSQL database whose name ends in `_test`; tests stop otherwise.
-The test environment also requires `AWS_REGION` and `S3_BUCKET`; use non-production values such as
-`ap-south-1` and `test-bucket`. AWS credentials are optional and should be omitted in tests.
-The `roles`, `permissions`, `role_permissions`, and `_prisma_migrations` tables are kept during reset.
+```powershell
+pnpm --filter @steamx/backend test:unit
+pnpm --filter @steamx/backend test:db
+pnpm --filter @steamx/backend test:e2e
+pnpm --filter @steamx/backend test:invariants
+pnpm --filter @steamx/backend lint
+pnpm --filter @steamx/backend typecheck
+pnpm --filter frontend test
+pnpm --filter frontend lint
+pnpm --filter frontend typecheck
+```
+
+`pnpm --filter @steamx/backend test` runs the four backend suites in order. The root
+`pnpm test`, `pnpm lint`, `pnpm typecheck`, and `pnpm build` run workspace scripts.
 
 ## Test rules
 
-- Test one behavior at a time and name it as behavior, for example, “returns 404 when the school is
-  outside the caller's scope”.
-- Tests are independent, order-free, and contain no sleeps.
-- Control time and randomness through injection.
-- In unit tests, mock only boundaries such as repositories and external services, never the class
-  or function under test.
-- Do not mock the database outside unit tests.
-- Do not test PostgreSQL, NestJS, or Prisma themselves.
-- Coverage percentage is not a goal; protect observable behavior.
-
-## Definition of done
-
-- A new database constraint or trigger has a database test.
-- A new endpoint has an e2e test following [the API testing guide](./api-testing.md).
-- A new business rule has a unit test.
-- Relevant tests, lint, and type-check pass.
+- Keep tests independent and focused on observable behavior.
+- Mock external boundaries in unit tests; do not mock PostgreSQL in database or e2e tests.
+- Add a database test for new database constraints or triggers and an e2e test for new routes.
+- Use an isolated test database. Never run reset commands against shared or production data.
+- For the manual fixture accounts, see [testing seed data](./testing-seed-data.md). That seed is
+  for a fresh development database, not the automated test database.
