@@ -44,7 +44,7 @@ export class DeliveryEnrollmentsRepository {
    * @param tx Current transaction.
    * @param schoolId School that owns the delivery.
    * @param studentIds Requested student IDs.
-   * @returns Each matching profile, class, and account status.
+   * @returns Each matching profile and account status.
    */
   findStudents(tx: Prisma.TransactionClient, schoolId: string, studentIds: string[]) {
     return tx.studentProfile.findMany({

@@ -174,7 +174,7 @@ describe('subscription and delivery database rules', () => {
     const sectionId = await db.createClassSection(schoolId);
     const courseId = await createCourse();
     const subscriptionId = await createSubscription(schoolId, courseId);
-    const deliveryId = await createDelivery(schoolId, courseId, sectionId);
+    const deliveryId = await createDelivery(schoolId, courseId, 'Lesson delivery');
     const studentId = await createStudent(schoolId, sectionId);
     const moduleId = await createModule(courseId);
     const lessonId = await createLesson(moduleId, courseId, {
@@ -352,30 +352,33 @@ describe('subscription and delivery database rules', () => {
 
   it('enforces the delivery limit for inserts, reactivation, and missing subscriptions', async () => {
     const schoolId = await db.createSchool();
-    const sectionOne = await db.createClassSection(schoolId);
-    const sectionTwo = await db.createClassSection(schoolId, 'Class 6');
     const courseId = await createCourse();
     await createSubscription(schoolId, courseId, { maxDeliveries: 1 });
-    await createDelivery(schoolId, courseId, sectionOne);
+    await createDelivery(schoolId, courseId, 'Active delivery');
 
     await expectFailure(
       `INSERT INTO deliveries
          (id, school_id, course_id, label, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
-      [randomUUID(), schoolId, courseId, sectionTwo],
+      [randomUUID(), schoolId, courseId, 'Second delivery'],
       '23000',
       'trg_deliveries_require_active_subscription',
     );
 
     const secondCourseId = await createCourse();
     await createSubscription(schoolId, secondCourseId, { maxDeliveries: 1 });
-    const thirdSection = await db.createClassSection(schoolId, 'Class 7');
-    const firstInactiveDeliveryId = await createDelivery(schoolId, secondCourseId, sectionOne, {
-      status: 'INACTIVE',
-    });
-    const secondInactiveDeliveryId = await createDelivery(schoolId, secondCourseId, thirdSection, {
-      status: 'INACTIVE',
-    });
+    const firstInactiveDeliveryId = await createDelivery(
+      schoolId,
+      secondCourseId,
+      'Inactive delivery one',
+      { status: 'INACTIVE' },
+    );
+    const secondInactiveDeliveryId = await createDelivery(
+      schoolId,
+      secondCourseId,
+      'Inactive delivery two',
+      { status: 'INACTIVE' },
+    );
     await client.query(
       `UPDATE deliveries SET status = 'ACTIVE', updated_at = now() WHERE id = $1`,
       [firstInactiveDeliveryId],
@@ -393,7 +396,7 @@ describe('subscription and delivery database rules', () => {
       `INSERT INTO deliveries
          (id, school_id, course_id, label, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
-      [randomUUID(), schoolId, noSubscriptionCourseId, sectionTwo],
+      [randomUUID(), schoolId, noSubscriptionCourseId, 'No subscription delivery'],
       '23000',
       'trg_deliveries_require_active_subscription',
     );
@@ -470,12 +473,10 @@ describe('subscription and delivery database rules', () => {
 
   it('rejects lowering a subscription cap below its active delivery count', async () => {
     const schoolId = await db.createSchool();
-    const sectionOne = await db.createClassSection(schoolId);
-    const sectionTwo = await db.createClassSection(schoolId, 'Class 6');
     const courseId = await createCourse();
     const subscriptionId = await createSubscription(schoolId, courseId, { maxDeliveries: 2 });
-    await createDelivery(schoolId, courseId, sectionOne);
-    await createDelivery(schoolId, courseId, sectionTwo);
+    await createDelivery(schoolId, courseId, 'Cap delivery one');
+    await createDelivery(schoolId, courseId, 'Cap delivery two');
 
     await expectFailure(
       'UPDATE subscriptions SET max_deliveries = 1 WHERE id = $1',
@@ -585,13 +586,10 @@ describe('subscription and delivery database rules', () => {
     const sectionId = await db.createClassSection(schoolId);
     const courseId = await createCourse();
     await createSubscription(schoolId, courseId, { maxDeliveries: 2 });
-    const deliveryId = await createDelivery(schoolId, courseId, sectionId);
-    const secondDeliveryId = await createDelivery(
-      schoolId,
-      courseId,
-      await db.createClassSection(schoolId, 'Class 6'),
-      { status: 'INACTIVE' },
-    );
+    const deliveryId = await createDelivery(schoolId, courseId, 'Identity delivery');
+    const secondDeliveryId = await createDelivery(schoolId, courseId, 'Other identity delivery', {
+      status: 'INACTIVE',
+    });
     const studentId = await createStudent(schoolId, sectionId);
     const otherStudentId = await createStudent(schoolId, sectionId);
     const enrollmentId = randomUUID();
@@ -623,10 +621,9 @@ describe('subscription and delivery database rules', () => {
 
   it('checks release lesson and module eligibility', async () => {
     const schoolId = await db.createSchool();
-    const sectionId = await db.createClassSection(schoolId);
     const courseId = await createCourse();
     await createSubscription(schoolId, courseId);
-    const deliveryId = await createDelivery(schoolId, courseId, sectionId);
+    const deliveryId = await createDelivery(schoolId, courseId, 'Release delivery');
     const activeModuleId = await createModule(courseId);
     const draftLessonId = await createLesson(activeModuleId, courseId, {
       status: 'DRAFT',
@@ -661,7 +658,7 @@ describe('subscription and delivery database rules', () => {
 
     const otherCourseId = await createCourse();
     await createSubscription(schoolId, otherCourseId);
-    const otherDeliveryId = await createDelivery(schoolId, otherCourseId, sectionId, {
+    const otherDeliveryId = await createDelivery(schoolId, otherCourseId, 'Other course delivery', {
       status: 'INACTIVE',
     });
     const otherModuleId = await createModule(otherCourseId);
