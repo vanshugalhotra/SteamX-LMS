@@ -104,7 +104,7 @@ export const API_ERROR = {
 
   ...defineErrors({
     // Deliveries
-    DELIVERY_ALREADY_EXISTS: alreadyExists('Delivery', 'this class, course, and academic year'),
+    DELIVERY_ALREADY_EXISTS: alreadyExists('Delivery', 'this course, label, and academic year'),
     DELIVERY_LIMIT_REACHED: 'The active delivery limit has been reached',
     DELIVERY_NOT_ACTIVE: notActive('Delivery'),
   }),
@@ -113,7 +113,6 @@ export const API_ERROR = {
     // Deliveries: enrollment
     STUDENT_NOT_FOUND: notFound('Student', 'the delivery school'),
     STUDENT_NOT_ACTIVE: notActive('Student'),
-    STUDENT_WRONG_CLASS: 'Students must belong to the delivery class section',
     ENROLLMENT_NOT_FOUND: notFound('Enrollment'),
     ENROLLMENT_NOT_ACTIVE: 'Completed enrollments cannot be removed',
   }),

@@ -89,7 +89,8 @@ school staff and students currently see only their own record. See [access contr
   course deliveries. It uses `ActiveSchoolService` for school scope and the exported
   `CourseAccessService` for current subscription checks.
 - PostgreSQL constraints enforce non-overlapping terms, active-course requirements, immutable
-  delivery identity, and the per-school-course active-delivery cap. The database trigger locks the
+  delivery school/course/year identity, label uniqueness within school/course/year, and the
+  per-school-course active-delivery cap. The cap counts active labeled groups, and the database trigger locks the
   current subscription while checking capacity to serialize concurrent activations.
 - Delivery reads remain available after subscription expiry and include `subscriptionActive` as
   current-state information. Teacher visibility is limited to deliveries with an active assignment.

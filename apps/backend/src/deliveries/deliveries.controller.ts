@@ -18,6 +18,7 @@ import { CreateDeliveryDto } from './dto/create-delivery.dto.js';
 import { DeliveryListQueryDto } from './dto/delivery-list-query.dto.js';
 import { DeliveryListResponseDto } from './dto/delivery-list-response.dto.js';
 import { DeliveryResponseDto } from './dto/delivery-response.dto.js';
+import { UpdateDeliveryLabelDto } from './dto/update-delivery-label.dto.js';
 import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto.js';
 import { DeliveriesService } from './deliveries.service.js';
 
@@ -36,9 +37,9 @@ export class DeliveriesController {
   // POST /deliveries — Create a delivery
   // ─────────────────────────────────────────
   /**
-   * Creates an ACTIVE delivery after validating the requested school, course, and class section.
+   * Creates an ACTIVE delivery after validating the requested school, course, and label.
    * @param actor Authenticated actor with delivery.manage.
-   * @param body Requested school, course, class section, and academic year.
+   * @param body Requested school, course, label, and academic year.
    * @returns The created delivery with derived fields.
    * @throws NotFoundException for unavailable or out-of-scope records.
    * @throws ConflictException for an inactive course, duplicate delivery, or reached delivery cap.
@@ -49,7 +50,7 @@ export class DeliveriesController {
   @ApiOperation({ summary: 'Create a delivery' })
   @ApiCreatedResponse({ description: 'Delivery created.', type: DeliveryResponseDto })
   @ApiBadRequestResponse({ description: 'Delivery details are invalid.' })
-  @ApiNotFoundResponse({ description: 'School, class section, or course not found.' })
+  @ApiNotFoundResponse({ description: 'School or course not found.' })
   @ApiConflictResponse({
     description: 'Course is inactive, delivery limit is reached, or delivery already exists.',
   })
@@ -58,6 +59,25 @@ export class DeliveriesController {
     @Body() body: CreateDeliveryDto,
   ): Promise<DeliveryResponseDto> {
     return this.deliveries.create(actor, body);
+  }
+
+  // ─────────────────────────────────────────
+  // PATCH /deliveries/:id — Rename a delivery
+  // ─────────────────────────────────────────
+  /** Changes a delivery label without changing its school, course, or academic year. */
+  @RequirePermission(PERMISSION.DELIVERY_MANAGE)
+  @Patch(':id')
+  @ApiOperation({ summary: 'Rename a delivery' })
+  @ApiOkResponse({ description: 'Delivery label updated.', type: DeliveryResponseDto })
+  @ApiBadRequestResponse({ description: 'The delivery ID or label is invalid.' })
+  @ApiNotFoundResponse({ description: 'Delivery not found.' })
+  @ApiConflictResponse({ description: 'A delivery with this label already exists.' })
+  updateLabel(
+    @CurrentAuth() actor: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateDeliveryLabelDto,
+  ): Promise<DeliveryResponseDto> {
+    return this.deliveries.updateLabel(actor, id, body);
   }
 
   // ─────────────────────────────────────────

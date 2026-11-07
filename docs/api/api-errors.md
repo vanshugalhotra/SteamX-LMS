@@ -70,7 +70,6 @@ fallback mapping.
 | `STEAMX_ID_UNAVAILABLE`           |         409 | A SteamX ID cannot be allocated after retries.                      | None                                    |
 | `STUDENT_NOT_ACTIVE`              |         409 | An inactive student is enrolled.                                    | `{ studentIds: string[] }`              |
 | `STUDENT_NOT_FOUND`               |         404 | One or more students are outside the delivery school.               | `{ studentIds: string[] }`              |
-| `STUDENT_WRONG_CLASS`             |         409 | A student is outside the delivery class section.                    | `{ studentIds: string[] }`              |
 | `SUBSCRIPTION_ALREADY_ENDED`      |         409 | An ended subscription is changed again.                             | None                                    |
 | `SUBSCRIPTION_EXPIRED`            |         403 | The school's subscription is not active.                            | None                                    |
 | `SUBSCRIPTION_INVALID_DATE_RANGE` |         400 | The end date is before the start date.                              | None                                    |

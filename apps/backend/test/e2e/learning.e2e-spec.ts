@@ -40,7 +40,7 @@ type LearningDeliverySet = {
   removed: string;
   inactive: string;
   anotherStudent: string;
-  anotherClass: string;
+  otherStudent: string;
   expired: string;
   foreign: string;
   noRelease: string;
@@ -59,7 +59,6 @@ describe('Student learning navigation (e2e)', () => {
   let unenrolledCookie: string;
   let unenrolledStudent: TestUserFixture;
   let otherClassStudent: TestUserFixture;
-  let otherClassSectionId: string;
   let origin: string;
   let alphaCourseId: string;
   let betaCourseId: string;
@@ -128,11 +127,10 @@ describe('Student learning navigation (e2e)', () => {
       );
       return { section: otherClassSection, unenrolledStudent, otherClassStudent };
     });
-    otherClassSectionId = otherClassSection.id;
     unenrolledStudent = createdUnenrolledStudent;
     otherClassStudent = createdOtherClassStudent;
     createdUserIds.push(unenrolledStudent.id, otherClassStudent.id);
-    createdSectionIds.push(otherClassSectionId);
+    createdSectionIds.push(otherClassSection.id);
 
     [studentCookie, teacherCookie, peerTeacherCookie, adminCookie, unenrolledCookie] =
       await Promise.all([
@@ -214,60 +212,35 @@ describe('Student learning navigation (e2e)', () => {
     await createSubscription(fixture.schoolB.school.id, foreignCourseId);
 
     const alphaDeliveries = await Promise.all([
+      createDelivery(fixture.schoolA.school.id, alphaCourseId, 'Current student', '2026-27'),
       createDelivery(
         fixture.schoolA.school.id,
         alphaCourseId,
-        fixture.schoolA.section.id,
-        '2026-27',
-      ),
-      createDelivery(
-        fixture.schoolA.school.id,
-        alphaCourseId,
-        fixture.schoolA.section.id,
+        'Current student second year',
         '2027-28',
       ),
-      createDelivery(
-        fixture.schoolA.school.id,
-        alphaCourseId,
-        fixture.schoolA.section.id,
-        '2025-26',
-      ),
-      createDelivery(
-        fixture.schoolA.school.id,
-        alphaCourseId,
-        fixture.schoolA.section.id,
-        '2024-25',
-      ),
-      createDelivery(
-        fixture.schoolA.school.id,
-        alphaCourseId,
-        fixture.schoolA.section.id,
-        '2023-24',
-      ),
-      createDelivery(
-        fixture.schoolA.school.id,
-        alphaCourseId,
-        fixture.schoolA.section.id,
-        '2022-23',
-      ),
-      createDelivery(fixture.schoolA.school.id, alphaCourseId, otherClassSectionId, '2021-22'),
+      createDelivery(fixture.schoolA.school.id, alphaCourseId, 'Completed enrollment', '2025-26'),
+      createDelivery(fixture.schoolA.school.id, alphaCourseId, 'Removed enrollment', '2024-25'),
+      createDelivery(fixture.schoolA.school.id, alphaCourseId, 'Inactive enrollment', '2023-24'),
+      createDelivery(fixture.schoolA.school.id, alphaCourseId, 'Another student', '2022-23'),
+      createDelivery(fixture.schoolA.school.id, alphaCourseId, 'Other student', '2021-22'),
     ]);
     const expiredDelivery = await createDelivery(
       fixture.schoolA.school.id,
       betaCourseId,
-      fixture.schoolA.section.id,
+      'Expired subscription',
       '2026-27',
     );
     const foreignDelivery = await createDelivery(
       fixture.schoolB.school.id,
       foreignCourseId,
-      fixture.schoolB.section.id,
+      'Foreign school',
       '2026-27',
     );
     const noReleaseDelivery = await createDelivery(
       fixture.schoolA.school.id,
       alphaCourseId,
-      fixture.schoolA.section.id,
+      'No release',
       '2020-21',
     );
     deliveries = {
@@ -277,7 +250,7 @@ describe('Student learning navigation (e2e)', () => {
       removed: alphaDeliveries[3]!,
       inactive: alphaDeliveries[4]!,
       anotherStudent: alphaDeliveries[5]!,
-      anotherClass: alphaDeliveries[6]!,
+      otherStudent: alphaDeliveries[6]!,
       expired: expiredDelivery,
       foreign: foreignDelivery,
       noRelease: noReleaseDelivery,
@@ -300,7 +273,7 @@ describe('Student learning navigation (e2e)', () => {
       ),
       enroll(deliveries.inactive, fixture.schoolA.student.id, fixture.schoolA.school.id),
       enroll(deliveries.anotherStudent, unenrolledStudent.id, fixture.schoolA.school.id),
-      enroll(deliveries.anotherClass, otherClassStudent.id, fixture.schoolA.school.id),
+      enroll(deliveries.otherStudent, otherClassStudent.id, fixture.schoolA.school.id),
       enroll(deliveries.expired, fixture.schoolA.student.id, fixture.schoolA.school.id),
       enroll(deliveries.foreign, fixture.schoolB.student.id, fixture.schoolB.school.id),
     ]);
@@ -601,11 +574,11 @@ describe('Student learning navigation (e2e)', () => {
   async function createDelivery(
     schoolId: string,
     courseId: string,
-    classSectionId: string,
+    label: string,
     academicYear: string,
   ): Promise<string> {
     const delivery = await prisma.delivery.create({
-      data: { schoolId, courseId, classSectionId, academicYear },
+      data: { schoolId, courseId, label, academicYear },
       select: { id: true },
     });
     createdDeliveryIds.push(delivery.id);
@@ -775,18 +748,21 @@ describe('Student learning navigation (e2e)', () => {
     expect(response.body.total).toBe(3);
     expect(response.body.items[0]).toMatchObject({
       deliveryId: deliveries.firstYear,
+      label: 'Current student',
       totalLessons: 3,
       completedLessons: 1,
       subscriptionActive: true,
     });
     expect(response.body.items[1]).toMatchObject({
       deliveryId: deliveries.secondYear,
+      label: 'Current student second year',
       totalLessons: 3,
       completedLessons: 0,
       subscriptionActive: true,
     });
     expect(response.body.items[2]).toMatchObject({
       deliveryId: deliveries.expired,
+      label: 'Expired subscription',
       totalLessons: 1,
       completedLessons: 0,
       subscriptionActive: false,
@@ -796,7 +772,7 @@ describe('Student learning navigation (e2e)', () => {
     ).not.toContain(deliveries.anotherStudent);
     expect(
       response.body.items.map((item: { deliveryId: string }) => item.deliveryId),
-    ).not.toContain(deliveries.anotherClass);
+    ).not.toContain(deliveries.otherStudent);
     expect(
       response.body.items.map((item: { deliveryId: string }) => item.deliveryId),
     ).not.toContain(deliveries.completed);
@@ -810,11 +786,10 @@ describe('Student learning navigation (e2e)', () => {
       expect(Object.keys(item).sort()).toEqual(
         [
           'academicYear',
-          'className',
           'completedLessons',
           'course',
           'deliveryId',
-          'sectionName',
+          'label',
           'subscriptionActive',
           'totalLessons',
         ].sort(),
@@ -1121,7 +1096,7 @@ describe('Student learning navigation (e2e)', () => {
     const deliveryId = await createDelivery(
       fixture.schoolA.school.id,
       courseId,
-      fixture.schoolA.section.id,
+      'Empty outline',
       '2026-27',
     );
     await enroll(deliveryId, fixture.schoolA.student.id, fixture.schoolA.school.id);
@@ -1258,9 +1233,9 @@ describe('Student learning navigation (e2e)', () => {
     await getLessonContent('', deliveries.firstYear, activeLessonId).expect(401);
   });
 
-  it('returns not found for foreign, another-class, and unenrolled deliveries', async () => {
+  it('returns not found for foreign, another-student, and unenrolled deliveries', async () => {
     await getOutline(studentCookie, deliveries.foreign).expect(404);
-    await getOutline(studentCookie, deliveries.anotherClass).expect(404);
+    await getOutline(studentCookie, deliveries.otherStudent).expect(404);
     await getOutline(unenrolledCookie, deliveries.firstYear).expect(404);
   });
 

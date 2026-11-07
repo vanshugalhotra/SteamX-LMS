@@ -150,25 +150,25 @@ describe('Learning asset access endpoint (e2e)', () => {
     deliveryId = await createDelivery(
       fixture.schoolA.school.id,
       schoolACourseId,
-      fixture.schoolA.section.id,
+      'Active student access',
       '2026-27',
     );
     removedEnrollmentDeliveryId = await createDelivery(
       fixture.schoolA.school.id,
       schoolACourseId,
-      fixture.schoolA.section.id,
+      'Removed student access',
       '2027-28',
     );
     foreignDeliveryId = await createDelivery(
       fixture.schoolB.school.id,
       schoolBCourseId,
-      fixture.schoolB.section.id,
+      'Foreign access',
       '2028-29',
     );
     expiredDeliveryId = await createDelivery(
       fixture.schoolA.school.id,
       expiredCourseId,
-      fixture.schoolA.section.id,
+      'Expired access',
       '2029-30',
     );
 
@@ -326,11 +326,11 @@ describe('Learning asset access endpoint (e2e)', () => {
   async function createDelivery(
     schoolId: string,
     courseId: string,
-    classSectionId: string,
+    label: string,
     academicYear: string,
   ): Promise<string> {
     const delivery = await prisma.delivery.create({
-      data: { schoolId, courseId, classSectionId, academicYear },
+      data: { schoolId, courseId, label, academicYear },
       select: { id: true },
     });
     createdDeliveryIds.push(delivery.id);

@@ -29,6 +29,21 @@ This page records decisions and their consequences, including constraints on pla
 - **Fail-closed user visibility** — explicit in queries. Prevents new callers from accidentally inheriting unrestricted access.
 - **School as the tenant key** — users and academic structures reference a school; class and section names are rows owned by that school. The database enforces case-insensitive uniqueness for each school/name pair.
 
+## Deliveries and enrollment
+
+- **Enrollment grants learning access; delivery labels identify groups**
+  - Context: students may change class during a school year, and class membership should not
+    determine access to already-assigned learning.
+  - Decision: enrollment is the access grant. Within a school, course, and academic year, each
+    delivery has a required, case-insensitively unique label. Its display name is derived from the
+    course title, label, and academic year. A student's current class is informational and a class
+    change never changes enrollments.
+  - Alternatives rejected: nullable class section (keeps class coupled to delivery identity);
+    `DeliverySection` join table (adds unnecessary schema and workflows); one delivery per
+    school/course/year (cannot distinguish groups).
+  - Consequence: `max_deliveries` limits active groups per school/course, regardless of label or
+    academic year.
+
 ## Curriculum
 
 - **Lifecycle and deletion** — courses, modules, and lessons share `canTransitionContentStatus`: status never returns to `DRAFT`, while `DRAFT → ARCHIVED` is allowed. Course titles are not unique.

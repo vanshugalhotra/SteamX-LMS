@@ -2,12 +2,7 @@
  * Runs Prisma queries for users and creates each account with its profile atomically.
  */
 import { Injectable } from '@nestjs/common';
-import {
-  EnrollmentStatus,
-  Prisma,
-  type UserStatus,
-  type UserType,
-} from '../generated/prisma/client.js';
+import { Prisma, type UserStatus, type UserType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import { USER_DETAIL_SELECT, USER_LIST_SELECT } from './users.types.js';
@@ -175,14 +170,13 @@ export class UsersRepository {
   }
 
   /**
-   * Updates account and profile fields atomically, completing active enrollments when a student changes class.
+   * Updates account and profile fields atomically without changing delivery enrollments.
    * @param userId User whose profile and enrollments may change.
    * @param where Caller-provided user scope and visibility predicates.
    * @param userData Account fields to update.
    * @param schoolId School that owns the user and related records.
    * @param profileData Optional teacher or student profile changes.
-   * @param classChange Optional new class and actor, used to complete enrollments for other classes.
-   * @returns The updated user or null, and the number of completed enrollments.
+   * @returns The updated user or null.
    */
   update(
     userId: string,
@@ -192,41 +186,19 @@ export class UsersRepository {
     profileData?:
       | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
       | { student: Prisma.StudentProfileUncheckedUpdateManyInput },
-    classChange?: { newClassSectionId: string; actorId: string },
-  ): Promise<{ user: UserDetailRecord | null; completedEnrollments: number }> {
+  ): Promise<UserDetailRecord | null> {
     // User and profile fields must commit together so a partial update is never reported as success.
     return this.prisma.$transaction(async (tx) => {
       const visible = await tx.user.findFirst({ where, select: { id: true } });
       if (!visible) {
-        return { user: null, completedEnrollments: 0 };
+        return null;
       }
 
       if (Object.keys(userData).length > 0) {
         const user = await tx.user.updateMany({ where, data: userData });
         if (user.count === 0) {
-          return { user: null, completedEnrollments: 0 };
+          return null;
         }
-      }
-
-      let completedEnrollments = 0;
-      if (classChange) {
-        completedEnrollments = (
-          await tx.deliveryEnrollment.updateMany({
-            where: {
-              studentId: userId,
-              schoolId,
-              status: EnrollmentStatus.ACTIVE,
-              delivery: {
-                is: { classSectionId: { not: classChange.newClassSectionId } },
-              },
-            },
-            data: {
-              status: EnrollmentStatus.COMPLETED,
-              endedAt: new Date(),
-              endedById: classChange.actorId,
-            },
-          })
-        ).count;
       }
 
       if (profileData) {
@@ -249,10 +221,7 @@ export class UsersRepository {
         }
       }
 
-      return {
-        user: await tx.user.findFirst({ where, select: USER_DETAIL_SELECT }),
-        completedEnrollments,
-      };
+      return tx.user.findFirst({ where, select: USER_DETAIL_SELECT });
     });
   }
 

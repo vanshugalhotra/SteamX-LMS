@@ -182,7 +182,7 @@ function createService(options: { target?: UserDetailRecord } = {}) {
     createStudent: vi
       .fn()
       .mockImplementation(async (input: Partial<UserDetailRecord>) => userRecord(input)),
-    update: vi.fn().mockResolvedValue({ user: userRecord(), completedEnrollments: 0 }),
+    update: vi.fn().mockResolvedValue(userRecord()),
     updateStatus: vi.fn().mockResolvedValue(userRecord()),
   };
   const prisma = {

@@ -250,7 +250,7 @@ CREATE TABLE "deliveries" (
     "id" UUID NOT NULL,
     "school_id" UUID NOT NULL,
     "course_id" UUID NOT NULL,
-    "class_section_id" UUID NOT NULL,
+    "label" TEXT NOT NULL,
     "academic_year" TEXT NOT NULL,
     "status" "delivery_status" NOT NULL DEFAULT 'ACTIVE',
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -558,8 +558,6 @@ CREATE INDEX "subscriptions_school_id_course_id_start_date_end_date_idx" ON "sub
 CREATE INDEX "deliveries_school_id_course_id_status_idx" ON "deliveries"("school_id", "course_id", "status");
 
 -- CreateIndex
-CREATE INDEX "deliveries_class_section_id_idx" ON "deliveries"("class_section_id");
-
 -- CreateIndex
 CREATE UNIQUE INDEX "deliveries_id_school_id_key" ON "deliveries"("id", "school_id");
 
@@ -567,8 +565,6 @@ CREATE UNIQUE INDEX "deliveries_id_school_id_key" ON "deliveries"("id", "school_
 CREATE UNIQUE INDEX "deliveries_id_school_id_course_id_key" ON "deliveries"("id", "school_id", "course_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "deliveries_class_section_id_course_id_academic_year_key" ON "deliveries"("class_section_id", "course_id", "academic_year");
-
 -- CreateIndex
 CREATE INDEX "delivery_teachers_delivery_id_idx" ON "delivery_teachers"("delivery_id");
 
@@ -741,8 +737,6 @@ ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_school_id_fkey" FOREIGN KEY 
 ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 
 -- AddForeignKey
-ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_class_section_id_school_id_fkey" FOREIGN KEY ("class_section_id", "school_id") REFERENCES "class_sections"("id", "school_id") ON DELETE RESTRICT ON UPDATE RESTRICT;
-
 -- AddForeignKey
 ALTER TABLE "delivery_teachers" ADD CONSTRAINT "delivery_teachers_delivery_id_school_id_fkey" FOREIGN KEY ("delivery_id", "school_id") REFERENCES "deliveries"("id", "school_id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 

@@ -18,11 +18,8 @@ export class LearningCourseResponseDto {
   @ApiProperty({ type: LearningCourseSummaryDto })
   course!: LearningCourseSummaryDto;
 
-  @ApiProperty()
-  className!: string;
-
-  @ApiProperty()
-  sectionName!: string;
+  @ApiProperty({ minLength: 1, maxLength: 100 })
+  label!: string;
 
   @ApiProperty({ example: '2026-27' })
   academicYear!: string;

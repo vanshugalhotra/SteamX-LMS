@@ -14,11 +14,6 @@ export class DeliveryListQueryDto extends PaginationQueryDto {
   @IsUUID()
   courseId?: string;
 
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  classSectionId?: string;
-
   @ApiPropertyOptional({ example: '2026-27', pattern: '^\\d{4}-\\d{2}$' })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}$/)

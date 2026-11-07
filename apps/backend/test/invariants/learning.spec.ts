@@ -88,7 +88,6 @@ describe('Learning API invariants', () => {
 
     groupA = await createLearningGroup(api, {
       schoolId: fixture.schoolA.school.id,
-      classSectionId: fixture.schoolA.section.id,
       studentId: fixture.schoolA.student.id,
       teacherId: fixture.schoolA.teacher.id,
       academicYear: '2026-27',
@@ -96,7 +95,6 @@ describe('Learning API invariants', () => {
     });
     groupB = await createLearningGroup(api, {
       schoolId: fixture.schoolB.school.id,
-      classSectionId: fixture.schoolB.section.id,
       studentId: fixture.schoolB.student.id,
       teacherId: fixture.schoolB.teacher.id,
       academicYear: '2026-27',
@@ -112,6 +110,11 @@ describe('Learning API invariants', () => {
     expect(listed.body.items.map((item: { deliveryId: string }) => item.deliveryId)).toEqual([
       groupA.deliveryId,
     ]);
+    expect(listed.body.items[0]).toMatchObject({
+      label: 'Student course',
+      academicYear: '2026-27',
+    });
+    expect(listed.body.items[0]).not.toHaveProperty('classSection');
 
     const outline = await learning(
       'GET',
@@ -410,7 +413,6 @@ async function createLearningGroup(
   api: InvariantApi,
   input: {
     schoolId: string;
-    classSectionId: string;
     studentId: string;
     teacherId: string;
     academicYear: string;
@@ -435,7 +437,7 @@ async function createLearningGroup(
     data: {
       schoolId: input.schoolId,
       courseId: course.id,
-      classSectionId: input.classSectionId,
+      label: 'Student course',
       academicYear: input.academicYear,
     },
     select: { id: true },
@@ -444,7 +446,7 @@ async function createLearningGroup(
     data: {
       schoolId: input.schoolId,
       courseId: course.id,
-      classSectionId: input.classSectionId,
+      label: 'Unassigned',
       academicYear: '2027-28',
     },
     select: { id: true },

@@ -11,13 +11,12 @@ const DELIVERY_SELECT = {
   id: true,
   schoolId: true,
   courseId: true,
-  classSectionId: true,
+  label: true,
   academicYear: true,
   status: true,
   createdAt: true,
   updatedAt: true,
   course: { select: { id: true, title: true } },
-  classSection: { select: { id: true, className: true, sectionName: true } },
 } satisfies Prisma.DeliverySelect;
 
 export type DeliveryRecord = Prisma.DeliveryGetPayload<{ select: typeof DELIVERY_SELECT }>;
@@ -30,19 +29,7 @@ export type DeliveryRecord = Prisma.DeliveryGetPayload<{ select: typeof DELIVERY
 export class DeliveriesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  // -------------------- Section and course lookups --------------------
-  /**
-   * Checks whether the class section ID belongs to the supplied school.
-   * @param classSectionId Class section UUID.
-   * @param schoolId School UUID.
-   * @returns Whether the section exists in that school.
-   */
-  classSectionExistsInSchool(classSectionId: string, schoolId: string): Promise<boolean> {
-    return this.prisma.classSection
-      .findFirst({ where: { id: classSectionId, schoolId }, select: { id: true } })
-      .then((section) => section !== null);
-  }
-
+  // -------------------- Course lookups --------------------
   /**
    * Loads the course fields used to validate delivery creation and activation.
    * @param courseId Course UUID.
@@ -73,7 +60,6 @@ export class DeliveriesRepository {
     const where: Prisma.DeliveryWhereInput = {
       ...schoolFilter(scope),
       ...(query.courseId === undefined ? {} : { courseId: query.courseId }),
-      ...(query.classSectionId === undefined ? {} : { classSectionId: query.classSectionId }),
       ...(query.academicYear === undefined ? {} : { academicYear: query.academicYear }),
       ...(query.status === undefined ? {} : { status: query.status }),
       ...(actor.userType === UserType.SCHOOL_STAFF
@@ -134,7 +120,7 @@ export class DeliveriesRepository {
   }
 
   /**
-   * Creates a delivery using the resolved school ID and request's course, section, and year.
+   * Creates a delivery using the resolved school ID and request's course, label, and year.
    * Database triggers enforce subscription access, capacity, and uniqueness constraints.
    * @param data Delivery fields supplied by the caller.
    * @param schoolId Resolved school UUID.
@@ -145,11 +131,30 @@ export class DeliveriesRepository {
       data: {
         schoolId,
         courseId: data.courseId,
-        classSectionId: data.classSectionId,
+        label: data.label,
         academicYear: data.academicYear,
       },
       select: DELIVERY_SELECT,
     });
+  }
+
+  /**
+   * Updates a delivery label under school scope and reloads the updated record.
+   * @param id Delivery UUID.
+   * @param scope Resolved school UUID, or undefined for platform-wide access.
+   * @param label New label.
+   * @returns The updated delivery, or null when missing or out of scope.
+   */
+  async updateLabel(
+    id: string,
+    scope: string | undefined,
+    label: string,
+  ): Promise<DeliveryRecord | null> {
+    const result = await this.prisma.delivery.updateMany({
+      where: { id, ...schoolFilter(scope) },
+      data: { label },
+    });
+    return result.count === 0 ? null : this.findById(id, scope);
   }
 
   /**

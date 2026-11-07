@@ -221,7 +221,7 @@ describe('identity foreign keys and indexes', () => {
        FROM pg_constraint
        WHERE contype = 'f' AND connamespace = 'public'::regnamespace`,
     );
-    expect(foreignKeys.rowCount).toBe(58);
+    expect(foreignKeys.rowCount).toBe(57);
     expect(
       foreignKeys.rows.every(
         (foreignKey) =>

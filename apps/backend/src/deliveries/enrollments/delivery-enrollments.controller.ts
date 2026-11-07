@@ -59,40 +59,13 @@ export class DeliveryEnrollmentsController {
   @ApiOkResponse({ description: 'Enrollment counts.', type: EnrollmentCountsResponseDto })
   @ApiBadRequestResponse({ description: 'The delivery ID or student IDs are invalid.' })
   @ApiNotFoundResponse({ description: 'Delivery or one or more students not found.' })
-  @ApiConflictResponse({
-    description: 'DELIVERY_NOT_ACTIVE, STUDENT_NOT_ACTIVE, or STUDENT_WRONG_CLASS.',
-  })
+  @ApiConflictResponse({ description: 'DELIVERY_NOT_ACTIVE or STUDENT_NOT_ACTIVE.' })
   enroll(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: EnrollDeliveryStudentsDto,
   ): Promise<EnrollmentCountsResponseDto> {
     return this.deliveryEnrollments.enroll(actor, id, body.studentIds);
-  }
-
-  // ─────────────────────────────────────────
-  // POST /deliveries/:id/enrollments/class — Enroll a class
-  // ─────────────────────────────────────────
-
-  /**
-   * Enrolls all active students currently found in the delivery's school and class section.
-   * @param actor Authenticated actor whose school and active teacher assignment scope the delivery.
-   * @param id Delivery UUID.
-   * @returns Counts of newly enrolled, reactivated, and already-active students.
-   */
-  @RequirePermission(PERMISSION.ENROLLMENT_MANAGE)
-  @Post(':id/enrollments/class')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Enroll the active students in a delivery class' })
-  @ApiOkResponse({ description: 'Enrollment counts.', type: EnrollmentCountsResponseDto })
-  @ApiBadRequestResponse({ description: 'The delivery ID is invalid.' })
-  @ApiNotFoundResponse({ description: 'Delivery not found.' })
-  @ApiConflictResponse({ description: 'DELIVERY_NOT_ACTIVE.' })
-  enrollClass(
-    @CurrentAuth() actor: AuthContext,
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<EnrollmentCountsResponseDto> {
-    return this.deliveryEnrollments.enrollClass(actor, id);
   }
 
   // ─────────────────────────────────────────

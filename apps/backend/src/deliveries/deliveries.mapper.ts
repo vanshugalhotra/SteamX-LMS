@@ -7,7 +7,7 @@ import type { DeliveryEnrollmentResponseDto } from './enrollments/dto/delivery-e
 
 /**
  * Builds the delivery response, including a display name and subscription-state snapshot.
- * @param delivery Stored delivery and selected course/class-section fields.
+ * @param delivery Stored delivery and selected course fields.
  * @param subscriptionActive Current access state for this school-course pair.
  * @returns The public delivery response.
  */
@@ -19,10 +19,10 @@ export function toDeliveryResponse(
     id: delivery.id,
     schoolId: delivery.schoolId,
     course: delivery.course,
-    classSection: delivery.classSection,
+    label: delivery.label,
     academicYear: delivery.academicYear,
     status: delivery.status,
-    displayName: `${delivery.course.title} - ${delivery.classSection.className} ${delivery.classSection.sectionName} - ${delivery.academicYear}`,
+    displayName: `${delivery.course.title} - ${delivery.label} - ${delivery.academicYear}`,
     subscriptionActive,
     createdAt: delivery.createdAt,
     updatedAt: delivery.updatedAt,

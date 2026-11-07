@@ -418,7 +418,7 @@ async function createSchoolFixture(
     data: {
       schoolId,
       courseId,
-      classSectionId: section.id,
+      label: 'Learning access',
       academicYear: '2026-27',
     },
     select: { id: true },
