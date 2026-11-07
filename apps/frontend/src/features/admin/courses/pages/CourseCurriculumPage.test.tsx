@@ -331,7 +331,10 @@ describe('CourseCurriculumPage', () => {
 
     renderPage();
 
-    expect(screen.queryByRole('link', { name: 'How plants make food' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'How plants make food' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/lessons\/lesson-1\/edit$/),
+    );
     expect(
       screen.getByRole('button', { name: 'Actions for lesson How plants make food' }),
     ).toBeInTheDocument();

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api-client';
+import { API_ERROR_CODE } from '@/lib/api-errors';
 import type {
   Lesson,
   LessonContent,
@@ -112,7 +113,9 @@ it('removes and reorders blocks', async () => {
 
 it('offers a reload on version conflict', async () => {
   const user = userEvent.setup();
-  saveContent.mockRejectedValue(new ApiError(409, 'Conflict'));
+  saveContent.mockRejectedValue(
+    new ApiError(409, 'Conflict', { code: API_ERROR_CODE.VERSION_CONFLICT }),
+  );
   const { onReload } = renderEditor();
   await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -121,4 +124,14 @@ it('offers a reload on version conflict', async () => {
   ).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Reload latest version' }));
   expect(onReload).toHaveBeenCalledOnce();
+});
+
+it('does not offer a reload for other 409 errors', async () => {
+  const user = userEvent.setup();
+  saveContent.mockRejectedValue(new ApiError(409, 'Conflict', { code: API_ERROR_CODE.CONFLICT }));
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('This already exists.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reload latest version' })).not.toBeInTheDocument();
 });
