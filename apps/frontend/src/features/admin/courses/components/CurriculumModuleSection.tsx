@@ -138,8 +138,9 @@ export function CurriculumModuleSection({
           <Button
             type="button"
             size="sm"
+            variant="neo"
             onClick={onAddLesson}
-            className="rounded-full flex items-center gap-1.5 border border-gray-200 bg-white text-brand-navy hover:bg-gray-100"
+            className="rounded-full"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             Add lesson
