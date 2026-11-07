@@ -1,8 +1,12 @@
 # Database
 
+This page summarizes the PostgreSQL model and constraints; check the Prisma schema and migrations
+before changing stored data or adding a workflow.
+
 The Prisma schema defines the tables and migrations enforce PostgreSQL rules. Subscriptions,
 deliveries, teacher assignments, enrollments, and lesson releases have API implementations. Use
-this page to check persistence constraints before changing a workflow.
+this page to check persistence constraints before changing a workflow. Assignment and submission
+tables are present in the schema, but their feature APIs are not implemented.
 
 ## Tables
 
@@ -76,7 +80,7 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 `business_today()` currently uses the hard-coded `Asia/Kolkata` timezone. The migration comment says
 it should match a `BUSINESS_TIMEZONE` default, but the backend does not define that setting.
 
-For route-level behavior, see the [subscription and delivery API cases](../testing/api-testing.md#subscriptions).
+For route-level behavior, see the [API testing guide](../testing/api-testing.md).
 
 ### Curriculum & assets
 

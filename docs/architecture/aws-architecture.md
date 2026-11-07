@@ -1,5 +1,8 @@
 # Production AWS Architecture
 
+This page describes a proposed production deployment, not resources currently deployed by CDK.
+Use [infrastructure operations](../operations/infrastructure.md) for the current stack.
+
 ## Overview and scale assumptions
 
 | Item                  | Target                                          |
@@ -12,8 +15,8 @@
 | Origin host           | `origin.thesteamx.com`, used only by CloudFront |
 | Browser origins       | One host; no app/API CORS and no subdomains     |
 
-This is the proposed production design, not a description of deployed resources. See
-[infrastructure.md](../operations/infrastructure.md) for the current CDK stack and deployment instructions.
+The current CDK stack is limited to S3, an IAM user, and a budget. Database backup, restore, ECS,
+and ALB operations described here are not implemented in the repository.
 
 ## Diagram
 

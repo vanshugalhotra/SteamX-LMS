@@ -1,5 +1,8 @@
 # Lesson content
 
+This page defines the lesson-content read and save contract; use it when changing block validation,
+authoring, or learning content responses.
+
 Lesson content is an ordered list of blocks. Each block has a client-generated UUID `id`, a
 `type`, and a type-specific `content` object. Asset-backed blocks also have an `assetId`. The
 examples below show the block shape; UUIDs are shortened only for readability.

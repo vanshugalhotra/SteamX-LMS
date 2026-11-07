@@ -1,134 +1,63 @@
 # Architecture
 
-This page maps the backend's modules and request path. Use it to find the owner of an API behavior.
+This page maps the request path and feature ownership in the NestJS API; use it to find where a
+behavior belongs before changing it.
 
-## Backend layers
+## Backend structure
 
-| Layer      | Responsibility                                                                      |
-| ---------- | ----------------------------------------------------------------------------------- |
-| Controller | HTTP routes, validated DTOs, and response status; delegates to services.            |
-| Service    | Business rules, school scope, and calls to other modules through exported services. |
-| Repository | Prisma queries and transactions; no HTTP behavior.                                  |
+| Layer      | Owns                                                             |
+| ---------- | ---------------------------------------------------------------- |
+| Controller | HTTP routes, DTO inputs, response status; delegates to services. |
+| Service    | Business rules and coordination across feature boundaries.       |
+| Repository | Prisma reads, writes, and transactions; no HTTP behavior.        |
+| Mapper     | Converts selected records into response DTOs.                    |
 
-Mappers convert selected database records to response DTOs. Shared request and domain helpers live
-in `apps/backend/src/common/`; feature rules stay in their feature modules.
+Shared request and domain helpers are in `apps/backend/src/common/`. Feature-specific behavior
+belongs in its module under `apps/backend/src/`.
 
-## Module map
+## Feature map
 
-| Module                                          | Responsibility                                                                                    |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `AppModule`                                     | Composes config, feature modules, global guards, and the exception filter.                        |
-| `AuthModule`                                    | Login, password changes, session tokens, and permission checks. Exports auth services and guards. |
-| `UsersModule`                                   | User accounts, profiles, status, password resets, and SteamX IDs.                                 |
-| `SchoolsModule`                                 | School identity, contact details, status, and school-scope reads. Exports `SchoolsService`.       |
-| `ClassSectionsModule`                           | School-owned class/section records and scoped CRUD. Exports `ClassSectionsService`.               |
-| `TenancyModule`                                 | Resolves active schools for scoped workflows.                                                     |
-| `CurriculumModule`                              | Global course/module/lesson authoring, ordering, outline reads, and lesson content.               |
-| `SubscriptionsModule`                           | Platform-managed school-course terms and shared course-access checks.                             |
-| `DeliveriesModule`                              | School course deliveries, teacher assignments, enrollments, lesson releases, and scoped reads.    |
-| `LearningModule`                                | Student course lists, outlines, progress, completion, lesson content, and lesson asset access.    |
-| `AssetsModule`                                  | Asset/file lifecycle, validation, processing, and author preview.                                 |
-| `StorageModule`                                 | S3 storage contract, presigned URLs, and queued object cleanup.                                   |
-| `PrismaModule`                                  | Configured Prisma client.                                                                         |
-| `HealthModule`, `LoggingModule`, `ConfigModule` | Liveness/readiness, request logging, and validated environment configuration.                     |
+| Feature                                 | Responsibility                                                                   |
+| --------------------------------------- | -------------------------------------------------------------------------------- |
+| `auth`, `users`                         | Cookie sessions, permission checks, accounts, profiles, and passwords.           |
+| `schools`, `class-sections`             | School records and school-owned class/section records.                           |
+| `curriculum`                            | Global courses, modules, lessons, ordering, outlines, and lesson content.        |
+| `subscriptions`                         | School/course access terms and shared course-access checks.                      |
+| `deliveries`                            | School course groups, teacher assignments, enrollments, and lesson releases.     |
+| `learning`                              | Student/teacher course views, progress, lesson content, and lesson asset access. |
+| `assets`, `storage`                     | Asset/file state, S3 access, and queued object cleanup.                          |
+| `health`, `logging`, `config`, `prisma` | Health routes, request logging, validated configuration, and database client.    |
 
-Curriculum `Assignment` and `AssignmentTemplate` APIs are not implemented; their schema tables are
-present.
+`Assignment` and `Submission` tables exist in Prisma, but their feature APIs are not implemented.
 
-## Curriculum authoring
-
-- Curriculum is global, not school-scoped. Course, module, and lesson routes require platform staff
-  as well as their declared `curriculum.read` or `curriculum.write` permission.
-- The hierarchy is `Course → Module → Lesson`. Create routes append draft children; module and
-  lesson lists are unpaginated and position-ordered. Reorder routes require the complete ID set.
-- `CourseOutlineController` is a read-only aggregate over courses, modules, and lessons. It returns
-  all statuses and lesson audiences; it is not the teacher/student delivery view.
-- `LessonContentController` serves the admin authoring read/write path. Reads return a block tree,
-  version, and asset summaries; saves validate and replace the full tree transactionally.
-- `LearningController` serves student course navigation, completion and progress, plus gated lesson
-  content and temporary asset access for enrolled students and assigned teachers.
-- The schema permits moving a lesson between modules in its current course, but there is no public
-  API route for moving lessons.
-
-## Authentication and user data flow
-
-1. Login goes from `AuthController` to `AuthService`, which uses `AuthContextRepository` and
-   `PasswordService`; `TokenService` signs the cookie token.
-2. Protected requests load the current user, role, and school from PostgreSQL in `AuthGuard`.
-   `PermissionGuard` checks the route's declared policy against grants cached at startup.
-3. User routes go from `UsersController` to `UsersService`. It combines school scope and user
-   visibility before reading or mutating records, and calls school/class-section services when
-   needed.
-4. `UsersRepository` handles persistence; account and profile creation/updates that must stay
-   together run in a transaction. `users.mapper.ts` returns public DTOs.
-
-User-record visibility is separate from school scope: platform staff can see all users, while
-school staff and students currently see only their own record. See [access control](./access-control.md).
-
-## Schools and class sections
-
-- `SchoolsController` → `SchoolsService` → `SchoolsRepository` handles school CRUD. School creation
-  is platform-staff-only even when another actor has `school.manage`; school reads and updates use
-  resolved scope.
-- `ClassSectionsController` → `ClassSectionsService` → `ClassSectionsRepository` handles
-  school-owned class/section rows. Creation resolves an active school; list, detail, update, and
-  delete queries include school scope. The service maps duplicate names and referenced deletes to
-  domain conflicts.
-- Class names and section names are stored on each row. A missing section name uses the database
-  default `All`; case-insensitive name pairs are unique within a school. A row is how the schema
-  represents a class and one of its sections.
-- School status is checked by authentication for school users and by `ActiveSchoolService` in
-  workflows that require an active school. See [database constraints](./database.md#identity--users),
-  [access control](./access-control.md), and the [API test checklist](../testing/api-testing.md).
-
-## Subscriptions and deliveries
-
-- `SubscriptionsController` → `SubscriptionsService` → `SubscriptionsRepository` manages
-  school-course terms. Only platform staff with `subscription.manage` can use these routes.
-- `DeliveriesController` → `DeliveriesService` → `DeliveriesRepository` manages active or inactive
-  course deliveries. It uses `ActiveSchoolService` for school scope and the exported
-  `CourseAccessService` for current subscription checks.
-- PostgreSQL constraints enforce non-overlapping terms, active-course requirements, immutable
-  delivery school/course/year identity, label uniqueness within school/course/year, and the
-  per-school-course active-delivery cap. The cap counts active labeled groups, and the database trigger locks the
-  current subscription while checking capacity to serialize concurrent activations.
-- Delivery reads remain available after subscription expiry and include `subscriptionActive` as
-  current-state information. Teacher visibility is limited to deliveries with an active assignment.
-- Student progress counts released STUDENT lessons with ACTIVE or ARCHIVED status, grouped by module;
-  completed counts include only the authenticated student.
-- Un-releasing a lesson keeps its completion row but removes it from both totals while unreleased.
-  Re-releasing it makes the retained completion count again.
-
-See [access control](./access-control.md) for scope rules, [database rules](./database.md) for
-constraints, and the [API test checklist](../testing/api-testing.md#subscriptions) for route cases.
-
-## HTTP request path
+## Main request path
 
 1. Pino assigns a request ID and logs the request.
-2. `OriginGuard` checks `Origin` on state-changing requests.
-3. `AuthGuard` allows public routes or validates the session and current account state.
+2. `OriginGuard` checks `Origin` on POST, PUT, PATCH, and DELETE requests.
+3. `AuthGuard` validates the cookie and reloads the current account and school state.
 4. `PermissionGuard` checks route policy; a protected route without explicit policy is denied.
-5. The global validation pipe transforms DTOs and rejects unknown or invalid fields.
-6. Controller → service → repository; response mappers shape the result. The exception filter
-   returns the standard error envelope.
+5. The global validation pipe transforms DTOs and rejects unknown fields.
+6. Controller → service → repository; the exception filter formats errors.
 
-Rate limiting is not configured. The API prefix is `/api/v1`; Swagger is at `/api/docs` when enabled.
+API routes use `/api/v1`; health routes are `/health/live` and `/health/ready`. Swagger is at
+`/api/docs` when enabled. No rate limiter is configured.
 
-## Asset upload and storage
+## Core data flows
 
-1. `AssetsService` validates declared type, MIME, and size; `AssetsRepository` creates the asset and
-   an `UPLOADING` file row in one transaction.
-2. `StorageService` returns a presigned S3 PUT URL. The client uploads directly to S3, then calls
-   the completion route.
-3. Completion checks S3 size/type and the first 16 bytes, runs the registered processor, and
-   transactionally makes the file `READY`. Current processors do not transform files.
-4. Deleting file rows queues their S3 prefixes through a PostgreSQL trigger. The in-process cleanup
-   scheduler drains the queue and removes stale non-READY files; details and limits are in
-   [infrastructure](../operations/infrastructure.md).
+- **Authoring:** platform staff manage the global `Course → Module → Lesson` hierarchy. Lesson
+  content is saved as a complete versioned block tree.
+- **Delivery:** platform-managed subscriptions allow a school to use a course. School deliveries
+  group that course; assigned teachers and enrolled students receive different learning views.
+- **Learning:** students see released STUDENT lessons while enrolled. Assigned teachers can also
+  read unreleased and TEACHER_ONLY lessons. Both use the authenticated school scope.
+- **Assets:** the API creates upload metadata and a presigned S3 URL. The client uploads directly
+  to S3 and calls completion. The current processors validate and pass files through; they do not
+  transcode them. File removal queues storage cleanup.
 
-## Related guides
+## Where to look next
 
-- [Database schema and constraints](./database.md)
-- [Access control](./access-control.md)
-- [Infrastructure and storage operations](../operations/infrastructure.md)
-- [Lesson content contract](./lesson-content.md)
+- [Access control](./access-control.md) for identity, permissions, and tenant filtering.
+- [Database](./database.md) for schema constraints and migration commands.
+- [Lesson content](./lesson-content.md) for the read/save contract.
+- [Infrastructure](../operations/infrastructure.md) for the current S3-only CDK stack.
+- [Proposed AWS design](./aws-architecture.md) for the not-yet-deployed target.
