@@ -139,9 +139,9 @@ change occur in different whole seconds when checking old-token revocation.
 11. As admin, attempt to deactivate own account; expect `400 CANNOT_DEACTIVATE_SELF`.
 12. Attempt to manage a platform-staff target; expect `400 USER_NOT_MANAGEABLE`.
 
-## Student class-section change
+## Student promotion
 
-**Goal:** Confirm section ownership and complete old-class enrollments during student promotion.
+**Goal:** Confirm class changes do not affect enrollments or learning access.
 
 **Preconditions:** Admin session; student in School A; one section in each of Schools A and B.
 
@@ -150,12 +150,11 @@ change occur in different whole seconds when checking old-token revocation.
 3. Call the same route with School B's section ID.
 4. Expect `404 NOT_FOUND` and the student's section to remain unchanged.
 5. Select the student's current section again; expect a successful no-op response.
-6. With ACTIVE, REMOVED, and COMPLETED enrollments in deliveries for the student's old class,
-   change to the new section. Expect old-class ACTIVE rows to become COMPLETED with `endedAt` and
-   `endedBy` recorded; REMOVED and COMPLETED rows remain unchanged.
-7. Confirm no enrollment was created for a delivery in the new section.
-8. Change back to the old section and enroll again. Expect the existing COMPLETED enrollment row
-   to be reactivated with the same ID and cleared ending fields.
+6. Enroll the student in an ACTIVE delivery and record its enrollment ID.
+7. Change the student's section. Expect the enrollment to remain ACTIVE with the same ID and
+   unchanged ending fields.
+8. Confirm the student still sees the delivery in `GET /api/v1/learning/courses`; the enrollment
+   list shows the student's new CURRENT section as informational data.
 
 ## SteamX ID generation and rename
 
@@ -288,18 +287,19 @@ email, names, and creation times.
 and renewal.
 
 **Preconditions:** Platform staff with `subscription.manage`; admin with `delivery.manage`,
-`enrollment.manage`, and `release.manage`; active school, course, and class section; active students;
+`enrollment.manage`, and `release.manage`; active school and course; active students;
 active module with at least one ACTIVE STUDENT-audience lesson. Use an isolated test database.
 
 1. As platform staff, grant the school/course a current subscription with `POST /api/v1/subscriptions`.
-2. As admin, create an ACTIVE delivery for the class and course with `POST /api/v1/deliveries`.
+2. As admin, create an ACTIVE delivery with a required label using `POST /api/v1/deliveries`.
 3. Assign a same-school active teacher with `POST /api/v1/deliveries/:id/teachers`.
-4. Enroll active students in that class with `POST /api/v1/deliveries/:id/enrollments/class`.
+4. Enroll active students from any class in one request with
+   `POST /api/v1/deliveries/:id/enrollments` (up to 500 student IDs).
 5. Release an eligible lesson with `PUT /api/v1/deliveries/:id/releases/lessons/:lessonId` or
    release its module with `POST /api/v1/deliveries/:id/releases/modules/:moduleId`.
 6. End the subscription yesterday in the isolated database, or set its end date to yesterday
    through the subscription API. Use the database `business_today()` date.
-7. Attempt delivery creation/reactivation, explicit/class enrollment, and lesson/module release.
+7. Attempt delivery creation/reactivation, explicit enrollment, and lesson/module release.
    Expect `403 SUBSCRIPTION_EXPIRED`, including for platform admin. Delivery, enrollment, and
    release management reads remain available.
 8. Renew the expired term with `POST /api/v1/subscriptions/:id/renew`; expect a new subscription

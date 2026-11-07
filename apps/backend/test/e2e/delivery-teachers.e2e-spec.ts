@@ -135,7 +135,7 @@ describe('Delivery teacher endpoints (e2e)', () => {
       data: {
         schoolId: fixture.schoolA.school.id,
         courseId,
-        classSectionId: fixture.schoolA.section.id,
+        label: `Teacher group ${randomUUID()}`,
         academicYear: `${year}-${String((deliverySequence + 1) % 100).padStart(2, '0')}`,
       },
       select: { id: true },

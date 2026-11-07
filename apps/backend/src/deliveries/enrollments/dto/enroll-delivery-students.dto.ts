@@ -6,12 +6,12 @@ export class EnrollDeliveryStudentsDto {
     type: [String],
     format: 'uuid',
     minItems: 1,
-    maxItems: 200,
+    maxItems: 500,
     uniqueItems: true,
   })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(200)
+  @ArrayMaxSize(500)
   @IsUUID('all', { each: true })
   studentIds!: string[];
 }

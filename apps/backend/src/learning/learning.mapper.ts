@@ -29,8 +29,7 @@ export function toLearningCourseResponse(
   return {
     deliveryId: enrollment.deliveryId,
     course: enrollment.delivery.course,
-    className: enrollment.delivery.classSection.className,
-    sectionName: enrollment.delivery.classSection.sectionName,
+    label: enrollment.delivery.label,
     academicYear: enrollment.delivery.academicYear,
     totalLessons,
     completedLessons,

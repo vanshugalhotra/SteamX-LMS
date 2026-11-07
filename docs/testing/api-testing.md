@@ -222,25 +222,35 @@ date-only `YYYY-MM-DD`; subscription status, active-delivery count, and retentio
 ### `POST /deliveries`
 
 Caller: `admin` with `delivery.manage`; creates an ACTIVE delivery in the requested school's
-scope. The school, same-school class section, and ACTIVE course are checked before current
+scope. The school and ACTIVE course are checked before current
 subscription access and the active delivery cap.
 
-- [auto] When school, section, course, and current subscription are valid and capacity remains -> expect `201`, nested course/section fields, derived `displayName`, and `subscriptionActive: true`.
-- [auto] When school is unknown or class section belongs to another school -> expect `404 NOT_FOUND`.
+- [auto] When school, course, label, and current subscription are valid and capacity remains -> expect `201`, nested course fields, label, derived `displayName`, and `subscriptionActive: true`.
+- [auto] When school or course is unknown -> expect `404 NOT_FOUND`.
 - [auto] When course is unknown -> expect `404 NOT_FOUND`; when DRAFT or ARCHIVED -> expect `409 COURSE_NOT_ACTIVE`.
 - [auto] When subscription is expired, absent, or upcoming, including for platform admin -> expect `403 SUBSCRIPTION_EXPIRED`.
 - [auto] When active delivery count reaches `maxDeliveries` -> expect `409 DELIVERY_LIMIT_REACHED` with used/max in the message.
-- [auto] When `(classSectionId, courseId, academicYear)` already exists -> expect `409 DELIVERY_ALREADY_EXISTS`; another academic year is allowed.
+- [auto] When `(schoolId, courseId, academicYear, lower(label))` already exists -> expect `409 DELIVERY_ALREADY_EXISTS`; another label, year, or school is allowed.
+- [auto] Labels are trimmed and must contain 1..100 characters; blank/overlong labels -> expect `400 VALIDATION_ERROR`.
 - [auto] When two requests race for the final slot -> expect exactly one `201` and one `409 DELIVERY_LIMIT_REACHED`.
 - [auto] When academic year does not match `YYYY-YY` or an unknown field is supplied -> expect `400 VALIDATION_ERROR`.
 - [auto] When teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
+
+### `PATCH /deliveries/:id`
+
+Caller: `admin` with `delivery.manage`; updates only the delivery label.
+
+- [auto] When the label is valid -> expect `200` with trimmed `label` and `displayName` recomputed as `{course.title} - {label} - {academicYear}`.
+- [auto] When another delivery has the same label ignoring case for the school, course, and year -> expect `409 DELIVERY_ALREADY_EXISTS`.
+- [auto] Renaming an INACTIVE delivery or renaming after subscription expiry is allowed; renaming does not consume a delivery slot or require subscription access.
+- [auto] When delivery is missing or foreign -> expect `404 NOT_FOUND`; when teacher or student calls -> expect `403 FORBIDDEN`; when unauthenticated -> expect `401 UNAUTHORIZED`.
 
 ### `GET /deliveries`
 
 Caller: `admin` or `teacher` with `delivery.read`; returns a paginated, newest-first list and an
 informational `subscriptionActive` value derived for each school-course pair.
 
-- [auto] When course, class section, academic year, or status is supplied -> expect results matching all supplied filters.
+- [auto] When course, academic year, or status is supplied -> expect results matching all supplied filters; there is no class-section filter.
 - [auto] When page and limit are supplied -> expect the correct page and total.
 - [auto] When a course subscription expires -> deliveries remain readable and report `subscriptionActive: false`.
 - [auto] When a teacher lists deliveries -> only rows with that teacher's active assignment appear; removed and foreign-school rows are absent.
@@ -300,25 +310,16 @@ Caller: `admin` with `delivery.manage`; returns a paginated assignment list.
 Caller: `admin` or an assigned `teacher` with `enrollment.manage`; enrolls the supplied active
 students in one delivery.
 
-Send up to 200 student IDs in one request. For more students, split them into groups of 200 or fewer
-and send more requests. To enroll everyone active in the delivery's class, use the class endpoint below.
+Send up to 500 student IDs in one request. Larger sets must use multiple requests.
 
 - [auto] When valid student IDs are supplied -> expect `200` with `enrolled`, `reactivated`, and `alreadyEnrolled` counts; duplicate IDs are processed once.
 - [auto] When any student is missing or belongs to another school -> expect `404 STUDENT_NOT_FOUND` with IDs in details and no enrollment writes.
-- [auto] When any student is inactive -> expect `409 STUDENT_NOT_ACTIVE`; when any student belongs to another class -> expect `409 STUDENT_WRONG_CLASS`; both validate the full request before writing.
+- [auto] Students in any current class in the delivery's school may be enrolled; class placement does not grant or restrict access.
+- [auto] When any student is inactive -> expect `409 STUDENT_NOT_ACTIVE`; the full request is validated before writing.
 - [auto] When the delivery is inactive -> expect `409 DELIVERY_NOT_ACTIVE`; when the subscription is expired -> expect `403 SUBSCRIPTION_EXPIRED`, including for admin.
 - [auto] Repeating an enrollment returns `alreadyEnrolled`; reactivating a REMOVED or COMPLETED row reuses its ID and clears ended fields.
-- [auto] When body has 0 or more than 200 IDs, malformed UUIDs, or unknown fields -> expect `400 VALIDATION_ERROR`.
+- [auto] When body has 0 or more than 500 IDs, malformed UUIDs, or unknown fields -> expect `400 VALIDATION_ERROR`.
 - [auto] When teacher is unassigned, foreign-school, or removed from the delivery -> expect `404 NOT_FOUND`; student -> `403 FORBIDDEN`; no cookie -> `401 UNAUTHORIZED`.
-
-### `POST /deliveries/:id/enrollments/class`
-
-Caller and access rules match the explicit enrollment route; enrolls active users in the delivery's
-class section, silently skipping inactive users.
-
-- [auto] When active students match the delivery class -> expect `200` counts; a repeat is a no-op, and no matching active students returns zero counts.
-- [auto] Inactive delivery -> `409 DELIVERY_NOT_ACTIVE`; expired subscription -> `403 SUBSCRIPTION_EXPIRED`; an unassigned teacher -> `404 NOT_FOUND`.
-- [auto] When student or unauthenticated caller calls -> expect `403 FORBIDDEN` or `401 UNAUTHORIZED`.
 
 ### `GET /deliveries/:id/enrollments`
 
@@ -326,7 +327,7 @@ Caller: `admin` or an assigned `teacher` with `enrollment.manage`; reads are ava
 subscription expiry and return a paginated, newest-first list.
 
 - [auto] When `status` is omitted, all statuses are returned; `status=ACTIVE`, `status=REMOVED`, or `status=COMPLETED` filters the list before pagination.
-- [auto] Each item includes student identity, class section, enrollment status/timestamps, and enrolling/ending actors.
+- [auto] Each item includes student identity, the student's CURRENT class section as read-only information, enrollment status/timestamps, and enrolling/ending actors; there is no class filter.
 - [auto] When the delivery is missing, foreign, or has no active teacher stint -> expect `404 NOT_FOUND`; student -> `403 FORBIDDEN`; no cookie -> `401 UNAUTHORIZED`.
 
 ### `DELETE /deliveries/:id/enrollments/:studentId`
@@ -346,7 +347,7 @@ deleting history or changing submissions/completions.
 Caller: a student with `learning.read`; returns a paginated list of the student's ACTIVE
 enrollments in ACTIVE deliveries, ordered by course title and academic year.
 
-- [auto] Each item includes only delivery ID, course ID/title/description, class and section names, academic year, eligible lesson/completion counts, and `subscriptionActive`.
+- [auto] Each item includes only delivery ID, course ID/title/description, delivery label, academic year, eligible lesson/completion counts, and `subscriptionActive`; it does not include class-section data.
 - [auto] Counts include only released STUDENT lessons with ACTIVE or ARCHIVED status; completed lessons are limited to that same set.
 - [auto] COMPLETED or REMOVED enrollments, INACTIVE deliveries, and another student's or another school's enrollments are omitted.
 - [auto] An expired subscription does not hide a course; it returns `subscriptionActive: false`.

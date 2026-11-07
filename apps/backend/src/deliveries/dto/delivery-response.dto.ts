@@ -9,17 +9,6 @@ export class DeliveryCourseDto {
   title!: string;
 }
 
-export class DeliveryClassSectionDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty()
-  className!: string;
-
-  @ApiProperty()
-  sectionName!: string;
-}
-
 export class DeliveryResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -30,8 +19,8 @@ export class DeliveryResponseDto {
   @ApiProperty({ type: DeliveryCourseDto })
   course!: DeliveryCourseDto;
 
-  @ApiProperty({ type: DeliveryClassSectionDto })
-  classSection!: DeliveryClassSectionDto;
+  @ApiProperty({ minLength: 1, maxLength: 100 })
+  label!: string;
 
   @ApiProperty({ example: '2026-27' })
   academicYear!: string;

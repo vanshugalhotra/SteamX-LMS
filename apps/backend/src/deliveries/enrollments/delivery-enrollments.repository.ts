@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EnrollmentStatus, Prisma, UserStatus } from '../../generated/prisma/client.js';
+import { EnrollmentStatus, Prisma } from '../../generated/prisma/client.js';
 import { paginatedSearch } from '../../common/repositories/paginated-search.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { DeliveryEnrollmentListQueryDto } from './dto/delivery-enrollment-list-query.dto.js';
@@ -51,31 +51,8 @@ export class DeliveryEnrollmentsRepository {
       where: { userId: { in: studentIds }, schoolId },
       select: {
         userId: true,
-        classSectionId: true,
         user: { select: { status: true } },
       },
-    });
-  }
-
-  /**
-   * Loads only active student accounts in the specified school and class.
-   * @param tx Current transaction.
-   * @param schoolId School that owns the delivery.
-   * @param classSectionId Delivery class-section ID.
-   * @returns The IDs of active students in the class.
-   */
-  findActiveStudentsInClass(
-    tx: Prisma.TransactionClient,
-    schoolId: string,
-    classSectionId: string,
-  ) {
-    return tx.studentProfile.findMany({
-      where: {
-        schoolId,
-        classSectionId,
-        user: { status: UserStatus.ACTIVE },
-      },
-      select: { userId: true },
     });
   }
 

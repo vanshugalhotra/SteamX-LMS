@@ -92,7 +92,7 @@ Key rules:
 | Create a delivery or reactivate an inactive delivery      | Yes, including for platform staff           |
 | Read/list deliveries or deactivate a delivery             | No                                          |
 | Assign/remove/list delivery teachers                      | No                                          |
-| Add students individually or enroll the delivery class    | Yes, including for platform staff           |
+| Enroll students individually                              | Yes, including for platform staff           |
 | Read or remove an enrollment                              | No                                          |
 | Release a lesson or all eligible lessons in a module      | Yes, including for platform staff           |
 | Read the release outline or remove a release              | No                                          |
@@ -103,6 +103,8 @@ See the [subscription and delivery API cases](../testing/api-testing.md#subscrip
 
 - Students can use an ACTIVE delivery only in their authenticated school while their enrollment is
   ACTIVE. They see and complete only ACTIVE or ARCHIVED STUDENT lessons released to that delivery.
+- Enrollment grants delivery access; a student's current class section is informational only and
+  neither grants nor removes access. Changing class does not alter enrollment.
 - Teachers can use an ACTIVE delivery only in their authenticated school while their assignment is
   active. They can read ACTIVE or ARCHIVED lessons, including TEACHER_ONLY and unreleased lessons;
   DRAFT lessons are hidden.

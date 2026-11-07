@@ -204,7 +204,7 @@ describe('Subscriptions endpoints (e2e)', () => {
       data: {
         schoolId: fixture.schoolA.school.id,
         courseId,
-        classSectionId: fixture.schoolA.section.id,
+        label: `Subscription group ${randomUUID()}`,
         academicYear: `${deliveryYear}-${(deliveryYear + 1).toString().slice(-2)}`,
         status: DeliveryStatus.ACTIVE,
       },

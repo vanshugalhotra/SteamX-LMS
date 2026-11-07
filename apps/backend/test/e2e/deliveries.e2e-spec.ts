@@ -34,7 +34,6 @@ describe('Deliveries endpoints (e2e)', () => {
   let studentCookie: string;
   let today: string;
   const createdCourseIds: string[] = [];
-  const extraSectionIds: string[] = [];
 
   beforeAll(async () => {
     const databaseUrl = process.env.DATABASE_URL;
@@ -82,7 +81,7 @@ describe('Deliveries endpoints (e2e)', () => {
           fixture.schoolB.student.id,
         ],
         schoolIds,
-        [fixture.schoolA.section.id, fixture.schoolB.section.id, ...extraSectionIds],
+        [fixture.schoolA.section.id, fixture.schoolB.section.id],
       );
     }
     await app?.close();
@@ -131,8 +130,8 @@ describe('Deliveries endpoints (e2e)', () => {
     options: {
       schoolId?: string;
       courseId: string;
-      classSectionId?: string;
       academicYear: string;
+      label?: string;
     },
   ) {
     return request(app.getHttpServer())
@@ -142,8 +141,8 @@ describe('Deliveries endpoints (e2e)', () => {
       .send({
         schoolId: options.schoolId ?? fixture.schoolA.school.id,
         courseId: options.courseId,
-        classSectionId: options.classSectionId ?? fixture.schoolA.section.id,
         academicYear: options.academicYear,
+        label: options.label ?? `Delivery ${randomUUID()}`,
       });
   }
 
@@ -166,14 +165,22 @@ describe('Deliveries endpoints (e2e)', () => {
       .send({ status });
   }
 
+  function updateDeliveryLabel(cookie: string, id: string, label: string) {
+    return request(app.getHttpServer())
+      .patch(`/api/v1/deliveries/${id}`)
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send({ label });
+  }
+
   async function createDirectDelivery(
     schoolId: string,
     courseId: string,
-    classSectionId: string,
+    label: string,
     academicYear: string,
   ): Promise<{ id: string }> {
     return prisma.delivery.create({
-      data: { schoolId, courseId, classSectionId, academicYear },
+      data: { schoolId, courseId, label, academicYear },
       select: { id: true },
     });
   }
@@ -182,34 +189,43 @@ describe('Deliveries endpoints (e2e)', () => {
     const courseId = await createCourse();
     await createSubscription(fixture.schoolA.school.id, courseId, { maxDeliveries: 2 });
 
-    const first = await createDelivery(adminCookie, { courseId, academicYear: '2030-31' }).expect(
-      201,
-    );
+    const first = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2030-31',
+      label: 'Grade 5 Blue',
+    }).expect(201);
     expect(first.body).toMatchObject({
       schoolId: fixture.schoolA.school.id,
       course: { id: courseId },
-      classSection: {
-        id: fixture.schoolA.section.id,
-        className: fixture.schoolA.section.className,
-        sectionName: fixture.schoolA.section.sectionName,
-      },
+      label: 'Grade 5 Blue',
       academicYear: '2030-31',
       status: DeliveryStatus.ACTIVE,
-      displayName: `${first.body.course.title} - ${fixture.schoolA.section.className} ${fixture.schoolA.section.sectionName} - 2030-31`,
+      displayName: `${first.body.course.title} - Grade 5 Blue - 2030-31`,
       subscriptionActive: true,
     });
     expect(first.body).not.toHaveProperty('courseId');
     expect(first.body).not.toHaveProperty('classSectionId');
+    expect(first.body).not.toHaveProperty('classSection');
 
-    const second = await createDelivery(adminCookie, { courseId, academicYear: '2031-32' }).expect(
-      201,
-    );
-    const atCap = await createDelivery(adminCookie, { courseId, academicYear: '2032-33' });
+    const second = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2030-31',
+      label: 'Grade 5 Green',
+    }).expect(201);
+    const atCap = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2032-33',
+      label: 'Grade 6',
+    });
     expectError(atCap, 409, 'DELIVERY_LIMIT_REACHED');
     expect(atCap.body.message).toContain('2/2');
 
     await updateDeliveryStatus(adminCookie, first.body.id, DeliveryStatus.INACTIVE).expect(200);
-    await createDelivery(adminCookie, { courseId, academicYear: '2032-33' }).expect(201);
+    await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2032-33',
+      label: 'Grade 6',
+    }).expect(201);
     expectError(
       await updateDeliveryStatus(adminCookie, first.body.id, DeliveryStatus.ACTIVE),
       409,
@@ -285,17 +301,34 @@ describe('Deliveries endpoints (e2e)', () => {
     }).expect(201);
   });
 
-  it('rejects duplicate delivery identity and inactive courses, but permits another academic year', async () => {
+  it('rejects duplicate delivery labels and inactive courses, but permits another year', async () => {
     const courseId = await createCourse();
     await createSubscription(fixture.schoolA.school.id, courseId);
-    await createDelivery(adminCookie, { courseId, academicYear: '2030-31' }).expect(201);
+    const created = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2030-31',
+      label: ' Science ',
+    }).expect(201);
+    expect(created.body.label).toBe('Science');
     expectError(
-      await createDelivery(adminCookie, { courseId, academicYear: '2030-31' }),
+      await createDelivery(adminCookie, {
+        courseId,
+        academicYear: '2030-31',
+        label: 'science',
+      }),
       409,
       'DELIVERY_ALREADY_EXISTS',
     );
-    await createDelivery(adminCookie, { courseId, academicYear: '2032' }).expect(400);
-    await createDelivery(adminCookie, { courseId, academicYear: '2031-32' }).expect(201);
+    await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2030-31',
+      label: '',
+    }).expect(400);
+    await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2031-32',
+      label: 'Science',
+    }).expect(201);
     expectError(
       await request(app.getHttpServer())
         .post('/api/v1/deliveries')
@@ -304,8 +337,8 @@ describe('Deliveries endpoints (e2e)', () => {
         .send({
           schoolId: fixture.schoolA.school.id,
           courseId,
-          classSectionId: fixture.schoolA.section.id,
           academicYear: '2033-34',
+          label: 'Science',
           unknown: true,
         }),
       400,
@@ -325,7 +358,7 @@ describe('Deliveries endpoints (e2e)', () => {
     }
   });
 
-  it('returns 404 for an unknown school and a section belonging to another school', async () => {
+  it('returns 404 for an unknown school or course', async () => {
     const courseId = await createCourse();
     await createSubscription(fixture.schoolA.school.id, courseId);
     expectError(
@@ -345,15 +378,85 @@ describe('Deliveries endpoints (e2e)', () => {
       404,
       'NOT_FOUND',
     );
+  });
+
+  it('distinguishes labels case-insensitively within school, course, and year', async () => {
+    const courseId = await createCourse();
+    await createSubscription(fixture.schoolA.school.id, courseId);
+    await createSubscription(fixture.schoolB.school.id, courseId);
+    const sameSchool = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2034-35',
+      label: 'Advanced',
+    }).expect(201);
+    const otherLabel = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2034-35',
+      label: 'Foundation',
+    }).expect(201);
+    const otherYear = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2035-36',
+      label: 'Advanced',
+    }).expect(201);
+    const otherSchool = await createDelivery(adminCookie, {
+      schoolId: fixture.schoolB.school.id,
+      courseId,
+      academicYear: '2034-35',
+      label: 'Advanced',
+    }).expect(201);
+
+    expect(
+      new Set([sameSchool.body.id, otherLabel.body.id, otherYear.body.id, otherSchool.body.id])
+        .size,
+    ).toBe(4);
+  });
+
+  it('renames inactive deliveries without subscription access and derives displayName', async () => {
+    const courseId = await createCourse();
+    const subscriptionId = await createSubscription(fixture.schoolA.school.id, courseId, {
+      startDate: addDateDays(today, -10),
+    });
+    const delivery = await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2036-37',
+      label: 'Original',
+    }).expect(201);
+    await createDelivery(adminCookie, {
+      courseId,
+      academicYear: '2036-37',
+      label: 'Reserved',
+    }).expect(201);
+    await updateDeliveryStatus(adminCookie, delivery.body.id, DeliveryStatus.INACTIVE).expect(200);
+    await prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: { endDate: new Date(`${addDateDays(today, -1)}T00:00:00.000Z`) },
+    });
+
+    const renamed = await updateDeliveryLabel(adminCookie, delivery.body.id, ' Renamed ').expect(
+      200,
+    );
+    expect(renamed.body).toMatchObject({
+      label: 'Renamed',
+      status: DeliveryStatus.INACTIVE,
+      subscriptionActive: false,
+      displayName: `${delivery.body.course.title} - Renamed - 2036-37`,
+    });
     expectError(
-      await createDelivery(adminCookie, {
-        schoolId: fixture.schoolA.school.id,
-        classSectionId: fixture.schoolB.section.id,
-        courseId,
-        academicYear: '2030-31',
-      }),
-      404,
-      'NOT_FOUND',
+      await updateDeliveryLabel(adminCookie, delivery.body.id, 'rEsErVeD'),
+      409,
+      'DELIVERY_ALREADY_EXISTS',
+    );
+    expectError(
+      await updateDeliveryLabel(teacherACookie, delivery.body.id, 'Teacher'),
+      403,
+      'PERMISSION_REQUIRED',
+    );
+    expectError(await updateDeliveryLabel(adminCookie, randomUUID(), 'Missing'), 404, 'NOT_FOUND');
+    expectError(
+      await updateDeliveryLabel(adminCookie, delivery.body.id, '   '),
+      400,
+      'VALIDATION_ERROR',
     );
   });
 
@@ -368,9 +471,9 @@ describe('Deliveries endpoints (e2e)', () => {
       expectError(
         await createDelivery(adminCookie, {
           schoolId: fixture.schoolB.school.id,
-          classSectionId: fixture.schoolB.section.id,
           courseId,
           academicYear: '2030-31',
+          label: 'School B group',
         }),
         409,
         'SCHOOL_INACTIVE',
@@ -384,22 +487,17 @@ describe('Deliveries endpoints (e2e)', () => {
   });
 
   it('filters and paginates results with subscription activity derived per school-course pair', async () => {
-    const section = await prisma.classSection.create({
-      data: { schoolId: fixture.schoolA.school.id, className: `Delivery filter ${randomUUID()}` },
-      select: { id: true },
-    });
-    extraSectionIds.push(section.id);
     const activeCourseId = await createCourse();
     await createSubscription(fixture.schoolA.school.id, activeCourseId);
     const first = await createDelivery(adminCookie, {
       courseId: activeCourseId,
-      classSectionId: section.id,
       academicYear: '2030-31',
+      label: 'First',
     }).expect(201);
     const second = await createDelivery(adminCookie, {
       courseId: activeCourseId,
-      classSectionId: section.id,
       academicYear: '2031-32',
+      label: 'Second',
     }).expect(201);
     await updateDeliveryStatus(adminCookie, second.body.id, DeliveryStatus.INACTIVE).expect(200);
 
@@ -411,8 +509,8 @@ describe('Deliveries endpoints (e2e)', () => {
     );
     const expiredDelivery = await createDelivery(adminCookie, {
       courseId: expiredCourseId,
-      classSectionId: section.id,
       academicYear: '2032-33',
+      label: 'Expired',
     }).expect(201);
     await prisma.subscription.update({
       where: { id: expiredSubscriptionId },
@@ -420,18 +518,16 @@ describe('Deliveries endpoints (e2e)', () => {
     });
 
     const pageOne = await listDeliveries(adminCookie, {
-      schoolId: fixture.schoolA.school.id,
-      classSectionId: section.id,
+      courseId: activeCourseId,
       page: 1,
-      limit: 2,
+      limit: 1,
     }).expect(200);
-    expect(pageOne.body).toMatchObject({ page: 1, limit: 2, total: 3 });
-    expect(pageOne.body.items).toHaveLength(2);
+    expect(pageOne.body).toMatchObject({ page: 1, limit: 1, total: 2 });
+    expect(pageOne.body.items).toHaveLength(1);
     const pageTwo = await listDeliveries(adminCookie, {
-      schoolId: fixture.schoolA.school.id,
-      classSectionId: section.id,
+      courseId: activeCourseId,
       page: 2,
-      limit: 2,
+      limit: 1,
     }).expect(200);
     expect(pageTwo.body.items).toHaveLength(1);
     const all = [...pageOne.body.items, ...pageTwo.body.items] as {
@@ -442,7 +538,11 @@ describe('Deliveries endpoints (e2e)', () => {
     expect(Date.parse(all[0]!.createdAt)).toBeGreaterThanOrEqual(Date.parse(all[1]!.createdAt));
     expect(all.find(({ id }) => id === first.body.id)?.subscriptionActive).toBe(true);
     expect(all.find(({ id }) => id === second.body.id)?.subscriptionActive).toBe(true);
-    expect(all.find(({ id }) => id === expiredDelivery.body.id)?.subscriptionActive).toBe(false);
+    expect(
+      (await listDeliveries(adminCookie, { courseId: expiredCourseId })).body.items.find(
+        ({ id }: { id: string }) => id === expiredDelivery.body.id,
+      )?.subscriptionActive,
+    ).toBe(false);
 
     expect(
       (await listDeliveries(adminCookie, { courseId: activeCourseId })).body.items.map(
@@ -451,12 +551,18 @@ describe('Deliveries endpoints (e2e)', () => {
     ).toEqual(expect.arrayContaining([first.body.id, second.body.id]));
     expect(
       (
-        await listDeliveries(adminCookie, { classSectionId: section.id, academicYear: '2030-31' })
+        await listDeliveries(adminCookie, {
+          courseId: activeCourseId,
+          academicYear: '2030-31',
+        })
       ).body.items.map((item: { id: string }) => item.id),
     ).toEqual([first.body.id]);
     expect(
       (
-        await listDeliveries(adminCookie, { classSectionId: section.id, status: 'INACTIVE' })
+        await listDeliveries(adminCookie, {
+          courseId: activeCourseId,
+          status: 'INACTIVE',
+        })
       ).body.items.map((item: { id: string }) => item.id),
     ).toEqual([second.body.id]);
   });
@@ -468,19 +574,19 @@ describe('Deliveries endpoints (e2e)', () => {
     const assigned = await createDirectDelivery(
       fixture.schoolA.school.id,
       courseId,
-      fixture.schoolA.section.id,
+      'Assigned',
       '2030-31',
     );
     const removed = await createDirectDelivery(
       fixture.schoolA.school.id,
       courseId,
-      fixture.schoolA.section.id,
+      'Removed',
       '2031-32',
     );
     const otherSchool = await createDirectDelivery(
       fixture.schoolB.school.id,
       courseId,
-      fixture.schoolB.section.id,
+      'Foreign',
       '2030-31',
     );
     await prisma.deliveryTeacher.create({
@@ -530,6 +636,15 @@ describe('Deliveries endpoints (e2e)', () => {
       403,
       'PERMISSION_REQUIRED',
     );
+    expectError(
+      await request(app.getHttpServer())
+        .patch(`/api/v1/deliveries/${assigned.id}`)
+        .set('Origin', origin)
+        .set('Cookie', teacherACookie)
+        .send({ label: 'Teacher rename' }),
+      403,
+      'PERMISSION_REQUIRED',
+    );
   });
 
   it('denies students on every delivery route and unauthenticated callers before authorization', async () => {
@@ -559,8 +674,8 @@ describe('Deliveries endpoints (e2e)', () => {
       .send({
         schoolId: fixture.schoolA.school.id,
         courseId,
-        classSectionId: fixture.schoolA.section.id,
         academicYear: '2032-33',
+        label: 'Anonymous',
       });
     expectError(anonymousPost, 401, 'AUTHENTICATION_FAILED');
     expectError(

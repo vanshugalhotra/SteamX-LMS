@@ -20,7 +20,6 @@ describe('delivery teacher database rules', () => {
     const db = createRawDbContext(client);
     const schoolId = await db.createSchool();
     const courseId = randomUUID();
-    const classSectionId = await db.createClassSection(schoolId);
     const teacherId = await db.createUser({
       userType: 'SCHOOL_STAFF',
       roleKey: 'teacher',
@@ -45,9 +44,9 @@ describe('delivery teacher database rules', () => {
     );
     await client.query(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, status, updated_at)
-       VALUES ($1, $2, $3, $4, '2026-27', 'ACTIVE', now())`,
-      [deliveryId, schoolId, courseId, classSectionId],
+         (id, school_id, course_id, label, academic_year, status, updated_at)
+       VALUES ($1, $2, $3, 'Teacher group', '2026-27', 'ACTIVE', now())`,
+      [deliveryId, schoolId, courseId],
     );
 
     const firstAssignmentId = randomUUID();

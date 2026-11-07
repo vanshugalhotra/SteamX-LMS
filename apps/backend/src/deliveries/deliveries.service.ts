@@ -22,6 +22,7 @@ import { CourseAccessService } from '../subscriptions/course-access.service.js';
 import type { CreateDeliveryDto } from './dto/create-delivery.dto.js';
 import type { DeliveryListQueryDto } from './dto/delivery-list-query.dto.js';
 import type { DeliveryResponseDto } from './dto/delivery-response.dto.js';
+import type { UpdateDeliveryLabelDto } from './dto/update-delivery-label.dto.js';
 import type { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto.js';
 import { toDeliveryResponse } from './deliveries.mapper.js';
 import { DeliveriesRepository } from './deliveries.repository.js';
@@ -54,9 +55,6 @@ export class DeliveriesService {
   async create(actor: AuthContext, body: CreateDeliveryDto): Promise<DeliveryResponseDto> {
     const school = await this.activeSchool.resolveSchool(actor, body.schoolId);
     const scope = school.id;
-    if (!(await this.deliveries.classSectionExistsInSchool(body.classSectionId, scope))) {
-      throw new NotFoundException(API_ERROR.NOT_FOUND);
-    }
 
     const course = await this.deliveries.findCourse(body.courseId);
     if (!course) {
@@ -86,6 +84,47 @@ export class DeliveriesService {
     } catch (error) {
       throwConflictOnDuplicate(error, API_ERROR.DELIVERY_ALREADY_EXISTS);
       await this.mapDeliveryWriteError(error, scope, body.courseId);
+      throw error;
+    }
+  }
+
+  /**
+   * Renames a delivery under actor school scope without requiring an active subscription.
+   * @param actor Authenticated actor.
+   * @param id Delivery UUID.
+   * @param body New delivery label.
+   * @returns The delivery response with a newly derived display name.
+   * @throws NotFoundException when the delivery is missing or out of scope.
+   * @throws ConflictException when the label is already used for the school, course, and year.
+   */
+  async updateLabel(
+    actor: AuthContext,
+    id: string,
+    body: UpdateDeliveryLabelDto,
+  ): Promise<DeliveryResponseDto> {
+    const scope = resolveSchoolScope(actor);
+    if (!(await this.deliveries.findById(id, scope))) {
+      throw new NotFoundException(API_ERROR.NOT_FOUND);
+    }
+
+    try {
+      const delivery = await this.deliveries.updateLabel(id, scope, body.label);
+      if (!delivery) {
+        throw new NotFoundException(API_ERROR.NOT_FOUND);
+      }
+      this.logger.info(
+        {
+          actorId: actor.userId,
+          action: 'label_change',
+          deliveryId: delivery.id,
+          schoolId: delivery.schoolId,
+          courseId: delivery.courseId,
+        },
+        'Delivery label changed',
+      );
+      return this.toResponse(delivery);
+    } catch (error) {
+      throwConflictOnDuplicate(error, API_ERROR.DELIVERY_ALREADY_EXISTS);
       throw error;
     }
   }

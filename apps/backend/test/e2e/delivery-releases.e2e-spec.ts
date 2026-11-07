@@ -127,7 +127,7 @@ describe('Delivery release endpoints (e2e)', () => {
       data: {
         schoolId: fixture.schoolA.school.id,
         courseId,
-        classSectionId: fixture.schoolA.section.id,
+        label: `Release group ${randomUUID()}`,
         academicYear: `${2500 + deliverySequence}-01`,
         status,
       },
@@ -228,7 +228,7 @@ describe('Delivery release endpoints (e2e)', () => {
       data: {
         schoolId: fixture.schoolB.school.id,
         courseId,
-        classSectionId: fixture.schoolB.section.id,
+        label: `Foreign release group ${randomUUID()}`,
         academicYear: '2600-01',
         status: DeliveryStatus.ACTIVE,
       },

@@ -54,7 +54,7 @@ const STUDENT_COURSE_SELECT = {
   delivery: {
     select: {
       academicYear: true,
-      classSection: { select: { className: true, sectionName: true } },
+      label: true,
       course: { select: { id: true, title: true, description: true } },
     },
   },

@@ -253,7 +253,7 @@ export class UsersService {
 
   /**
    * Updates applicable account and profile fields together for a visible school user.
-   * Changing a student's class completes active enrollments for deliveries in other classes.
+   * Changing a student's current class does not change delivery enrollments.
    * @param actor Authenticated actor defining school and record visibility.
    * @param id User UUID.
    * @param body Account and profile changes.
@@ -288,7 +288,6 @@ export class UsersService {
       | { teacher: Prisma.TeacherProfileUncheckedUpdateManyInput }
       | { student: Prisma.StudentProfileUncheckedUpdateManyInput }
       | undefined;
-    let newClassSectionId: string | undefined;
     if (user.userType === UserType.SCHOOL_STAFF && body.primaryAssignment !== undefined) {
       profileData = { teacher: { primaryAssignment: body.primaryAssignment } };
     }
@@ -303,7 +302,6 @@ export class UsersService {
       ) {
         await this.sections.assertInSchool(body.classSectionId, user.schoolId);
         studentData.classSectionId = body.classSectionId;
-        newClassSectionId = body.classSectionId;
       }
       if (Object.keys(studentData).length > 0) {
         profileData = { student: studentData };
@@ -315,14 +313,7 @@ export class UsersService {
     }
 
     try {
-      const { user: updated, completedEnrollments } = await this.users.update(
-        id,
-        where,
-        userData,
-        user.schoolId,
-        profileData,
-        newClassSectionId === undefined ? undefined : { newClassSectionId, actorId: actor.userId },
-      );
+      const updated = await this.users.update(id, where, userData, user.schoolId, profileData);
       if (!updated) {
         throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
@@ -331,7 +322,6 @@ export class UsersService {
           actorId: actor.userId,
           userId: updated.id,
           schoolId: updated.schoolId,
-          ...(newClassSectionId === undefined ? {} : { completedEnrollments }),
         },
         'User updated',
       );

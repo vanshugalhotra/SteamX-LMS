@@ -36,6 +36,9 @@ pnpm --filter @steamx/backend prisma:generate
 pnpm --filter @steamx/backend migrate:dev
 ```
 
+After pulling a change that edits the existing migrations, reset your local database with
+`pnpm --filter @steamx/backend exec prisma migrate reset`.
+
 Set `DATABASE_URL` and `AUTH_JWT_SECRET` in `apps/backend/.env`. To create the initial platform
 admin, also set `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD`, then run:
 

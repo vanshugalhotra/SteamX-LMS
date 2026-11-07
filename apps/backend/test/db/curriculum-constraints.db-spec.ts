@@ -549,7 +549,7 @@ describe('curriculum and asset database rules', () => {
     const activeDeliveryId = randomUUID();
     await client.query(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, updated_at)
+         (id, school_id, course_id, label, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
       [activeDeliveryId, schoolId, activeCourse, sectionId],
     );
@@ -586,7 +586,7 @@ describe('curriculum and asset database rules', () => {
     );
     await expectPgFailure(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, updated_at)
+         (id, school_id, course_id, label, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
       [randomUUID(), schoolId, archivedCourse, sectionId],
       { code: '23000', name: 'trg_deliveries_reject_archived_course' },
@@ -1119,7 +1119,7 @@ describe('curriculum and asset database rules', () => {
     );
     await client.query(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, updated_at)
+         (id, school_id, course_id, label, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
       [deliveryId, schoolId, course, sectionId],
     );

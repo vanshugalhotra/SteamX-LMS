@@ -176,17 +176,14 @@ describe('Delivery enrollment endpoints (e2e)', () => {
     return section.id;
   }
 
-  async function createDelivery(
-    classSectionId = fixture.schoolA.section.id,
-    status: DeliveryStatus = DeliveryStatus.ACTIVE,
-  ): Promise<string> {
+  async function createDelivery(status: DeliveryStatus = DeliveryStatus.ACTIVE): Promise<string> {
     deliverySequence += 1;
     const year = 2500 + deliverySequence;
     const delivery = await prisma.delivery.create({
       data: {
         schoolId: fixture.schoolA.school.id,
         courseId,
-        classSectionId,
+        label: `Enrollment group ${deliverySequence}`,
         academicYear: `${year}-${String(deliverySequence % 100).padStart(2, '0')}`,
         status,
       },
@@ -201,13 +198,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       .set('Origin', origin)
       .set('Cookie', cookie)
       .send({ studentIds });
-  }
-
-  function enrollClass(cookie: string, deliveryId: string) {
-    return request(app.getHttpServer())
-      .post(`/api/v1/deliveries/${deliveryId}/enrollments/class`)
-      .set('Origin', origin)
-      .set('Cookie', cookie);
   }
 
   function listEnrollments(
@@ -254,21 +244,23 @@ describe('Delivery enrollment endpoints (e2e)', () => {
   it('validates every requested student before enrolling any and returns the enrollment list', async () => {
     const deliveryId = await createDelivery();
     const validStudent = await createStudent();
-    const wrongClassStudent = await createStudent(await createSection());
+    const otherClassStudent = await createStudent(await createSection());
     const inactiveStudent = await createStudent(fixture.schoolA.section.id, UserStatus.INACTIVE);
 
-    const wrongClass = await enroll(adminCookie, deliveryId, [
+    const enrolledAcrossClasses = await enroll(adminCookie, deliveryId, [
       validStudent.id,
-      wrongClassStudent.id,
-    ]);
-    expectError(wrongClass, 409, 'STUDENT_WRONG_CLASS');
-    expect(wrongClass.body.details.studentIds).toEqual([wrongClassStudent.id]);
-    expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(0);
+      otherClassStudent.id,
+    ]).expect(200);
+    expect(enrolledAcrossClasses.body).toEqual({
+      enrolled: 2,
+      reactivated: 0,
+      alreadyEnrolled: 0,
+    });
 
     const inactive = await enroll(adminCookie, deliveryId, [validStudent.id, inactiveStudent.id]);
     expectError(inactive, 409, 'STUDENT_NOT_ACTIVE');
     expect(inactive.body.details.studentIds).toEqual([inactiveStudent.id]);
-    expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(0);
+    expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(2);
 
     expectError(await enroll(adminCookie, deliveryId, []), 400, 'VALIDATION_ERROR');
     expectError(await enroll(adminCookie, deliveryId, ['not-a-uuid']), 400, 'VALIDATION_ERROR');
@@ -276,7 +268,7 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       await enroll(
         adminCookie,
         deliveryId,
-        Array.from({ length: 201 }, () => randomUUID()),
+        Array.from({ length: 501 }, () => randomUUID()),
       ),
       400,
       'VALIDATION_ERROR',
@@ -286,35 +278,58 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       const notFound = await enroll(adminCookie, deliveryId, [validStudent.id, missingId]);
       expectError(notFound, 404, 'STUDENT_NOT_FOUND');
       expect(notFound.body.details.studentIds).toEqual([missingId]);
-      expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(0);
+      expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(2);
     }
 
-    const enrolled = await enroll(adminCookie, deliveryId, [
+    const repeated = await enroll(adminCookie, deliveryId, [
       validStudent.id,
       validStudent.id,
     ]).expect(200);
-    expect(enrolled.body).toEqual({ enrolled: 1, reactivated: 0, alreadyEnrolled: 0 });
+    expect(repeated.body).toEqual({ enrolled: 0, reactivated: 0, alreadyEnrolled: 1 });
     const list = await listEnrollments(adminCookie, deliveryId).expect(200);
-    expect(list.body).toMatchObject({
-      total: 1,
-      items: [
-        {
+    expect(list.body.total).toBe(2);
+    const listedStudents = list.body.items as {
+      studentId: string;
+      classSection: { id: string };
+      status: EnrollmentStatus;
+    }[];
+    expect(listedStudents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
           studentId: validStudent.id,
-          name: expect.any(String),
-          steamxId: validStudent.steamxId,
-          classSection: {
-            id: fixture.schoolA.section.id,
-            className: expect.any(String),
-            sectionName: 'All',
-          },
+          classSection: expect.objectContaining({ id: fixture.schoolA.section.id }),
           status: EnrollmentStatus.ACTIVE,
-          enrolledBy: { id: fixture.admin.id, name: 'Tenancy Test Admin' },
-          endedAt: null,
-          endedBy: null,
-        },
-      ],
-    });
+        }),
+        expect.objectContaining({
+          studentId: otherClassStudent.id,
+          classSection: expect.objectContaining({ id: otherClassStudent.classSectionId }),
+          status: EnrollmentStatus.ACTIVE,
+        }),
+      ]),
+    );
     expect(list.body.items[0].id).toBeTruthy();
+  });
+
+  it('enrolls 500 students and rejects 501 student IDs', async () => {
+    const deliveryId = await createDelivery();
+    const students = await Promise.all(Array.from({ length: 500 }, () => createStudent()));
+    const result = await enroll(
+      adminCookie,
+      deliveryId,
+      students.map(({ id }) => id),
+    ).expect(200);
+    expect(result.body).toEqual({ enrolled: 500, reactivated: 0, alreadyEnrolled: 0 });
+
+    expectError(
+      await enroll(
+        adminCookie,
+        deliveryId,
+        Array.from({ length: 501 }, () => randomUUID()),
+      ),
+      400,
+      'VALIDATION_ERROR',
+    );
+    expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(500);
   });
 
   it('is idempotent, removes safely, and reactivates the same enrollment row', async () => {
@@ -379,97 +394,37 @@ describe('Delivery enrollment endpoints (e2e)', () => {
     expect(finalRow.enrolledById).toBe(fixture.admin.id);
   });
 
-  it('enrolls active students in the delivery class and silently skips inactive users', async () => {
-    const sectionId = await createSection();
-    const activeStudent = await createStudent(sectionId);
-    await createStudent(sectionId, UserStatus.INACTIVE);
-    const deliveryId = await createDelivery(sectionId);
-
-    const first = await enrollClass(adminCookie, deliveryId).expect(200);
-    expect(first.body).toEqual({ enrolled: 1, reactivated: 0, alreadyEnrolled: 0 });
-    const second = await enrollClass(adminCookie, deliveryId).expect(200);
-    expect(second.body).toEqual({ enrolled: 0, reactivated: 0, alreadyEnrolled: 1 });
-    expect(
-      await prisma.deliveryEnrollment.count({ where: { deliveryId, studentId: activeStudent.id } }),
-    ).toBe(1);
-    expect(await prisma.deliveryEnrollment.count({ where: { deliveryId } })).toBe(1);
-
-    const emptyDelivery = await createDelivery(await createSection());
-    await expect(enrollClass(adminCookie, emptyDelivery).expect(200)).resolves.toMatchObject({
-      body: { enrolled: 0, reactivated: 0, alreadyEnrolled: 0 },
-    });
-  });
-
-  it('completes old-class active enrollments on class change and reuses them when returning', async () => {
-    const oldDeliveryId = await createDelivery();
-    const removedDeliveryId = await createDelivery();
-    const completedDeliveryId = await createDelivery();
+  it('keeps enrollment and learning access when a student changes class', async () => {
+    const deliveryId = await createDelivery();
     const nextSectionId = await createSection();
-    const nextDeliveryId = await createDelivery(nextSectionId);
-    const student = await createStudent();
+    await enroll(adminCookie, deliveryId, [fixture.schoolA.student.id]).expect(200);
 
-    await enroll(adminCookie, oldDeliveryId, [student.id]).expect(200);
-    await enroll(adminCookie, removedDeliveryId, [student.id]).expect(200);
-    await removeEnrollment(adminCookie, removedDeliveryId, student.id).expect(204);
-    await enroll(adminCookie, completedDeliveryId, [student.id]).expect(200);
-    const completedBefore = await prisma.deliveryEnrollment.update({
-      where: {
-        deliveryId_studentId: { deliveryId: completedDeliveryId, studentId: student.id },
-      },
-      data: {
-        status: EnrollmentStatus.COMPLETED,
-        endedAt: new Date(),
-        endedById: fixture.admin.id,
-      },
-    });
-
-    await patchUser(student.id, { classSectionId: fixture.schoolA.section.id }).expect(200);
-    const beforeNoOp = await prisma.deliveryEnrollment.findUniqueOrThrow({
-      where: { deliveryId_studentId: { deliveryId: oldDeliveryId, studentId: student.id } },
-    });
-    expect(beforeNoOp.status).toBe(EnrollmentStatus.ACTIVE);
-
-    const changed = await patchUser(student.id, { classSectionId: nextSectionId }).expect(200);
+    const changed = await patchUser(fixture.schoolA.student.id, {
+      classSectionId: nextSectionId,
+    }).expect(200);
     expect(changed.body.profile.classSectionId).toBe(nextSectionId);
-    const [completedOld, removed, unchangedCompleted] = await Promise.all([
-      prisma.deliveryEnrollment.findUniqueOrThrow({
-        where: { deliveryId_studentId: { deliveryId: oldDeliveryId, studentId: student.id } },
-      }),
-      prisma.deliveryEnrollment.findUniqueOrThrow({
-        where: { deliveryId_studentId: { deliveryId: removedDeliveryId, studentId: student.id } },
-      }),
-      prisma.deliveryEnrollment.findUniqueOrThrow({
-        where: { deliveryId_studentId: { deliveryId: completedDeliveryId, studentId: student.id } },
-      }),
-    ]);
-    expect(completedOld).toMatchObject({
-      status: EnrollmentStatus.COMPLETED,
-      endedById: fixture.admin.id,
+    const enrollment = await prisma.deliveryEnrollment.findUniqueOrThrow({
+      where: {
+        deliveryId_studentId: { deliveryId, studentId: fixture.schoolA.student.id },
+      },
     });
-    expect(completedOld.endedAt).toBeTruthy();
-    expect(removed.status).toBe(EnrollmentStatus.REMOVED);
-    expect(unchangedCompleted.status).toBe(EnrollmentStatus.COMPLETED);
-    expect(unchangedCompleted.endedAt).toEqual(completedBefore.endedAt);
-    expectError(
-      await removeEnrollment(adminCookie, oldDeliveryId, student.id),
-      409,
-      'ENROLLMENT_NOT_ACTIVE',
-    );
-    expect(
-      await prisma.deliveryEnrollment.count({
-        where: { deliveryId: nextDeliveryId, studentId: student.id },
-      }),
-    ).toBe(0);
+    expect(enrollment).toMatchObject({
+      status: EnrollmentStatus.ACTIVE,
+      endedAt: null,
+      endedById: null,
+    });
 
-    await patchUser(student.id, { classSectionId: fixture.schoolA.section.id }).expect(200);
-    const response = await enroll(adminCookie, oldDeliveryId, [student.id]).expect(200);
-    expect(response.body).toEqual({ enrolled: 0, reactivated: 1, alreadyEnrolled: 0 });
-    const reactivated = await prisma.deliveryEnrollment.findUniqueOrThrow({
-      where: { id: completedOld.id },
-    });
-    expect(reactivated.status).toBe(EnrollmentStatus.ACTIVE);
-    expect(reactivated.endedAt).toBeNull();
-    expect(reactivated.endedById).toBeNull();
+    const learningCourses = await request(app.getHttpServer())
+      .get('/api/v1/learning/courses')
+      .set('Cookie', studentCookie)
+      .expect(200);
+    expect(learningCourses.body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ deliveryId, academicYear: expect.any(String) }),
+      ]),
+    );
+    const enrollmentList = await listEnrollments(adminCookie, deliveryId).expect(200);
+    expect(enrollmentList.body.items[0].classSection.id).toBe(nextSectionId);
   });
 
   it('enforces active teacher stints on all routes and role authentication', async () => {
@@ -482,7 +437,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
 
     const unassignedCalls = [
       () => enroll(peerTeacherCookie, deliveryId, [assignedStudent.id]),
-      () => enrollClass(peerTeacherCookie, deliveryId),
       () => listEnrollments(peerTeacherCookie, deliveryId),
       () => removeEnrollment(peerTeacherCookie, deliveryId, assignedStudent.id),
     ];
@@ -493,7 +447,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
     await removeTeacher(deliveryId, fixture.schoolA.teacher.id).expect(204);
     const removedTeacherCalls = [
       () => enroll(teacherCookie, deliveryId, [assignedStudent.id]),
-      () => enrollClass(teacherCookie, deliveryId),
       () => listEnrollments(teacherCookie, deliveryId),
       () => removeEnrollment(teacherCookie, deliveryId, assignedStudent.id),
     ];
@@ -503,7 +456,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
 
     const foreignTeacherCalls = [
       () => enroll(otherSchoolTeacherCookie, deliveryId, [assignedStudent.id]),
-      () => enrollClass(otherSchoolTeacherCookie, deliveryId),
       () => listEnrollments(otherSchoolTeacherCookie, deliveryId),
       () => removeEnrollment(otherSchoolTeacherCookie, deliveryId, assignedStudent.id),
     ];
@@ -513,7 +465,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
 
     const studentCalls = [
       () => enroll(studentCookie, deliveryId, [assignedStudent.id]),
-      () => enrollClass(studentCookie, deliveryId),
       () => listEnrollments(studentCookie, deliveryId),
       () => removeEnrollment(studentCookie, deliveryId, assignedStudent.id),
     ];
@@ -527,10 +478,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
           .post(`/api/v1/deliveries/${deliveryId}/enrollments`)
           .set('Origin', origin)
           .send({ studentIds: [assignedStudent.id] }),
-      () =>
-        request(app.getHttpServer())
-          .post(`/api/v1/deliveries/${deliveryId}/enrollments/class`)
-          .set('Origin', origin),
       () => request(app.getHttpServer()).get(`/api/v1/deliveries/${deliveryId}/enrollments`),
       () =>
         request(app.getHttpServer())
@@ -570,8 +517,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       403,
       'SUBSCRIPTION_EXPIRED',
     );
-    expectError(await enrollClass(adminCookie, deliveryId), 403, 'SUBSCRIPTION_EXPIRED');
-    expectError(await enrollClass(teacherCookie, deliveryId), 403, 'SUBSCRIPTION_EXPIRED');
     await listEnrollments(adminCookie, deliveryId).expect(200);
     await listEnrollments(teacherCookie, deliveryId).expect(200);
     await removeEnrollment(teacherCookie, deliveryId, existingStudent.id).expect(204);
@@ -584,7 +529,6 @@ describe('Delivery enrollment endpoints (e2e)', () => {
       .expect(201);
     expect(renewed.body.id).not.toBe(subscriptionId);
     await enroll(adminCookie, deliveryId, [newStudent.id]).expect(200);
-    await enrollClass(adminCookie, deliveryId).expect(200);
   });
 
   it('rejects enrollment on an inactive delivery but permits removal', async () => {

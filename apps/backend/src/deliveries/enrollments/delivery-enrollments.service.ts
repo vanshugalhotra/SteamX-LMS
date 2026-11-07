@@ -9,11 +9,6 @@ import {
 import type { AuthContext } from '../../auth/types/auth-context.js';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import { paginate } from '../../common/pagination/paginate.js';
-import {
-  getPostgresCode,
-  getPrismaReason,
-  isPrismaKnownError,
-} from '../../common/errors/prisma-error.js';
 import { CourseAccessService } from '../../subscriptions/course-access.service.js';
 import { DeliveryAccessService } from '../delivery-access.service.js';
 import { toDeliveryEnrollmentResponse } from '../deliveries.mapper.js';
@@ -45,7 +40,7 @@ export class DeliveryEnrollmentsService {
    * @param studentIds Student IDs; duplicates are processed only once.
    * @returns Counts of new, reactivated, and already-active enrollments.
    * @throws NotFoundException when the delivery or a requested same-school student is missing.
-   * @throws ConflictException when the delivery is inactive or a student is inactive/in another class.
+   * @throws ConflictException when the delivery or any requested student is inactive.
    * @throws ForbiddenException when the delivery's course subscription is not current.
    */
   async enroll(
@@ -56,45 +51,6 @@ export class DeliveryEnrollmentsService {
     const delivery = await this.loadDelivery(actor, deliveryId);
     await this.assertEnrollmentWritesAllowed(delivery);
     const counts = await this.enrollStudents(delivery, [...new Set(studentIds)], actor.userId);
-    this.logEnrollment(actor, delivery.id, delivery.schoolId, counts);
-    return counts;
-  }
-
-  // ─────────────────────────────────────────
-  // POST /deliveries/:id/enrollments/class — Enroll a class
-  // ─────────────────────────────────────────
-
-  /**
-   * Enrolls active students found in the delivery's school and class section in one transaction.
-   * @param actor Authenticated actor.
-   * @param deliveryId Delivery whose class section will be enrolled.
-   * @returns Counts of new, reactivated, and already-active enrollments.
-   * @throws NotFoundException when the delivery is not visible to the actor.
-   * @throws ConflictException when the delivery is inactive or a database class check fails.
-   * @throws ForbiddenException when the delivery's course subscription is not current.
-   */
-  async enrollClass(actor: AuthContext, deliveryId: string): Promise<EnrollmentCountsResponseDto> {
-    const delivery = await this.loadDelivery(actor, deliveryId);
-    await this.assertEnrollmentWritesAllowed(delivery);
-    let counts: EnrollmentCountsResponseDto;
-    try {
-      counts = await this.enrollments.transaction(async (tx) => {
-        const students = await this.enrollments.findActiveStudentsInClass(
-          tx,
-          delivery.schoolId,
-          delivery.classSectionId,
-        );
-        return this.enrollStudentsInTransaction(
-          tx,
-          delivery,
-          students.map(({ userId }) => userId),
-          actor.userId,
-        );
-      });
-    } catch (error) {
-      this.throwStudentClassMismatch(error);
-      throw error;
-    }
     this.logEnrollment(actor, delivery.id, delivery.schoolId, counts);
     return counts;
   }
@@ -199,57 +155,43 @@ export class DeliveryEnrollmentsService {
   }
 
   /**
-   * Validates every requested profile in the delivery's school/class before writing enrollments.
+   * Validates every requested profile in the delivery's school before writing enrollments.
    * Validation and enrollment writes share one transaction, so invalid input causes no partial writes.
    * @param delivery Delivery being enrolled.
    * @param studentIds Deduplicated student IDs.
    * @param actorId Authenticated actor ID used as enrollment owner.
    * @returns Counts of new, reactivated, and already-active enrollments.
    * @throws NotFoundException when any requested student profile is missing in the delivery's school.
-   * @throws ConflictException when any student is inactive or belongs to another class.
+   * @throws ConflictException when any student is inactive.
    */
   private async enrollStudents(
-    delivery: { id: string; schoolId: string; classSectionId: string },
+    delivery: { id: string; schoolId: string },
     studentIds: string[],
     actorId: string,
   ): Promise<EnrollmentCountsResponseDto> {
-    try {
-      return await this.enrollments.transaction(async (tx) => {
-        const students = await this.enrollments.findStudents(tx, delivery.schoolId, studentIds);
-        const byId = new Map(students.map((student) => [student.userId, student]));
-        const missingIds = studentIds.filter((studentId) => !byId.has(studentId));
-        if (missingIds.length > 0) {
-          throw new NotFoundException({
-            ...API_ERROR.STUDENT_NOT_FOUND,
-            details: { studentIds: missingIds },
-          });
-        }
+    return this.enrollments.transaction(async (tx) => {
+      const students = await this.enrollments.findStudents(tx, delivery.schoolId, studentIds);
+      const byId = new Map(students.map((student) => [student.userId, student]));
+      const missingIds = studentIds.filter((studentId) => !byId.has(studentId));
+      if (missingIds.length > 0) {
+        throw new NotFoundException({
+          ...API_ERROR.STUDENT_NOT_FOUND,
+          details: { studentIds: missingIds },
+        });
+      }
 
-        const inactiveIds = studentIds.filter(
-          (studentId) => byId.get(studentId)?.user.status !== UserStatus.ACTIVE,
-        );
-        if (inactiveIds.length > 0) {
-          throw new ConflictException({
-            ...API_ERROR.STUDENT_NOT_ACTIVE,
-            details: { studentIds: inactiveIds },
-          });
-        }
+      const inactiveIds = studentIds.filter(
+        (studentId) => byId.get(studentId)?.user.status !== UserStatus.ACTIVE,
+      );
+      if (inactiveIds.length > 0) {
+        throw new ConflictException({
+          ...API_ERROR.STUDENT_NOT_ACTIVE,
+          details: { studentIds: inactiveIds },
+        });
+      }
 
-        const wrongClassIds = studentIds.filter(
-          (studentId) => byId.get(studentId)?.classSectionId !== delivery.classSectionId,
-        );
-        if (wrongClassIds.length > 0) {
-          throw new ConflictException({
-            ...API_ERROR.STUDENT_WRONG_CLASS,
-            details: { studentIds: wrongClassIds },
-          });
-        }
-        return this.enrollStudentsInTransaction(tx, delivery, studentIds, actorId);
-      });
-    } catch (error) {
-      this.throwStudentClassMismatch(error);
-      throw error;
-    }
+      return this.enrollStudentsInTransaction(tx, delivery, studentIds, actorId);
+    });
   }
 
   /**
@@ -262,7 +204,7 @@ export class DeliveryEnrollmentsService {
    */
   private async enrollStudentsInTransaction(
     tx: Prisma.TransactionClient,
-    delivery: { id: string; schoolId: string; classSectionId: string },
+    delivery: { id: string; schoolId: string },
     studentIds: string[],
     actorId: string,
   ): Promise<EnrollmentCountsResponseDto> {
@@ -311,24 +253,6 @@ export class DeliveryEnrollmentsService {
       reactivated,
       alreadyEnrolled: studentIds.length - enrolled - reactivated,
     };
-  }
-
-  /**
-   * Converts the recognized database class-match trigger failure into a domain conflict.
-   * @param error Error raised by Prisma or PostgreSQL.
-   * @throws ConflictException when the trigger reports a student-class mismatch.
-   */
-  private throwStudentClassMismatch(error: unknown): void {
-    const reason = getPrismaReason(error).toLowerCase();
-    if (
-      ((isPrismaKnownError(error) && error.code === 'P2004') ||
-        getPostgresCode(error) === '23000') &&
-      reason.includes(
-        'delivery_enrollments require the student and delivery class sections to match',
-      )
-    ) {
-      throw new ConflictException(API_ERROR.STUDENT_WRONG_CLASS);
-    }
   }
 
   /**

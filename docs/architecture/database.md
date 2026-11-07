@@ -6,38 +6,38 @@ this page to check persistence constraints before changing a workflow.
 
 ## Tables
 
-| Area           | Table                         | Purpose                                             |
-| -------------- | ----------------------------- | --------------------------------------------------- |
-| School         | `schools`                     | School identity, contact, status.                   |
-| Auth           | `roles`                       | Role key + user type.                               |
-| Auth           | `permissions`                 | Named capabilities.                                 |
-| Auth           | `role_permissions`            | Role → permission grants.                           |
-| Users          | `users`                       | Account identity, credentials, status, school.      |
-| Users          | `student_profiles`            | Student-specific details + class section.           |
-| Users          | `teacher_profiles`            | Teacher-specific details.                           |
-| Class sections | `class_sections`              | School-owned class + section names.                 |
-| Curriculum     | `courses`                     | Central course records.                             |
-| Curriculum     | `modules`                     | Ordered modules within a course.                    |
-| Curriculum     | `lessons`                     | Ordered lessons within a module.                    |
-| Curriculum     | `lesson_blocks`               | Structured content blocks within lessons.           |
-| Assets         | `assets`                      | Central media asset metadata.                       |
-| Assets         | `asset_files`                 | File upload + processing state.                     |
-| Subscriptions  | `subscriptions`               | School access period + delivery limit per course.   |
-| Delivery       | `deliveries`                  | Course delivery to a class section + academic year. |
-| Delivery       | `delivery_teachers`           | Teacher assignment stints.                          |
-| Delivery       | `delivery_lesson_releases`    | Released lessons in a delivery.                     |
-| Enrollment     | `delivery_enrollments`        | Student membership + status.                        |
-| Progress       | `lesson_completions`          | Student lesson completion state.                    |
-| Assignments    | `assignment_templates`        | Reusable assignment blueprint.                      |
-| Assignments    | `assignments`                 | Assignment instance for a delivery.                 |
-| Assignments    | `assignment_items`            | Questions/tasks within an assignment.               |
-| Assignments    | `assignment_item_options`     | Choices for single-choice items.                    |
-| Assignments    | `assignment_rubric_criteria`  | Scoring criteria.                                   |
-| Submissions    | `submissions`                 | Student submission + grading state.                 |
-| Submissions    | `submission_answers`          | Answers attached to a submission.                   |
-| Submissions    | `submission_files`            | Files attached to a submission.                     |
-| Submissions    | `submission_criterion_scores` | Per-criterion scores.                               |
-| Storage        | `storage_cleanup_queue`       | Storage keys queued for deletion.                   |
+| Area           | Table                         | Purpose                                               |
+| -------------- | ----------------------------- | ----------------------------------------------------- |
+| School         | `schools`                     | School identity, contact, status.                     |
+| Auth           | `roles`                       | Role key + user type.                                 |
+| Auth           | `permissions`                 | Named capabilities.                                   |
+| Auth           | `role_permissions`            | Role → permission grants.                             |
+| Users          | `users`                       | Account identity, credentials, status, school.        |
+| Users          | `student_profiles`            | Student-specific details + class section.             |
+| Users          | `teacher_profiles`            | Teacher-specific details.                             |
+| Class sections | `class_sections`              | School-owned class + section names.                   |
+| Curriculum     | `courses`                     | Central course records.                               |
+| Curriculum     | `modules`                     | Ordered modules within a course.                      |
+| Curriculum     | `lessons`                     | Ordered lessons within a module.                      |
+| Curriculum     | `lesson_blocks`               | Structured content blocks within lessons.             |
+| Assets         | `assets`                      | Central media asset metadata.                         |
+| Assets         | `asset_files`                 | File upload + processing state.                       |
+| Subscriptions  | `subscriptions`               | School access period + delivery limit per course.     |
+| Delivery       | `deliveries`                  | Labeled course group within a school + academic year. |
+| Delivery       | `delivery_teachers`           | Teacher assignment stints.                            |
+| Delivery       | `delivery_lesson_releases`    | Released lessons in a delivery.                       |
+| Enrollment     | `delivery_enrollments`        | Student membership + status.                          |
+| Progress       | `lesson_completions`          | Student lesson completion state.                      |
+| Assignments    | `assignment_templates`        | Reusable assignment blueprint.                        |
+| Assignments    | `assignments`                 | Assignment instance for a delivery.                   |
+| Assignments    | `assignment_items`            | Questions/tasks within an assignment.                 |
+| Assignments    | `assignment_item_options`     | Choices for single-choice items.                      |
+| Assignments    | `assignment_rubric_criteria`  | Scoring criteria.                                     |
+| Submissions    | `submissions`                 | Student submission + grading state.                   |
+| Submissions    | `submission_answers`          | Answers attached to a submission.                     |
+| Submissions    | `submission_files`            | Files attached to a submission.                       |
+| Submissions    | `submission_criterion_scores` | Per-criterion scores.                                 |
+| Storage        | `storage_cleanup_queue`       | Storage keys queued for deletion.                     |
 
 ## Database-enforced rules
 
@@ -61,10 +61,12 @@ All foreign keys use `ON DELETE RESTRICT` / `ON UPDATE RESTRICT`.
 - **SQL function:** `business_today()` derives the business date in the database; its current timezone is hard-coded as `Asia/Kolkata`.
 - **Service layer:** subscription-gated workflows check current access with `business_today()`; database triggers repeat checks for delivery, enrollment, and release writes.
 - **SQL exclusion constraint:** subscription date ranges cannot overlap per school/course; it is deferred, so a conflict can surface when the transaction commits.
-- **SQL triggers:** subscription school/course, delivery school/course/class/year, enrollment school/delivery/student, and release school/course/delivery/lesson identity are immutable.
+- **SQL triggers:** subscription school/course, delivery school/course/year, enrollment school/delivery/student, and release school/course/delivery/lesson identity are immutable. Delivery labels may be renamed.
+- **SQL unique index:** delivery labels are unique case-insensitively within school/course/academic year.
+- **SQL CHECK:** delivery labels are trimmed and 1..100 characters.
 - **Service and SQL:** subscription grants/renewals and delivery activation require an ACTIVE course; the delivery trigger also enforces this for inserts and reactivation.
-- **SQL trigger:** the active-delivery cap locks the current subscription row while counting ACTIVE deliveries, serializing concurrent use of the cap.
-- **SQL trigger:** enrollment insert/reactivation requires a same-school active student, a matching delivery class section, an ACTIVE delivery, and current course access; status/end-date consistency is also constrained.
+- **SQL trigger:** `max_deliveries` counts ACTIVE labeled groups for each school/course across years. The trigger locks the current subscription row while counting, serializing concurrent use of the cap.
+- **SQL trigger:** enrollment insert/reactivation requires a same-school active student, an ACTIVE delivery, and current course access; current class section does not affect enrollment or access. Status/end-date consistency is also constrained.
 - **SQL trigger:** a release requires an in-scope actor, ACTIVE delivery and module, an ACTIVE STUDENT-audience lesson, and current course access.
 - **SQL triggers:** lesson completions require an ACTIVE enrollment, a release, an ACTIVE or ARCHIVED STUDENT lesson, and current course access; completions are insert-only, with deletes handled by `purge_student()` in the retention issue.
 - **SQL partial unique index:** only one active teacher stint is allowed per delivery/teacher pair; removed stints remain as history.
