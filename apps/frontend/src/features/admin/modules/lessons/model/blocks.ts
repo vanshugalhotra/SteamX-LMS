@@ -18,11 +18,7 @@ export const BLOCK_META: Partial<Record<BlockType, BlockMeta>> = {
     label: 'Rich text',
     icon: FileText,
     accent: 'before:bg-teal-400',
-    create: () => ({
-      id: crypto.randomUUID(),
-      type: 'RICH_TEXT',
-      content: { format: 'tiptap', doc: EMPTY_DOC },
-    }),
+    create: newRichTextBlock,
   },
 };
 
@@ -49,4 +45,20 @@ export function moveBlock(blocks: LessonContentBlock[], index: number, direction
   const [item] = next.splice(index, 1);
   next.splice(target, 0, item);
   return next;
+}
+
+export function newRichTextBlock(): LessonContentBlock {
+  return {
+    id: crypto.randomUUID(),
+    type: 'RICH_TEXT',
+    content: { format: 'tiptap', doc: EMPTY_DOC },
+  };
+}
+
+export function insertBlock(
+  blocks: LessonContentBlock[],
+  block: LessonContentBlock,
+  index = blocks.length,
+) {
+  return [...blocks.slice(0, index), block, ...blocks.slice(index)];
 }

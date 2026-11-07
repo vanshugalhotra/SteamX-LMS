@@ -4,12 +4,13 @@ import { Input } from '@/components/ui/input';
 import { CourseStatusBadge } from '@/features/admin/courses/components/CourseStatusBadge';
 import { Spinner } from '@/components/ui/spinner';
 import type { Lesson } from '../model/types';
+import { LESSON_TITLE_MAX_LENGTH } from '../config/lessons.config';
 
 function SaveStatus({ pending, hasChanges }: { pending: boolean; hasChanges: boolean }) {
   const { label, dot } = pending
-    ? { label: 'Saving…', dot: 'bg-amber-400 animate-pulse' }
+    ? { label: 'Saving…', dot: 'bg-yellow-500 animate-pulse' }
     : hasChanges
-      ? { label: 'Unsaved changes', dot: 'bg-amber-400' }
+      ? { label: 'Unsaved changes', dot: 'bg-yellow-500' }
       : { label: 'All changes saved', dot: 'bg-teal-400' };
   return (
     <p
@@ -50,13 +51,20 @@ export function LessonEditorHeader({
         <Input
           id="lesson-title"
           className="text-xl font-semibold"
+          maxLength={LESSON_TITLE_MAX_LENGTH}
           readOnly={pending}
           value={title}
+          aria-invalid={titleIssue ? true : undefined}
+          aria-describedby={titleIssue ? 'lesson-title-error' : undefined}
           onChange={(e) => {
             onTitleChange(e.target.value);
           }}
         />
-        {titleIssue && <p className="mt-1 text-xs text-danger">{titleIssue}</p>}
+        {titleIssue && (
+          <p id="lesson-title-error" role="alert" className="mt-1 text-xs text-danger">
+            {titleIssue}
+          </p>
+        )}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <CourseStatusBadge status={lesson.status} />
           <Badge variant="neutral">

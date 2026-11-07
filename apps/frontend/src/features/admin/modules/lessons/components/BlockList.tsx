@@ -3,6 +3,9 @@ import type { LessonContentBlock } from '../model/types';
 import { AddBlockMenu } from './AddBlockMenu';
 import { BlockCard } from './BlockCard';
 import { BlockRenderer } from './BlockRenderer';
+import { Fragment } from 'react';
+import { newRichTextBlock } from '../model/blocks';
+import { BlockInsertDivider } from './BlockInsertDivider';
 
 export function BlockList({
   blocks,
@@ -14,7 +17,7 @@ export function BlockList({
 }: {
   blocks: LessonContentBlock[];
   disabled: boolean;
-  onAdd: (block: LessonContentBlock) => void;
+  onAdd: (block: LessonContentBlock, index?: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (id: string) => void;
   onRichTextChange: (id: string, doc: JSONContent) => void;
@@ -32,25 +35,39 @@ export function BlockList({
   }
 
   return (
-    <section aria-label="Lesson content" className="space-y-4">
+    <section aria-label="Lesson content">
       {blocks.map((block, index) => (
-        <BlockCard
-          key={block.id}
-          type={block.type}
-          index={index}
-          count={blocks.length}
-          disabled={disabled}
-          onMove={(direction) => {
-            onMove(index, direction);
-          }}
-          onRemove={() => {
-            onRemove(block.id);
-          }}
-        >
-          <BlockRenderer block={block} disabled={disabled} onRichTextChange={onRichTextChange} />
-        </BlockCard>
+        <Fragment key={block.id}>
+          {index > 0 && (
+            <BlockInsertDivider
+              disabled={disabled}
+              onInsert={() => {
+                onAdd(newRichTextBlock(), index);
+              }}
+            />
+          )}
+          <BlockCard
+            type={block.type}
+            index={index}
+            count={blocks.length}
+            disabled={disabled}
+            onMove={(direction) => {
+              onMove(index, direction);
+            }}
+            onRemove={() => {
+              onRemove(block.id);
+            }}
+          >
+            <BlockRenderer
+              block={block}
+              index={index}
+              disabled={disabled}
+              onRichTextChange={onRichTextChange}
+            />
+          </BlockCard>
+        </Fragment>
       ))}
-      <div className="pt-2">
+      <div className="pt-4">
         <p className="mb-2 text-xs text-gray-600">Add a block to the end of the lesson</p>
         <AddBlockMenu disabled={disabled} onAdd={onAdd} />
       </div>

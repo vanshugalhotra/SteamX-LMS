@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { JSONContent } from '@tiptap/react';
-import { API_ERROR_CODE, getErrorMessage, hasErrorCode } from '@/lib/api-errors';
-import { moveBlock } from '../model/blocks';
+import { API_ERROR_CODE, getErrorMessage, getFieldErrors, hasErrorCode } from '@/lib/api-errors';
+import { moveBlock, insertBlock } from '../model/blocks';
 import type { Lesson, LessonContent, LessonContentBlock } from '../model/types';
 import { useSaveLessonContent, useUpdateLesson } from '../queries';
 
@@ -24,6 +24,10 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   );
   const hasChanges = title.trim() !== savedTitle || blocksChanged;
 
+  const changeTitle = (value: string) => {
+    setTitle(value);
+    setTitleIssue('');
+  };
   const save = async () => {
     const nextTitle = title.trim();
     if (!nextTitle) {
@@ -48,6 +52,11 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
         setVersion(result.version);
       }
     } catch (e) {
+      const titleError = getFieldErrors(e).title;
+      if (titleError) {
+        setTitleIssue(titleError);
+        return;
+      }
       setError({
         conflict: hasErrorCode(e, API_ERROR_CODE.VERSION_CONFLICT),
         message: getErrorMessage(e, {
@@ -57,8 +66,8 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
     }
   };
 
-  const addBlock = (block: LessonContentBlock) => {
-    setBlocks((c) => [...c, block]);
+  const addBlock = (block: LessonContentBlock, index?: number) => {
+    setBlocks((c) => insertBlock(c, block, index));
   };
   const removeBlock = (id: string) => {
     setBlocks((c) => c.filter((b) => b.id !== id));
@@ -74,7 +83,7 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
 
   return {
     title,
-    setTitle,
+    setTitle: changeTitle,
     titleIssue,
     blocks,
     version,

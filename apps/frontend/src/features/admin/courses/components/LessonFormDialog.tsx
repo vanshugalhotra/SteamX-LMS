@@ -8,8 +8,7 @@ import { useNativeDialog } from '@/components/ui/use-native-dialog';
 import { getErrorMessage } from '@/lib/api-errors';
 import type { CourseOutlineLesson } from '../model/types';
 import type { LessonAudience } from '@/features/admin/modules/lessons/model/types';
-
-const LESSON_TITLE_MAX_LENGTH = 200;
+import { LESSON_TITLE_MAX_LENGTH } from '@/features/admin/modules/lessons/config/lessons.config';
 
 export function LessonFormDialog({
   lesson,

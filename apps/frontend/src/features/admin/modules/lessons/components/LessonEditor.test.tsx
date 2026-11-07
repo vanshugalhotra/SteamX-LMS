@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api-client';
@@ -40,14 +41,21 @@ const textBlock = (id: string): LessonContentBlock => ({
 });
 
 function renderEditor(blocks: LessonContentBlock[] = [], onReload = vi.fn()) {
-  render(
-    <LessonEditor
-      lesson={lesson}
-      content={{ version: 3, blocks, assets: {} }}
-      onReload={onReload}
-    />,
-  );
-  return { onReload };
+  const router = createMemoryRouter([
+    {
+      path: '/',
+      element: (
+        <LessonEditor
+          lesson={lesson}
+          content={{ version: 3, blocks, assets: {} }}
+          onReload={onReload}
+        />
+      ),
+    },
+    { path: '/curriculum', element: <p>Curriculum</p> },
+  ]);
+  render(<RouterProvider router={router} />);
+  return { onReload, router };
 }
 
 const savedBlocks = () => saveContent.mock.calls[0][0].body.blocks;
@@ -134,4 +142,64 @@ it('does not offer a reload for other 409 errors', async () => {
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(await screen.findByText('This already exists.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Reload latest version' })).not.toBeInTheDocument();
+});
+
+it('inserts a block between two blocks', async () => {
+  const user = userEvent.setup();
+  renderEditor([textBlock('a'), textBlock('b')]);
+  await user.click(screen.getByRole('button', { name: 'Insert rich text block here' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  const ids = savedBlocks().map((b) => b.id);
+  expect(ids).toHaveLength(3);
+  expect([ids[0], ids[2]]).toEqual(['a', 'b']);
+});
+
+it('asks before leaving with unsaved changes', async () => {
+  const user = userEvent.setup();
+  const { router } = renderEditor();
+  await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
+  await act(() => router.navigate('/curriculum'));
+  expect(await screen.findByText('Leave without saving?')).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe('/');
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(router.state.location.pathname).toBe('/');
+  await act(() => router.navigate('/curriculum'));
+  await user.click(await screen.findByRole('button', { name: 'Leave page' }));
+  expect(router.state.location.pathname).toBe('/curriculum');
+});
+
+it('leaves without a prompt when nothing changed', async () => {
+  const { router } = renderEditor();
+  await act(() => router.navigate('/curriculum'));
+  expect(router.state.location.pathname).toBe('/curriculum');
+});
+
+it('shows a backend title error next to the field', async () => {
+  const user = userEvent.setup();
+  updateLesson.mockRejectedValue(
+    new ApiError(400, 'Invalid', {
+      code: API_ERROR_CODE.VALIDATION_ERROR,
+      details: [{ field: 'title', errors: ['Title is too long'] }],
+    }),
+  );
+  renderEditor([textBlock('a')]);
+  const input = screen.getByRole('textbox', { name: 'Lesson title' });
+  expect(input).toHaveAttribute('maxlength', '200');
+  await user.type(input, ' x');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('Title is too long')).toBeInTheDocument();
+  expect(input).toBeInvalid();
+  expect(input).toHaveAccessibleDescription('Title is too long');
+  expect(saveContent).not.toHaveBeenCalled();
+});
+
+it('moves between toolbar buttons with the arrow keys', async () => {
+  const user = userEvent.setup();
+  renderEditor([textBlock('a')]);
+  const undo = screen.getByRole('button', { name: 'Undo' });
+  act(() => {
+    undo.focus();
+  });
+  await user.keyboard('{ArrowRight}');
+  expect(screen.getByRole('button', { name: 'Redo' })).toHaveFocus();
 });
