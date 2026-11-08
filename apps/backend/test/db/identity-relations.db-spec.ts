@@ -221,7 +221,7 @@ describe('identity foreign keys and indexes', () => {
        FROM pg_constraint
        WHERE contype = 'f' AND connamespace = 'public'::regnamespace`,
     );
-    expect(foreignKeys.rowCount).toBe(57);
+    expect(foreignKeys.rowCount).toBe(54);
     expect(
       foreignKeys.rows.every(
         (foreignKey) =>
@@ -242,6 +242,6 @@ describe('identity foreign keys and indexes', () => {
        JOIN pg_namespace schema_name ON schema_name.oid = table_name.relnamespace
        WHERE schema_name.nspname = 'public' AND indisunique`,
     );
-    expect(db.firstRow(uniqueIndexes.rows)).toEqual({ total: 74, partial: 3, valid: 74 });
+    expect(db.firstRow(uniqueIndexes.rows)).toEqual({ total: 71, partial: 5, valid: 71 });
   });
 });

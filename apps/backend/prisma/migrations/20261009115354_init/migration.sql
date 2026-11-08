@@ -322,7 +322,6 @@ CREATE TABLE "assignment_templates" (
     "title" TEXT NOT NULL,
     "description" TEXT,
     "blueprint" JSONB NOT NULL,
-    "blueprint_version" INTEGER NOT NULL DEFAULT 1,
     "status" "content_status" NOT NULL DEFAULT 'DRAFT',
     "created_by_id" UUID,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -343,7 +342,8 @@ CREATE TABLE "assignments" (
     "description" TEXT,
     "status" "assignment_status" NOT NULL DEFAULT 'DRAFT',
     "due_at" TIMESTAMPTZ,
-    "max_score" DECIMAL(8,2),
+    "allow_resubmission" BOOLEAN NOT NULL DEFAULT true,
+    "rubric" JSONB,
     "published_at" TIMESTAMPTZ,
     "source_template_id" UUID,
     "created_by_id" UUID,
@@ -360,7 +360,6 @@ CREATE TABLE "assignment_items" (
     "position" INTEGER NOT NULL,
     "type" "item_type" NOT NULL,
     "prompt" TEXT NOT NULL,
-    "marks" DECIMAL(6,2),
     "config" JSONB,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL,
@@ -380,18 +379,6 @@ CREATE TABLE "assignment_item_options" (
 );
 
 -- CreateTable
-CREATE TABLE "assignment_rubric_criteria" (
-    "id" UUID NOT NULL,
-    "assignment_id" UUID NOT NULL,
-    "position" INTEGER NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "max_points" DECIMAL(6,2) NOT NULL,
-
-    CONSTRAINT "assignment_rubric_criteria_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "submissions" (
     "id" UUID NOT NULL,
     "school_id" UUID NOT NULL,
@@ -401,7 +388,8 @@ CREATE TABLE "submissions" (
     "status" "submission_status" NOT NULL DEFAULT 'SUBMITTED',
     "submitted_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "due_at_at_submission" TIMESTAMPTZ,
-    "score" DECIMAL(8,2),
+    "grade_percent" DECIMAL(5,2),
+    "rubric_levels" JSONB,
     "overall_feedback" TEXT,
     "graded_by_id" UUID,
     "graded_at" TIMESTAMPTZ,
@@ -420,7 +408,7 @@ CREATE TABLE "submission_answers" (
     "item_id" UUID NOT NULL,
     "answer_text" TEXT,
     "selected_option_id" UUID,
-    "points_awarded" DECIMAL(6,2),
+    "is_correct" BOOLEAN,
 
     CONSTRAINT "submission_answers_pkey" PRIMARY KEY ("id")
 );
@@ -439,18 +427,6 @@ CREATE TABLE "submission_files" (
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "submission_files_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "submission_criterion_scores" (
-    "id" UUID NOT NULL,
-    "school_id" UUID NOT NULL,
-    "submission_id" UUID NOT NULL,
-    "assignment_id" UUID NOT NULL,
-    "criterion_id" UUID NOT NULL,
-    "points" DECIMAL(6,2) NOT NULL,
-
-    CONSTRAINT "submission_criterion_scores_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -558,13 +534,11 @@ CREATE INDEX "subscriptions_school_id_course_id_start_date_end_date_idx" ON "sub
 CREATE INDEX "deliveries_school_id_course_id_status_idx" ON "deliveries"("school_id", "course_id", "status");
 
 -- CreateIndex
--- CreateIndex
 CREATE UNIQUE INDEX "deliveries_id_school_id_key" ON "deliveries"("id", "school_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "deliveries_id_school_id_course_id_key" ON "deliveries"("id", "school_id", "course_id");
 
--- CreateIndex
 -- CreateIndex
 CREATE INDEX "delivery_teachers_delivery_id_idx" ON "delivery_teachers"("delivery_id");
 
@@ -632,12 +606,6 @@ CREATE UNIQUE INDEX "assignment_item_options_id_item_id_key" ON "assignment_item
 CREATE UNIQUE INDEX "assignment_item_options_item_id_position_key" ON "assignment_item_options"("item_id", "position");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "assignment_rubric_criteria_id_assignment_id_key" ON "assignment_rubric_criteria"("id", "assignment_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "assignment_rubric_criteria_assignment_id_position_key" ON "assignment_rubric_criteria"("assignment_id", "position");
-
--- CreateIndex
 CREATE INDEX "submissions_delivery_id_student_id_idx" ON "submissions"("delivery_id", "student_id");
 
 -- CreateIndex
@@ -666,12 +634,6 @@ CREATE INDEX "submission_files_submission_id_idx" ON "submission_files"("submiss
 
 -- CreateIndex
 CREATE INDEX "submission_files_school_id_idx" ON "submission_files"("school_id");
-
--- CreateIndex
-CREATE INDEX "submission_criterion_scores_school_id_idx" ON "submission_criterion_scores"("school_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "submission_criterion_scores_submission_id_criterion_id_key" ON "submission_criterion_scores"("submission_id", "criterion_id");
 
 -- AddForeignKey
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
@@ -736,7 +698,6 @@ ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_school_id_fkey" FOREIGN KEY 
 -- AddForeignKey
 ALTER TABLE "deliveries" ADD CONSTRAINT "deliveries_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 
--- AddForeignKey
 -- AddForeignKey
 ALTER TABLE "delivery_teachers" ADD CONSTRAINT "delivery_teachers_delivery_id_school_id_fkey" FOREIGN KEY ("delivery_id", "school_id") REFERENCES "deliveries"("id", "school_id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 
@@ -813,9 +774,6 @@ ALTER TABLE "assignment_items" ADD CONSTRAINT "assignment_items_assignment_id_fk
 ALTER TABLE "assignment_item_options" ADD CONSTRAINT "assignment_item_options_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "assignment_items"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 
 -- AddForeignKey
-ALTER TABLE "assignment_rubric_criteria" ADD CONSTRAINT "assignment_rubric_criteria_assignment_id_fkey" FOREIGN KEY ("assignment_id") REFERENCES "assignments"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
-
--- AddForeignKey
 ALTER TABLE "submissions" ADD CONSTRAINT "submissions_assignment_id_delivery_id_fkey" FOREIGN KEY ("assignment_id", "delivery_id") REFERENCES "assignments"("id", "delivery_id") ON DELETE RESTRICT ON UPDATE RESTRICT;
 
 -- AddForeignKey
@@ -838,9 +796,3 @@ ALTER TABLE "submission_files" ADD CONSTRAINT "submission_files_submission_id_as
 
 -- AddForeignKey
 ALTER TABLE "submission_files" ADD CONSTRAINT "submission_files_item_id_assignment_id_fkey" FOREIGN KEY ("item_id", "assignment_id") REFERENCES "assignment_items"("id", "assignment_id") ON DELETE RESTRICT ON UPDATE RESTRICT;
-
--- AddForeignKey
-ALTER TABLE "submission_criterion_scores" ADD CONSTRAINT "submission_criterion_scores_submission_id_assignment_id_sc_fkey" FOREIGN KEY ("submission_id", "assignment_id", "school_id") REFERENCES "submissions"("id", "assignment_id", "school_id") ON DELETE RESTRICT ON UPDATE RESTRICT;
-
--- AddForeignKey
-ALTER TABLE "submission_criterion_scores" ADD CONSTRAINT "submission_criterion_scores_criterion_id_assignment_id_fkey" FOREIGN KEY ("criterion_id", "assignment_id") REFERENCES "assignment_rubric_criteria"("id", "assignment_id") ON DELETE RESTRICT ON UPDATE RESTRICT;

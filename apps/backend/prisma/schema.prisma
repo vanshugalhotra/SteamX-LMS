@@ -662,18 +662,17 @@ model LessonCompletion {
 // ============================================================================
 
 model AssignmentTemplate {
-  id               String        @id @default(uuid(7)) @db.Uuid
-  courseId         String        @map("course_id") @db.Uuid
-  moduleId         String?       @map("module_id") @db.Uuid
-  lessonId         String?       @map("lesson_id") @db.Uuid
-  title            String
-  description      String?
-  blueprint        Json // items, options (+answer keys), rubric
-  blueprintVersion Int           @default(1) @map("blueprint_version")
-  status           ContentStatus @default(DRAFT)
-  createdById      String?       @map("created_by_id") @db.Uuid
-  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  id          String        @id @default(uuid(7)) @db.Uuid
+  courseId    String        @map("course_id") @db.Uuid
+  moduleId    String?       @map("module_id") @db.Uuid
+  lessonId    String?       @map("lesson_id") @db.Uuid
+  title       String
+  description String?
+  blueprint   Json // { items: [{type, prompt, config, options:[{text,isCorrect}]}], rubric: [{name, description}] | null, allowResubmission }
+  status      ContentStatus @default(DRAFT)
+  createdById String?       @map("created_by_id") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   course    Course  @relation(fields: [courseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   module    Module? @relation(fields: [moduleId, courseId], references: [id, courseId], onDelete: Restrict, onUpdate: Restrict)
@@ -683,30 +682,31 @@ model AssignmentTemplate {
   copies Assignment[]
   // [CHECK] num_nonnulls(module_id, lesson_id) <= 1   (none = course-level)
   // [CHECK] jsonb_typeof(blueprint) = 'object'; length(btrim(title)) > 0
-  // [TRG]   created_by must be PLATFORM_STAFF. Only ACTIVE templates can be published.
-  // [RULE]  Teachers never read blueprint (contains answer keys); they trigger a publish proc that copies it server-side.
+  // [TRG]   created_by must be PLATFORM_STAFF.
+  // [RULE]  Teachers never read blueprint (contains answer keys); publishing copies it server-side.
 
   @@index([courseId])
   @@map("assignment_templates")
 }
 
 model Assignment {
-  id               String           @id @default(uuid(7)) @db.Uuid
-  schoolId         String           @map("school_id") @db.Uuid
-  deliveryId       String           @map("delivery_id") @db.Uuid
-  courseId         String           @map("course_id") @db.Uuid
-  moduleId         String?          @map("module_id") @db.Uuid
-  lessonId         String?          @map("lesson_id") @db.Uuid
-  title            String
-  description      String?
-  status           AssignmentStatus @default(DRAFT)
-  dueAt            DateTime?        @map("due_at") @db.Timestamptz
-  maxScore         Decimal?         @map("max_score") @db.Decimal(8, 2) // set at first publish, then frozen
-  publishedAt      DateTime?        @map("published_at") @db.Timestamptz
-  sourceTemplateId String?          @map("source_template_id") @db.Uuid
-  createdById      String?          @map("created_by_id") @db.Uuid
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  id                String           @id @default(uuid(7)) @db.Uuid
+  schoolId          String           @map("school_id") @db.Uuid
+  deliveryId        String           @map("delivery_id") @db.Uuid
+  courseId          String           @map("course_id") @db.Uuid
+  moduleId          String?          @map("module_id") @db.Uuid
+  lessonId          String?          @map("lesson_id") @db.Uuid
+  title             String
+  description       String?
+  status            AssignmentStatus @default(DRAFT)
+  dueAt             DateTime?        @map("due_at") @db.Timestamptz
+  allowResubmission Boolean          @default(true) @map("allow_resubmission")
+  rubric            Json? // NULL = no rubric. Else array of {name, description}; length = RUBRIC_SIZE (app constant, 4)
+  publishedAt       DateTime?        @map("published_at") @db.Timestamptz
+  sourceTemplateId  String?          @map("source_template_id") @db.Uuid
+  createdById       String?          @map("created_by_id") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   delivery       Delivery            @relation(fields: [deliveryId, schoolId, courseId], references: [id, schoolId, courseId], onDelete: Restrict, onUpdate: Restrict)
   module         Module?             @relation(fields: [moduleId, courseId], references: [id, courseId], onDelete: Restrict, onUpdate: Restrict)
@@ -715,20 +715,18 @@ model Assignment {
   createdBy      User?               @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   items       AssignmentItem[]
-  rubric      AssignmentRubricCriterion[]
   submissions Submission[]
-  // [CHECK] num_nonnulls(module_id, lesson_id) <= 1  (exactly-one-location: course / module / lesson)
-  // [CHECK] (status = 'DRAFT') = (published_at IS NULL)
-  // [CHECK] status <> 'PUBLISHED' OR due_at IS NOT NULL   (assumption A3)
-  // [IDX]   UNIQUE (delivery_id, source_template_id) WHERE source_template_id IS NOT NULL  (no double publish of a template)
-  // [TRG]   Status transitions: DRAFT->PUBLISHED, PUBLISHED<->UNPUBLISHED; never back to DRAFT. published_at set once.
-  // [TRG]   Publish: delivery ACTIVE + has_course_access; every SINGLE_CHOICE item has >=2 options and exactly 1 correct;
-  //         compute max_score; reject if anchored lesson is TEACHER_ONLY (assumption A5).
-  // [TRG]   FREEZE: if submissions exist, only title, description, due_at, status may change. Always immutable: delivery_id,
-  //         school_id, course_id, source_template_id. Anchor + max_score freeze with first submission (draft/pre-submission fully editable).
-  // [TRG]   Insert from template: anchor copied from the template (client value ignored); template.course_id must equal course_id.
-  //         Items/rubric copied by publish proc.
-  // [TRG]   Teacher-created: creator must be an active teacher of the delivery (G2 + delivery_teachers check).
+  // [CHECK] num_nonnulls(module_id, lesson_id) <= 1; length(btrim(title)) > 0;
+  //         (status = 'DRAFT') = (published_at IS NULL);
+  //         status <> 'PUBLISHED' OR due_at IS NOT NULL; rubric IS NULL OR jsonb_typeof(rubric) = 'array'.
+  // [IDX]   UNIQUE (delivery_id, source_template_id) WHERE source_template_id IS NOT NULL.
+  // [TRG]   INSERT must be DRAFT. Template source must be ACTIVE and in the same course; template anchor overrides the client anchor.
+  //         created_by, when set, must be in actor scope and either PLATFORM_STAFF or an active teacher of this delivery.
+  // [TRG]   Status transitions: DRAFT->PUBLISHED, PUBLISHED<->UNPUBLISHED; never back to DRAFT. Set published_at at first publish.
+  //         Every publish requires ACTIVE delivery, has_course_access(today), at least one item, all items SINGLE_CHOICE or none,
+  //         valid SINGLE_CHOICE options, NULL rubric for MCQ, and no TEACHER_ONLY anchored lesson.
+  // [TRG]   Once a submission exists, only title, description, due_at, allow_resubmission, and status may change.
+  //         delivery_id, school_id, course_id, and source_template_id are always immutable; anchor and rubric freeze with first submission.
 
   @@unique([id, deliveryId])
   @@index([deliveryId, status, dueAt])
@@ -744,8 +742,7 @@ model AssignmentItem {
   position     Int
   type         ItemType
   prompt       String
-  marks        Decimal? @db.Decimal(6, 2)
-  config       Json?
+  config       Json? // TEXT: {maxLength}; FILE_UPLOAD: {maxFiles, maxSizeMb, allowedTypes}
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -755,8 +752,7 @@ model AssignmentItem {
   answers SubmissionAnswer[]
   files   SubmissionFile[]
   // [CHECK] position >= 1; length(btrim(prompt)) > 0; config IS NULL OR jsonb_typeof(config) = 'object'
-  // [CHECK] type = 'SINGLE_CHOICE' => marks IS NOT NULL AND marks > 0; other types => marks IS NULL (score model, assumption A1)
-  // [IDX]   UNIQUE (assignment_id, position) DEFERRABLE INITIALLY DEFERRED
+  // [IDX]   UNIQUE (assignment_id, position), immediate; replace items by delete + recreate in one transaction while editable.
   // [TRG]   FREEZE (INSERT/UPDATE/DELETE blocked once parent assignment has any submission; G1 purge exempt).
 
   @@unique([id, assignmentId]) // target for answers/files
@@ -776,31 +772,12 @@ model AssignmentItemOption {
   answers SubmissionAnswer[]
   // [CHECK] position >= 1; length(btrim(text)) > 0
   // [IDX]   UNIQUE (item_id) WHERE is_correct  -> at most one correct option (at-least-one checked at publish)
-  // [TRG]   BEFORE INSERT: parent item must be type SINGLE_CHOICE. FREEZE as items.
+  // [TRG]   INSERT/UPDATE: parent item must be type SINGLE_CHOICE. FREEZE as items.
   // [RULE]  is_correct never returned by any student-facing query (column-level discipline in the data layer).
 
   @@unique([id, itemId])
   @@unique([itemId, position])
   @@map("assignment_item_options")
-}
-
-model AssignmentRubricCriterion {
-  id           String  @id @default(uuid(7)) @db.Uuid
-  assignmentId String  @map("assignment_id") @db.Uuid
-  position     Int
-  name         String
-  description  String?
-  maxPoints    Decimal @map("max_points") @db.Decimal(6, 2)
-
-  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-
-  scores SubmissionCriterionScore[]
-  // [CHECK] max_points > 0; position >= 1; length(btrim(name)) > 0
-  // [TRG]   FREEZE as items. Rubric shape still pending: keep it flat (criterion + max_points) until confirmed.
-
-  @@unique([id, assignmentId])
-  @@unique([assignmentId, position])
-  @@map("assignment_rubric_criteria")
 }
 
 model Submission {
@@ -810,9 +787,10 @@ model Submission {
   deliveryId        String           @map("delivery_id") @db.Uuid
   studentId         String           @map("student_id") @db.Uuid
   status            SubmissionStatus @default(SUBMITTED)
-  submittedAt       DateTime         @default(now()) @map("submitted_at") @db.Timestamptz // now NOT NULL
+  submittedAt       DateTime         @default(now()) @map("submitted_at") @db.Timestamptz // time of latest submit
   dueAtAtSubmission DateTime?        @map("due_at_at_submission") @db.Timestamptz
-  score             Decimal?         @db.Decimal(8, 2)
+  gradePercent      Decimal?         @map("grade_percent") @db.Decimal(5, 2) // the single grade value; level derived on read
+  rubricLevels      Json?            @map("rubric_levels") // array of level codes ("4+","3","R"...), same order as assignment.rubric
   overallFeedback   String?          @map("overall_feedback")
   gradedById        String?          @map("graded_by_id") @db.Uuid // NULL + GRADED = auto-graded by system
   gradedAt          DateTime?        @map("graded_at") @db.Timestamptz
@@ -823,20 +801,25 @@ model Submission {
   enrollment DeliveryEnrollment @relation(fields: [deliveryId, studentId, schoolId], references: [deliveryId, studentId, schoolId], onDelete: Restrict, onUpdate: Restrict)
   gradedBy   User?              @relation(fields: [gradedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
-  answers         SubmissionAnswer[]
-  files           SubmissionFile[]
-  criterionScores SubmissionCriterionScore[]
-  // [CHECK] (status = 'GRADED') = (graded_at IS NOT NULL) AND (status = 'GRADED') = (score IS NOT NULL); score >= 0
+  answers SubmissionAnswer[]
+  files   SubmissionFile[]
+  // [CHECK] (status = 'GRADED') = (graded_at IS NOT NULL) AND (status = 'GRADED') = (grade_percent IS NOT NULL)
+  // [CHECK] grade_percent IS NULL OR grade_percent BETWEEN 0 AND 100
+  // [CHECK] rubric_levels IS NULL OR jsonb_typeof(rubric_levels) = 'array'
   // [TRG]   BEFORE INSERT: overwrite submitted_at = now() and due_at_at_submission = assignment.due_at (client values ignored);
   //         require assignment PUBLISHED, enrollment ACTIVE, has_course_access(today).
-  // [RULE]  is_late = submitted_at > due_at_at_submission (derived, frozen inputs). Expose in submissions_v.
-  // [TRG]   After insert, immutable: assignment_id, delivery_id, student_id, submitted_at, due_at_at_submission. Only grading columns change.
-  // [TRG]   DEFERRED constraint trigger on ->GRADED: one criterion score per rubric criterion; score <= assignment.max_score;
-  //         graded_by (if set) passes G2 and is an active teacher of the delivery or platform staff.
-  // [RULE]  Regrade policy open (A8): graded_by = last grader; history needs the future audit table.
-  // [RULE]  No drafts: row is created atomically with answers/files in one tx; uploads stage under a TTLd pending/ prefix.
+  // [RULE]  is_late = submitted_at > due_at_at_submission (derived, frozen inputs); is_late computed in the query/mapper (no view).
+  // [RULE]  Resubmit in one transaction: delete old answers/files (G4 queues storage keys), insert new ones, and update
+  //         submitted_at + due_at_at_submission together. Allowed whenever allow_resubmission is true and the assignment is
+  //         PUBLISHED, including after grading; clears the grade. Grading requests must carry the submitted_at the teacher saw
+  //         (app check, 409 on mismatch).
+  // [TRG]   Immutable always: assignment_id, delivery_id, student_id. submitted_at and due_at_at_submission change only together
+  //         on resubmit; any other UPDATE may only touch grading columns.
+  // [TRG]   DEFERRED constraint trigger: graded_by (if set) passes G2 and is an active teacher of the delivery or platform staff.
+  // [RULE]  Regrade overwrites grading columns. No attempt history.
+  // [RULE]  No drafts: row is created atomically with answers/files in one tx.
 
-  @@unique([assignmentId, studentId]) // one attempt = natural idempotency
+  @@unique([assignmentId, studentId]) // one row per student per assignment = natural idempotency
   @@unique([id, assignmentId, schoolId])
   @@index([deliveryId, studentId])
   @@index([assignmentId, status])
@@ -852,16 +835,15 @@ model SubmissionAnswer {
   itemId           String   @map("item_id") @db.Uuid
   answerText       String?  @map("answer_text")
   selectedOptionId String?  @map("selected_option_id") @db.Uuid
-  pointsAwarded    Decimal? @map("points_awarded") @db.Decimal(6, 2)
+  isCorrect        Boolean? @map("is_correct") // MCQ only; set by server
 
   submission     Submission            @relation(fields: [submissionId, assignmentId, schoolId], references: [id, assignmentId, schoolId], onDelete: Restrict, onUpdate: Restrict)
   item           AssignmentItem        @relation(fields: [itemId, assignmentId], references: [id, assignmentId], onDelete: Restrict, onUpdate: Restrict)
   selectedOption AssignmentItemOption? @relation(fields: [selectedOptionId, itemId], references: [id, itemId], onDelete: Restrict, onUpdate: Restrict)
-  // [CHECK] points_awarded IS NULL OR points_awarded >= 0
   // [TRG]   BEFORE INSERT: item type decides the shape (SINGLE_CHOICE => selected_option_id only, TEXT => answer_text only,
-  //         FILE_UPLOAD rejected: files live in submission_files); points_awarded computed from option.is_correct x item.marks
+  //         FILE_UPLOAD rejected: files live in submission_files); is_correct computed from option.is_correct
   //         (never trusted from payload), NULL for non-MCQ.
-  // [TRG]   INSERT only in same tx as the submission (submissions.created_at = now()); content columns immutable afterwards.
+  // [TRG]   INSERT/DELETE only inside submit/resubmit tx (parent submitted_at = now()); UPDATE always rejected.
 
   @@unique([submissionId, itemId])
   @@index([schoolId])
@@ -883,31 +865,15 @@ model SubmissionFile {
   submission Submission     @relation(fields: [submissionId, assignmentId, schoolId], references: [id, assignmentId, schoolId], onDelete: Restrict, onUpdate: Restrict)
   item       AssignmentItem @relation(fields: [itemId, assignmentId], references: [id, assignmentId], onDelete: Restrict, onUpdate: Restrict)
   // [CHECK] size_bytes > 0
-  // [CHECK] storage_key LIKE 'submissions/' || school_id || '/%'   (tenant-prefixed key; enables per-school bucket policy)
-  // [TRG]   BEFORE INSERT: item must be type FILE_UPLOAD. Same-tx insert rule as answers; immutable. G4 on delete.
+  // [CHECK] storage_key LIKE 'submissions/' || school_id || '/%' (applies to the final key).
+  // [TRG]   BEFORE INSERT: item must be type FILE_UPLOAD. INSERT/DELETE only inside submit/resubmit tx (parent submitted_at = now());
+  //         UPDATE rejected. G4 on delete.
   //         Count/size/mime limits from item.config enforced by app.
+  // [RULE]  Uploads stage under submissions/<school>/pending/...; the final key (submissions/<school>/...) is set at submit.
 
   @@index([submissionId])
   @@index([schoolId])
   @@map("submission_files")
-}
-
-model SubmissionCriterionScore {
-  id           String  @id @default(uuid(7)) @db.Uuid
-  schoolId     String  @map("school_id") @db.Uuid
-  submissionId String  @map("submission_id") @db.Uuid
-  assignmentId String  @map("assignment_id") @db.Uuid
-  criterionId  String  @map("criterion_id") @db.Uuid
-  points       Decimal @db.Decimal(6, 2)
-
-  submission Submission                @relation(fields: [submissionId, assignmentId, schoolId], references: [id, assignmentId, schoolId], onDelete: Restrict, onUpdate: Restrict)
-  criterion  AssignmentRubricCriterion @relation(fields: [criterionId, assignmentId], references: [id, assignmentId], onDelete: Restrict, onUpdate: Restrict)
-  // [CHECK] points >= 0
-  // [TRG]   BEFORE INSERT/UPDATE: points <= the criterions max_points (criterion is frozen once published).
-
-  @@unique([submissionId, criterionId])
-  @@index([schoolId])
-  @@map("submission_criterion_scores")
 }
 
 // ============================================================================
