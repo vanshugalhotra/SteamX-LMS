@@ -668,7 +668,7 @@ model AssignmentTemplate {
   lessonId    String?       @map("lesson_id") @db.Uuid
   title       String
   description String?
-  blueprint   Json // { items: [{type, prompt, config, options:[{text,isCorrect}]}], rubric: [{name, description}] | null, allowResubmission }
+  blueprint   Json // { items: [{type, prompt, config, options:[{text,isCorrect}]}], rubric: [{name, description}] | null, allowResubmission (default false) }
   status      ContentStatus @default(DRAFT)
   createdById String?       @map("created_by_id") @db.Uuid
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -680,10 +680,9 @@ model AssignmentTemplate {
   createdBy User?   @relation(fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   copies Assignment[]
-  // [CHECK] num_nonnulls(module_id, lesson_id) <= 1   (none = course-level)
-  // [CHECK] jsonb_typeof(blueprint) = 'object'; length(btrim(title)) > 0
-  // [TRG]   created_by must be PLATFORM_STAFF.
-  // [RULE]  Teachers never read blueprint (contains answer keys); publishing copies it server-side.
+  // [CHECK] num_nonnulls(module_id, lesson_id) <= 1; length(btrim(title)) > 0;
+  //         jsonb_typeof(blueprint) = 'object'.
+  // [SERVICE] created_by authorization; teachers never read blueprint (it contains answer keys), which is copied server-side.
 
   @@index([courseId])
   @@map("assignment_templates")
@@ -700,7 +699,7 @@ model Assignment {
   description       String?
   status            AssignmentStatus @default(DRAFT)
   dueAt             DateTime?        @map("due_at") @db.Timestamptz
-  allowResubmission Boolean          @default(true) @map("allow_resubmission")
+  allowResubmission Boolean          @default(false) @map("allow_resubmission")
   rubric            Json? // NULL = no rubric. Else array of {name, description}; length = RUBRIC_SIZE (app constant, 4)
   publishedAt       DateTime?        @map("published_at") @db.Timestamptz
   sourceTemplateId  String?          @map("source_template_id") @db.Uuid
@@ -717,16 +716,18 @@ model Assignment {
   items       AssignmentItem[]
   submissions Submission[]
   // [CHECK] num_nonnulls(module_id, lesson_id) <= 1; length(btrim(title)) > 0;
-  //         (status = 'DRAFT') = (published_at IS NULL);
-  //         status <> 'PUBLISHED' OR due_at IS NOT NULL; rubric IS NULL OR jsonb_typeof(rubric) = 'array'.
+  //         (status = 'DRAFT') = (published_at IS NULL); status <> 'PUBLISHED' OR due_at IS NOT NULL;
+  //         rubric IS NULL OR jsonb_typeof(rubric) = 'array'.
   // [IDX]   UNIQUE (delivery_id, source_template_id) WHERE source_template_id IS NOT NULL.
-  // [TRG]   INSERT must be DRAFT. Template source must be ACTIVE and in the same course; template anchor overrides the client anchor.
-  //         created_by, when set, must be in actor scope and either PLATFORM_STAFF or an active teacher of this delivery.
-  // [TRG]   Status transitions: DRAFT->PUBLISHED, PUBLISHED<->UNPUBLISHED; never back to DRAFT. Set published_at at first publish.
-  //         Every publish requires ACTIVE delivery, has_course_access(today), at least one item, all items SINGLE_CHOICE or none,
-  //         valid SINGLE_CHOICE options, NULL rubric for MCQ, and no TEACHER_ONLY anchored lesson.
-  // [TRG]   Once a submission exists, only title, description, due_at, allow_resubmission, and status may change.
-  //         delivery_id, school_id, course_id, and source_template_id are always immutable; anchor and rubric freeze with first submission.
+  // [LIFECYCLE] DRAFT = never published; PUBLISHED = visible to students; UNPUBLISHED = was published, hidden again.
+  //             No PUBLISHED->DRAFT transition. Status transitions are [SERVICE].
+  // [TRG]   delivery_id, school_id, course_id, source_template_id are immutable. Rubric and anchor cannot change while
+  //         PUBLISHED or after the first submission.
+  // [SERVICE] Publish requires an ACTIVE delivery, has_course_access(today), at least one item, valid MCQ options
+  //           (at least two and exactly one correct), all-MCQ or none, no rubric on MCQ, and an anchor lesson not
+  //           TEACHER_ONLY. The template and delivery must be in the same course; creator/grader authorization is checked.
+  // [SERVICE] Content edits (items, options, rubric, anchor) only when status is not PUBLISHED and no submission exists.
+  //           While PUBLISHED only title, description, due_at, and allow_resubmission may change.
 
   @@unique([id, deliveryId])
   @@index([deliveryId, status, dueAt])
@@ -753,7 +754,8 @@ model AssignmentItem {
   files   SubmissionFile[]
   // [CHECK] position >= 1; length(btrim(prompt)) > 0; config IS NULL OR jsonb_typeof(config) = 'object'
   // [IDX]   UNIQUE (assignment_id, position), immediate; replace items by delete + recreate in one transaction while editable.
-  // [TRG]   FREEZE (INSERT/UPDATE/DELETE blocked once parent assignment has any submission; G1 purge exempt).
+  // [TRG]   INSERT/UPDATE/DELETE blocked while parent assignment is PUBLISHED or once it has any submission; G1 purge exempt.
+  // [SERVICE] Content edits only when assignment status is not PUBLISHED and no submission exists.
 
   @@unique([id, assignmentId]) // target for answers/files
   @@unique([assignmentId, position])
@@ -772,8 +774,9 @@ model AssignmentItemOption {
   answers SubmissionAnswer[]
   // [CHECK] position >= 1; length(btrim(text)) > 0
   // [IDX]   UNIQUE (item_id) WHERE is_correct  -> at most one correct option (at-least-one checked at publish)
-  // [TRG]   INSERT/UPDATE: parent item must be type SINGLE_CHOICE. FREEZE as items.
-  // [RULE]  is_correct never returned by any student-facing query (column-level discipline in the data layer).
+  // [TRG]   INSERT/UPDATE/DELETE blocked while parent assignment is PUBLISHED or once it has any submission; G1 purge exempt.
+  // [SERVICE] Content edits only when assignment status is not PUBLISHED and no submission exists.
+  // [SERVICE] is_correct is never returned by student-facing queries.
 
   @@unique([id, itemId])
   @@unique([itemId, position])
@@ -803,21 +806,17 @@ model Submission {
 
   answers SubmissionAnswer[]
   files   SubmissionFile[]
-  // [CHECK] (status = 'GRADED') = (graded_at IS NOT NULL) AND (status = 'GRADED') = (grade_percent IS NOT NULL)
-  // [CHECK] grade_percent IS NULL OR grade_percent BETWEEN 0 AND 100
-  // [CHECK] rubric_levels IS NULL OR jsonb_typeof(rubric_levels) = 'array'
-  // [TRG]   BEFORE INSERT: overwrite submitted_at = now() and due_at_at_submission = assignment.due_at (client values ignored);
-  //         require assignment PUBLISHED, enrollment ACTIVE, has_course_access(today).
-  // [RULE]  is_late = submitted_at > due_at_at_submission (derived, frozen inputs); is_late computed in the query/mapper (no view).
-  // [RULE]  Resubmit in one transaction: delete old answers/files (G4 queues storage keys), insert new ones, and update
-  //         submitted_at + due_at_at_submission together. Allowed whenever allow_resubmission is true and the assignment is
-  //         PUBLISHED, including after grading; clears the grade. Grading requests must carry the submitted_at the teacher saw
-  //         (app check, 409 on mismatch).
-  // [TRG]   Immutable always: assignment_id, delivery_id, student_id. submitted_at and due_at_at_submission change only together
-  //         on resubmit; any other UPDATE may only touch grading columns.
-  // [TRG]   DEFERRED constraint trigger: graded_by (if set) passes G2 and is an active teacher of the delivery or platform staff.
-  // [RULE]  Regrade overwrites grading columns. No attempt history.
-  // [RULE]  No drafts: row is created atomically with answers/files in one tx.
+  // [CHECK] (status = 'GRADED') = (graded_at IS NOT NULL); (status = 'GRADED') = (grade_percent IS NOT NULL).
+  // [CHECK] grade_percent IS NULL OR grade_percent BETWEEN 0 AND 100;
+  //         rubric_levels IS NULL OR jsonb_typeof(rubric_levels) = 'array';
+  //         status = 'GRADED' OR (graded_at, grade_percent, rubric_levels, overall_feedback, graded_by_id are all NULL).
+  // [TRG]   BEFORE INSERT: require assignment PUBLISHED, enrollment ACTIVE, and has_course_access(today);
+  //         set submitted_at = now() and due_at_at_submission = assignment.due_at (client values ignored).
+  // [TRG]   assignment_id, delivery_id, and student_id are immutable.
+  // [TRG]   BEFORE UPDATE OF submitted_at, due_at_at_submission: require allow_resubmission and SUBMITTED status;
+  //         recheck assignment PUBLISHED, enrollment ACTIVE, and course access; reset both timestamps from the database.
+  // [SERVICE] Clear grading fields on resubmit; enforce optimistic submitted_at checks and grader authorization.
+  // [SERVICE] is_late is computed in the query/mapper (no view): submitted_at > due_at_at_submission.
 
   @@unique([assignmentId, studentId]) // one row per student per assignment = natural idempotency
   @@unique([id, assignmentId, schoolId])
@@ -840,10 +839,9 @@ model SubmissionAnswer {
   submission     Submission            @relation(fields: [submissionId, assignmentId, schoolId], references: [id, assignmentId, schoolId], onDelete: Restrict, onUpdate: Restrict)
   item           AssignmentItem        @relation(fields: [itemId, assignmentId], references: [id, assignmentId], onDelete: Restrict, onUpdate: Restrict)
   selectedOption AssignmentItemOption? @relation(fields: [selectedOptionId, itemId], references: [id, itemId], onDelete: Restrict, onUpdate: Restrict)
-  // [TRG]   BEFORE INSERT: item type decides the shape (SINGLE_CHOICE => selected_option_id only, TEXT => answer_text only,
-  //         FILE_UPLOAD rejected: files live in submission_files); is_correct computed from option.is_correct
-  //         (never trusted from payload), NULL for non-MCQ.
-  // [TRG]   INSERT/DELETE only inside submit/resubmit tx (parent submitted_at = now()); UPDATE always rejected.
+  // [TRG]   BEFORE INSERT: is_correct is computed from selected_option_id's option (client value ignored), NULL when no option.
+  // [TRG]   BEFORE UPDATE: always reject.
+  // [SERVICE] Answer shape validation and submit/resubmit transaction behavior.
 
   @@unique([submissionId, itemId])
   @@index([schoolId])
@@ -864,12 +862,10 @@ model SubmissionFile {
 
   submission Submission     @relation(fields: [submissionId, assignmentId, schoolId], references: [id, assignmentId, schoolId], onDelete: Restrict, onUpdate: Restrict)
   item       AssignmentItem @relation(fields: [itemId, assignmentId], references: [id, assignmentId], onDelete: Restrict, onUpdate: Restrict)
-  // [CHECK] size_bytes > 0
-  // [CHECK] storage_key LIKE 'submissions/' || school_id || '/%' (applies to the final key).
-  // [TRG]   BEFORE INSERT: item must be type FILE_UPLOAD. INSERT/DELETE only inside submit/resubmit tx (parent submitted_at = now());
-  //         UPDATE rejected. G4 on delete.
-  //         Count/size/mime limits from item.config enforced by app.
-  // [RULE]  Uploads stage under submissions/<school>/pending/...; the final key (submissions/<school>/...) is set at submit.
+  // [CHECK] size_bytes > 0; storage_key LIKE 'submissions/' || school_id || '/%' (applies to the final key).
+  // [TRG]   BEFORE UPDATE: always reject. G4 on delete enqueues the storage key.
+  // [SERVICE] File item type, submit/resubmit transaction, upload limits, and pending-to-final key transition.
+  //           Uploads stage under submissions/<school>/pending/...; submit assigns the final submissions/<school>/... key.
 
   @@index([submissionId])
   @@index([schoolId])

@@ -1140,7 +1140,9 @@ describe('curriculum and asset database rules', () => {
       [itemId, assignmentId],
     );
     await client.query(
-      `UPDATE assignments SET status = 'PUBLISHED', updated_at = now() WHERE id = $1`,
+      `UPDATE assignments
+       SET status = 'PUBLISHED', published_at = COALESCE(published_at, now()), updated_at = now()
+       WHERE id = $1`,
       [assignmentId],
     );
     await client.query(

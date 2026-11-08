@@ -100,10 +100,11 @@ For route-level behavior, see the [API testing guide](../testing/api-testing.md)
 
 ### Assignments & submissions
 
-- Templates are platform-staff authored. Assignments start as DRAFT and may publish only with an active delivery, course access, due date, items, and valid item/rubric combinations.
-- First publish sets `published_at`; assignments cannot return to DRAFT. Once a submission exists, only title, description, due date, resubmission setting, and status remain editable.
-- Submissions are created only for published assignments and active enrollments with current course access. Resubmission is transactional and clears grading; answers/files are writable only during submit/resubmit or purge.
-- Grading state, answer shape/correctness, file ownership/type/key, and item/option freeze rules are database-enforced. `is_late` is derived in the query/mapper; uploads stage under a school-scoped pending key and receive their final key at submit.
+- **Enforced by the database**
+  - Structural CHECKs, partial unique indexes, assignment/submission identity immutability, assignment rubric/anchor freeze after a submission, item/option freeze (except purge), submission insert eligibility and timestamps, computed answer correctness, answer/file update rejection, and submission-file size/key checks.
+- **Enforced by the service (see ASG-2 to ASG-5)**
+  - Publish checklist: active delivery, course access, at least one item, valid MCQ options (at least two and exactly one correct), all-MCQ or none, no rubric on MCQ, anchor lesson not `TEACHER_ONLY`, template and delivery in the same course, and creator/grader authorization.
+  - Lifecycle: DRAFT is never published; PUBLISHED is visible to students; UNPUBLISHED was published and is hidden again. No PUBLISHED→DRAFT transition. Content edits (items, options, rubric, anchor) are allowed only when not PUBLISHED and no submission exists; while PUBLISHED, only title, description, due date, and resubmission setting may change.
 
 ## Migrations
 

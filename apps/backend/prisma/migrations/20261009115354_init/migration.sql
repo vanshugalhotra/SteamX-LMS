@@ -342,7 +342,7 @@ CREATE TABLE "assignments" (
     "description" TEXT,
     "status" "assignment_status" NOT NULL DEFAULT 'DRAFT',
     "due_at" TIMESTAMPTZ,
-    "allow_resubmission" BOOLEAN NOT NULL DEFAULT true,
+    "allow_resubmission" BOOLEAN NOT NULL DEFAULT false,
     "rubric" JSONB,
     "published_at" TIMESTAMPTZ,
     "source_template_id" UUID,
