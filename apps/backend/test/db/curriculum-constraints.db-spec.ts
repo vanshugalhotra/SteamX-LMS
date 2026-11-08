@@ -1130,14 +1130,20 @@ describe('curriculum and asset database rules', () => {
     );
     await client.query(
       `INSERT INTO assignments
-         (id, school_id, delivery_id, course_id, title, updated_at)
-       VALUES ($1, $2, $3, $4, 'Test Assignment', now())`,
+         (id, school_id, delivery_id, course_id, title, due_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'Test Assignment', now() + interval '1 day', now())`,
       [assignmentId, schoolId, deliveryId, course],
     );
     await client.query(
       `INSERT INTO assignment_items (id, assignment_id, position, type, prompt, updated_at)
        VALUES ($1, $2, 1, 'FILE_UPLOAD', 'Upload a file', now())`,
       [itemId, assignmentId],
+    );
+    await client.query(
+      `UPDATE assignments
+       SET status = 'PUBLISHED', published_at = COALESCE(published_at, now()), updated_at = now()
+       WHERE id = $1`,
+      [assignmentId],
     );
     await client.query(
       `INSERT INTO submissions

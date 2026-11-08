@@ -10,38 +10,36 @@ tables are present in the schema, but their feature APIs are not implemented.
 
 ## Tables
 
-| Area           | Table                         | Purpose                                               |
-| -------------- | ----------------------------- | ----------------------------------------------------- |
-| School         | `schools`                     | School identity, contact, status.                     |
-| Auth           | `roles`                       | Role key + user type.                                 |
-| Auth           | `permissions`                 | Named capabilities.                                   |
-| Auth           | `role_permissions`            | Role → permission grants.                             |
-| Users          | `users`                       | Account identity, credentials, status, school.        |
-| Users          | `student_profiles`            | Student-specific details + class section.             |
-| Users          | `teacher_profiles`            | Teacher-specific details.                             |
-| Class sections | `class_sections`              | School-owned class + section names.                   |
-| Curriculum     | `courses`                     | Central course records.                               |
-| Curriculum     | `modules`                     | Ordered modules within a course.                      |
-| Curriculum     | `lessons`                     | Ordered lessons within a module.                      |
-| Curriculum     | `lesson_blocks`               | Structured content blocks within lessons.             |
-| Assets         | `assets`                      | Central media asset metadata.                         |
-| Assets         | `asset_files`                 | File upload + processing state.                       |
-| Subscriptions  | `subscriptions`               | School access period + delivery limit per course.     |
-| Delivery       | `deliveries`                  | Labeled course group within a school + academic year. |
-| Delivery       | `delivery_teachers`           | Teacher assignment stints.                            |
-| Delivery       | `delivery_lesson_releases`    | Released lessons in a delivery.                       |
-| Enrollment     | `delivery_enrollments`        | Student membership + status.                          |
-| Progress       | `lesson_completions`          | Student lesson completion state.                      |
-| Assignments    | `assignment_templates`        | Reusable assignment blueprint.                        |
-| Assignments    | `assignments`                 | Assignment instance for a delivery.                   |
-| Assignments    | `assignment_items`            | Questions/tasks within an assignment.                 |
-| Assignments    | `assignment_item_options`     | Choices for single-choice items.                      |
-| Assignments    | `assignment_rubric_criteria`  | Scoring criteria.                                     |
-| Submissions    | `submissions`                 | Student submission + grading state.                   |
-| Submissions    | `submission_answers`          | Answers attached to a submission.                     |
-| Submissions    | `submission_files`            | Files attached to a submission.                       |
-| Submissions    | `submission_criterion_scores` | Per-criterion scores.                                 |
-| Storage        | `storage_cleanup_queue`       | Storage keys queued for deletion.                     |
+| Area           | Table                      | Purpose                                               |
+| -------------- | -------------------------- | ----------------------------------------------------- |
+| School         | `schools`                  | School identity, contact, status.                     |
+| Auth           | `roles`                    | Role key + user type.                                 |
+| Auth           | `permissions`              | Named capabilities.                                   |
+| Auth           | `role_permissions`         | Role → permission grants.                             |
+| Users          | `users`                    | Account identity, credentials, status, school.        |
+| Users          | `student_profiles`         | Student-specific details + class section.             |
+| Users          | `teacher_profiles`         | Teacher-specific details.                             |
+| Class sections | `class_sections`           | School-owned class + section names.                   |
+| Curriculum     | `courses`                  | Central course records.                               |
+| Curriculum     | `modules`                  | Ordered modules within a course.                      |
+| Curriculum     | `lessons`                  | Ordered lessons within a module.                      |
+| Curriculum     | `lesson_blocks`            | Structured content blocks within lessons.             |
+| Assets         | `assets`                   | Central media asset metadata.                         |
+| Assets         | `asset_files`              | File upload + processing state.                       |
+| Subscriptions  | `subscriptions`            | School access period + delivery limit per course.     |
+| Delivery       | `deliveries`               | Labeled course group within a school + academic year. |
+| Delivery       | `delivery_teachers`        | Teacher assignment stints.                            |
+| Delivery       | `delivery_lesson_releases` | Released lessons in a delivery.                       |
+| Enrollment     | `delivery_enrollments`     | Student membership + status.                          |
+| Progress       | `lesson_completions`       | Student lesson completion state.                      |
+| Assignments    | `assignment_templates`     | Reusable assignment blueprint.                        |
+| Assignments    | `assignments`              | Assignment instance for a delivery.                   |
+| Assignments    | `assignment_items`         | Questions/tasks within an assignment.                 |
+| Assignments    | `assignment_item_options`  | Choices for single-choice items.                      |
+| Submissions    | `submissions`              | Student submission + grading state.                   |
+| Submissions    | `submission_answers`       | Answers attached to a submission.                     |
+| Submissions    | `submission_files`         | Files attached to a submission.                       |
+| Storage        | `storage_cleanup_queue`    | Storage keys queued for deletion.                     |
 
 ## Database-enforced rules
 
@@ -99,6 +97,14 @@ For route-level behavior, see the [API testing guide](../testing/api-testing.md)
   - Draft content is never student-visible. Released active/archived content stays available until subscription expiry.
 - **Asset files:** IDs are UUIDv7. Storage keys must start with `assets/<asset_id>/<asset_file_id>/`. Only one READY file per asset. READY/FAILED rows reject updates. VIDEO READY files require a playback key. The database permits `UPLOADED → READY` for IMAGE/PDF and requires `PROCESSING` for VIDEO/PPTX; the current completion service routes supported types through `PROCESSING`. PPTX remains in the enum but uploads are rejected.
 - **Cleanup queue:** Deleting an asset file queues its prefix; deleting a submission file queues its object key. The current worker handles prefixes only. Pending jobs have partial indexes.
+
+### Assignments & submissions
+
+- **Enforced by the database**
+  - Structural CHECKs, partial unique indexes, assignment/submission identity immutability, assignment rubric/anchor freeze after a submission, item/option freeze (except purge), submission insert eligibility and timestamps, computed answer correctness, answer/file update rejection, and submission-file size/key checks.
+- **Enforced by the service (see ASG-2 to ASG-5)**
+  - Publish checklist: active delivery, course access, at least one item, valid MCQ options (at least two and exactly one correct), all-MCQ or none, no rubric on MCQ, anchor lesson not `TEACHER_ONLY`, template and delivery in the same course, and creator/grader authorization.
+  - Lifecycle: DRAFT is never published; PUBLISHED is visible to students; UNPUBLISHED was published and is hidden again. No PUBLISHED→DRAFT transition. Content edits (items, options, rubric, anchor) are allowed only when not PUBLISHED and no submission exists; while PUBLISHED, only title, description, due date, and resubmission setting may change.
 
 ## Migrations
 
