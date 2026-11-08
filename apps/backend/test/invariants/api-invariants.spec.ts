@@ -172,9 +172,10 @@ describe('Black-box API invariants', () => {
     }
   });
 
-  it('requires an explicit permission on every non-public, non-session-only route', async () => {
+  it('enforces an explicit authorization policy on every protected route', async () => {
     expectAssetRoutesAreEnumerated(api.routes);
     expectLessonContentRoutesAreEnumerated(api.routes);
+    expectAuthenticatedOnlyRoutesAreEnumerated(api.routes);
     const admin = await adminCookie();
     const school = await createSchool(admin, 'Permission sweep school');
     const section = await createSection(admin, school.id);
@@ -195,10 +196,14 @@ describe('Black-box API invariants', () => {
           ? { body: {} }
           : {}),
       });
+      if (isAuthenticatedOnlyRoute(route)) {
+        assertStatus(response, 200);
+        continue;
+      }
       try {
         assertStatus(response, 403, 'PERMISSION_REQUIRED');
       } catch (error) {
-        throw new Error(`${route.method} ${route.path} did not require a permission.`, {
+        throw new Error(`${route.method} ${route.path} did not enforce its declared permission.`, {
           cause: error,
         });
       }
@@ -754,6 +759,16 @@ function isSessionOnlyRoute(route: ApiRoute): boolean {
   return ['/api/v1/auth/me', '/api/v1/auth/logout', '/api/v1/auth/change-password'].includes(
     route.path,
   );
+}
+
+function isAuthenticatedOnlyRoute(route: ApiRoute): boolean {
+  return route.path === '/api/v1/assignments/defaults';
+}
+
+function expectAuthenticatedOnlyRoutesAreEnumerated(routes: ApiRoute[]): void {
+  expect(
+    routes.filter(isAuthenticatedOnlyRoute).map(({ method, path }) => `${method} ${path}`),
+  ).toEqual(['GET /api/v1/assignments/defaults']);
 }
 
 function cookieFrom(response: { headers: Record<string, string | string[] | undefined> }): string {

@@ -38,6 +38,6 @@ import { LessonContentService } from './lesson-content/lesson-content.service.js
     LessonContentRepository,
     LessonContentService,
   ],
-  exports: [LessonContentService],
+  exports: [CoursesService, CourseModulesService, LessonsService, LessonContentService],
 })
 export class CurriculumModule {}

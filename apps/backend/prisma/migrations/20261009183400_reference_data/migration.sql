@@ -14,6 +14,8 @@ VALUES
   -- Assets
   ('asset.read',             'Read asset file state'),
   ('asset.write',            'Create assets and upload asset files'),
+  -- Assignment templates
+  ('assignment.template.manage', 'Create and manage assignment templates'),
   -- Class sections
   ('classsection.manage',    'Create, update, and delete class sections'),
   ('classsection.read',      'View class sections'),
@@ -52,6 +54,7 @@ WHERE roles.key = 'admin'
   AND permissions.key IN (
     'asset.read',
     'asset.write',
+    'assignment.template.manage',
     'classsection.manage',
     'classsection.read',
     'curriculum.read',

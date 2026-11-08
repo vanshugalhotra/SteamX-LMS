@@ -15,6 +15,7 @@ This index helps developers find the guide for the task they are working on.
 | Change authentication, permissions, or school scope | [Access control](./architecture/access-control.md)                                                                           |
 | Change persistence rules or a migration             | [Database](./architecture/database.md)                                                                                       |
 | Change lesson block content                         | [Lesson content](./architecture/lesson-content.md)                                                                           |
+| Work with assignment templates and blueprints       | [Assignments](./assignments.md)                                                                                              |
 | Understand a recorded design choice                 | [Decisions](./architecture/decisions.md)                                                                                     |
 | Interpret an API error                              | [API errors](./api/api-errors.md)                                                                                            |
 | Run tests or write API/workflow tests               | [Testing](./testing/testing.md), [API testing](./testing/api-testing.md), [workflow testing](./testing/workflows-testing.md) |

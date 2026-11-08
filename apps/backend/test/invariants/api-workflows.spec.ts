@@ -337,6 +337,13 @@ describe('Documented API workflows', () => {
         if (isPublicRoute(route) || isSessionOnlyRoute(route)) {
           continue;
         }
+        if (route.path === '/api/v1/assignments/defaults') {
+          assertStatus(
+            await api.send(route.method, concretePath(route), { cookie: session.cookie }),
+            200,
+          );
+          continue;
+        }
         const options: { body?: object } = {};
         if (route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE') {
           options.body = {};

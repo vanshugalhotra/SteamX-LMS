@@ -18,6 +18,7 @@ import { AssetsModule } from './assets/assets.module.js';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
 import { DeliveriesModule } from './deliveries/deliveries.module.js';
 import { LearningModule } from './learning/learning.module.js';
+import { AssignmentsModule } from './assignments/assignments.module.js';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { LearningModule } from './learning/learning.module.js';
     SubscriptionsModule,
     DeliveriesModule,
     LearningModule,
+    AssignmentsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OriginGuard },
