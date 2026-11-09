@@ -1043,3 +1043,51 @@ Caller: public; checks PostgreSQL readiness.
 - [auto: DB] When SteamX ID changes outside the controlled transaction-local setting -> expect the trigger to reject it.
 - [auto] When teacher or student profile insertion fails midway -> verify the user insert rolls back with the profile.
 - [manual] When a rename operation fails midway -> verify the user ID remains unchanged.
+
+## Assignments
+
+### `POST /assignment-templates`
+
+Caller: platform admin with `assignment.template.manage`; creates a DRAFT template and defaults an
+omitted blueprint to empty items, a null rubric, and resubmission disabled.
+
+- [auto] When a course and optional module or lesson anchor belong together -> expect `201` and trimmed template text.
+- [auto] When a module or lesson belongs to another course -> expect `404 NOT_FOUND`.
+- [auto] When the course is ARCHIVED or both anchor IDs are supplied -> expect `409` for the archived course or `400 VALIDATION_ERROR` for two anchors.
+- [auto] When the blueprint is structurally valid but incomplete for publishing -> expect `201`; drafts do not require complete validation.
+- [auto] When teacher or student calls -> expect `403 FORBIDDEN`; without a cookie -> expect `401 UNAUTHORIZED`.
+
+### `GET /assignment-templates` and `GET /assignment-templates/:id`
+
+Caller: platform admin with `assignment.template.manage`.
+
+- [auto] When listing templates with course, module, lesson, or status filters and page settings -> expect matching summaries ordered by most recently updated.
+- [auto] When a summary is returned -> expect item count, unique item types, rubric and resubmission metadata, and no blueprint or answer keys.
+- [auto] When an admin reads a template by ID -> expect the full blueprint including `isCorrect`; a missing valid UUID returns `404 NOT_FOUND`.
+- [auto] When teacher or student calls either route -> expect `403 FORBIDDEN`; without a cookie -> expect `401 UNAUTHORIZED`.
+
+### `PATCH /assignment-templates/:id` and `PATCH /assignment-templates/:id/status`
+
+Caller: platform admin with `assignment.template.manage`.
+
+- [auto] When saving a DRAFT blueprint that passes shape validation but is not publishable -> expect success.
+- [auto] When a DRAFT template is activated with no items, an incomplete single-choice item, mixed item types, or a rubric on single-choice items -> expect `409 ASSIGNMENT_BLUEPRINT_INVALID` with every problem path and rule.
+- [auto] When an ACTIVE template's blueprint is replaced -> expect the complete validation rules to run again; title-only edits remain allowed.
+- [auto] When moving DRAFT to ARCHIVED or ACTIVE to ARCHIVED and back to ACTIVE -> expect success; any transition to DRAFT returns `409 ASSIGNMENT_TEMPLATE_INVALID_STATUS_TRANSITION`.
+- [auto] When an ARCHIVED template is edited -> expect `409 ASSIGNMENT_TEMPLATE_ARCHIVED`.
+- [auto] When teacher or student calls either route -> expect `403 FORBIDDEN`; without a cookie -> expect `401 UNAUTHORIZED`.
+
+### `DELETE /assignment-templates/:id`
+
+Caller: platform admin with `assignment.template.manage`.
+
+- [auto] When no assignment copy refers to the template -> expect `204`.
+- [auto] When a copy references the template -> expect `409 RESOURCE_IN_USE`.
+- [auto] When teacher or student calls -> expect `403 FORBIDDEN`; without a cookie -> expect `401 UNAUTHORIZED`.
+
+### `GET /assignments/defaults`
+
+Caller: any authenticated user; no permission is required.
+
+- [auto] When an authenticated teacher or student calls -> expect rubric categories, grade-level code/letter pairs, and the server's assignment limits.
+- [auto] When no cookie is sent -> expect `401 UNAUTHORIZED`.

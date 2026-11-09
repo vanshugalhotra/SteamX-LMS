@@ -110,6 +110,16 @@ export const API_ERROR = {
   }),
 
   ...defineErrors({
+    // Assignment templates
+    ASSIGNMENT_BLUEPRINT_INVALID: 'Assignment blueprint cannot be activated',
+    ASSIGNMENT_TEMPLATE_ARCHIVED: 'Archived assignment templates are read-only',
+    ASSIGNMENT_TEMPLATE_COURSE_ARCHIVED:
+      'Assignment templates cannot be created for archived courses',
+    ASSIGNMENT_TEMPLATE_INVALID_STATUS_TRANSITION:
+      'Assignment templates cannot return to DRAFT status',
+  }),
+
+  ...defineErrors({
     // Deliveries: enrollment
     STUDENT_NOT_FOUND: notFound('Student', 'the delivery school'),
     STUDENT_NOT_ACTIVE: notActive('Student'),
