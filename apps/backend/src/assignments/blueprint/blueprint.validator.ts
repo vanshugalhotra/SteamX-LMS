@@ -15,7 +15,7 @@ export interface BlueprintProblem {
   message: string;
 }
 
-/** Checks configuration and options permitted for an item type. */
+/** Checks configuration and options permitted for an item type.*/
 @ValidatorConstraint({ name: 'blueprintItemShape', async: false })
 export class BlueprintItemShapeConstraint implements ValidatorConstraintInterface {
   validate(_value: unknown, args: ValidationArguments): boolean {
