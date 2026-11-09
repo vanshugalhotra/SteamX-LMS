@@ -4,7 +4,7 @@ import { ContentStatus, Prisma } from '../../generated/prisma/client.js';
 import type { AssignmentTemplate } from '../../generated/prisma/client.js';
 import { paginatedSearch } from '../../common/repositories/paginated-search.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import type { AssignmentBlueprint } from '../blueprint/constants.js';
+import type { AssignmentBlueprint } from '../blueprint/blueprint.schema.js';
 import type {
   AssignmentTemplateListQueryDto,
   CreateAssignmentTemplateDto,

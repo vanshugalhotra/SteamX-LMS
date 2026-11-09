@@ -1,9 +1,6 @@
 /** Covers blueprint shape validation on save and complete validation before activation. */
-import { plainToInstance } from 'class-transformer';
-import { validateSync } from 'class-validator';
-import type { ValidationError } from 'class-validator';
-import { AssignmentBlueprintDto } from './blueprint.dto.js';
-import type { AssignmentBlueprint } from './constants.js';
+import { AssignmentBlueprintSchema } from './blueprint.schema.js';
+import type { AssignmentBlueprint } from './blueprint.schema.js';
 import { assertPublishableBlueprint } from './blueprint.validator.js';
 
 const textItem = (overrides: Record<string, unknown> = {}) => ({
@@ -33,20 +30,10 @@ const blueprint = (items: unknown[] = [textItem()], overrides: Record<string, un
 });
 
 function shapeErrors(value: unknown): string[] {
-  const instance = plainToInstance(AssignmentBlueprintDto, value);
-  return validateSync(instance, {
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    forbidUnknownValues: true,
-  }).flatMap((error) => flattenErrors(error));
-}
-
-function flattenErrors(error: ValidationError, parent = ''): string[] {
-  const path = parent ? `${parent}.${error.property}` : error.property;
-  return [
-    ...Object.keys(error.constraints ?? {}).map((key) => `${path}:${key}`),
-    ...(error.children ?? []).flatMap((child) => flattenErrors(child, path)),
-  ];
+  const parsed = AssignmentBlueprintSchema.safeParse(value);
+  return parsed.success
+    ? []
+    : parsed.error.issues.map((issue) => `${issue.path.join('.')}:${issue.code}`);
 }
 
 describe('assignment blueprint shape validation', () => {
@@ -124,6 +111,7 @@ describe('assignment blueprint shape validation', () => {
       }),
     ],
     ['TEXT maxLength over limit', blueprint([textItem({ config: { maxLength: 20001 } })])],
+    ['TEXT config without maxLength', blueprint([textItem({ config: {} })])],
     [
       'FILE_UPLOAD config missing required fields',
       blueprint([
@@ -131,6 +119,17 @@ describe('assignment blueprint shape validation', () => {
           type: 'FILE_UPLOAD',
           prompt: 'Upload a file.',
           config: { maxFiles: 1, allowedTypes: ['PDF'] },
+        },
+      ]),
+    ],
+    [
+      'options on FILE_UPLOAD',
+      blueprint([
+        {
+          type: 'FILE_UPLOAD',
+          prompt: 'Upload a file.',
+          config: { maxFiles: 1, maxSizeMb: 1, allowedTypes: ['PDF'] },
+          options: [],
         },
       ]),
     ],
@@ -241,8 +240,7 @@ describe('assignment blueprint shape validation', () => {
   });
 
   it('trims prompts, option text, rubric names, and rubric descriptions', () => {
-    const instance = plainToInstance(
-      AssignmentBlueprintDto,
+    const parsed = AssignmentBlueprintSchema.parse(
       blueprint(
         [
           choiceItem([
@@ -260,20 +258,36 @@ describe('assignment blueprint shape validation', () => {
         },
       ),
     );
-    expect(instance.items[0]?.prompt).toBe('Choose an answer.');
-    expect(instance.items[0]?.options?.[0]?.text).toBe('Correct');
-    expect(instance.rubric?.[0]?.name).toBe('One');
-    expect(instance.rubric?.[0]?.description).toBe('Desc');
+    const item = parsed.items[0];
+    expect(item?.prompt).toBe('Choose an answer.');
+    expect(item?.type === 'SINGLE_CHOICE' && item.options[0]?.text).toBe('Correct');
+    expect(parsed.rubric?.[0]?.name).toBe('One');
+    expect(parsed.rubric?.[0]?.description).toBe('Desc');
     expect(shapeErrors(blueprint([textItem()]))).toEqual([]);
   });
 
   it('defaults allowResubmission to false when omitted from a supplied blueprint', () => {
-    const instance = plainToInstance(AssignmentBlueprintDto, {
+    const parsed = AssignmentBlueprintSchema.parse({
       items: [textItem()],
       rubric: null,
     });
-    expect(instance.allowResubmission).toBe(false);
+    expect(parsed.allowResubmission).toBe(false);
     expect(shapeErrors({ items: [textItem()], rubric: null })).toEqual([]);
+  });
+
+  it('accepts valid TEXT and FILE_UPLOAD configs', () => {
+    expect(
+      shapeErrors(
+        blueprint([
+          textItem({ config: { maxLength: 20000 } }),
+          {
+            type: 'FILE_UPLOAD',
+            prompt: 'Upload a file.',
+            config: { maxFiles: 5, maxSizeMb: 25, allowedTypes: ['PDF', 'IMAGE'] },
+          },
+        ]),
+      ),
+    ).toEqual([]);
   });
 });
 

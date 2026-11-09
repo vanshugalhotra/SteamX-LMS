@@ -1,13 +1,9 @@
-/** Validates publish readiness and item-specific blueprint shape rules. */
-import { ConflictException } from '@nestjs/common';
-import {
-  ValidatorConstraint,
-  type ValidationArguments,
-  type ValidatorConstraintInterface,
-} from 'class-validator';
+/** Handles request-shape errors and publish-readiness checks. */
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { API_ERROR } from '../../common/errors/api-errors.js';
 import { ASSIGNMENT_ITEM_TYPE } from './constants.js';
-import type { AssignmentBlueprint } from './constants.js';
+import { AssignmentBlueprintSchema } from './blueprint.schema.js';
+import type { AssignmentBlueprint } from './blueprint.schema.js';
 
 export interface BlueprintProblem {
   path: string;
@@ -15,68 +11,25 @@ export interface BlueprintProblem {
   message: string;
 }
 
-/** Checks configuration and options permitted for an item type.*/
-@ValidatorConstraint({ name: 'blueprintItemShape', async: false })
-export class BlueprintItemShapeConstraint implements ValidatorConstraintInterface {
-  validate(_value: unknown, args: ValidationArguments): boolean {
-    const item = args.object as Record<string, unknown>;
-    const config = item.config;
-    const options = item.options;
-
-    switch (item.type) {
-      case ASSIGNMENT_ITEM_TYPE.SINGLE_CHOICE:
-        return config === undefined && Array.isArray(options);
-      case ASSIGNMENT_ITEM_TYPE.TEXT:
-        return (
-          options === undefined &&
-          (config === undefined ||
-            (isObject(config) &&
-              typeof config.maxLength === 'number' &&
-              Object.entries(config).every(
-                ([key, value]) => key === 'maxLength' || value === undefined,
-              )))
-        );
-      case ASSIGNMENT_ITEM_TYPE.FILE_UPLOAD:
-        return (
-          options === undefined &&
-          isObject(config) &&
-          config.maxFiles !== undefined &&
-          config.maxSizeMb !== undefined &&
-          config.allowedTypes !== undefined &&
-          Object.keys(config).every((key) =>
-            ['maxFiles', 'maxSizeMb', 'allowedTypes'].includes(key),
-          )
-        );
-      default:
-        return true;
+/** Parses request JSON and maps shape errors to the standard validation response. */
+export function parseAssignmentBlueprint(value: unknown): AssignmentBlueprint {
+  const parsed = AssignmentBlueprintSchema.safeParse(value);
+  if (!parsed.success) {
+    const errorsByField = new Map<string, string[]>();
+    for (const issue of parsed.error.issues) {
+      const field = ['blueprint', ...issue.path].map(String).join('.');
+      const errors = errorsByField.get(field) ?? [];
+      if (!errors.includes(issue.message)) {
+        errors.push(issue.message);
+      }
+      errorsByField.set(field, errors);
     }
+    throw new BadRequestException({
+      ...API_ERROR.VALIDATION_ERROR,
+      details: [...errorsByField].map(([field, errors]) => ({ field, errors })),
+    });
   }
-
-  defaultMessage(args: ValidationArguments): string {
-    const item = args.object as Record<string, unknown>;
-    if (item.type === ASSIGNMENT_ITEM_TYPE.SINGLE_CHOICE) {
-      return 'SINGLE_CHOICE items require options and do not allow config';
-    }
-    if (item.type === ASSIGNMENT_ITEM_TYPE.TEXT) {
-      return 'TEXT items do not allow options and config may only contain maxLength';
-    }
-    if (item.type === ASSIGNMENT_ITEM_TYPE.FILE_UPLOAD) {
-      return 'FILE_UPLOAD items require file upload config and do not allow options';
-    }
-    return `Item shape is invalid for ${String(item.type)}`;
-  }
-}
-
-/** Limits each draft multiple-choice item to one marked correct option. */
-@ValidatorConstraint({ name: 'maxOneCorrectOption', async: false })
-export class MaxOneCorrectOptionConstraint implements ValidatorConstraintInterface {
-  validate(value: unknown): boolean {
-    return !Array.isArray(value) || value.filter(isCorrectOption).length <= 1;
-  }
-
-  defaultMessage(): string {
-    return 'At most one option may be marked correct';
-  }
+  return parsed.data;
 }
 
 /** Collects every publish rule violation and throws one structured conflict. */
@@ -142,12 +95,7 @@ export function assertPublishableBlueprint(blueprint: AssignmentBlueprint): void
   }
 }
 
-/** Checks a plain object without relying on untrusted properties. */
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /** Checks that a candidate option explicitly marks itself correct. */
-function isCorrectOption(value: unknown): boolean {
-  return isObject(value) && value.isCorrect === true;
+function isCorrectOption(value: { isCorrect: boolean }): boolean {
+  return value.isCorrect;
 }

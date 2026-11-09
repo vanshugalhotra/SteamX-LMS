@@ -1,16 +1,14 @@
 /** Request and response DTOs for assignment template endpoints. */
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
+  Allow,
   IsEnum,
   IsNotEmpty,
-  IsObject,
   IsString,
   IsUUID,
   MaxLength,
   Validate,
   ValidateIf,
-  ValidateNested,
   ValidatorConstraint,
   type ValidationArguments,
   type ValidatorConstraintInterface,
@@ -20,7 +18,11 @@ import { PaginationQueryDto } from '../../../common/pagination/pagination-query.
 import { PaginationResponseDto } from '../../../common/pagination/pagination-response.dto.js';
 import { Trim } from '../../../common/decorators/trim.decorator.js';
 import { AssignmentBlueprintDto } from '../../blueprint/blueprint.dto.js';
-import type { AssignmentBlueprint, AssignmentItemType } from '../../blueprint/constants.js';
+import type {
+  AssignmentBlueprint,
+  AssignmentBlueprintInput,
+  AssignmentItemType,
+} from '../../blueprint/blueprint.schema.js';
 
 /** Rejects template anchors that name both a module and a lesson. */
 @ValidatorConstraint({ name: 'oneTemplateAnchor', async: false })
@@ -75,11 +77,8 @@ export class CreateAssignmentTemplateDto {
       allowResubmission: false,
     },
   })
-  @ValidateIf((_object, value) => value !== undefined)
-  @IsObject()
-  @ValidateNested()
-  @Type(() => AssignmentBlueprintDto)
-  blueprint?: AssignmentBlueprintDto;
+  @Allow()
+  blueprint?: AssignmentBlueprintInput;
 }
 
 export class UpdateAssignmentTemplateDto {
@@ -99,11 +98,8 @@ export class UpdateAssignmentTemplateDto {
   description?: string | null;
 
   @ApiPropertyOptional({ type: AssignmentBlueprintDto })
-  @ValidateIf((_object, value) => value !== undefined)
-  @IsObject()
-  @ValidateNested()
-  @Type(() => AssignmentBlueprintDto)
-  blueprint?: AssignmentBlueprintDto;
+  @Allow()
+  blueprint?: AssignmentBlueprintInput;
 }
 
 export class UpdateAssignmentTemplateStatusDto {

@@ -16,7 +16,10 @@ import type { PaginationResponseDto } from '../../common/pagination/pagination-r
 import { CourseModulesService } from '../../curriculum/course-modules/course-modules.service.js';
 import { CoursesService } from '../../curriculum/courses/courses.service.js';
 import { LessonsService } from '../../curriculum/lessons/lessons.service.js';
-import { assertPublishableBlueprint } from '../blueprint/blueprint.validator.js';
+import {
+  assertPublishableBlueprint,
+  parseAssignmentBlueprint,
+} from '../blueprint/blueprint.validator.js';
 import type {
   AssignmentTemplateListQueryDto,
   AssignmentTemplateResponseDto,
@@ -30,7 +33,6 @@ import {
   toAssignmentTemplateSummary,
 } from './assignment-templates.mapper.js';
 import { AssignmentTemplatesRepository } from './assignment-templates.repository.js';
-import { emptyBlueprint, normalizeBlueprint } from '../blueprint/blueprint-normalizer.js';
 
 @Injectable()
 export class AssignmentTemplatesService {
@@ -50,12 +52,11 @@ export class AssignmentTemplatesService {
     body: CreateAssignmentTemplateDto,
   ): Promise<AssignmentTemplateSummaryDto> {
     assertPlatformStaff(actor);
-    await this.assertCourseAndAnchor(actor, body.courseId, body.moduleId, body.lessonId);
-    const template = await this.templates.create(
-      body,
-      actor.userId,
-      body.blueprint ? normalizeBlueprint(body.blueprint) : emptyBlueprint(),
+    const blueprint = parseAssignmentBlueprint(
+      body.blueprint === undefined ? { items: [], rubric: null } : body.blueprint,
     );
+    await this.assertCourseAndAnchor(actor, body.courseId, body.moduleId, body.lessonId);
+    const template = await this.templates.create(body, actor.userId, blueprint);
     this.logger.info(
       { actorId: actor.userId, templateId: template.id },
       'Assignment template created',
@@ -93,23 +94,17 @@ export class AssignmentTemplatesService {
     if (Object.values(body).every((value) => value === undefined)) {
       throw new BadRequestException(API_ERROR.EMPTY_UPDATE);
     }
+    const updatedBlueprint =
+      body.blueprint === undefined ? undefined : parseAssignmentBlueprint(body.blueprint);
     const current = await this.requireTemplate(id);
     if (current.status === ContentStatus.ARCHIVED) {
       throw new ConflictException(API_ERROR.ASSIGNMENT_TEMPLATE_ARCHIVED);
     }
-    const blueprint =
-      body.blueprint === undefined
-        ? readAssignmentBlueprint(current.blueprint)
-        : normalizeBlueprint(body.blueprint);
+    const blueprint = updatedBlueprint ?? readAssignmentBlueprint(current.blueprint);
     if (current.status === ContentStatus.ACTIVE) {
       assertPublishableBlueprint(blueprint);
     }
-    const updated = await this.templates.update(
-      id,
-      current.status,
-      body,
-      body.blueprint ? blueprint : undefined,
-    );
+    const updated = await this.templates.update(id, current.status, body, updatedBlueprint);
     if (!updated) {
       throw await this.updatedTemplateConflict(id);
     }
@@ -180,6 +175,7 @@ export class AssignmentTemplatesService {
         throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
     }
+
     if (lessonId !== undefined) {
       const lesson = await this.lessons.findById(actor, lessonId);
       if (lesson.courseId !== courseId) {

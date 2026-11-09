@@ -329,6 +329,28 @@ describe('Assignment template endpoints (e2e)', () => {
     expect(bothAnchors.body.code).toBe('VALIDATION_ERROR');
   });
 
+  it('rejects blueprint shape errors with dotted field details', async () => {
+    const courseId = await createCourse('Invalid blueprint course');
+    const response = await postTemplate(adminCookie, {
+      courseId,
+      title: 'Invalid shape',
+      blueprint: {
+        items: [{ type: 'TEXT', prompt: 'Write an answer.', options: [] }],
+        rubric: null,
+      },
+    }).expect(400);
+
+    expect(response.body.code).toBe('VALIDATION_ERROR');
+    expect(response.body.details).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'blueprint.items.0.options' })]),
+    );
+    await postTemplate(adminCookie, {
+      courseId,
+      title: 'Null blueprint',
+      blueprint: null,
+    }).expect(400);
+  });
+
   it('allows incomplete drafts, checks activation and active edits, and enforces lifecycle transitions', async () => {
     const courseId = await createCourse('Template lifecycle course');
     const incomplete = await createTemplate(courseId, {
