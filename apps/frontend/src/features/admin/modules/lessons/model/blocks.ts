@@ -1,7 +1,16 @@
-import { File as FileIcon, FileText, ImageIcon, Video, type LucideIcon } from 'lucide-react';
+import {
+  Columns2,
+  File as FileIcon,
+  FileText,
+  ImageIcon,
+  ListCollapse,
+  Video,
+  type LucideIcon,
+} from 'lucide-react';
 import type { AssetType } from '../../../assets/model/types';
 import type { JSONContent } from '@tiptap/react';
 import type { LessonContentBlock } from './types';
+import { ACCORDION_TITLE_MAX_LENGTH } from '../config/lessons.config';
 
 type BlockType = LessonContentBlock['type'];
 
@@ -53,6 +62,18 @@ export const BLOCK_META: Partial<Record<BlockType, BlockMeta>> = {
     assetType: 'VIDEO',
     fields: [CAPTION],
   },
+  ACCORDION: {
+    label: 'Accordion',
+    icon: ListCollapse,
+    accent: 'before:bg-teal-400',
+    create: newAccordionBlock,
+  },
+  TWO_COLUMN: {
+    label: 'Two columns',
+    icon: Columns2,
+    accent: 'before:bg-gray-400',
+    create: newTwoColumnBlock,
+  },
   PDF: {
     label: 'PDF',
     icon: FileIcon,
@@ -94,6 +115,23 @@ export function newRichTextBlock(): LessonContentBlock {
   };
 }
 
+export function newAccordionBlock(): LessonContentBlock {
+  return {
+    id: crypto.randomUUID(),
+    type: 'ACCORDION',
+    content: { title: '', body: { format: 'tiptap', doc: EMPTY_DOC } },
+  };
+}
+
+export function newTwoColumnBlock(): LessonContentBlock {
+  return {
+    id: crypto.randomUUID(),
+    type: 'TWO_COLUMN',
+    content: {},
+    columns: [null, null],
+  };
+}
+
 export function insertBlock(
   blocks: LessonContentBlock[],
   block: LessonContentBlock,
@@ -106,7 +144,85 @@ export const isAssetBlock = (block: LessonContentBlock) =>
   BLOCK_META[block.type]?.assetType !== undefined;
 
 export const findIncompleteBlockIds = (blocks: LessonContentBlock[]) =>
-  blocks.filter((block) => isAssetBlock(block) && !block.assetId).map((block) => block.id);
+  visitBlocks(blocks).filter((block) => isAssetBlock(block) && !block.assetId).map((block) => block.id);
+
+export function findInvalidAccordionIds(blocks: LessonContentBlock[]) {
+  return visitBlocks(blocks)
+    .filter((block) => {
+      if (block.type !== 'ACCORDION') return false;
+      const title = block.content.title;
+      return typeof title !== 'string' || !title.trim() || title.trim().length > ACCORDION_TITLE_MAX_LENGTH;
+    })
+    .map((block) => block.id);
+}
+
+export function countBlocks(blocks: LessonContentBlock[]): number {
+  return visitBlocks(blocks).length;
+}
+
+export function updateBlockById(
+  blocks: LessonContentBlock[],
+  id: string,
+  update: (block: LessonContentBlock) => LessonContentBlock,
+): LessonContentBlock[] {
+  const next = blocks.map((block) => {
+    return updateNestedBlock(block, id, update);
+  });
+  return next.every((block, index) => block === blocks[index]) ? blocks : next;
+}
+
+function updateNestedBlock(
+  block: LessonContentBlock,
+  id: string,
+  update: (block: LessonContentBlock) => LessonContentBlock,
+): LessonContentBlock {
+  let updated = block.id === id ? update(block) : block;
+  if (!Array.isArray(updated.columns)) return updated;
+
+  const [first, second] = updated.columns;
+  const nextFirst = first ? updateNestedBlock(first, id, update) : null;
+  const nextSecond = second ? updateNestedBlock(second, id, update) : null;
+  if (nextFirst === first && nextSecond === second) return updated;
+  updated = { ...updated, columns: [nextFirst, nextSecond] };
+  return updated;
+}
+
+export function removeBlockById(blocks: LessonContentBlock[], id: string): LessonContentBlock[] {
+  const next = blocks.flatMap((block) => {
+    const updated = removeNestedBlock(block, id);
+    return updated ? [updated] : [];
+  });
+  return next.length === blocks.length && next.every((block, index) => block === blocks[index])
+    ? blocks
+    : next;
+}
+
+function removeNestedBlock(
+  block: LessonContentBlock,
+  id: string,
+): LessonContentBlock | null {
+  if (block.id === id) return null;
+  if (!Array.isArray(block.columns)) return block;
+
+  const [first, second] = block.columns;
+  const nextFirst = first ? removeNestedBlock(first, id) : null;
+  const nextSecond = second ? removeNestedBlock(second, id) : null;
+  if (nextFirst === first && nextSecond === second) return block;
+  return { ...block, columns: [nextFirst, nextSecond] };
+}
+
+function visitBlocks(blocks: LessonContentBlock[]): LessonContentBlock[] {
+  const visited: LessonContentBlock[] = [];
+  for (const block of blocks) {
+    visited.push(block);
+    if (block.columns) {
+      for (const child of block.columns) {
+        if (child) visited.push(...visitBlocks([child]));
+      }
+    }
+  }
+  return visited;
+}
 
 /** Sets one text field; empty values are dropped, matching what the backend stores. */
 export function setBlockField(
@@ -126,7 +242,12 @@ export const getBlockField = (block: LessonContentBlock, key: BlockTextField) =>
 };
 
 /** Block types the editor can create, in menu order. */
-export const ADDABLE_BLOCKS = (['RICH_TEXT', 'IMAGE', 'VIDEO', 'PDF'] as const).flatMap((type) => {
+export const ADDABLE_BLOCKS = (
+  ['RICH_TEXT', 'ACCORDION', 'TWO_COLUMN', 'IMAGE', 'VIDEO', 'PDF'] as const
+).flatMap((type) => {
   const meta = BLOCK_META[type];
   return meta?.create ? [{ type, label: meta.label, icon: meta.icon, create: meta.create }] : [];
 });
+
+export type AddableBlock = (typeof ADDABLE_BLOCKS)[number];
+export const COLUMN_ADDABLE_BLOCKS = ADDABLE_BLOCKS.filter(({ type }) => type !== 'TWO_COLUMN');

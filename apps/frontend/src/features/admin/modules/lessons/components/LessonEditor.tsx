@@ -8,8 +8,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 
 // TODO(follow-up): image preview (useAssetAccess) and "open in Asset Library" on asset blocks,
-// accordion and two-column blocks, drag-and-drop reorder, outline sidebar, discard changes,
-// conflict compare dialog, asset picker pagination.
+// drag-and-drop reorder, outline sidebar, discard changes, conflict compare dialog,
+// asset picker pagination.
 
 export function LessonEditor({
   lesson,
@@ -23,6 +23,7 @@ export function LessonEditor({
   const editor = useLessonEditor(lesson, content);
   const blocker = useUnsavedChangesGuard(editor.hasChanges);
   const missing = editor.incompleteIds.length;
+  const invalidAccordions = editor.invalidAccordionIds.length;
 
   return (
     <div className="space-y-5">
@@ -51,17 +52,25 @@ export function LessonEditor({
           {`${String(missing)} ${missing === 1 ? 'block needs' : 'blocks need'} a file before this lesson can be saved.`}
         </Alert>
       )}
+      {invalidAccordions > 0 && (
+        <Alert>
+          {`${String(invalidAccordions)} accordion ${invalidAccordions === 1 ? 'needs' : 'blocks need'} a title before this lesson can be saved.`}
+        </Alert>
+      )}
       <BlockList
         blocks={editor.blocks}
         assets={editor.assets}
         incompleteIds={editor.incompleteIds}
+        invalidAccordionIds={editor.invalidAccordionIds}
         disabled={editor.pending}
         onAdd={editor.addBlock}
+        onAddColumnBlock={editor.addColumnBlock}
         onMove={editor.move}
         onRemove={editor.removeBlock}
         onRichTextChange={editor.updateRichText}
         onAttachAsset={editor.attachAsset}
         onFieldChange={editor.setField}
+        onAccordionTitleChange={editor.setAccordionTitle}
       />
       <ConfirmDialog
         open={blocker.state === 'blocked'}

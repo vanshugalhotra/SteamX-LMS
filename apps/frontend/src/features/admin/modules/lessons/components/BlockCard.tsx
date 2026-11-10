@@ -36,6 +36,8 @@ export function BlockCard({
   index,
   count,
   disabled,
+  nested = false,
+  contextLabel,
   onMove,
   onRemove,
   children,
@@ -44,7 +46,9 @@ export function BlockCard({
   index: number;
   count: number;
   disabled: boolean;
-  onMove: (direction: -1 | 1) => void;
+  nested?: boolean;
+  contextLabel?: string;
+  onMove?: (direction: -1 | 1) => void;
   onRemove: () => void;
   children: ReactNode;
 }) {
@@ -55,29 +59,33 @@ export function BlockCard({
       className={`relative rounded-2xl border border-brand-line bg-white before:absolute before:inset-y-3 before:-left-px before:w-1 before:rounded-r ${accent}`}
     >
       <div className="flex items-center gap-2 px-4 pt-3">
-        <span className="text-[11px] font-semibold text-gray-600">{index + 1}</span>
+        {!nested && <span className="text-[11px] font-semibold text-gray-600">{index + 1}</span>}
         <Badge variant="neutral">{label}</Badge>
         <div className="ml-auto flex">
-          <BlockAction
-            icon={ArrowUp}
-            label={`Move ${label} block up`}
-            disabled={disabled || index === 0}
-            onClick={() => {
-              onMove(-1);
-            }}
-          />
-          <BlockAction
-            icon={ArrowDown}
-            label={`Move ${label} block down`}
-            disabled={disabled || index === count - 1}
-            onClick={() => {
-              onMove(1);
-            }}
-          />
+          {!nested && (
+            <>
+              <BlockAction
+                icon={ArrowUp}
+                label={`Move ${label} block up`}
+                disabled={disabled || index === 0}
+                onClick={() => {
+                  onMove?.(-1);
+                }}
+              />
+              <BlockAction
+                icon={ArrowDown}
+                label={`Move ${label} block down`}
+                disabled={disabled || index === count - 1}
+                onClick={() => {
+                  onMove?.(1);
+                }}
+              />
+            </>
+          )}
           <BlockAction
             icon={Trash2}
             danger
-            label={`Remove ${label} block`}
+            label={`Remove ${label} block${contextLabel ? ` from ${contextLabel}` : ''}`}
             disabled={disabled}
             onClick={onRemove}
           />
