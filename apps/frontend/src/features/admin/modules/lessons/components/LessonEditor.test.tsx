@@ -171,7 +171,7 @@ it('inserts the chosen block type between two blocks', async () => {
   const user = userEvent.setup();
   renderEditor([textBlock('a'), textBlock('b')]);
   await user.click(screen.getByRole('button', { name: 'Insert block before block 2' }));
-  await user.click(screen.getByRole('menuitem', { name: 'Rich text' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Rich text' }));
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   const ids = savedBlocks().map((b) => b.id);
   expect(ids).toHaveLength(3);
@@ -183,7 +183,7 @@ it('offers every block type in the divider menu', async () => {
   renderEditor([textBlock('a'), textBlock('b')]);
   await user.click(screen.getByRole('button', { name: 'Insert block before block 2' }));
   for (const name of ['Rich text', 'Image', 'Video', 'PDF']) {
-    expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
   }
 });
 
