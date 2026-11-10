@@ -20,6 +20,7 @@ export const PERMISSION = {
   DELIVERY_MANAGE: 'delivery.manage',
   ENROLLMENT_MANAGE: 'enrollment.manage',
   RELEASE_MANAGE: 'release.manage',
+  ASSIGNMENT_MANAGE: 'assignment.manage',
   ASSIGNMENT_TEMPLATE_MANAGE: 'assignment.template.manage',
   LEARNING_READ: 'learning.read',
   LESSON_COMPLETE: 'lesson.complete',

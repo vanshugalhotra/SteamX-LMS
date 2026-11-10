@@ -105,6 +105,11 @@ export class CourseModulesService {
     return toCourseModuleResponse(module);
   }
 
+  /** Finds the narrow course-scoped module fields needed by assignment anchor validation. */
+  findAssignmentAnchor(courseId: string, moduleId: string) {
+    return this.modules.findAssignmentAnchor(courseId, moduleId);
+  }
+
   // ─────────────────────────────────────────
   // PATCH /modules/:id — Update a module
   // ─────────────────────────────────────────

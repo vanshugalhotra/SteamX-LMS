@@ -13,8 +13,8 @@ scenario you need; API field requirements and individual endpoint cases are in S
    `pnpm install`, then `pnpm --filter @steamx/backend prisma:generate`.
 4. Apply committed schema/reference data with `pnpm --filter @steamx/backend migrate:deploy`.
    The reference migration creates `admin`, `teacher`, and `student` roles; current permissions
-   are granted to admin, and teacher also receives `delivery.read`, `enrollment.manage`, and
-   `release.manage`. There is no Prisma seed
+   include the configured admin grants; teacher also receives `assignment.manage`, `delivery.read`,
+   `enrollment.manage`, and `release.manage`. There is no Prisma seed
    script and no default admin account.
 5. Set `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD`, then run
    `pnpm --filter @steamx/backend admin:create`. This creates the first admin and sets
@@ -287,7 +287,7 @@ email, names, and creation times.
 and renewal.
 
 **Preconditions:** Platform staff with `subscription.manage`; admin with `delivery.manage`,
-`enrollment.manage`, and `release.manage`; active school and course; active students;
+`enrollment.manage`, and `release.manage`; teacher with `assignment.manage`; active school and course; active students;
 active module with at least one ACTIVE STUDENT-audience lesson. Use an isolated test database.
 
 1. As platform staff, grant the school/course a current subscription with `POST /api/v1/subscriptions`.
@@ -301,7 +301,7 @@ active module with at least one ACTIVE STUDENT-audience lesson. Use an isolated 
    through the subscription API. Use the database `business_today()` date.
 7. Attempt delivery creation/reactivation, explicit enrollment, and lesson/module release.
    Expect `403 SUBSCRIPTION_EXPIRED`, including for platform admin. Delivery, enrollment, and
-   release management reads remain available.
+   release and assignment reads remain available; assignment writes return `403 SUBSCRIPTION_EXPIRED`.
 8. Renew the expired term with `POST /api/v1/subscriptions/:id/renew`; expect a new subscription
    row. Retry a gated operation and expect access to be restored.
 

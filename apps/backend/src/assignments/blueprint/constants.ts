@@ -21,6 +21,8 @@ export const DEFAULT_RUBRIC = [
 ] as const;
 
 export const ASSIGNMENT_LIMITS = {
+  titleMaxLength: 200,
+  descriptionMaxLength: 2000,
   maxItems: 50,
   promptMaxLength: 5000,
   options: {

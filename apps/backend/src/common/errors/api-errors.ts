@@ -120,6 +120,18 @@ export const API_ERROR = {
   }),
 
   ...defineErrors({
+    // Delivery assignments
+    ASSIGNMENT_CONTENT_LOCKED: 'Assignment content cannot be edited in its current state',
+    ASSIGNMENT_DUE_DATE_REQUIRED: 'A due date is required before publishing an assignment',
+    ASSIGNMENT_LESSON_NOT_STUDENT_FACING:
+      'An assignment cannot be published with a teacher-only lesson anchor',
+    ASSIGNMENT_HAS_SUBMISSIONS: 'Assignments with submissions cannot be deleted',
+    ASSIGNMENT_UNPUBLISHED_FROM_DRAFT: 'A draft assignment cannot be unpublished',
+    TEMPLATE_ALREADY_PUBLISHED_TO_DELIVERY:
+      'This assignment template has already been copied to this delivery',
+  }),
+
+  ...defineErrors({
     // Deliveries: enrollment
     STUDENT_NOT_FOUND: notFound('Student', 'the delivery school'),
     STUDENT_NOT_ACTIVE: notActive('Student'),

@@ -111,6 +111,14 @@ export class CourseModulesRepository {
     });
   }
 
+  /** Finds an assignment module anchor only when it belongs to the supplied course. */
+  findAssignmentAnchor(courseId: string, moduleId: string) {
+    return this.prisma.module.findFirst({
+      where: { id: moduleId, courseId },
+      select: { id: true, courseId: true },
+    });
+  }
+
   /** Applies a module patch and returns null when the module ID did not match. */
   async update(id: string, data: UpdateCourseModuleDto): Promise<CourseModuleWithCourse | null> {
     const result = await this.prisma.module.updateMany({ where: { id }, data });

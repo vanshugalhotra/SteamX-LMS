@@ -91,6 +91,7 @@ describe('Authentication foundation reference data', () => {
     expect(snapshot.permissions).toEqual([
       'asset.read',
       'asset.write',
+      'assignment.manage',
       'assignment.template.manage',
       'classsection.manage',
       'classsection.read',
@@ -137,6 +138,7 @@ describe('Authentication foundation reference data', () => {
       { role: 'admin', permission: 'user.update' },
       { role: 'student', permission: 'learning.read' },
       { role: 'student', permission: 'lesson.complete' },
+      { role: 'teacher', permission: 'assignment.manage' },
       { role: 'teacher', permission: 'delivery.read' },
       { role: 'teacher', permission: 'enrollment.manage' },
       { role: 'teacher', permission: 'learning.read' },
