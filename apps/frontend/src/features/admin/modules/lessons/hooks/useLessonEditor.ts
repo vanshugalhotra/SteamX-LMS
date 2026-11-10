@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react';
 import type { JSONContent } from '@tiptap/react';
 import { API_ERROR_CODE, getErrorMessage, getFieldErrors, hasErrorCode } from '@/lib/api-errors';
-import { moveBlock, insertBlock } from '../model/blocks';
 import type { Lesson, LessonContent, LessonContentBlock } from '../model/types';
+import {
+  findIncompleteBlockIds,
+  insertBlock,
+  moveBlock,
+  setBlockField,
+  type BlockTextField,
+} from '../model/blocks';
 import { useSaveLessonContent, useUpdateLesson } from '../queries';
+import type { Asset } from '@/features/admin/assets/model/types';
 
 export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   const [title, setTitle] = useState(lesson.title);
@@ -18,11 +25,19 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   const updateLesson = useUpdateLesson();
   const pending = saveContent.isPending || updateLesson.isPending;
 
+  const [assets, setAssets] = useState(content.assets);
+  const [attempted, setAttempted] = useState(false);
+
   const blocksChanged = useMemo(
     () => JSON.stringify(blocks) !== JSON.stringify(savedBlocks),
     [blocks, savedBlocks],
   );
   const hasChanges = title.trim() !== savedTitle || blocksChanged;
+
+  const incompleteIds = useMemo(
+    () => (attempted ? findIncompleteBlockIds(blocks) : []),
+    [attempted, blocks],
+  );
 
   const changeTitle = (value: string) => {
     setTitle(value);
@@ -34,6 +49,12 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
       setTitleIssue('Add a title for this lesson.');
       return;
     }
+
+    if (findIncompleteBlockIds(blocks).length > 0) {
+      setAttempted(true);
+      return;
+    }
+    setAttempted(false);
     setTitleIssue('');
     setError(null);
     try {
@@ -48,6 +69,7 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
           body: { expectedVersion: version, blocks },
         });
         setBlocks(result.blocks);
+        setAssets(result.assets);
         setSavedBlocks(result.blocks);
         setVersion(result.version);
       }
@@ -67,6 +89,7 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   };
 
   const addBlock = (block: LessonContentBlock, index?: number) => {
+    setAttempted(false);
     setBlocks((c) => insertBlock(c, block, index));
   };
   const removeBlock = (id: string) => {
@@ -79,6 +102,16 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
     setBlocks((c) =>
       c.map((b) => (b.id === id ? { ...b, content: { format: 'tiptap', doc } } : b)),
     );
+  };
+  const updateBlock = (id: string, update: (block: LessonContentBlock) => LessonContentBlock) => {
+    setBlocks((c) => c.map((b) => (b.id === id ? update(b) : b)));
+  };
+  const attachAsset = (id: string, asset: Asset) => {
+    setAssets((c) => ({ ...c, [asset.id]: asset }));
+    updateBlock(id, (b) => ({ ...b, assetId: asset.id }));
+  };
+  const setField = (id: string, key: BlockTextField, value: string) => {
+    updateBlock(id, (b) => setBlockField(b, key, value));
   };
 
   return {
@@ -95,5 +128,10 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
     removeBlock,
     move,
     updateRichText,
+    assets,
+    updateBlock,
+    incompleteIds,
+    attachAsset,
+    setField,
   };
 }
