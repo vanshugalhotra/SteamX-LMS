@@ -30,13 +30,15 @@ import type { AuthContext } from '../../auth/types/auth-context.js';
 import { ApiProtectedController } from '../../common/decorators/api-protected-controller.decorator.js';
 import {
   AssignmentTemplateListQueryDto,
-  AssignmentTemplateListResponseDto,
-  AssignmentTemplateSummaryDto,
-  AssignmentTemplateResponseDto,
   CreateAssignmentTemplateDto,
   UpdateAssignmentTemplateDto,
   UpdateAssignmentTemplateStatusDto,
-} from './dto/assignment-template.dto.js';
+} from './dto/assignment-template-request.dto.js';
+import {
+  AssignmentTemplateListResponseDto,
+  AssignmentTemplateSummaryDto,
+  AssignmentTemplateResponseDto,
+} from './dto/assignment-template-response.dto.js';
 import { AssignmentTemplatesService } from './assignment-templates.service.js';
 
 @ApiTags('Assignment templates')

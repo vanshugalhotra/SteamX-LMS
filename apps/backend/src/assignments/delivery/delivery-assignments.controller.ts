@@ -36,10 +36,12 @@ import {
   CreateDeliveryAssignmentDto,
   CreateDeliveryAssignmentFromTemplateDto,
   DeliveryAssignmentListQueryDto,
+  UpdateDeliveryAssignmentDto,
+} from '../dto/delivery-assignment-request.dto.js';
+import {
   DeliveryAssignmentListResponseDto,
   DeliveryAssignmentResponseDto,
-  UpdateDeliveryAssignmentDto,
-} from '../dto/delivery-assignment.dto.js';
+} from '../dto/delivery-assignment-response.dto.js';
 import { DeliveryAssignmentsService } from './delivery-assignments.service.js';
 
 /** Provides delivery-scoped CRUD and lifecycle operations for assignments. */

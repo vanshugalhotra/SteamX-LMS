@@ -14,13 +14,10 @@ import type { AssignmentBlueprint } from '../blueprint/blueprint.schema.js';
 import { isAssignmentContentUnlocked } from './assignment-editability.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
 import { toAssignmentBlueprint } from '../blueprint/assignment-blueprint.mapper.js';
-import type {
-  DeliveryAssignmentResponseDto,
-  UpdateDeliveryAssignmentDto,
-} from '../dto/delivery-assignment.dto.js';
-import { toDeliveryAssignmentResponse } from './delivery-assignments.mapper.js';
+import type { UpdateDeliveryAssignmentDto } from '../dto/delivery-assignment-request.dto.js';
+import type { DeliveryAssignmentResponseDto } from '../dto/delivery-assignment-response.dto.js';
+import { toDeliveryAssignmentDetailResponse } from './delivery-assignment-response.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
-import type { AssignmentDetailRecord } from './delivery-assignments.repository.js';
 
 /** Performs PATCH and DELETE operations once delivery visibility is established. */
 @Injectable()
@@ -81,7 +78,7 @@ export class DeliveryAssignmentEditsService {
       if (!updated) {
         throw new NotFoundException(API_ERROR.NOT_FOUND);
       }
-      return this.toResponse(updated);
+      return toDeliveryAssignmentDetailResponse(this.assignments, updated);
     } catch (error) {
       this.mapFreezeError(error);
       throw error;
@@ -114,16 +111,6 @@ export class DeliveryAssignmentEditsService {
     }
     return assignment;
   }
-
-  /** Maps assignment detail and aggregates after an edit. */
-  private async toResponse(assignment: AssignmentDetailRecord) {
-    const counts = (await this.assignments.findCounts([assignment.id])).get(assignment.id)!;
-    return toDeliveryAssignmentResponse(assignment, {
-      ...counts,
-      itemCount: assignment.items.length,
-    });
-  }
-
   /** Maps database freeze trigger failures to the service's stable content-lock response. */
   private mapFreezeError(error: unknown): void {
     const reason = getPrismaReason(error).toLowerCase();
