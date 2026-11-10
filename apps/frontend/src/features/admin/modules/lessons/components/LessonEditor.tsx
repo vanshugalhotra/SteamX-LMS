@@ -7,8 +7,9 @@ import { LessonEditorHeader } from './LessonEditorHeader';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 
-// TODO(follow-up): image/video/PDF/accordion/column blocks and a type picker for the + divider,
-// drag-and-drop reorder, outline sidebar, discard changes, conflict compare dialog.
+// TODO(follow-up): image preview (useAssetAccess) and "open in Asset Library" on asset blocks,
+// accordion and two-column blocks, drag-and-drop reorder, outline sidebar, discard changes,
+// conflict compare dialog, asset picker pagination.
 
 export function LessonEditor({
   lesson,
@@ -21,6 +22,7 @@ export function LessonEditor({
 }) {
   const editor = useLessonEditor(lesson, content);
   const blocker = useUnsavedChangesGuard(editor.hasChanges);
+  const missing = editor.incompleteIds.length;
 
   return (
     <div className="space-y-5">
@@ -44,13 +46,22 @@ export function LessonEditor({
           )}
         </Alert>
       )}
+      {missing > 0 && (
+        <Alert>
+          {`${String(missing)} ${missing === 1 ? 'block needs' : 'blocks need'} a file before this lesson can be saved.`}
+        </Alert>
+      )}
       <BlockList
         blocks={editor.blocks}
+        assets={editor.assets}
+        incompleteIds={editor.incompleteIds}
         disabled={editor.pending}
         onAdd={editor.addBlock}
         onMove={editor.move}
         onRemove={editor.removeBlock}
         onRichTextChange={editor.updateRichText}
+        onAttachAsset={editor.attachAsset}
+        onFieldChange={editor.setField}
       />
       <ConfirmDialog
         open={blocker.state === 'blocked'}

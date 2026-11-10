@@ -10,17 +10,40 @@ import type {
   LessonContentBlock,
   SaveLessonContentPayload,
 } from '../model/types';
+import { LessonEditor } from './LessonEditor';
 
-const { saveContent, updateLesson } = vi.hoisted(() => ({
+const { saveContent, updateLesson, handout } = vi.hoisted(() => ({
   saveContent:
     vi.fn<(input: { id: string; body: SaveLessonContentPayload }) => Promise<LessonContent>>(),
   updateLesson: vi.fn<(input: { id: string; body: { title: string } }) => Promise<Lesson>>(),
+  handout: {
+    id: 'asset-1',
+    type: 'PDF',
+    title: 'Handout',
+    status: 'ACTIVE',
+    createdAt: '',
+    updatedAt: '',
+    file: {
+      id: 'file-1',
+      status: 'READY',
+      lastError: null,
+      mimeType: 'application/pdf',
+      sizeBytes: 2048,
+      originalFilename: 'handout.pdf',
+    },
+  },
 }));
 vi.mock('../queries', () => ({
   useSaveLessonContent: () => ({ mutateAsync: saveContent, isPending: false }),
   useUpdateLesson: () => ({ mutateAsync: updateLesson, isPending: false }),
 }));
-import { LessonEditor } from './LessonEditor';
+vi.mock('@/features/admin/assets/queries', () => ({
+  useAssets: () => ({
+    data: { items: [handout], page: 1, limit: 24, total: 1 },
+    isPending: false,
+    error: null,
+  }),
+}));
 
 const lesson: Lesson = {
   id: 'lesson-1',
@@ -144,14 +167,47 @@ it('does not offer a reload for other 409 errors', async () => {
   expect(screen.queryByRole('button', { name: 'Reload latest version' })).not.toBeInTheDocument();
 });
 
-it('inserts a block between two blocks', async () => {
+it('inserts the chosen block type between two blocks', async () => {
   const user = userEvent.setup();
   renderEditor([textBlock('a'), textBlock('b')]);
-  await user.click(screen.getByRole('button', { name: 'Insert rich text block here' }));
+  await user.click(screen.getByRole('button', { name: 'Insert block before block 2' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Rich text' }));
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   const ids = savedBlocks().map((b) => b.id);
   expect(ids).toHaveLength(3);
   expect([ids[0], ids[2]]).toEqual(['a', 'b']);
+});
+
+it('offers every block type in the divider menu', async () => {
+  const user = userEvent.setup();
+  renderEditor([textBlock('a'), textBlock('b')]);
+  await user.click(screen.getByRole('button', { name: 'Insert block before block 2' }));
+  for (const name of ['Rich text', 'Image', 'Video', 'PDF']) {
+    expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
+  }
+});
+
+it('blocks saving an image block that has no file', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'Add image block' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(screen.getByText('Choose a file to save this block.')).toBeInTheDocument();
+  expect(saveContent).not.toHaveBeenCalled();
+});
+
+it('saves a picked asset with its caption on a PDF block', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'Add pdf block' }));
+  await user.click(screen.getByRole('button', { name: 'Choose from Asset Library' }));
+  await user.click(screen.getByRole('button', { name: /Handout/ }));
+  await user.click(screen.getByRole('button', { name: 'Use PDF' }));
+  await user.type(screen.getByRole('textbox', { name: 'Caption (optional)' }), 'Read first');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(savedBlocks()).toMatchObject([
+    { type: 'PDF', assetId: 'asset-1', content: { caption: 'Read first' } },
+  ]);
 });
 
 it('asks before leaving with unsaved changes', async () => {
