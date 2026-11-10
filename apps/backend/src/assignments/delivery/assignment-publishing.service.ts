@@ -9,9 +9,8 @@ import { assertPublishableBlueprint } from '../blueprint/blueprint.validator.js'
 import { toAssignmentBlueprint } from '../blueprint/assignment-blueprint.mapper.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
 import type { DeliveryAssignmentResponseDto } from '../dto/delivery-assignment-response.dto.js';
-import { toDeliveryAssignmentResponse } from './delivery-assignments.mapper.js';
+import { toDeliveryAssignmentDetailResponse } from './delivery-assignment-response.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
-import type { AssignmentDetailRecord } from './delivery-assignments.repository.js';
 
 /** Publishes assignments only after delivery, subscription, due-date, blueprint, and lesson checks. */
 @Injectable()
@@ -35,7 +34,7 @@ export class AssignmentPublishingService {
     const current = await this.requireAssignment(deliveryId, assignmentId);
     await this.access.assertWriteEligibility(delivery);
     if (current.status === AssignmentStatus.PUBLISHED) {
-      return this.toResponse(current);
+      return toDeliveryAssignmentDetailResponse(this.assignments, current);
     }
     if (current.dueAt === null) {
       throw new ConflictException(API_ERROR.ASSIGNMENT_DUE_DATE_REQUIRED);
@@ -60,7 +59,7 @@ export class AssignmentPublishingService {
     if (!updated) {
       const latest = await this.requireAssignment(deliveryId, assignmentId);
       if (latest.status === AssignmentStatus.PUBLISHED) {
-        return this.toResponse(latest);
+        return toDeliveryAssignmentDetailResponse(this.assignments, latest);
       }
       throw new ConflictException(API_ERROR.CONFLICT);
     }
@@ -68,7 +67,7 @@ export class AssignmentPublishingService {
       { actorId: actor.userId, deliveryId, assignmentId },
       'Delivery assignment published',
     );
-    return this.toResponse(updated);
+    return toDeliveryAssignmentDetailResponse(this.assignments, updated);
   }
 
   /** Hides a published assignment; repeated unpublishes succeed and DRAFT cannot be unpublished. */
@@ -81,7 +80,7 @@ export class AssignmentPublishingService {
     const current = await this.requireAssignment(deliveryId, assignmentId);
     await this.access.assertWriteEligibility(delivery);
     if (current.status === AssignmentStatus.UNPUBLISHED) {
-      return this.toResponse(current);
+      return toDeliveryAssignmentDetailResponse(this.assignments, current);
     }
     if (current.status === AssignmentStatus.DRAFT) {
       throw new ConflictException(API_ERROR.ASSIGNMENT_UNPUBLISHED_FROM_DRAFT);
@@ -90,7 +89,7 @@ export class AssignmentPublishingService {
     if (!updated) {
       const latest = await this.requireAssignment(deliveryId, assignmentId);
       if (latest.status === AssignmentStatus.UNPUBLISHED) {
-        return this.toResponse(latest);
+        return toDeliveryAssignmentDetailResponse(this.assignments, latest);
       }
       throw new ConflictException(API_ERROR.CONFLICT);
     }
@@ -98,7 +97,7 @@ export class AssignmentPublishingService {
       { actorId: actor.userId, deliveryId, assignmentId },
       'Delivery assignment unpublished',
     );
-    return this.toResponse(updated);
+    return toDeliveryAssignmentDetailResponse(this.assignments, updated);
   }
 
   /** Loads an assignment only when it belongs to the already-visible delivery. */
@@ -108,14 +107,5 @@ export class AssignmentPublishingService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return assignment;
-  }
-
-  /** Maps assignment detail and aggregates after a lifecycle operation. */
-  private async toResponse(assignment: AssignmentDetailRecord) {
-    const counts = (await this.assignments.findCounts([assignment.id])).get(assignment.id)!;
-    return toDeliveryAssignmentResponse(assignment, {
-      ...counts,
-      itemCount: assignment.items.length,
-    });
   }
 }

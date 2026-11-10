@@ -9,33 +9,18 @@ import {
   MaxLength,
   Validate,
   ValidateIf,
-  ValidatorConstraint,
-  type ValidationArguments,
-  type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ContentStatus } from '../../../generated/prisma/client.js';
 import { PaginationQueryDto } from '../../../common/pagination/pagination-query.dto.js';
 import { Trim } from '../../../common/decorators/trim.decorator.js';
 import { AssignmentBlueprintDto } from '../../blueprint/blueprint.dto.js';
 import type { AssignmentBlueprintInput } from '../../blueprint/blueprint.schema.js';
-
-/** Rejects template anchors that name both a module and a lesson. */
-@ValidatorConstraint({ name: 'oneTemplateAnchor', async: false })
-export class OneTemplateAnchorConstraint implements ValidatorConstraintInterface {
-  validate(_value: unknown, args: ValidationArguments): boolean {
-    const body = args.object as Record<string, unknown>;
-    return !(body.moduleId !== undefined && body.lessonId !== undefined);
-  }
-
-  defaultMessage(): string {
-    return 'Choose at most one module or lesson anchor';
-  }
-}
+import { OneAssignmentAnchorConstraint } from '../../dto/one-assignment-anchor.constraint.js';
 
 export class CreateAssignmentTemplateDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
-  @Validate(OneTemplateAnchorConstraint)
+  @Validate(OneAssignmentAnchorConstraint)
   courseId!: string;
 
   @ApiPropertyOptional({ format: 'uuid' })

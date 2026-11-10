@@ -26,7 +26,7 @@ import type {
   AssignmentBlueprintInput,
   AssignmentRubricItem,
 } from '../blueprint/blueprint.schema.js';
-import { OneTemplateAnchorConstraint } from '../assignment-template/dto/assignment-template-request.dto.js';
+import { OneAssignmentAnchorConstraint } from './one-assignment-anchor.constraint.js';
 
 /** Validates the optional rubric text supplied when copying a template. */
 export class AssignmentRubricOverrideDto implements AssignmentRubricItem {
@@ -65,7 +65,7 @@ export class CreateDeliveryAssignmentDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @ValidateIf((_object, value) => value !== undefined)
   @IsUUID()
-  @Validate(OneTemplateAnchorConstraint)
+  @Validate(OneAssignmentAnchorConstraint)
   moduleId?: string;
 
   @ApiPropertyOptional({ format: 'uuid' })
