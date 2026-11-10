@@ -102,10 +102,9 @@ function isTemplateCopyDuplicate(error: unknown): boolean {
   const adapter = readProperty(error.meta, 'driverAdapterError');
   const cause = readProperty(adapter, 'cause');
   const constraintName = readProperty(readProperty(cause, 'constraint'), 'index');
-  const targets = [
-    ...(Array.isArray(target) ? target : [target]),
-    constraintName,
-  ].filter((value): value is string => typeof value === 'string');
+  const targets = [...(Array.isArray(target) ? target : [target]), constraintName].filter(
+    (value): value is string => typeof value === 'string',
+  );
   return targets.some((value) => {
     const normalized = value.toLowerCase().replaceAll('_', '');
     return normalized.includes('delivery') && normalized.includes('sourcetemplate');
