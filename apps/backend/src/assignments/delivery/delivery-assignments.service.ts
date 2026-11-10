@@ -11,9 +11,11 @@ import { parseAssignmentBlueprint } from '../blueprint/blueprint.validator.js';
 import type {
   CreateDeliveryAssignmentDto,
   DeliveryAssignmentListQueryDto,
+} from '../dto/delivery-assignment-request.dto.js';
+import type {
   DeliveryAssignmentResponseDto,
   DeliveryAssignmentSummaryDto,
-} from '../dto/delivery-assignment.dto.js';
+} from '../dto/delivery-assignment-response.dto.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
 import {
   toDeliveryAssignmentResponse,

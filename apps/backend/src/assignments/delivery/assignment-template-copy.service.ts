@@ -9,10 +9,8 @@ import { readAssignmentBlueprint } from '../assignment-template/assignment-templ
 import { AssignmentTemplatesRepository } from '../assignment-template/assignment-templates.repository.js';
 import { parseAssignmentBlueprint } from '../blueprint/blueprint.validator.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
-import type {
-  CreateDeliveryAssignmentFromTemplateDto,
-  DeliveryAssignmentResponseDto,
-} from '../dto/delivery-assignment.dto.js';
+import type { CreateDeliveryAssignmentFromTemplateDto } from '../dto/delivery-assignment-request.dto.js';
+import type { DeliveryAssignmentResponseDto } from '../dto/delivery-assignment-response.dto.js';
 import { toDeliveryAssignmentResponse } from './delivery-assignments.mapper.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
 import type { AssignmentDetailRecord } from './delivery-assignments.repository.js';

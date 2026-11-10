@@ -14,10 +14,8 @@ import type { AssignmentBlueprint } from '../blueprint/blueprint.schema.js';
 import { isAssignmentContentUnlocked } from './assignment-editability.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
 import { toAssignmentBlueprint } from '../blueprint/assignment-blueprint.mapper.js';
-import type {
-  DeliveryAssignmentResponseDto,
-  UpdateDeliveryAssignmentDto,
-} from '../dto/delivery-assignment.dto.js';
+import type { UpdateDeliveryAssignmentDto } from '../dto/delivery-assignment-request.dto.js';
+import type { DeliveryAssignmentResponseDto } from '../dto/delivery-assignment-response.dto.js';
 import { toDeliveryAssignmentResponse } from './delivery-assignments.mapper.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
 import type { AssignmentDetailRecord } from './delivery-assignments.repository.js';

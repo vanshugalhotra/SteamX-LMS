@@ -22,11 +22,13 @@ import {
 } from '../blueprint/blueprint.validator.js';
 import type {
   AssignmentTemplateListQueryDto,
-  AssignmentTemplateResponseDto,
-  AssignmentTemplateSummaryDto,
   CreateAssignmentTemplateDto,
   UpdateAssignmentTemplateDto,
-} from './dto/assignment-template.dto.js';
+} from './dto/assignment-template-request.dto.js';
+import type {
+  AssignmentTemplateResponseDto,
+  AssignmentTemplateSummaryDto,
+} from './dto/assignment-template-response.dto.js';
 import {
   toAssignmentTemplateResponse,
   readAssignmentBlueprint,

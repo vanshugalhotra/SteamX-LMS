@@ -8,7 +8,7 @@ import { LessonsService } from '../../curriculum/lessons/lessons.service.js';
 import { assertPublishableBlueprint } from '../blueprint/blueprint.validator.js';
 import { toAssignmentBlueprint } from '../blueprint/assignment-blueprint.mapper.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
-import type { DeliveryAssignmentResponseDto } from '../dto/delivery-assignment.dto.js';
+import type { DeliveryAssignmentResponseDto } from '../dto/delivery-assignment-response.dto.js';
 import { toDeliveryAssignmentResponse } from './delivery-assignments.mapper.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
 import type { AssignmentDetailRecord } from './delivery-assignments.repository.js';

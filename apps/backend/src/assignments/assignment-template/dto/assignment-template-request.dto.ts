@@ -1,4 +1,4 @@
-/** Request and response DTOs for assignment template endpoints. */
+/** Request DTOs for assignment template endpoints. */
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Allow,
@@ -15,14 +15,9 @@ import {
 } from 'class-validator';
 import { ContentStatus } from '../../../generated/prisma/client.js';
 import { PaginationQueryDto } from '../../../common/pagination/pagination-query.dto.js';
-import { PaginationResponseDto } from '../../../common/pagination/pagination-response.dto.js';
 import { Trim } from '../../../common/decorators/trim.decorator.js';
 import { AssignmentBlueprintDto } from '../../blueprint/blueprint.dto.js';
-import type {
-  AssignmentBlueprint,
-  AssignmentBlueprintInput,
-  AssignmentItemType,
-} from '../../blueprint/blueprint.schema.js';
+import type { AssignmentBlueprintInput } from '../../blueprint/blueprint.schema.js';
 
 /** Rejects template anchors that name both a module and a lesson. */
 @ValidatorConstraint({ name: 'oneTemplateAnchor', async: false })
@@ -128,58 +123,4 @@ export class AssignmentTemplateListQueryDto extends PaginationQueryDto {
   @ValidateIf((_object, value) => value !== undefined)
   @IsEnum(ContentStatus)
   status?: ContentStatus;
-}
-
-export class AssignmentTemplateSummaryDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty({ format: 'uuid' })
-  courseId!: string;
-
-  @ApiProperty({ format: 'uuid', nullable: true })
-  moduleId!: string | null;
-
-  @ApiProperty({ format: 'uuid', nullable: true })
-  lessonId!: string | null;
-
-  @ApiProperty({ maxLength: 200 })
-  title!: string;
-
-  @ApiProperty({ enum: ContentStatus })
-  status!: ContentStatus;
-
-  @ApiProperty({ minimum: 0 })
-  itemCount!: number;
-
-  @ApiProperty({ enum: ['SINGLE_CHOICE', 'TEXT', 'FILE_UPLOAD'], isArray: true })
-  itemTypes!: AssignmentItemType[];
-
-  @ApiProperty()
-  hasRubric!: boolean;
-
-  @ApiProperty()
-  allowResubmission!: boolean;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  createdAt!: Date;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  updatedAt!: Date;
-}
-
-export class AssignmentTemplateResponseDto extends AssignmentTemplateSummaryDto {
-  @ApiProperty({ maxLength: 2000, nullable: true })
-  description!: string | null;
-
-  @ApiProperty({ format: 'uuid', nullable: true })
-  createdById!: string | null;
-
-  @ApiProperty({ type: AssignmentBlueprintDto })
-  blueprint!: AssignmentBlueprint;
-}
-
-export class AssignmentTemplateListResponseDto extends PaginationResponseDto<AssignmentTemplateSummaryDto> {
-  @ApiProperty({ type: [AssignmentTemplateSummaryDto] })
-  override items!: AssignmentTemplateSummaryDto[];
 }

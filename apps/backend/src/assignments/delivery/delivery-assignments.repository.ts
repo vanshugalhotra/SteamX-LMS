@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { AssignmentStatus, Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AssignmentBlueprint } from '../blueprint/blueprint.schema.js';
-import type { UpdateDeliveryAssignmentDto } from '../dto/delivery-assignment.dto.js';
+import type { UpdateDeliveryAssignmentDto } from '../dto/delivery-assignment-request.dto.js';
 
 const ASSIGNMENT_LIST_SELECT = {
   id: true,
