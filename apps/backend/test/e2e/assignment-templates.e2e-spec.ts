@@ -522,6 +522,8 @@ describe('Assignment template endpoints (e2e)', () => {
         { code: 'R', letter: 'F' },
       ]),
       limits: {
+        titleMaxLength: 200,
+        descriptionMaxLength: 2000,
         maxItems: 50,
         promptMaxLength: 5000,
         options: { min: 2, max: 6, textMaxLength: 500 },

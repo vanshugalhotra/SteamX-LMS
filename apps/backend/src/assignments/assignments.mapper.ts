@@ -13,6 +13,8 @@ export function toAssignmentDefaultsResponse(): AssignmentDefaultsResponseDto {
     gradeLevels: GRADE_LEVELS.map(({ code, letter }) => ({ code, letter })),
     limits: {
       maxItems: ASSIGNMENT_LIMITS.maxItems,
+      titleMaxLength: ASSIGNMENT_LIMITS.titleMaxLength,
+      descriptionMaxLength: ASSIGNMENT_LIMITS.descriptionMaxLength,
       promptMaxLength: ASSIGNMENT_LIMITS.promptMaxLength,
       options: { ...ASSIGNMENT_LIMITS.options },
       rubric: { ...ASSIGNMENT_LIMITS.rubric },

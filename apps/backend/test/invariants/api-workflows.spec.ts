@@ -351,10 +351,29 @@ describe('Documented API workflows', () => {
             options.body = { studentIds: [randomUUID()] };
           }
         }
+        if (
+          session === teacherSession &&
+          route.path.startsWith('/api/v1/deliveries/:id/assignments')
+        ) {
+          if (route.method === 'POST' && route.path.endsWith('/from-template')) {
+            options.body = { templateId: randomUUID() };
+          } else if (route.method === 'POST') {
+            options.body = { title: 'Permission matrix draft' };
+          } else if (route.method === 'PATCH') {
+            options.body = { title: 'Permission matrix update' };
+          }
+        }
         const response = await api.send(route.method, concretePath(route), {
           cookie: session.cookie,
           ...options,
         });
+        if (
+          session === teacherSession &&
+          route.path.startsWith('/api/v1/deliveries/:id/assignments')
+        ) {
+          assertStatus(response, 404, 'NOT_FOUND');
+          continue;
+        }
         if (route.path.startsWith('/api/v1/learning')) {
           if (session === teacherSession) {
             if (

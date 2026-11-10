@@ -113,6 +113,14 @@ export class LessonsRepository {
     });
   }
 
+  /** Finds assignment lesson anchor fields only when the lesson belongs to the supplied course. */
+  findAssignmentAnchor(courseId: string, lessonId: string) {
+    return this.prisma.lesson.findFirst({
+      where: { id: lessonId, courseId },
+      select: { id: true, courseId: true, audience: true },
+    });
+  }
+
   /** Applies a lesson patch and returns null when the lesson ID did not match. */
   async update(id: string, data: UpdateLessonDto): Promise<LessonWithModule | null> {
     const result = await this.prisma.lesson.updateMany({ where: { id }, data });

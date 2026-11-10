@@ -68,6 +68,12 @@ export class AssignmentFileUploadLimitsDto {
 }
 
 export class AssignmentDefaultLimitsDto {
+  @ApiProperty({ example: ASSIGNMENT_LIMITS.titleMaxLength })
+  titleMaxLength!: number;
+
+  @ApiProperty({ example: ASSIGNMENT_LIMITS.descriptionMaxLength })
+  descriptionMaxLength!: number;
+
   @ApiProperty({ example: ASSIGNMENT_LIMITS.maxItems })
   maxItems!: number;
 

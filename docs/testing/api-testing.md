@@ -1091,3 +1091,21 @@ Caller: any authenticated user; no permission is required.
 
 - [auto] When an authenticated teacher or student calls -> expect rubric categories, grade-level code/letter pairs, and the server's assignment limits.
 - [auto] When no cookie is sent -> expect `401 UNAUTHORIZED`.
+
+### `/deliveries/:id/assignments`
+
+Caller: teacher with `assignment.manage` and an active teacher assignment to the delivery.
+
+- [auto] When creating from scratch with an incomplete blueprint -> expect `201` and a DRAFT; omitted blueprint defaults to no items, no rubric, and resubmission disabled.
+- [auto] When the module or lesson anchor belongs to the delivery course -> expect success; another-course anchors return `404`, and supplying both anchors returns `400`.
+- [auto] When copying an ACTIVE same-course template -> expect a DRAFT with copied item/option order, anchor, rubric, and resubmission setting; title, description, due date, resubmission, and rubric text overrides are applied.
+- [auto] When a template is inactive, belongs to another course, or a rubric is added to a template with no rubric -> expect rejection; a second copy in the same delivery returns `409 TEMPLATE_ALREADY_PUBLISHED_TO_DELIVERY`.
+- [auto] When listing by status and page -> expect newest `updatedAt` first, summary counts, and no item or option data; counts match inserted submissions and graded submissions.
+- [auto] When reading a teacher-authored assignment -> expect `isCorrect`; for a template copy, walk the full JSON response and verify `isCorrect` is absent.
+- [auto] When content is edited in DRAFT or UNPUBLISHED with no submissions -> expect success; replacement changes item and option IDs. Content edits in PUBLISHED or after any submission return `409 ASSIGNMENT_CONTENT_LOCKED`.
+- [auto] When editing title, description, due date, or resubmission setting in any status or with submissions -> expect success. Template-copy items remain locked; rubric text can change only while unlocked and its presence and four entries remain fixed.
+- [auto] When publishing without an ACTIVE delivery, current subscription, due date, complete blueprint, or student-facing anchored lesson -> expect the respective `DELIVERY_NOT_ACTIVE`, `SUBSCRIPTION_EXPIRED`, `ASSIGNMENT_DUE_DATE_REQUIRED`, `ASSIGNMENT_BLUEPRINT_INVALID`, or `ASSIGNMENT_LESSON_NOT_STUDENT_FACING`.
+- [auto] When publishing successfully, publishing again, unpublishing, unpublishing again, and republishing -> expect 200; repeated operations retain the first `publishedAt`. Unpublishing a DRAFT returns `409`.
+- [auto] When deleting an assignment without submissions -> expect `204`; with a submission -> expect `409`.
+- [auto] When an unassigned or removed teacher, a teacher from another school, or an assignment ID from another delivery is used -> expect `404`. Any active teacher assigned to the delivery can edit.
+- [auto] When platform staff or a student calls -> expect `403`; without a cookie -> expect `401`. Reads continue after subscription expiry; writes return `403 SUBSCRIPTION_EXPIRED`.
