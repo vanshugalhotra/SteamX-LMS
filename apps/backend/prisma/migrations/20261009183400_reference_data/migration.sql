@@ -15,6 +15,7 @@ VALUES
   ('asset.read',             'Read asset file state'),
   ('asset.write',            'Create assets and upload asset files'),
   -- Assignment templates
+  ('assignment.manage',          'Create and manage assignments for deliveries'),
   ('assignment.template.manage', 'Create and manage assignment templates'),
   -- Class sections
   ('classsection.manage',    'Create, update, and delete class sections'),
@@ -82,7 +83,13 @@ SELECT roles.id, permissions.id
 FROM roles
 CROSS JOIN permissions
 WHERE roles.key = 'teacher'
-  AND permissions.key IN ('delivery.read', 'enrollment.manage', 'learning.read', 'release.manage')
+  AND permissions.key IN (
+    'assignment.manage',
+    'delivery.read',
+    'enrollment.manage',
+    'learning.read',
+    'release.manage'
+  )
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
 -- ── Student permissions ─────────────────────────────────

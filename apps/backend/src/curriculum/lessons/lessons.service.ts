@@ -105,6 +105,11 @@ export class LessonsService {
     return toLessonResponse(lesson);
   }
 
+  /** Finds the narrow course-scoped lesson fields needed by assignment validation. */
+  findAssignmentAnchor(courseId: string, lessonId: string) {
+    return this.lessons.findAssignmentAnchor(courseId, lessonId);
+  }
+
   // ─────────────────────────────────────────
   // PATCH /lessons/:id — Update a lesson
   // ─────────────────────────────────────────
