@@ -43,6 +43,19 @@ vi.mock('@/features/admin/assets/queries', () => ({
     isPending: false,
     error: null,
   }),
+  useAssetAccess: () => ({
+    data: {
+      url: 'https://example.test/asset',
+      expiresAt: '',
+      type: 'IMAGE',
+      mimeType: 'image/png',
+    },
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 const lesson: Lesson = {
@@ -83,6 +96,11 @@ function renderEditor(blocks: LessonContentBlock[] = [], onReload = vi.fn()) {
 
 const savedBlocks = () => saveContent.mock.calls[0][0].body.blocks;
 
+async function addBlock(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(screen.getByRole('button', { name: 'Add a block' }));
+  await user.click(await screen.findByRole('menuitem', { name: label }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   saveContent.mockImplementation(({ body }) =>
@@ -95,8 +113,54 @@ it('disables save until something changes', async () => {
   renderEditor();
   const save = screen.getByRole('button', { name: 'Save changes' });
   expect(save).toBeDisabled();
-  await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
+  await addBlock(user, 'Rich text');
   expect(save).toBeEnabled();
+});
+
+it('previews the unsaved draft and keeps it when switching back to edit', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  const title = screen.getByRole('textbox', { name: 'Lesson title' });
+  await user.clear(title);
+  await user.type(title, 'Draft lesson title');
+  await addBlock(user, 'Image');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await user.click(screen.getByRole('radio', { name: 'Preview' }));
+
+  expect(screen.getByRole('heading', { name: 'Draft lesson title' })).toBeInTheDocument();
+  expect(screen.getByText('Previewing unsaved changes')).toBeInTheDocument();
+  expect(screen.getByText('No file chosen.')).toBeInTheDocument();
+  expect(screen.queryByText(/blocks need a file before this lesson can be saved/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Add a block' })).not.toBeInTheDocument();
+  expect(updateLesson).not.toHaveBeenCalled();
+  expect(saveContent).not.toHaveBeenCalled();
+
+  await user.click(screen.getByRole('radio', { name: 'Edit' }));
+  expect(screen.getByRole('textbox', { name: 'Lesson title' })).toHaveValue('Draft lesson title');
+  expect(screen.getByRole('button', { name: 'Add a block' })).toBeInTheDocument();
+});
+
+it('confirms discarding changes and restores the saved draft', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  const title = screen.getByRole('textbox', { name: 'Lesson title' });
+  await user.clear(title);
+  await user.type(title, 'Temporary title');
+  await addBlock(user, 'Rich text');
+
+  await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('Discard unsaved changes?');
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('textbox', { name: 'Lesson title' })).toHaveValue('Temporary title');
+  expect(screen.getByRole('button', { name: 'Remove Rich text block' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+  await user.click(screen.getByRole('button', { name: 'Discard edits' }));
+  expect(screen.getByRole('textbox', { name: 'Lesson title' })).toHaveValue('Ultrasonic sensors');
+  expect(screen.getByRole('button', { name: 'Add a block' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+  expect(updateLesson).not.toHaveBeenCalled();
+  expect(saveContent).not.toHaveBeenCalled();
 });
 
 it('blocks saving an empty title without calling the API', async () => {
@@ -112,7 +176,7 @@ it('blocks saving an empty title without calling the API', async () => {
 it('adds a rich-text block and saves with the current version', async () => {
   const user = userEvent.setup();
   renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
+  await addBlock(user, 'Rich text');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(saveContent.mock.calls[0][0].body).toMatchObject({
     expectedVersion: 3,
@@ -148,7 +212,7 @@ it('offers a reload on version conflict', async () => {
     new ApiError(409, 'Conflict', { code: API_ERROR_CODE.VERSION_CONFLICT }),
   );
   const { onReload } = renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
+  await addBlock(user, 'Rich text');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(
     await screen.findByText('This lesson changed while you were editing.'),
@@ -161,7 +225,7 @@ it('does not offer a reload for other 409 errors', async () => {
   const user = userEvent.setup();
   saveContent.mockRejectedValue(new ApiError(409, 'Conflict', { code: API_ERROR_CODE.CONFLICT }));
   renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
+  await addBlock(user, 'Rich text');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(await screen.findByText('This already exists.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Reload latest version' })).not.toBeInTheDocument();
@@ -187,10 +251,19 @@ it('offers every block type in the divider menu', async () => {
   }
 });
 
+it('offers the same horizontal block picker at the end of the lesson', async () => {
+  const user = userEvent.setup();
+  renderEditor([textBlock('a')]);
+  await user.click(screen.getByRole('button', { name: 'Add a block' }));
+  for (const name of ['Rich text', 'Accordion', 'Two columns', 'Image', 'Video', 'PDF']) {
+    expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
+  }
+});
+
 it('requires an accordion title and saves its content shape', async () => {
   const user = userEvent.setup();
   renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add accordion block' }));
+  await addBlock(user, 'Accordion');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(screen.getByText('Add an accordion title to save this block.')).toBeInTheDocument();
   expect(saveContent).not.toHaveBeenCalled();
@@ -211,7 +284,7 @@ it('requires an accordion title and saves its content shape', async () => {
 it('adds and saves a block inside a column without allowing nested layouts', async () => {
   const user = userEvent.setup();
   renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add two columns block' }));
+  await addBlock(user, 'Two columns');
   await user.click(screen.getByRole('button', { name: 'Add block to column 1' }));
   expect(await screen.findByRole('menuitem', { name: 'Rich text' })).toBeInTheDocument();
   expect(screen.queryByRole('menuitem', { name: 'Two columns' })).not.toBeInTheDocument();
@@ -228,7 +301,7 @@ it('adds and saves a block inside a column without allowing nested layouts', asy
 it('blocks saving a column child that needs an asset', async () => {
   const user = userEvent.setup();
   renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add two columns block' }));
+  await addBlock(user, 'Two columns');
   await user.click(screen.getByRole('button', { name: 'Add block to column 1' }));
   await user.click(await screen.findByRole('menuitem', { name: 'Image' }));
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -293,7 +366,7 @@ it('removes a nested block and leaves its column empty', async () => {
 it('blocks saving an image block that has no file', async () => {
   const user = userEvent.setup();
   renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add image block' }));
+  await addBlock(user, 'Image');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(screen.getByText('Choose a file to save this block.')).toBeInTheDocument();
   expect(saveContent).not.toHaveBeenCalled();
@@ -302,7 +375,7 @@ it('blocks saving an image block that has no file', async () => {
 it('saves a picked asset with its caption on a PDF block', async () => {
   const user = userEvent.setup();
   renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add pdf block' }));
+  await addBlock(user, 'PDF');
   await user.click(screen.getByRole('button', { name: 'Choose from Asset Library' }));
   await user.click(screen.getByRole('button', { name: /Handout/ }));
   await user.click(screen.getByRole('button', { name: 'Use PDF' }));
@@ -316,7 +389,7 @@ it('saves a picked asset with its caption on a PDF block', async () => {
 it('asks before leaving with unsaved changes', async () => {
   const user = userEvent.setup();
   const { router } = renderEditor();
-  await user.click(screen.getByRole('button', { name: 'Add rich text block' }));
+  await addBlock(user, 'Rich text');
   await act(() => router.navigate('/curriculum'));
   expect(await screen.findByText('Leave without saving?')).toBeInTheDocument();
   expect(router.state.location.pathname).toBe('/');
