@@ -21,11 +21,7 @@ interface BlockRendererProps {
   onAttachAsset: (id: string, asset: Asset) => void;
   onFieldChange: (id: string, key: BlockTextField, value: string) => void;
   onAccordionTitleChange: (id: string, title: string) => void;
-  onAddColumnBlock: (
-    parentId: string,
-    column: 0 | 1,
-    block: LessonContentBlock,
-  ) => void;
+  onAddColumnBlock: (parentId: string, column: 0 | 1, block: LessonContentBlock) => void;
   onRemoveBlock: (id: string) => void;
 }
 
@@ -51,9 +47,7 @@ export function BlockRenderer({
       return (
         <RichTextEditor
           label={
-            contextLabel
-              ? `${contextLabel} rich text`
-              : `Rich text block ${String(index + 1)}`
+            contextLabel ? `${contextLabel} rich text` : `Rich text block ${String(index + 1)}`
           }
           initialValue={getRichTextDoc(block)}
           editable={!disabled}

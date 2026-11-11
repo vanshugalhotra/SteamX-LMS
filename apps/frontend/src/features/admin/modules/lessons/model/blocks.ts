@@ -144,14 +144,20 @@ export const isAssetBlock = (block: LessonContentBlock) =>
   BLOCK_META[block.type]?.assetType !== undefined;
 
 export const findIncompleteBlockIds = (blocks: LessonContentBlock[]) =>
-  visitBlocks(blocks).filter((block) => isAssetBlock(block) && !block.assetId).map((block) => block.id);
+  visitBlocks(blocks)
+    .filter((block) => isAssetBlock(block) && !block.assetId)
+    .map((block) => block.id);
 
 export function findInvalidAccordionIds(blocks: LessonContentBlock[]) {
   return visitBlocks(blocks)
     .filter((block) => {
       if (block.type !== 'ACCORDION') return false;
       const title = block.content.title;
-      return typeof title !== 'string' || !title.trim() || title.trim().length > ACCORDION_TITLE_MAX_LENGTH;
+      return (
+        typeof title !== 'string' ||
+        !title.trim() ||
+        title.trim().length > ACCORDION_TITLE_MAX_LENGTH
+      );
     })
     .map((block) => block.id);
 }
@@ -197,10 +203,7 @@ export function removeBlockById(blocks: LessonContentBlock[], id: string): Lesso
     : next;
 }
 
-function removeNestedBlock(
-  block: LessonContentBlock,
-  id: string,
-): LessonContentBlock | null {
+function removeNestedBlock(block: LessonContentBlock, id: string): LessonContentBlock | null {
   if (block.id === id) return null;
   if (!Array.isArray(block.columns)) return block;
 

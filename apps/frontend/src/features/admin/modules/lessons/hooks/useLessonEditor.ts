@@ -59,10 +59,7 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
       return;
     }
 
-    if (
-      findIncompleteBlockIds(blocks).length > 0 ||
-      findInvalidAccordionIds(blocks).length > 0
-    ) {
+    if (findIncompleteBlockIds(blocks).length > 0 || findInvalidAccordionIds(blocks).length > 0) {
       setAttempted(true);
       return;
     }
@@ -102,15 +99,9 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
 
   const addBlock = (block: LessonContentBlock, index?: number) => {
     setAttempted(false);
-    setBlocks((c) =>
-      countBlocks(c) >= LESSON_MAX_BLOCKS ? c : insertBlock(c, block, index),
-    );
+    setBlocks((c) => (countBlocks(c) >= LESSON_MAX_BLOCKS ? c : insertBlock(c, block, index)));
   };
-  const addColumnBlock = (
-    parentId: string,
-    column: 0 | 1,
-    child: LessonContentBlock,
-  ) => {
+  const addColumnBlock = (parentId: string, column: 0 | 1, child: LessonContentBlock) => {
     setAttempted(false);
     setBlocks((current) => {
       if (countBlocks(current) >= LESSON_MAX_BLOCKS) return current;

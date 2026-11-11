@@ -36,11 +36,7 @@ export function BlockList({
   onAttachAsset: (id: string, asset: Asset) => void;
   onFieldChange: (id: string, key: BlockTextField, value: string) => void;
   onAccordionTitleChange: (id: string, title: string) => void;
-  onAddColumnBlock: (
-    parentId: string,
-    column: 0 | 1,
-    block: LessonContentBlock,
-  ) => void;
+  onAddColumnBlock: (parentId: string, column: 0 | 1, block: LessonContentBlock) => void;
 }) {
   const full = countBlocks(blocks) >= LESSON_MAX_BLOCKS;
   const addDisabled = disabled || full;

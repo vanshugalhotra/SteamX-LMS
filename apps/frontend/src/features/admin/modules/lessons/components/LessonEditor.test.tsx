@@ -285,13 +285,9 @@ it('removes a nested block and leaves its column empty', async () => {
     columns: [textBlock('nested'), null],
   };
   renderEditor([layout]);
-  await user.click(
-    screen.getByRole('button', { name: 'Remove Rich text block from column 1' }),
-  );
+  await user.click(screen.getByRole('button', { name: 'Remove Rich text block from column 1' }));
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(savedBlocks()).toMatchObject([
-    { type: 'TWO_COLUMN', columns: [null, null] },
-  ]);
+  expect(savedBlocks()).toMatchObject([{ type: 'TWO_COLUMN', columns: [null, null] }]);
 });
 
 it('blocks saving an image block that has no file', async () => {
