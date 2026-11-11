@@ -3,14 +3,19 @@ import type { JSONContent } from '@tiptap/react';
 import { API_ERROR_CODE, getErrorMessage, getFieldErrors, hasErrorCode } from '@/lib/api-errors';
 import type { Lesson, LessonContent, LessonContentBlock } from '../model/types';
 import {
+  countBlocks,
+  findInvalidAccordionIds,
   findIncompleteBlockIds,
   insertBlock,
   moveBlock,
+  removeBlockById,
   setBlockField,
+  updateBlockById,
   type BlockTextField,
 } from '../model/blocks';
 import { useSaveLessonContent, useUpdateLesson } from '../queries';
 import type { Asset } from '@/features/admin/assets/model/types';
+import { LESSON_MAX_BLOCKS } from '../config/lessons.config';
 
 export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   const [title, setTitle] = useState(lesson.title);
@@ -38,6 +43,10 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
     () => (attempted ? findIncompleteBlockIds(blocks) : []),
     [attempted, blocks],
   );
+  const invalidAccordionIds = useMemo(
+    () => (attempted ? findInvalidAccordionIds(blocks) : []),
+    [attempted, blocks],
+  );
 
   const changeTitle = (value: string) => {
     setTitle(value);
@@ -50,7 +59,7 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
       return;
     }
 
-    if (findIncompleteBlockIds(blocks).length > 0) {
+    if (findIncompleteBlockIds(blocks).length > 0 || findInvalidAccordionIds(blocks).length > 0) {
       setAttempted(true);
       return;
     }
@@ -90,21 +99,43 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
 
   const addBlock = (block: LessonContentBlock, index?: number) => {
     setAttempted(false);
-    setBlocks((c) => insertBlock(c, block, index));
+    setBlocks((c) => (countBlocks(c) >= LESSON_MAX_BLOCKS ? c : insertBlock(c, block, index)));
+  };
+  const addColumnBlock = (parentId: string, column: 0 | 1, child: LessonContentBlock) => {
+    setAttempted(false);
+    setBlocks((current) => {
+      if (countBlocks(current) >= LESSON_MAX_BLOCKS) return current;
+      return updateBlockById(current, parentId, (block) => {
+        if (block.type !== 'TWO_COLUMN') return block;
+        const columns = block.columns ?? [null, null];
+        if (columns[column]) return block;
+        const next: [LessonContentBlock | null, LessonContentBlock | null] = [...columns];
+        next[column] = child;
+        return { ...block, columns: next };
+      });
+    });
   };
   const removeBlock = (id: string) => {
-    setBlocks((c) => c.filter((b) => b.id !== id));
+    setBlocks((c) => removeBlockById(c, id));
   };
   const move = (index: number, direction: -1 | 1) => {
     setBlocks((c) => moveBlock(c, index, direction));
   };
   const updateRichText = (id: string, doc: JSONContent) => {
     setBlocks((c) =>
-      c.map((b) => (b.id === id ? { ...b, content: { format: 'tiptap', doc } } : b)),
+      updateBlockById(c, id, (block) => {
+        if (block.type === 'ACCORDION') {
+          return {
+            ...block,
+            content: { ...block.content, body: { format: 'tiptap', doc } },
+          };
+        }
+        return { ...block, content: { format: 'tiptap', doc } };
+      }),
     );
   };
   const updateBlock = (id: string, update: (block: LessonContentBlock) => LessonContentBlock) => {
-    setBlocks((c) => c.map((b) => (b.id === id ? update(b) : b)));
+    setBlocks((c) => updateBlockById(c, id, update));
   };
   const attachAsset = (id: string, asset: Asset) => {
     setAssets((c) => ({ ...c, [asset.id]: asset }));
@@ -112,6 +143,12 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   };
   const setField = (id: string, key: BlockTextField, value: string) => {
     updateBlock(id, (b) => setBlockField(b, key, value));
+  };
+  const setAccordionTitle = (id: string, title: string) => {
+    updateBlock(id, (block) => ({
+      ...block,
+      content: { ...block.content, title },
+    }));
   };
 
   return {
@@ -125,13 +162,16 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
     hasChanges,
     save,
     addBlock,
+    addColumnBlock,
     removeBlock,
     move,
     updateRichText,
     assets,
     updateBlock,
     incompleteIds,
+    invalidAccordionIds,
     attachAsset,
     setField,
+    setAccordionTitle,
   };
 }

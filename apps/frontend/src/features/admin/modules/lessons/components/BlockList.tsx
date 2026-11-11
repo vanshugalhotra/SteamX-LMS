@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import type { JSONContent } from '@tiptap/react';
 import type { Asset } from '@/features/admin/assets/model/types';
 import { LESSON_MAX_BLOCKS } from '../config/lessons.config';
-import type { BlockTextField } from '../model/blocks';
+import { countBlocks, type BlockTextField } from '../model/blocks';
 import type { LessonContent, LessonContentBlock } from '../model/types';
 import { AddBlockMenu } from './AddBlockMenu';
 import { BlockCard } from './BlockCard';
@@ -13,6 +13,7 @@ export function BlockList({
   blocks,
   assets,
   incompleteIds,
+  invalidAccordionIds,
   disabled,
   onAdd,
   onMove,
@@ -20,10 +21,13 @@ export function BlockList({
   onRichTextChange,
   onAttachAsset,
   onFieldChange,
+  onAccordionTitleChange,
+  onAddColumnBlock,
 }: {
   blocks: LessonContentBlock[];
   assets: LessonContent['assets'];
   incompleteIds: string[];
+  invalidAccordionIds: string[];
   disabled: boolean;
   onAdd: (block: LessonContentBlock, index?: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
@@ -31,8 +35,10 @@ export function BlockList({
   onRichTextChange: (id: string, doc: JSONContent) => void;
   onAttachAsset: (id: string, asset: Asset) => void;
   onFieldChange: (id: string, key: BlockTextField, value: string) => void;
+  onAccordionTitleChange: (id: string, title: string) => void;
+  onAddColumnBlock: (parentId: string, column: 0 | 1, block: LessonContentBlock) => void;
 }) {
-  const full = blocks.length >= LESSON_MAX_BLOCKS;
+  const full = countBlocks(blocks) >= LESSON_MAX_BLOCKS;
   const addDisabled = disabled || full;
 
   if (blocks.length === 0) {
@@ -42,7 +48,7 @@ export function BlockList({
         <p className="mx-auto mb-5 mt-1 max-w-sm text-xs leading-5 text-gray-600">
           Add your first block to introduce a topic, explain a concept, or share instructions.
         </p>
-        <AddBlockMenu disabled={disabled} onAdd={onAdd} />
+        <AddBlockMenu disabled={addDisabled} onAdd={onAdd} />
       </section>
     );
   }
@@ -75,12 +81,17 @@ export function BlockList({
             <BlockRenderer
               block={block}
               index={index}
+              full={full}
               assets={assets}
-              invalid={incompleteIds.includes(block.id)}
+              incompleteIds={incompleteIds}
+              invalidAccordionIds={invalidAccordionIds}
               disabled={disabled}
               onRichTextChange={onRichTextChange}
               onAttachAsset={onAttachAsset}
               onFieldChange={onFieldChange}
+              onAccordionTitleChange={onAccordionTitleChange}
+              onAddColumnBlock={onAddColumnBlock}
+              onRemoveBlock={onRemove}
             />
           </BlockCard>
         </Fragment>

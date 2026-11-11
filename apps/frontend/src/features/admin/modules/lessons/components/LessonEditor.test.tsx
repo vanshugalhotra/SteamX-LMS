@@ -182,9 +182,112 @@ it('offers every block type in the divider menu', async () => {
   const user = userEvent.setup();
   renderEditor([textBlock('a'), textBlock('b')]);
   await user.click(screen.getByRole('button', { name: 'Insert block before block 2' }));
-  for (const name of ['Rich text', 'Image', 'Video', 'PDF']) {
+  for (const name of ['Rich text', 'Accordion', 'Two columns', 'Image', 'Video', 'PDF']) {
     expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
   }
+});
+
+it('requires an accordion title and saves its content shape', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'Add accordion block' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(screen.getByText('Add an accordion title to save this block.')).toBeInTheDocument();
+  expect(saveContent).not.toHaveBeenCalled();
+
+  await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Common wiring mistakes');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(savedBlocks()).toMatchObject([
+    {
+      type: 'ACCORDION',
+      content: {
+        title: 'Common wiring mistakes',
+        body: { format: 'tiptap', doc: { type: 'doc' } },
+      },
+    },
+  ]);
+});
+
+it('adds and saves a block inside a column without allowing nested layouts', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'Add two columns block' }));
+  await user.click(screen.getByRole('button', { name: 'Add block to column 1' }));
+  expect(await screen.findByRole('menuitem', { name: 'Rich text' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: 'Two columns' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('menuitem', { name: 'Rich text' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(savedBlocks()).toMatchObject([
+    {
+      type: 'TWO_COLUMN',
+      columns: [{ type: 'RICH_TEXT' }, null],
+    },
+  ]);
+});
+
+it('blocks saving a column child that needs an asset', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'Add two columns block' }));
+  await user.click(screen.getByRole('button', { name: 'Add block to column 1' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Image' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(screen.getByText('Choose a file to save this block.')).toBeInTheDocument();
+  expect(saveContent).not.toHaveBeenCalled();
+});
+
+it('updates a nested accordion and preserves its body when saving', async () => {
+  const user = userEvent.setup();
+  const accordion: LessonContentBlock = {
+    id: 'nested-accordion',
+    type: 'ACCORDION',
+    content: {
+      title: 'Old title',
+      body: {
+        format: 'tiptap',
+        doc: { type: 'doc', content: [{ type: 'paragraph' }] },
+      },
+    },
+  };
+  const layout: LessonContentBlock = {
+    id: 'layout',
+    type: 'TWO_COLUMN',
+    content: {},
+    columns: [accordion, null],
+  };
+  renderEditor([layout]);
+  const title = screen.getByRole('textbox', { name: 'Title (Column 1)' });
+  await user.clear(title);
+  await user.type(title, 'Updated title');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(savedBlocks()).toMatchObject([
+    {
+      columns: [
+        {
+          type: 'ACCORDION',
+          content: {
+            title: 'Updated title',
+            body: { format: 'tiptap', doc: { type: 'doc' } },
+          },
+        },
+        null,
+      ],
+    },
+  ]);
+});
+
+it('removes a nested block and leaves its column empty', async () => {
+  const user = userEvent.setup();
+  const layout: LessonContentBlock = {
+    id: 'layout',
+    type: 'TWO_COLUMN',
+    content: {},
+    columns: [textBlock('nested'), null],
+  };
+  renderEditor([layout]);
+  await user.click(screen.getByRole('button', { name: 'Remove Rich text block from column 1' }));
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(savedBlocks()).toMatchObject([{ type: 'TWO_COLUMN', columns: [null, null] }]);
 });
 
 it('blocks saving an image block that has no file', async () => {
