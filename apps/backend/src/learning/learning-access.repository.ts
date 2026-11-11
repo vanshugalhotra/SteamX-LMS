@@ -11,7 +11,7 @@ import { paginatedSearch } from '../common/repositories/paginated-search.js';
 import type { PaginationQueryDto } from '../common/pagination/pagination-query.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-function releasedStudentLessonFilter() {
+export function releasedStudentLessonFilter() {
   return Prisma.sql`
     l.status IN ('ACTIVE'::content_status, 'ARCHIVED'::content_status)
     AND l.audience = 'STUDENT'::lesson_audience

@@ -58,3 +58,19 @@ Publishing checks, in order: ACTIVE delivery, current course subscription, due d
 publishable blueprint, and a student-facing lesson if anchored. A template copy requires an ACTIVE
 template from the delivery's course and can be created only once in each delivery. Its answer-key
 fields are never included in teacher responses.
+
+## Student view
+
+Students read published assignments through the learning API. Course-level and module-anchored
+assignments are visible in an active enrolled delivery. A lesson-anchored assignment is visible only
+while its lesson is ACTIVE or ARCHIVED, has STUDENT audience, and is released to that delivery.
+DRAFT and UNPUBLISHED assignments are hidden.
+
+The list reports `NOT_SUBMITTED`, `SUBMITTED`, or `GRADED` for the student's own submission.
+`canSubmit` is true when no submission exists or resubmission is enabled. For a submission,
+`isLate` compares its submitted time with the due date captured for that submission; without a
+submission, `isLate` predicts whether submitting now would be late. A null due date is not late.
+
+Student responses omit answer correctness, answer keys, template and teacher details, storage keys,
+and file URLs. File metadata is available in assignment detail; file downloads are a separate
+workflow.
