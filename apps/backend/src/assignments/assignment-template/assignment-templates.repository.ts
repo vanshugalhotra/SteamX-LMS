@@ -9,7 +9,7 @@ import type {
   AssignmentTemplateListQueryDto,
   CreateAssignmentTemplateDto,
   UpdateAssignmentTemplateDto,
-} from './dto/assignment-template.dto.js';
+} from './dto/assignment-template-request.dto.js';
 
 @Injectable()
 export class AssignmentTemplatesRepository {

@@ -9,13 +9,10 @@ import { readAssignmentBlueprint } from '../assignment-template/assignment-templ
 import { AssignmentTemplatesRepository } from '../assignment-template/assignment-templates.repository.js';
 import { parseAssignmentBlueprint } from '../blueprint/blueprint.validator.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
-import type {
-  CreateDeliveryAssignmentFromTemplateDto,
-  DeliveryAssignmentResponseDto,
-} from '../dto/delivery-assignment.dto.js';
-import { toDeliveryAssignmentResponse } from './delivery-assignments.mapper.js';
+import type { CreateDeliveryAssignmentFromTemplateDto } from '../dto/delivery-assignment-request.dto.js';
+import { toDeliveryAssignmentDetailResponse } from './delivery-assignment-response.js';
+import type { DeliveryAssignmentResponseDto } from '../dto/delivery-assignment-response.dto.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
-import type { AssignmentDetailRecord } from './delivery-assignments.repository.js';
 import { mergeTemplateRubric } from '../assignment-template/template-rubric.js';
 
 /** Applies the fixed-shape template-copy rules and translates the copy unique index. */
@@ -69,22 +66,13 @@ export class AssignmentTemplateCopyService {
         { actorId: actor.userId, deliveryId, assignmentId: assignment.id, templateId: template.id },
         'Delivery assignment copied from template',
       );
-      return this.toResponse(assignment);
+      return toDeliveryAssignmentDetailResponse(this.assignments, assignment);
     } catch (error) {
       if (isTemplateCopyDuplicate(error)) {
         throw new ConflictException(API_ERROR.TEMPLATE_ALREADY_PUBLISHED_TO_DELIVERY);
       }
       throw error;
     }
-  }
-
-  /** Maps the new assignment and page aggregates to the standard detail response. */
-  private async toResponse(assignment: AssignmentDetailRecord) {
-    const counts = (await this.assignments.findCounts([assignment.id])).get(assignment.id)!;
-    return toDeliveryAssignmentResponse(assignment, {
-      ...counts,
-      itemCount: assignment.items.length,
-    });
   }
 }
 

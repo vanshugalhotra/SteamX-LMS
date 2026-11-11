@@ -5,7 +5,7 @@ import type { AssignmentBlueprint, AssignmentItemType } from '../blueprint/bluep
 import type {
   AssignmentTemplateResponseDto,
   AssignmentTemplateSummaryDto,
-} from './dto/assignment-template.dto.js';
+} from './dto/assignment-template-response.dto.js';
 
 /** Maps computed blueprint metadata without including the blueprint itself. */
 export function toAssignmentTemplateSummary(

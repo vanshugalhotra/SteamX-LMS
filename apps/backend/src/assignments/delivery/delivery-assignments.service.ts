@@ -11,16 +11,15 @@ import { parseAssignmentBlueprint } from '../blueprint/blueprint.validator.js';
 import type {
   CreateDeliveryAssignmentDto,
   DeliveryAssignmentListQueryDto,
+} from '../dto/delivery-assignment-request.dto.js';
+import type {
   DeliveryAssignmentResponseDto,
   DeliveryAssignmentSummaryDto,
-} from '../dto/delivery-assignment.dto.js';
+} from '../dto/delivery-assignment-response.dto.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
-import {
-  toDeliveryAssignmentResponse,
-  toDeliveryAssignmentSummary,
-} from './delivery-assignments.mapper.js';
+import { toDeliveryAssignmentDetailResponse } from './delivery-assignment-response.js';
+import { toDeliveryAssignmentSummary } from './delivery-assignments.mapper.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
-import type { AssignmentDetailRecord } from './delivery-assignments.repository.js';
 
 /** Creates DRAFT assignments and serves delivery-scoped list and detail reads. */
 @Injectable()
@@ -62,7 +61,7 @@ export class DeliveryAssignmentsService {
       { actorId: actor.userId, deliveryId, assignmentId: assignment.id },
       'Delivery assignment created',
     );
-    return this.toResponse(assignment);
+    return toDeliveryAssignmentDetailResponse(this.assignments, assignment);
   }
 
   /** Lists paginated summaries and resolves all page counts in two grouped queries. */
@@ -92,7 +91,7 @@ export class DeliveryAssignmentsService {
   ): Promise<DeliveryAssignmentResponseDto> {
     await this.access.loadForRead(actor, deliveryId);
     const assignment = await this.requireAssignment(deliveryId, assignmentId);
-    return this.toResponse(assignment);
+    return toDeliveryAssignmentDetailResponse(this.assignments, assignment);
   }
 
   /** Validates optional module and lesson anchors using the curriculum's scoped services. */
@@ -116,14 +115,5 @@ export class DeliveryAssignmentsService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return assignment;
-  }
-
-  /** Builds detail counts from grouped page queries for a single record. */
-  private async toResponse(assignment: AssignmentDetailRecord) {
-    const counts = (await this.assignments.findCounts([assignment.id])).get(assignment.id)!;
-    return toDeliveryAssignmentResponse(assignment, {
-      ...counts,
-      itemCount: assignment.items.length,
-    });
   }
 }

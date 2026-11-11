@@ -3,7 +3,7 @@ import type {
   DeliveryAssignmentItemResponseDto,
   DeliveryAssignmentResponseDto,
   DeliveryAssignmentSummaryDto,
-} from '../dto/delivery-assignment.dto.js';
+} from '../dto/delivery-assignment-response.dto.js';
 import type {
   AssignmentDetailRecord,
   AssignmentListRecord,
