@@ -40,7 +40,7 @@ export function LessonEditorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-5">
       <BackLink to={PATHS.admin.courseCurriculum(lesson.data.courseId)}>
         Back to course curriculum
       </BackLink>
