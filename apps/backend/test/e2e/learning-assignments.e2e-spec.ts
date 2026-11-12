@@ -632,6 +632,34 @@ describe('Student assignment reads (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  function submitAssignment(
+    assignmentId: string,
+    answers: Array<{
+      itemId: string;
+      selectedOptionId?: string;
+      answerText?: string;
+    }>,
+    cookie = studentCookie,
+    targetDeliveryId = deliveryId,
+  ) {
+    return request(app.getHttpServer())
+      .put(`/api/v1/learning/deliveries/${targetDeliveryId}/assignments/${assignmentId}/submission`)
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send({ answers });
+  }
+
+  function getAssignmentItems(assignmentId: string) {
+    return prisma.assignmentItem.findMany({
+      where: { assignmentId },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        options: { orderBy: { position: 'asc' }, select: { id: true } },
+      },
+    });
+  }
+
   function allJsonKeys(value: unknown): string[] {
     if (Array.isArray(value)) {
       return value.flatMap(allJsonKeys);
@@ -784,6 +812,553 @@ describe('Student assignment reads (e2e)', () => {
       submission: { isLate: true },
     });
     expect((await getAssignment(lateNoSubmissionAssignmentId).expect(200)).body.isLate).toBe(true);
+  });
+
+  it('submits TEXT answers and reports lateness from the database due-date snapshot', async () => {
+    const regularId = await createPublishedAssignment({
+      title: 'First text submit',
+      dueAt: futureDueDate,
+      blueprint: { items: [{ type: 'TEXT', prompt: 'Explain.' }], rubric: null },
+    });
+    const lateId = await createPublishedAssignment({
+      title: 'Late text submit',
+      dueAt: '2000-01-01T00:00:00.000Z',
+      blueprint: { items: [{ type: 'TEXT', prompt: 'Explain.' }], rubric: null },
+    });
+    const [regularItem, lateItem] = await Promise.all([
+      getAssignmentItems(regularId),
+      getAssignmentItems(lateId),
+    ]);
+
+    const regular = await submitAssignment(regularId, [
+      { itemId: regularItem[0]!.id, answerText: '  My response.  ' },
+    ]).expect(200);
+    expect(regular.headers['cache-control']).toBe('private, no-store');
+    expect(regular.body).toMatchObject({
+      state: 'SUBMITTED',
+      isLate: false,
+      answers: [{ itemId: regularItem[0]!.id, answerText: 'My response.', selectedOptionId: null }],
+      files: [],
+      grade: null,
+    });
+    expect(
+      await prisma.submission.count({
+        where: { assignmentId: regularId, studentId: fixture.schoolA.student.id },
+      }),
+    ).toBe(1);
+
+    const late = await submitAssignment(lateId, [
+      { itemId: lateItem[0]!.id, answerText: 'Past due.' },
+    ]).expect(200);
+    const stored = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: lateId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { dueAtAtSubmission: true },
+    });
+    expect(late.body.isLate).toBe(true);
+    expect(stored.dueAtAtSubmission?.toISOString()).toBe(
+      new Date('2000-01-01T00:00:00.000Z').toISOString(),
+    );
+  });
+
+  it('auto-grades MCQ answers and rejects unanswered and foreign options', async () => {
+    const assignmentId = await createPublishedAssignment({
+      title: 'Three question auto grade',
+      dueAt: futureDueDate,
+      blueprint: {
+        items: Array.from({ length: 3 }, (_, index) => ({
+          type: 'SINGLE_CHOICE',
+          prompt: `Question ${index + 1}`,
+          options: [
+            { text: 'Correct', isCorrect: true },
+            { text: 'Incorrect', isCorrect: false },
+          ],
+        })),
+        rubric: null,
+      },
+    });
+    const items = await getAssignmentItems(assignmentId);
+    expectError(await submitAssignment(assignmentId, []), 422, 'SUBMISSION_INVALID');
+    const foreignOption = items[1]!.options[0]!.id;
+    expectError(
+      await submitAssignment(assignmentId, [
+        { itemId: items[0]!.id, selectedOptionId: foreignOption },
+        { itemId: items[1]!.id, selectedOptionId: items[1]!.options[0]!.id },
+        { itemId: items[2]!.id, selectedOptionId: items[2]!.options[0]!.id },
+      ]),
+      422,
+      'SUBMISSION_INVALID',
+    );
+    const response = await submitAssignment(
+      assignmentId,
+      items.map((item) => ({
+        itemId: item.id,
+        selectedOptionId: item.options[0]!.id,
+      })),
+    ).expect(200);
+    expect(response.body).toMatchObject({
+      state: 'GRADED',
+      grade: { percent: 100, level: '4+', letter: 'A+', rubricLevels: null, feedback: null },
+    });
+    const stored = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { status: true, gradePercent: true, gradedById: true },
+    });
+    expect(stored).toMatchObject({
+      status: SubmissionStatus.GRADED,
+      gradePercent: new Prisma.Decimal(100),
+      gradedById: null,
+    });
+  });
+
+  it('rejects different content when resubmission is off and keeps identical retries unchanged', async () => {
+    const assignmentId = await createPublishedAssignment({
+      title: 'Idempotent MCQ submit',
+      dueAt: futureDueDate,
+      blueprint: {
+        items: [
+          {
+            type: 'SINGLE_CHOICE',
+            prompt: 'Choose.',
+            options: [
+              { text: 'Correct', isCorrect: true },
+              { text: 'Incorrect', isCorrect: false },
+            ],
+          },
+        ],
+        rubric: null,
+      },
+    });
+    const [item] = await getAssignmentItems(assignmentId);
+    const correct = { itemId: item!.id, selectedOptionId: item!.options[0]!.id };
+    const first = await submitAssignment(assignmentId, [correct]).expect(200);
+    const before = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { submittedAt: true, gradePercent: true },
+    });
+
+    await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { dueAt: new Date('2000-01-01T00:00:00.000Z') },
+    });
+    const retry = await submitAssignment(assignmentId, [correct]).expect(200);
+    expect(retry.body).toEqual(first.body);
+    expectError(
+      await submitAssignment(assignmentId, [
+        { itemId: item!.id, selectedOptionId: item!.options[1]!.id },
+      ]),
+      409,
+      'SUBMISSION_ALREADY_EXISTS',
+    );
+    const after = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { submittedAt: true, gradePercent: true },
+    });
+    expect(after.submittedAt).toEqual(before.submittedAt);
+    expect(after.gradePercent).toEqual(before.gradePercent);
+    expect(retry.body.isLate).toBe(false);
+  });
+
+  it('replaces answers, clears teacher grading, and re-grades MCQ resubmissions', async () => {
+    const textId = await createPublishedAssignment({
+      title: 'Text replacement',
+      dueAt: futureDueDate,
+      blueprint: {
+        allowResubmission: true,
+        items: [{ type: 'TEXT', prompt: 'Explain.' }],
+        rubric: null,
+      },
+    });
+    const [textItem] = await getAssignmentItems(textId);
+    await submitAssignment(textId, [{ itemId: textItem!.id, answerText: 'First.' }]).expect(200);
+    const textSubmission = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: textId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { id: true, submittedAt: true },
+    });
+    await prisma.submission.update({
+      where: { id: textSubmission.id },
+      data: {
+        status: SubmissionStatus.GRADED,
+        gradePercent: new Prisma.Decimal(80),
+        gradedAt: new Date(),
+        gradedById: fixture.schoolA.teacher.id,
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const replaced = await submitAssignment(textId, [
+      { itemId: textItem!.id, answerText: 'Second.' },
+    ]).expect(200);
+    expect(replaced.body).toMatchObject({
+      state: 'SUBMITTED',
+      answers: [{ itemId: textItem!.id, answerText: 'Second.' }],
+      grade: null,
+    });
+    const cleared = await prisma.submission.findUniqueOrThrow({
+      where: { id: textSubmission.id },
+      select: {
+        submittedAt: true,
+        status: true,
+        gradePercent: true,
+        rubricLevels: true,
+        overallFeedback: true,
+        gradedById: true,
+        gradedAt: true,
+      },
+    });
+    expect(cleared.submittedAt.getTime()).toBeGreaterThan(textSubmission.submittedAt.getTime());
+    expect(cleared).toMatchObject({
+      status: SubmissionStatus.SUBMITTED,
+      gradePercent: null,
+      rubricLevels: null,
+      overallFeedback: null,
+      gradedById: null,
+      gradedAt: null,
+    });
+
+    const mcqId = await createPublishedAssignment({
+      title: 'MCQ replacement',
+      dueAt: futureDueDate,
+      blueprint: {
+        allowResubmission: true,
+        items: [
+          {
+            type: 'SINGLE_CHOICE',
+            prompt: 'Choose.',
+            options: [
+              { text: 'Correct', isCorrect: true },
+              { text: 'Incorrect', isCorrect: false },
+            ],
+          },
+        ],
+        rubric: null,
+      },
+    });
+    const [mcqItem] = await getAssignmentItems(mcqId);
+    const mcqAnswer = (optionIndex: number) => ({
+      itemId: mcqItem!.id,
+      selectedOptionId: mcqItem!.options[optionIndex]!.id,
+    });
+    await submitAssignment(mcqId, [mcqAnswer(0)]).expect(200);
+    const regraded = await submitAssignment(mcqId, [mcqAnswer(1)]).expect(200);
+    expect(regraded.body).toMatchObject({
+      state: 'GRADED',
+      grade: { percent: 0, level: 'R', letter: 'F' },
+    });
+  });
+
+  it('collects validation errors for each answer rule and rejects file-upload assignments', async () => {
+    const textId = await createPublishedAssignment({
+      title: 'Validation answers',
+      dueAt: futureDueDate,
+      blueprint: {
+        items: [{ type: 'TEXT', prompt: 'Short answer.', config: { maxLength: 4 } }],
+        rubric: null,
+      },
+    });
+    const otherTextId = await createPublishedAssignment({
+      title: 'Foreign answer item',
+      dueAt: futureDueDate,
+      blueprint: { items: [{ type: 'TEXT', prompt: 'Other answer.' }], rubric: null },
+    });
+    const mcqId = await createPublishedAssignment({
+      title: 'MCQ answer validation',
+      dueAt: futureDueDate,
+      blueprint: {
+        items: [
+          {
+            type: 'SINGLE_CHOICE',
+            prompt: 'One.',
+            options: [
+              { text: 'A', isCorrect: true },
+              { text: 'B', isCorrect: false },
+            ],
+          },
+          {
+            type: 'SINGLE_CHOICE',
+            prompt: 'Two.',
+            options: [
+              { text: 'C', isCorrect: true },
+              { text: 'D', isCorrect: false },
+            ],
+          },
+        ],
+        rubric: null,
+      },
+    });
+    const fileId = await createPublishedAssignment({
+      title: 'File submit guard',
+      dueAt: futureDueDate,
+      blueprint: {
+        items: [
+          {
+            type: 'FILE_UPLOAD',
+            prompt: 'Upload.',
+            config: { maxFiles: 1, maxSizeMb: 1, allowedTypes: ['PDF'] },
+          },
+        ],
+        rubric: null,
+      },
+    });
+    const [textItem] = await getAssignmentItems(textId);
+    const [foreignItem] = await getAssignmentItems(otherTextId);
+    const mcqItems = await getAssignmentItems(mcqId);
+    const unknownItemId = randomUUID();
+    const invalidCases: Array<{
+      assignmentId: string;
+      answers: Array<{ itemId: string; selectedOptionId?: string; answerText?: string }>;
+      itemId: string;
+      rule: string;
+    }> = [
+      {
+        assignmentId: textId,
+        answers: [{ itemId: unknownItemId, answerText: 'x' }],
+        itemId: unknownItemId,
+        rule: 'unknownItem',
+      },
+      {
+        assignmentId: textId,
+        answers: [{ itemId: foreignItem!.id, answerText: 'x' }],
+        itemId: foreignItem!.id,
+        rule: 'unknownItem',
+      },
+      {
+        assignmentId: textId,
+        answers: [
+          { itemId: textItem!.id, answerText: 'one' },
+          { itemId: textItem!.id, answerText: 'two' },
+        ],
+        itemId: textItem!.id,
+        rule: 'duplicateItem',
+      },
+      {
+        assignmentId: textId,
+        answers: [],
+        itemId: textItem!.id,
+        rule: 'required',
+      },
+      {
+        assignmentId: mcqId,
+        answers: [
+          { itemId: mcqItems[0]!.id, selectedOptionId: mcqItems[1]!.options[0]!.id },
+          { itemId: mcqItems[1]!.id, selectedOptionId: mcqItems[1]!.options[0]!.id },
+        ],
+        itemId: mcqItems[0]!.id,
+        rule: 'selectedOptionInvalid',
+      },
+      {
+        assignmentId: mcqId,
+        answers: [
+          { itemId: mcqItems[0]!.id, answerText: 'text' },
+          { itemId: mcqItems[1]!.id, selectedOptionId: mcqItems[1]!.options[0]!.id },
+        ],
+        itemId: mcqItems[0]!.id,
+        rule: 'selectedOptionRequired',
+      },
+      {
+        assignmentId: textId,
+        answers: [{ itemId: textItem!.id, answerText: '  ' }],
+        itemId: textItem!.id,
+        rule: 'answerTextRequired',
+      },
+      {
+        assignmentId: textId,
+        answers: [{ itemId: textItem!.id, answerText: '12345' }],
+        itemId: textItem!.id,
+        rule: 'answerTextTooLong',
+      },
+    ];
+    for (const testCase of invalidCases) {
+      const response = await submitAssignment(testCase.assignmentId, testCase.answers);
+      expectError(response, 422, 'SUBMISSION_INVALID');
+      expect(response.body.details).toContainEqual({
+        itemId: testCase.itemId,
+        rule: testCase.rule,
+      });
+    }
+    await request(app.getHttpServer())
+      .put(`/api/v1/learning/deliveries/${deliveryId}/assignments/${textId}/submission`)
+      .set('Origin', origin)
+      .set('Cookie', studentCookie)
+      .send({
+        answers: [{ itemId: textItem!.id, answerText: 'ok', unknown: true }],
+      })
+      .expect(400);
+    expectError(await submitAssignment(fileId, []), 409, 'SUBMISSION_FILES_NOT_SUPPORTED');
+  });
+
+  it('serializes concurrent first submits and replacements without mixing answers', async () => {
+    const identicalId = await createPublishedAssignment({
+      title: 'Concurrent identical submit',
+      dueAt: futureDueDate,
+      blueprint: { items: [{ type: 'TEXT', prompt: 'Response.' }], rubric: null },
+    });
+    const [identicalItem] = await getAssignmentItems(identicalId);
+    const identicalRequests = Array.from({ length: 5 }, () =>
+      submitAssignment(identicalId, [{ itemId: identicalItem!.id, answerText: 'Same.' }]),
+    );
+    const identicalResponses = await Promise.all(identicalRequests);
+    expect(identicalResponses.map(({ status }) => status)).toEqual([200, 200, 200, 200, 200]);
+    expect(identicalResponses.map(({ body }) => body)).toEqual(
+      Array.from({ length: 5 }, () => identicalResponses[0]!.body),
+    );
+    expect(
+      await prisma.submission.count({
+        where: { assignmentId: identicalId, studentId: fixture.schoolA.student.id },
+      }),
+    ).toBe(1);
+
+    const replaceId = await createPublishedAssignment({
+      title: 'Concurrent replacement submit',
+      dueAt: futureDueDate,
+      blueprint: {
+        allowResubmission: true,
+        items: [{ type: 'TEXT', prompt: 'Response.' }],
+        rubric: null,
+      },
+    });
+    const [replaceItem] = await getAssignmentItems(replaceId);
+    const values = ['First.', 'Second.', 'Third.', 'Fourth.', 'Fifth.'];
+    const responses = await Promise.all(
+      values.map((answerText) =>
+        submitAssignment(replaceId, [{ itemId: replaceItem!.id, answerText }]),
+      ),
+    );
+    expect(responses.map(({ status }) => status)).toEqual([200, 200, 200, 200, 200]);
+    const final = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: replaceId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { answers: { select: { itemId: true, answerText: true } } },
+    });
+    expect(values).toContain(final.answers[0]!.answerText);
+    expect(final.answers).toEqual([
+      { itemId: replaceItem!.id, answerText: final.answers[0]!.answerText },
+    ]);
+    expect(
+      await prisma.submission.count({
+        where: { assignmentId: replaceId, studentId: fixture.schoolA.student.id },
+      }),
+    ).toBe(1);
+  });
+
+  it('keeps peer submissions private and matches student read visibility and access failures', async () => {
+    const peerBefore = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: moduleAssignmentId,
+          studentId: otherStudent.id,
+        },
+      },
+      select: { id: true, submittedAt: true },
+    });
+    const [moduleItem] = await getAssignmentItems(moduleAssignmentId);
+    await submitAssignment(moduleAssignmentId, [
+      { itemId: moduleItem!.id, answerText: 'My own answer.' },
+    ]).expect(200);
+    const peerAfter = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: moduleAssignmentId,
+          studentId: otherStudent.id,
+        },
+      },
+      select: { id: true, submittedAt: true },
+    });
+    expect(peerAfter).toEqual(peerBefore);
+    expect(await prisma.submission.count({ where: { assignmentId: moduleAssignmentId } })).toBe(2);
+
+    expectError(await submitAssignment(draftAssignmentId, []), 404, 'NOT_FOUND');
+    expectError(await submitAssignment(unreleasedAssignmentId, []), 404, 'NOT_FOUND');
+    await request(app.getHttpServer())
+      .post(`/api/v1/deliveries/${deliveryId}/assignments/${unpublishedAssignmentId}/unpublish`)
+      .set('Origin', origin)
+      .set('Cookie', teacherCookie)
+      .expect(200);
+    expectError(await submitAssignment(unpublishedAssignmentId, []), 404, 'NOT_FOUND');
+    expectError(
+      await submitAssignment(otherDeliveryAssignmentId, [], studentCookie, deliveryId),
+      404,
+      'NOT_FOUND',
+    );
+    expectError(
+      await submitAssignment(otherDeliveryAssignmentId, [], studentCookie, otherDeliveryId),
+      404,
+      'NOT_FOUND',
+    );
+    expectError(
+      await submitAssignment(foreignAssignmentId, [], foreignStudentCookie, foreignDeliveryId),
+      404,
+      'NOT_FOUND',
+    );
+    expectError(await submitAssignment(moduleAssignmentId, [], unenrolledCookie), 404, 'NOT_FOUND');
+    expectError(
+      await submitAssignment(moduleAssignmentId, [], teacherCookie),
+      403,
+      'PERMISSION_REQUIRED',
+    );
+    expectError(
+      await submitAssignment(moduleAssignmentId, [], adminCookie),
+      403,
+      'PERMISSION_REQUIRED',
+    );
+    await submitAssignment(moduleAssignmentId, []).unset('Cookie').expect(401);
+
+    await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: DeliveryStatus.INACTIVE },
+    });
+    expectError(await submitAssignment(moduleAssignmentId, []), 404, 'NOT_FOUND');
+    await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: DeliveryStatus.ACTIVE },
+    });
+    await prisma.deliveryEnrollment.update({
+      where: { id: ownEnrollmentId },
+      data: { status: EnrollmentStatus.REMOVED, endedAt: new Date() },
+    });
+    expectError(await submitAssignment(moduleAssignmentId, []), 404, 'NOT_FOUND');
+    await prisma.deliveryEnrollment.update({
+      where: { id: ownEnrollmentId },
+      data: { status: EnrollmentStatus.ACTIVE, endedAt: null },
+    });
+    await prisma.$executeRaw`
+      UPDATE subscriptions
+      SET start_date = business_today() - 2, end_date = business_today() - 1
+      WHERE id = ${subscriptionId}::uuid
+    `;
+    expectError(await submitAssignment(moduleAssignmentId, []), 403, 'SUBSCRIPTION_EXPIRED');
+    await prisma.$executeRaw`
+      UPDATE subscriptions
+      SET start_date = business_today() - 1, end_date = business_today() + 30
+      WHERE id = ${subscriptionId}::uuid
+    `;
   });
 
   it('hides drafts, unpublished assignments, foreign delivery IDs, and unreleased lessons', async () => {

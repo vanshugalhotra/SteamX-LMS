@@ -76,6 +76,24 @@ const STUDENT_ASSIGNMENT_DETAIL_SELECT = {
   },
 } satisfies Prisma.AssignmentSelect;
 
+export const STUDENT_SUBMISSION_SELECT = {
+  status: true,
+  submittedAt: true,
+  dueAtAtSubmission: true,
+  gradePercent: true,
+  rubricLevels: true,
+  overallFeedback: true,
+  gradedAt: true,
+  answers: {
+    orderBy: [{ itemId: 'asc' }],
+    select: { itemId: true, answerText: true, selectedOptionId: true },
+  },
+  files: {
+    orderBy: [{ id: 'asc' }],
+    select: { id: true, itemId: true, filename: true, mimeType: true, sizeBytes: true },
+  },
+} satisfies Prisma.SubmissionSelect;
+
 export type AssignmentListRecord = Prisma.AssignmentGetPayload<{
   select: typeof ASSIGNMENT_LIST_SELECT;
 }>;
@@ -97,6 +115,9 @@ export type StudentAssignmentListRecord = {
 };
 export type StudentAssignmentDetailRecord = Prisma.AssignmentGetPayload<{
   select: typeof STUDENT_ASSIGNMENT_DETAIL_SELECT;
+}>;
+export type StudentSubmissionRecord = Prisma.SubmissionGetPayload<{
+  select: typeof STUDENT_SUBMISSION_SELECT;
 }>;
 
 /** Stores delivery-scoped assignments, their content, and their summary aggregates. */

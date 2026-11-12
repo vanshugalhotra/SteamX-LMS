@@ -74,3 +74,12 @@ submission, `isLate` predicts whether submitting now would be late. A null due d
 Student responses omit answer correctness, answer keys, template and teacher details, storage keys,
 and file URLs. File metadata is available in assignment detail; file downloads are a separate
 workflow.
+
+## Submitting
+
+Students submit one answer for every item. The PUT replaces the complete answer set when
+`allowResubmission` is enabled; a changed submission clears any existing teacher grade before
+multiple-choice assignments are auto-graded again. A repeated identical answer set is a no-op, even
+when resubmission is disabled, so it does not change `submittedAt`, lateness, or the grade. Late
+submissions are accepted; `isLate` compares `submittedAt` with the due date captured for that
+submission. Text answers are trimmed plain text, and file-upload items are not yet supported.
