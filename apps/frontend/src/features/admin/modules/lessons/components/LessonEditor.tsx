@@ -29,7 +29,7 @@ export function LessonEditor({
   const invalidAccordions = editor.invalidAccordionIds.length;
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <LessonEditorHeader
         lesson={lesson}
         title={editor.title}
@@ -83,9 +83,13 @@ export function LessonEditor({
           onAccordionTitleChange={editor.setAccordionTitle}
         />
       ) : (
-        <div className="space-y-4 rounded-3xl border border-brand-line bg-white px-5 py-8 sm:px-8">
+        <div className="min-w-0 max-w-full space-y-5 overflow-x-clip border-t border-brand-line pt-5">
           {editor.hasChanges && (
-            <p className="text-sm text-gray-600" role="status">
+            <p
+              className="inline-flex items-center gap-2 rounded-full bg-brand-draft px-3 py-1 text-xs font-medium text-brand-draft-ink"
+              role="status"
+            >
+              <span className="size-2 rounded-full bg-yellow-500" aria-hidden="true" />
               Previewing unsaved changes
             </p>
           )}

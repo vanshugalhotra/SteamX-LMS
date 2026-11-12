@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { JSONContent } from '@tiptap/react';
 import { EditorContent, useEditor } from '@tiptap/react';
+import { ChevronDown, FileText, Image as ImageIcon, Play, Video } from 'lucide-react';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -19,7 +20,7 @@ interface LessonAsset {
   id: string;
   title: string;
   status?: string;
-  file?: { status: string } | null;
+  file?: { status: string; originalFilename?: string | null } | null;
 }
 
 interface AssetUrlQuery {
@@ -35,7 +36,7 @@ type UseAssetUrl = (assetId: string) => AssetUrlQuery;
 
 const EMPTY_DOC: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] };
 const PROSE_CLASS =
-  'text-sm leading-7 [&_.ProseMirror]:outline-none [&_h1]:text-2xl [&_h1]:font-bold ' +
+  'min-w-0 max-w-full break-words text-sm leading-7 [&_.ProseMirror]:min-w-0 [&_.ProseMirror]:outline-none [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:leading-tight sm:[&_h1]:text-2xl ' +
   '[&_h2]:text-xl [&_h2]:font-semibold [&_h3]:text-lg [&_h3]:font-semibold ' +
   '[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 ' +
   '[&_blockquote]:border-l-4 [&_blockquote]:border-brand-line [&_blockquote]:pl-4 ' +
@@ -62,7 +63,7 @@ function RichTextView({ value }: { value: unknown }) {
   });
 
   return (
-    <article className={PROSE_CLASS}>
+    <article className={`w-full max-w-3xl ${PROSE_CLASS}`}>
       <EditorContent editor={editor} />
     </article>
   );
@@ -78,6 +79,8 @@ function AssetBlockView({
   useAssetUrl: UseAssetUrl;
 }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [videoStarted, setVideoStarted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const assetId = block.assetId ?? '';
   const archived = asset?.status === 'ARCHIVED';
   const notReady = asset?.file !== undefined && asset.file?.status !== 'READY';
@@ -86,6 +89,8 @@ function AssetBlockView({
   // TODO: Refresh signed URLs on expiry.
   const url = access.data?.url;
   const caption = getString(block.content, 'caption');
+  const PreviewIcon =
+    block.type === 'IMAGE' ? ImageIcon : block.type === 'VIDEO' ? Video : FileText;
 
   if (!assetId) return <p className="text-sm text-gray-600">No file chosen.</p>;
   if (archived) return <p className="text-sm text-gray-600">This file has been archived.</p>;
@@ -115,15 +120,20 @@ function AssetBlockView({
   if (url === undefined) {
     return (
       <div
-        className="grid min-h-48 place-items-center rounded-2xl bg-gray-100"
+        className="grid min-h-48 place-items-center rounded-2xl bg-brand-side"
         role="status"
         aria-live="polite"
         aria-label="Loading lesson file"
       >
-        {(access.isPending || access.isFetching) && <Spinner />}
-        {!access.isPending && !access.isFetching && (
-          <p className="text-sm text-gray-600">Preview unavailable.</p>
-        )}
+        <div className="flex flex-col items-center gap-3">
+          <span className="grid size-14 place-items-center rounded-2xl bg-brand-coral/15 text-brand-coral">
+            <PreviewIcon className="size-7" aria-hidden="true" />
+          </span>
+          {(access.isPending || access.isFetching) && <Spinner />}
+          {!access.isPending && !access.isFetching && (
+            <p className="text-sm text-gray-600">Preview unavailable.</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -143,7 +153,7 @@ function AssetBlockView({
           alt={getString(block.content, 'alt')}
           loading="lazy"
           onError={onMediaError}
-          className="mx-auto max-h-168 w-auto max-w-full rounded-xl object-contain"
+          className="mx-auto max-h-96 w-full max-w-3xl rounded-xl object-contain"
         />
         {figcaption}
       </figure>
@@ -153,32 +163,69 @@ function AssetBlockView({
   if (block.type === 'VIDEO') {
     return (
       <figure>
-        <video
-          src={url}
-          controls
-          preload="metadata"
-          onError={onMediaError}
-          className="aspect-video w-full rounded-2xl bg-black"
-        />
+        <div className="relative mx-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-brand-navy">
+          <video
+            ref={videoRef}
+            src={url}
+            controls={videoStarted}
+            preload="metadata"
+            muted
+            playsInline
+            onError={onMediaError}
+            onPlay={() => {
+              setVideoStarted(true);
+            }}
+            className="aspect-video w-full bg-brand-navy"
+          />
+          {!videoStarted && (
+            <button
+              type="button"
+              aria-label="Play video"
+              className="absolute inset-0 grid place-items-center bg-transparent outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-ring/70"
+              onClick={() => {
+                setVideoStarted(true);
+                void videoRef.current?.play().catch(() => {
+                  setVideoStarted(false);
+                });
+              }}
+            >
+              <span className="grid size-14 place-items-center rounded-full bg-brand-coral text-white shadow-lg">
+                <Play className="ml-1 size-6 fill-current" aria-hidden="true" />
+              </span>
+            </button>
+          )}
+        </div>
         {figcaption}
       </figure>
     );
   }
 
   return (
-    <figure className="rounded-2xl border border-brand-line bg-white p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-medium">{asset?.title ?? 'PDF document'}</p>
+    <figure className="overflow-hidden rounded-2xl border border-brand-line bg-brand-side">
+      <div className="flex flex-wrap items-center gap-3 p-4 sm:p-5">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-coral text-white">
+          <FileText className="size-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{asset?.title ?? 'PDF document'}</p>
+          <p className="mt-0.5 text-xs text-gray-600">
+            PDF{asset?.file?.originalFilename ? ` · ${asset.file.originalFilename}` : ''}
+          </p>
+        </div>
         <a
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-lg border border-brand-line px-3 py-2 text-sm font-medium outline-none hover:bg-brand-side focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-xl bg-brand-coral px-4 py-2.5 text-xs font-semibold text-white outline-none hover:bg-coral-700 focus-visible:ring-2 focus-visible:ring-ring"
         >
           Open PDF
         </a>
       </div>
-      {figcaption}
+      {caption && (
+        <figcaption className="border-t border-brand-line px-4 py-3 text-sm text-gray-600 sm:px-5">
+          {caption}
+        </figcaption>
+      )}
     </figure>
   );
 }
@@ -201,9 +248,13 @@ function LessonBlockView({
         typeof body === 'object' && body !== null && 'doc' in body ? body.doc : undefined;
       const title = getString(block.content, 'title') || 'More information';
       return (
-        <details className="rounded-2xl border border-brand-line px-4 py-3">
-          <summary className="cursor-pointer rounded-lg font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            {title}
+        <details className="group/accordion min-w-0 rounded-2xl border border-brand-line px-4 py-3">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg font-medium outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0">{title}</span>
+            <ChevronDown
+              className="size-3.5 shrink-0 transition-transform group-open/accordion:rotate-180"
+              aria-hidden="true"
+            />
           </summary>
           <div className="pt-3">
             <RichTextView value={bodyDoc} />
@@ -213,9 +264,13 @@ function LessonBlockView({
     }
     case 'TWO_COLUMN':
       return (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid min-w-0 max-w-full grid-cols-1 gap-4 rounded-2xl bg-brand-side p-3 sm:p-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {(block.columns ?? [null, null]).map((child, index) => (
-            <section key={index} aria-label={`Column ${String(index + 1)}`} className="min-w-0">
+            <section
+              key={index}
+              aria-label={`Column ${String(index + 1)}`}
+              className="min-w-0 p-1 sm:p-2"
+            >
               {child && <LessonBlockView block={child} assets={assets} useAssetUrl={useAssetUrl} />}
             </section>
           ))}
@@ -250,7 +305,7 @@ export function LessonContentView({
   useAssetUrl: UseAssetUrl;
 }) {
   return (
-    <section aria-label="Lesson preview" className="mx-auto max-w-4xl space-y-8">
+    <section aria-label="Lesson preview" className="w-full min-w-0 max-w-full space-y-8">
       {blocks.length === 0 ? (
         <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-600">
           This lesson is empty.

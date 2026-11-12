@@ -96,9 +96,16 @@ it('renders accordion and two-column blocks', async () => {
     />,
   );
   expect(screen.getByText('Common questions')).toBeInTheDocument();
+  const accordion = screen.getByText('Common questions').closest('summary');
+  expect(accordion?.lastElementChild?.tagName.toLowerCase()).toBe('svg');
   expect(await screen.findByText('Answers')).toBeInTheDocument();
   expect(await screen.findByText('Left side')).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: 'Column 2' })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Column 2' })).toHaveClass('min-w-0');
+  expect(screen.getByRole('region', { name: 'Column 2' })).not.toHaveClass('bg-white', 'shadow-sm');
+  expect(screen.getByRole('region', { name: 'Lesson preview' })).toHaveClass(
+    'min-w-0',
+    'max-w-full',
+  );
 });
 
 it('renders unknown blocks with a neutral placeholder', () => {
@@ -134,7 +141,9 @@ it('renders images with optional caption and decorative empty alt text', () => {
   expect(screen.getByText('Sensor overview')).toBeInTheDocument();
 });
 
-it('renders videos with controls and captions', () => {
+it('shows a video thumbnail and starts playback on request', async () => {
+  const user = userEvent.setup();
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
   const { container } = render(
     <LessonContentView
       blocks={[
@@ -149,13 +158,19 @@ it('renders videos with controls and captions', () => {
       useAssetUrl={() => readyAccess}
     />,
   );
-  expect(container.querySelector('video')).toHaveAttribute('controls');
-  expect(container.querySelector('video')).toHaveAttribute('preload', 'metadata');
+  const video = container.querySelector('video');
+  expect(video).toHaveAttribute('preload', 'metadata');
+  expect(video).toHaveProperty('muted', true);
+  expect(video).not.toHaveAttribute('controls');
+  await user.click(screen.getByRole('button', { name: 'Play video' }));
+  expect(play).toHaveBeenCalledOnce();
+  expect(video).toHaveAttribute('controls');
   expect(screen.getByText('Wiring demo')).toBeInTheDocument();
+  play.mockRestore();
 });
 
 it('renders PDF title, safe link, and caption', () => {
-  render(
+  const { container } = render(
     <LessonContentView
       blocks={[
         {
@@ -172,6 +187,8 @@ it('renders PDF title, safe link, and caption', () => {
   const link = screen.getByRole('link', { name: 'Open PDF' });
   expect(link).toHaveAttribute('target', '_blank');
   expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  expect(link).toHaveClass('bg-brand-coral');
+  expect(container.querySelector('figure > div > span svg')).toBeInTheDocument();
   expect(screen.getByText(readyAsset.title)).toBeInTheDocument();
   expect(screen.getByText('Read this handout')).toBeInTheDocument();
 });
@@ -191,7 +208,11 @@ it('shows loading and retries asset access errors', async () => {
       useAssetUrl={() => access}
     />,
   );
-  expect(screen.getByRole('status', { name: 'Loading lesson file' })).toBeInTheDocument();
+  const loadingPreview = screen.getByRole('status', { name: 'Loading lesson file' });
+  expect(loadingPreview).toBeInTheDocument();
+  expect(loadingPreview).toHaveClass('bg-brand-side');
+  expect(loadingPreview).not.toHaveClass('bg-linear-to-br');
+  expect(loadingPreview.querySelector('svg')).toBeInTheDocument();
   access.isPending = false;
   access.isError = true;
   access.error = new Error('Access denied');
