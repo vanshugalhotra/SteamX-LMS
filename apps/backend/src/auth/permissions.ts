@@ -24,6 +24,7 @@ export const PERMISSION = {
   ASSIGNMENT_TEMPLATE_MANAGE: 'assignment.template.manage',
   LEARNING_READ: 'learning.read',
   LESSON_COMPLETE: 'lesson.complete',
+  SUBMISSION_SUBMIT: 'submission.submit',
 } as const;
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION];

@@ -50,6 +50,7 @@ rejects school users while their school is inactive; it does not change their st
   an assigned permission alone does not grant school users authoring access.
 - Students need an active enrollment in an active delivery. They can see ACTIVE or ARCHIVED
   STUDENT lessons released to that delivery.
+- Students need `submission.submit` to submit or replace answers for their own visible assignment.
 - Student assignment reads require a published assignment; lesson anchors follow that same
   released-student-lesson visibility rule, and only the authenticated student's submission is read.
 - Assigned teachers need an active assignment in an active delivery. They can read ACTIVE or

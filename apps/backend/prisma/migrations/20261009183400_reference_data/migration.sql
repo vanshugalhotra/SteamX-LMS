@@ -29,6 +29,7 @@ VALUES
   ('enrollment.manage',      'Enroll students and manage delivery enrollments'),
   ('learning.read',          'Read assigned learning deliveries and lessons'),
   ('lesson.complete',        'Complete released student lessons'),
+  ('submission.submit',      'Submit and resubmit assignment answers'),
   ('release.manage',         'Release and un-release lessons for deliveries'),
   -- Schools
   ('school.manage',          'Create and manage schools'),
@@ -98,5 +99,5 @@ SELECT roles.id, permissions.id
 FROM roles
 CROSS JOIN permissions
 WHERE roles.key = 'student'
-  AND permissions.key IN ('learning.read', 'lesson.complete')
+  AND permissions.key IN ('learning.read', 'lesson.complete', 'submission.submit')
 ON CONFLICT (role_id, permission_id) DO NOTHING;

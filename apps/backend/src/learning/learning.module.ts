@@ -11,6 +11,8 @@ import { LearningController } from './learning.controller.js';
 import { LearningService } from './learning.service.js';
 import { StudentAssignmentsController } from './assignments/student-assignments.controller.js';
 import { StudentAssignmentsService } from './assignments/student-assignments.service.js';
+import { StudentSubmissionsRepository } from './assignments/student-submissions.repository.js';
+import { StudentSubmissionsService } from './assignments/student-submissions.service.js';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { StudentAssignmentsService } from './assignments/student-assignments.ser
     LearningAccessService,
     LearningService,
     StudentAssignmentsService,
+    StudentSubmissionsRepository,
+    StudentSubmissionsService,
   ],
   exports: [LearningAccessService],
 })
