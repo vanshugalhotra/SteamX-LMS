@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import type { AddableBlock } from '../model/blocks';
+import { cn } from '@/lib/utils';
+
+const BLOCK_ICON_BACKGROUNDS: Record<AddableBlock['type'], string> = {
+  RICH_TEXT: 'bg-gray-100',
+  ACCORDION: 'bg-teal-100',
+  IMAGE: 'bg-magenta-100',
+  VIDEO: 'bg-magenta-100',
+  PDF: 'bg-brand-draft',
+  TWO_COLUMN: 'bg-brand-student',
+};
 
 export function BlockTypeMenu({
   items,
@@ -39,19 +49,10 @@ export function BlockTypeMenu({
                 className="flex min-h-20 cursor-default flex-col items-center justify-center gap-2 rounded-xl px-1.5 py-2 text-center text-xs font-medium outline-none data-highlighted:bg-brand-side data-highlighted:ring-2 data-highlighted:ring-primary/30"
               >
                 <span
-                  className={`grid size-10 place-items-center rounded-xl ${
-                    type === 'RICH_TEXT'
-                      ? 'bg-gray-100'
-                      : type === 'ACCORDION'
-                        ? 'bg-teal-100'
-                        : type === 'IMAGE'
-                          ? 'bg-rose-100'
-                          : type === 'VIDEO'
-                            ? 'bg-pink-100'
-                            : type === 'PDF'
-                              ? 'bg-amber-100'
-                              : 'bg-indigo-100'
-                  }`}
+                  className={cn(
+                    'grid size-10 place-items-center rounded-xl',
+                    BLOCK_ICON_BACKGROUNDS[type],
+                  )}
                 >
                   <Icon className="size-4" aria-hidden="true" />
                 </span>

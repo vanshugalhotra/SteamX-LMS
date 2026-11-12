@@ -2,18 +2,14 @@ import type { JSONContent } from '@tiptap/react';
 import { useId } from 'react';
 import { Input } from '@/components/ui/input';
 import { ACCORDION_TITLE_MAX_LENGTH } from '../config/lessons.config';
+import { getRichTextDocument } from '../model/blocks';
 import type { LessonContentBlock } from '../model/types';
 import { RichTextEditor } from './richtext/RichTextEditor';
 
 function getBodyDoc(block: LessonContentBlock): JSONContent {
   const body = block.content.body;
-  if (typeof body !== 'object' || body === null || !('doc' in body)) {
-    return { type: 'doc', content: [{ type: 'paragraph' }] };
-  }
-  const doc = body.doc;
-  return typeof doc === 'object' && doc !== null && 'type' in doc
-    ? (doc as JSONContent)
-    : { type: 'doc', content: [{ type: 'paragraph' }] };
+  const doc = typeof body === 'object' && body !== null && 'doc' in body ? body.doc : undefined;
+  return getRichTextDocument(doc);
 }
 
 export function AccordionBlockEditor({

@@ -29,6 +29,14 @@ export interface BlockMeta {
 
 const EMPTY_DOC: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] };
 
+function isJSONContent(value: unknown): value is JSONContent {
+  return typeof value === 'object' && value !== null && 'type' in value;
+}
+
+export function getRichTextDocument(value: unknown): JSONContent {
+  return isJSONContent(value) ? value : EMPTY_DOC;
+}
+
 export const FALLBACK_ACCENT = 'before:bg-gray-300';
 
 const CAPTION = { key: 'caption', label: 'Caption (optional)' } as const;
@@ -92,10 +100,7 @@ export const getBlockLabel = (type: BlockType) =>
     .replace(/^./, (c) => c.toUpperCase());
 
 export function getRichTextDoc(block: LessonContentBlock): JSONContent {
-  const doc = block.content.doc;
-  return typeof doc === 'object' && doc !== null && 'type' in doc
-    ? (doc as JSONContent)
-    : EMPTY_DOC;
+  return getRichTextDocument(block.content.doc);
 }
 
 export function moveBlock(blocks: LessonContentBlock[], index: number, direction: -1 | 1) {

@@ -67,9 +67,10 @@ export function AssetBlockEditor({
           <div
             data-thumbnail-fallback
             aria-hidden="true"
-            className={`absolute inset-0 grid place-items-center bg-brand-side ${
-              previewLoaded ? 'hidden' : ''
-            }`}
+            className={cn(
+              'absolute inset-0 grid place-items-center bg-brand-side',
+              previewLoaded && 'hidden',
+            )}
           >
             {asset.type === 'VIDEO' ? (
               <Play className="size-10 fill-current text-brand-navy" />
@@ -88,9 +89,10 @@ export function AssetBlockEditor({
               onError={() => {
                 setFailedPreviewUrl(previewUrl);
               }}
-              className={`absolute inset-0 size-full object-contain transition-opacity ${
-                previewLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
+              className={cn(
+                'absolute inset-0 size-full object-contain transition-opacity',
+                previewLoaded ? 'opacity-100' : 'opacity-0',
+              )}
             />
           )}
           {asset.type === 'VIDEO' && previewUrl && failedPreviewUrl !== previewUrl && (
@@ -106,9 +108,10 @@ export function AssetBlockEditor({
               onError={() => {
                 setFailedPreviewUrl(previewUrl);
               }}
-              className={`absolute inset-0 size-full object-contain transition-opacity ${
-                previewLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
+              className={cn(
+                'absolute inset-0 size-full object-contain transition-opacity',
+                previewLoaded ? 'opacity-100' : 'opacity-0',
+              )}
             />
           )}
         </div>
@@ -118,7 +121,7 @@ export function AssetBlockEditor({
           <AssetThumb
             type={asset.type}
             mimeType={asset.file?.mimeType}
-            className={asset.type === 'IMAGE' ? 'size-14' : 'size-11'}
+            className={cn(asset.type === 'IMAGE' ? 'size-14' : 'size-11')}
           />
           <p className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold">{asset.title}</span>

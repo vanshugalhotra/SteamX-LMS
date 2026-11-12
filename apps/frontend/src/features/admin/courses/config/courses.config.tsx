@@ -1,5 +1,5 @@
 import type { FieldConfig } from '@/components/form/FormRenderer';
-import type { ContentStatus } from '@/lib/content-status';
+import { CONTENT_STATUS_PRESENTATION, type ContentStatus } from '@/lib/content-status';
 import type { CourseFormValues } from '../model/schemas';
 import type { CourseStatusFilter } from '../model/types';
 
@@ -13,20 +13,17 @@ export const COURSE_STATUSES = [
 
 export const courseStatuses = {
   DRAFT: {
-    label: 'Draft',
-    badgeClassName: 'bg-brand-draft text-brand-draft-ink',
+    ...CONTENT_STATUS_PRESENTATION.DRAFT,
     bannerClass: 'bg-brand-sun',
     description: 'Not visible to students. Build and review here.',
   },
   ACTIVE: {
-    label: 'Active',
-    badgeClassName: 'bg-teal-100 text-brand-active-ink',
+    ...CONTENT_STATUS_PRESENTATION.ACTIVE,
     bannerClass: 'bg-brand-teal',
     description: 'Usable. Students see its active modules and lessons.',
   },
   ARCHIVED: {
-    label: 'Archived',
-    badgeClassName: 'bg-brand-chip text-gray-600',
+    ...CONTENT_STATUS_PRESENTATION.ARCHIVED,
     bannerClass: 'bg-gray-200',
     description: 'Retired from new use. Released content stays until it expires.',
   },

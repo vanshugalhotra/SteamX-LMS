@@ -1,5 +1,3 @@
-// TODO: these mirror the backend DTOs by hand. Generate them from Swagger
-// (or share a typed API client) so they cannot drift.
 import type { AssetFileStatus, AssetType } from '../../../assets/model/types';
 import type { ContentStatus } from '@/lib/content-status';
 

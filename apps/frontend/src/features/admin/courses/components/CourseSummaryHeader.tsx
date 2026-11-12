@@ -5,7 +5,7 @@ import { PATHS } from '@/lib/paths';
 import type { CourseOutline } from '../model/types';
 import { CourseStatusNotice } from './CourseStatusNotice';
 import { CourseHero } from './CourseHero';
-import { CourseStatusBadge } from './CourseStatusBadge';
+import { CourseStatusBadge } from '@/components/ui/CourseStatusBadge';
 import { CourseStatusSection } from './CourseStatusSection';
 
 export function CourseSummaryHeader({

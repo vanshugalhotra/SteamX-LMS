@@ -6,8 +6,9 @@ import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { getErrorMessage } from '@/lib/api-errors';
 import { PATHS } from '@/lib/paths';
+import { cn } from '@/lib/utils';
 import type { CourseOutlineLesson } from '../model/types';
-import { CourseStatusBadge } from './CourseStatusBadge';
+import { CourseStatusBadge } from '@/components/ui/CourseStatusBadge';
 
 export function CurriculumLessonRow({
   lesson,
@@ -31,7 +32,7 @@ export function CurriculumLessonRow({
   const canPublish = lesson.status !== 'ACTIVE';
   const canArchive = lesson.status !== 'ARCHIVED';
 
-  const move = async (direction: -1 | 1) => {
+  const handleMove = async (direction: -1 | 1) => {
     setActionError(null);
     try {
       await onMove(direction);
@@ -42,9 +43,10 @@ export function CurriculumLessonRow({
 
   return (
     <li
-      className={`flex flex-wrap items-center gap-3 rounded-2xl bg-white px-4 py-3 ${
-        lesson.status === 'ARCHIVED' ? 'opacity-60' : ''
-      }`}
+      className={cn(
+        'flex flex-wrap items-center gap-3 rounded-2xl bg-white px-4 py-3',
+        lesson.status === 'ARCHIVED' && 'opacity-60',
+      )}
     >
       {actionError && <Alert className="w-full">{actionError}</Alert>}
       <span className="w-5 text-center text-[11px] text-gray-600">{index + 1}</span>
@@ -88,7 +90,7 @@ export function CurriculumLessonRow({
             icon: ArrowUp,
             disabled: reordering || index === 0,
             onSelect: () => {
-              void move(-1);
+              void handleMove(-1);
             },
           },
           {
@@ -96,7 +98,7 @@ export function CurriculumLessonRow({
             icon: ArrowDown,
             disabled: reordering || index === count - 1,
             onSelect: () => {
-              void move(1);
+              void handleMove(1);
             },
           },
           ...(canArchive

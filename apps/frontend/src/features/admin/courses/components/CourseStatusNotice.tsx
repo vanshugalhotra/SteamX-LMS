@@ -1,6 +1,7 @@
 import { Archive, CircleAlert } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ContentStatus } from '@/lib/content-status';
+import { cn } from '@/lib/utils';
 
 const notices: Partial<
   Record<ContentStatus, { icon: LucideIcon; className: string; text: string }>
@@ -25,7 +26,7 @@ export function CourseStatusNotice({ status }: { status: ContentStatus }) {
   return (
     <p
       role="note"
-      className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-xs ${notice.className}`}
+      className={cn('flex items-center gap-2 rounded-2xl px-4 py-3 text-xs', notice.className)}
     >
       <Icon className="size-4 shrink-0" aria-hidden="true" />
       {notice.text}
