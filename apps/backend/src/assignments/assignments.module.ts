@@ -34,5 +34,6 @@ import { AssignmentTemplatesService } from './assignment-template/assignment-tem
     AssignmentTemplateCopyService,
     AssignmentPublishingService,
   ],
+  exports: [DeliveryAssignmentsService],
 })
 export class AssignmentsModule {}

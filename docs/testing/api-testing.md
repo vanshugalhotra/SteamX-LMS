@@ -385,6 +385,30 @@ Caller: an enrolled student with `learning.read`; returns progress for released 
 - [auto] Another school, inactive or missing delivery, or inactive enrollment -> expect `404 NOT_FOUND`; expired subscription -> expect `403 SUBSCRIPTION_EXPIRED`; teacher or platform staff -> expect `403 FORBIDDEN`; malformed delivery ID -> expect `400 BAD_REQUEST`; a valid unknown delivery ID -> expect `404 NOT_FOUND`; without a session cookie -> expect `401 UNAUTHORIZED`.
 - [auto] The response contains only delivery ID, overall lesson totals, and module ID/title/position with each module's lesson totals.
 
+### `GET /learning/deliveries/:id/assignments`
+
+Caller: an enrolled student with `learning.read`; returns published assignments visible in the
+delivery and submission state for that authenticated student only.
+
+- [auto] Course-level and module-anchored published assignments are visible. A lesson-anchored assignment is visible only when its lesson is ACTIVE or ARCHIVED, has STUDENT audience, and is released to this delivery.
+- [auto] DRAFT or UNPUBLISHED assignments, another delivery's or school's assignment, assignments anchored to an unreleased lesson, and assignments anchored to a lesson whose release is removed or audience becomes TEACHER_ONLY -> expect the same `404 NOT_FOUND`.
+- [auto] Archived lessons remain eligible when they were released; module-anchored and course-level assignments do not require a lesson release.
+- [auto] `NOT_SUBMITTED`, `SUBMITTED`, and `GRADED` reflect only this student's submission. Another student's submission does not change the result. A grade includes percent, grade level, and letter.
+- [auto] `lessonId` and `moduleId` filter the matching anchor exactly; state and anchor filters combine, and results order by due date ascending then ID. Page and limit return the matching total and stable page slice.
+- [auto] `canSubmit` is true when no submission exists or resubmission is enabled. With no submission, `isLate` indicates whether a submission now would be late; with a submission it uses the due-date snapshot captured at submission, and a null snapshot is not late.
+- [auto] When delivery is inactive, foreign, or the student is unenrolled or removed -> expect `404 NOT_FOUND`; expired subscription -> expect `403 SUBSCRIPTION_EXPIRED`. Teacher or platform staff -> expect `403 FORBIDDEN`; malformed IDs or query fields -> expect `400 VALIDATION_ERROR`; without a cookie -> expect `401 UNAUTHORIZED`.
+- [auto] Responses include `Cache-Control: private, no-store` and omit assignment status, answer correctness, answer keys, template/teacher fields, storage keys, and file URLs.
+
+### `GET /learning/deliveries/:id/assignments/:assignmentId`
+
+Caller: an enrolled student with `learning.read`; returns visible assignment content and only that
+student's submission.
+
+- [auto] Items and options are ordered by position; options contain exactly `id`, `position`, and `text`. Rubric names/descriptions, the student's own answer text and selected option IDs, file metadata, and grade details are returned when present.
+- [auto] Another student's submission is never returned. Full JSON contains no correctness fields, answer keys, template/teacher IDs, school IDs, storage keys, or assignment status; file metadata contains no download URL.
+- [auto] Visibility and access failures match the list route: hidden assignments and deliveries return `404 NOT_FOUND`; expired subscription returns `403 SUBSCRIPTION_EXPIRED`; teacher/platform staff return `403 FORBIDDEN`; malformed IDs return `400 BAD_REQUEST`; no cookie returns `401 UNAUTHORIZED`.
+- [auto] `canSubmit`, `isLate`, and `Cache-Control: private, no-store` follow the list route semantics.
+
 ### `GET /learning/deliveries/:id/lessons/:lessonId/content`
 
 Caller: a student enrolled in the delivery or a teacher actively assigned to it, with `learning.read`.

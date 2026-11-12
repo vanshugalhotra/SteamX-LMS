@@ -16,10 +16,20 @@ import type {
   DeliveryAssignmentResponseDto,
   DeliveryAssignmentSummaryDto,
 } from '../dto/delivery-assignment-response.dto.js';
+import type {
+  StudentAssignmentDetailRecord,
+  StudentAssignmentListRecord,
+} from './delivery-assignments.repository.js';
+import type { StudentSubmissionState } from '../../learning/assignments/assignment-student-rules.js';
 import { DeliveryAssignmentAccessService } from './delivery-assignment-access.service.js';
 import { toDeliveryAssignmentDetailResponse } from './delivery-assignment-response.js';
 import { toDeliveryAssignmentSummary } from './delivery-assignments.mapper.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
+
+export type {
+  StudentAssignmentDetailRecord,
+  StudentAssignmentListRecord,
+} from './delivery-assignments.repository.js';
 
 /** Creates DRAFT assignments and serves delivery-scoped list and detail reads. */
 @Injectable()
@@ -92,6 +102,30 @@ export class DeliveryAssignmentsService {
     await this.access.loadForRead(actor, deliveryId);
     const assignment = await this.requireAssignment(deliveryId, assignmentId);
     return toDeliveryAssignmentDetailResponse(this.assignments, assignment);
+  }
+
+  /** Delegates student-scoped list reads to the assignments repository. */
+  findStudentAssignments(
+    deliveryId: string,
+    studentId: string,
+    query: {
+      page: number;
+      limit: number;
+      state?: StudentSubmissionState;
+      lessonId?: string;
+      moduleId?: string;
+    },
+  ): Promise<{ items: StudentAssignmentListRecord[]; total: number }> {
+    return this.assignments.findStudentAssignments(deliveryId, studentId, query);
+  }
+
+  /** Delegates a student-scoped detail read to the assignments repository. */
+  findStudentAssignmentById(
+    deliveryId: string,
+    studentId: string,
+    assignmentId: string,
+  ): Promise<StudentAssignmentDetailRecord | null> {
+    return this.assignments.findStudentAssignmentById(deliveryId, studentId, assignmentId);
   }
 
   /** Validates optional module and lesson anchors using the curriculum's scoped services. */
