@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
 import { useAssetAccess } from '@/features/admin/assets/queries';
 import type { Asset } from '@/features/admin/assets/model/types';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, Play } from 'lucide-react';
 import { getErrorMessage } from '@/lib/api-errors';
 import { cn } from '@/lib/utils';
 import { BLOCK_TEXT_MAX_LENGTH } from '../../config/lessons.config';
@@ -39,35 +39,77 @@ export function AssetBlockEditor({
   const id = useId();
   const [picking, setPicking] = useState(false);
   const [failedPreviewUrl, setFailedPreviewUrl] = useState<string | null>(null);
+  const [loadedPreviewUrl, setLoadedPreviewUrl] = useState<string | null>(null);
   const meta = BLOCK_META[block.type];
-  const previewReady =
-    block.type === 'IMAGE' && asset?.status === 'ACTIVE' && asset.file?.status === 'READY';
-  const access = useAssetAccess(previewReady ? asset.id : '');
+  const previewAssetId =
+    (block.type === 'IMAGE' || block.type === 'VIDEO') &&
+    asset?.status === 'ACTIVE' &&
+    asset.file?.status === 'READY'
+      ? asset.id
+      : '';
+  const previewReady = previewAssetId !== '';
+  const access = useAssetAccess(previewAssetId);
   if (!meta?.assetType) return null;
 
   const note = asset ? assetNote(asset) : null;
   const errorId = `${id}-error`;
   const previewUrl = access.data?.url;
+  const previewLoaded =
+    previewUrl !== undefined && loadedPreviewUrl === previewUrl && failedPreviewUrl !== previewUrl;
   const openPicker = () => {
     setPicking(true);
   };
 
   return (
     <div className="space-y-3">
-      {asset?.type === 'IMAGE' && (
-        <div className="relative grid aspect-16/5 min-h-32 max-h-60 place-items-center overflow-hidden rounded-2xl bg-linear-to-br from-teal-400/80 to-yellow-400/90">
-          {previewUrl && failedPreviewUrl !== previewUrl ? (
+      {(asset?.type === 'IMAGE' || asset?.type === 'VIDEO') && (
+        <div className="relative grid aspect-16/5 min-h-32 max-h-60 place-items-center overflow-hidden rounded-2xl">
+          <div
+            data-thumbnail-fallback
+            aria-hidden="true"
+            className={`absolute inset-0 grid place-items-center bg-brand-side ${
+              previewLoaded ? 'hidden' : ''
+            }`}
+          >
+            {asset.type === 'VIDEO' ? (
+              <Play className="size-10 fill-current text-brand-navy" />
+            ) : (
+              <ImageIcon className="size-10 text-brand-navy" />
+            )}
+          </div>
+          {asset.type === 'IMAGE' && previewUrl && failedPreviewUrl !== previewUrl && (
             <img
               src={previewUrl}
               alt=""
               loading="lazy"
+              onLoad={() => {
+                setLoadedPreviewUrl(previewUrl);
+              }}
               onError={() => {
                 setFailedPreviewUrl(previewUrl);
               }}
-              className="absolute inset-0 size-full object-contain"
+              className={`absolute inset-0 size-full object-contain transition-opacity ${
+                previewLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
             />
-          ) : (
-            <ImageIcon className="size-10 text-white/90" aria-hidden="true" />
+          )}
+          {asset.type === 'VIDEO' && previewUrl && failedPreviewUrl !== previewUrl && (
+            <video
+              src={previewUrl}
+              aria-label={`${asset.title} thumbnail`}
+              preload="metadata"
+              muted
+              playsInline
+              onLoadedData={() => {
+                setLoadedPreviewUrl(previewUrl);
+              }}
+              onError={() => {
+                setFailedPreviewUrl(previewUrl);
+              }}
+              className={`absolute inset-0 size-full object-contain transition-opacity ${
+                previewLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
           )}
         </div>
       )}
@@ -125,7 +167,7 @@ export function AssetBlockEditor({
             <Alert>
               {access.isError
                 ? getErrorMessage(access.error)
-                : "The image preview couldn't be loaded."}
+                : `The ${block.type === 'VIDEO' ? 'video' : 'image'} thumbnail couldn't be loaded.`}
             </Alert>
             <Button
               type="button"
@@ -137,7 +179,7 @@ export function AssetBlockEditor({
                 void access.refetch();
               }}
             >
-              Retry image preview
+              Retry thumbnail
             </Button>
           </div>
         )}
