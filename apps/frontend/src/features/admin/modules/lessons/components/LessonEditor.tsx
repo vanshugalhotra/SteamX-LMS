@@ -1,15 +1,16 @@
+import { useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { LessonContentView } from '@/components/lesson-content/LessonContentView';
+import { useAssetAccess } from '@/features/admin/assets/queries';
 import { useLessonEditor } from '../hooks/useLessonEditor';
 import type { Lesson, LessonContent } from '../model/types';
 import { BlockList } from './BlockList';
-import { LessonEditorHeader } from './LessonEditorHeader';
+import { LessonEditorHeader, type LessonEditorView } from './LessonEditorHeader';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 
-// TODO(follow-up): image preview (useAssetAccess) and "open in Asset Library" on asset blocks,
-// drag-and-drop reorder, outline sidebar, discard changes, conflict compare dialog,
-// asset picker pagination.
+const useAdminAssetUrl = (assetId: string) => useAssetAccess(assetId);
 
 export function LessonEditor({
   lesson,
@@ -21,6 +22,8 @@ export function LessonEditor({
   onReload: () => void;
 }) {
   const editor = useLessonEditor(lesson, content);
+  const [view, setView] = useState<LessonEditorView>('edit');
+  const [discardOpen, setDiscardOpen] = useState(false);
   const blocker = useUnsavedChangesGuard(editor.hasChanges);
   const missing = editor.incompleteIds.length;
   const invalidAccordions = editor.invalidAccordionIds.length;
@@ -34,7 +37,12 @@ export function LessonEditor({
         version={editor.version}
         hasChanges={editor.hasChanges}
         pending={editor.pending}
+        view={view}
+        onViewChange={setView}
         onTitleChange={editor.setTitle}
+        onDiscard={() => {
+          setDiscardOpen(true);
+        }}
         onSave={() => void editor.save()}
       />
       {editor.error && (
@@ -47,30 +55,61 @@ export function LessonEditor({
           )}
         </Alert>
       )}
-      {missing > 0 && (
+      {view === 'edit' && missing > 0 && (
         <Alert>
           {`${String(missing)} ${missing === 1 ? 'block needs' : 'blocks need'} a file before this lesson can be saved.`}
         </Alert>
       )}
-      {invalidAccordions > 0 && (
+      {view === 'edit' && invalidAccordions > 0 && (
         <Alert>
           {`${String(invalidAccordions)} accordion ${invalidAccordions === 1 ? 'needs' : 'blocks need'} a title before this lesson can be saved.`}
         </Alert>
       )}
-      <BlockList
-        blocks={editor.blocks}
-        assets={editor.assets}
-        incompleteIds={editor.incompleteIds}
-        invalidAccordionIds={editor.invalidAccordionIds}
-        disabled={editor.pending}
-        onAdd={editor.addBlock}
-        onAddColumnBlock={editor.addColumnBlock}
-        onMove={editor.move}
-        onRemove={editor.removeBlock}
-        onRichTextChange={editor.updateRichText}
-        onAttachAsset={editor.attachAsset}
-        onFieldChange={editor.setField}
-        onAccordionTitleChange={editor.setAccordionTitle}
+      {view === 'edit' ? (
+        <BlockList
+          key={editor.resetKey}
+          blocks={editor.blocks}
+          assets={editor.assets}
+          incompleteIds={editor.incompleteIds}
+          invalidAccordionIds={editor.invalidAccordionIds}
+          disabled={editor.pending}
+          onAdd={editor.addBlock}
+          onAddColumnBlock={editor.addColumnBlock}
+          onMove={editor.move}
+          onRemove={editor.removeBlock}
+          onRichTextChange={editor.updateRichText}
+          onAttachAsset={editor.attachAsset}
+          onFieldChange={editor.setField}
+          onAccordionTitleChange={editor.setAccordionTitle}
+        />
+      ) : (
+        <div className="space-y-4 rounded-3xl border border-brand-line bg-white px-5 py-8 sm:px-8">
+          {editor.hasChanges && (
+            <p className="text-sm text-gray-600" role="status">
+              Previewing unsaved changes
+            </p>
+          )}
+          <LessonContentView
+            blocks={editor.blocks}
+            assets={editor.assets}
+            useAssetUrl={useAdminAssetUrl}
+          />
+        </div>
+      )}
+      <ConfirmDialog
+        open={discardOpen}
+        title="Discard unsaved changes?"
+        description="Your unsaved title and lesson content changes will be lost."
+        confirmLabel="Discard edits"
+        pending={false}
+        pendingLabel="Discarding…"
+        onConfirm={() => {
+          editor.discardChanges();
+          setDiscardOpen(false);
+        }}
+        onCancel={() => {
+          setDiscardOpen(false);
+        }}
       />
       <ConfirmDialog
         open={blocker.state === 'blocked'}

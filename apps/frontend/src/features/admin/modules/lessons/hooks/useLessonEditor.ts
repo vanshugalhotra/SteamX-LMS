@@ -31,7 +31,9 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   const pending = saveContent.isPending || updateLesson.isPending;
 
   const [assets, setAssets] = useState(content.assets);
+  const [savedAssets, setSavedAssets] = useState(content.assets);
   const [attempted, setAttempted] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
 
   const blocksChanged = useMemo(
     () => JSON.stringify(blocks) !== JSON.stringify(savedBlocks),
@@ -80,6 +82,7 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
         setBlocks(result.blocks);
         setAssets(result.assets);
         setSavedBlocks(result.blocks);
+        setSavedAssets(result.assets);
         setVersion(result.version);
       }
     } catch (e) {
@@ -150,6 +153,15 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
       content: { ...block.content, title },
     }));
   };
+  const discardChanges = () => {
+    setTitle(savedTitle);
+    setBlocks(savedBlocks);
+    setAssets(savedAssets);
+    setTitleIssue('');
+    setError(null);
+    setAttempted(false);
+    setResetKey((current) => current + 1);
+  };
 
   return {
     title,
@@ -160,6 +172,8 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
     error,
     pending,
     hasChanges,
+    resetKey,
+    discardChanges,
     save,
     addBlock,
     addColumnBlock,

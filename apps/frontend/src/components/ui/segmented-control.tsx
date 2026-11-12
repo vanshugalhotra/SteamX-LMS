@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface SegmentOption<T extends string> {
@@ -6,6 +7,7 @@ export interface SegmentOption<T extends string> {
   label: string;
   /** Tailwind class for the small dot when this option is selected. */
   dotClass?: string;
+  icon?: LucideIcon;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -14,6 +16,7 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   disabled?: boolean;
+  hideLabel?: boolean;
 }
 
 export function SegmentedControl<T extends string>({
@@ -22,12 +25,13 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   disabled,
+  hideLabel = false,
 }: SegmentedControlProps<T>) {
   const labelId = useId();
 
   return (
     <div>
-      <p id={labelId} className="mb-1.5 text-xs font-medium">
+      <p id={labelId} className={cn('mb-1.5 text-xs font-medium', hideLabel && 'sr-only')}>
         {label}
       </p>
       <div
@@ -37,6 +41,7 @@ export function SegmentedControl<T extends string>({
       >
         {options.map((option) => {
           const selected = option.value === value;
+          const Icon = option.icon;
           return (
             <button
               key={option.value}
@@ -48,14 +53,18 @@ export function SegmentedControl<T extends string>({
                 onChange(option.value);
               }}
               className={cn(
-                'flex items-center justify-center gap-2 rounded-lg text-[13px] font-medium text-gray-600 outline-none focus-visible:ring-4 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-60',
+                'flex items-center justify-center gap-2 rounded-lg px-3 text-[13px] font-medium text-gray-600 outline-none focus-visible:ring-4 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-60',
                 selected && 'bg-white text-foreground shadow-sm',
               )}
             >
-              <span
-                aria-hidden="true"
-                className={cn('size-2 rounded-full bg-gray-400', selected && option.dotClass)}
-              />
+              {Icon ? (
+                <Icon className="size-3.5" aria-hidden="true" />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className={cn('size-2 rounded-full bg-gray-400', selected && option.dotClass)}
+                />
+              )}
               {option.label}
             </button>
           );
