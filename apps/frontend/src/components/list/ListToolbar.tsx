@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 export interface FilterOption<T extends string> {
   value: T;
   label: string;
+  indicatorClassName?: string;
 }
 
 interface SearchBoxProps {
@@ -75,6 +76,12 @@ export function ListToolbar<T extends string>({
                 : 'bg-gray-100',
           )}
         >
+          {f.indicatorClassName && (
+            <span
+              aria-hidden="true"
+              className={cn('mr-2 inline-block size-2 rounded-full', f.indicatorClassName)}
+            />
+          )}
           {f.label}
         </button>
       ))}

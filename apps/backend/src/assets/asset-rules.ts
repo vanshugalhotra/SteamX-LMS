@@ -1,5 +1,6 @@
 /** Holds upload-type, declared-metadata, size, and content-signature validation rules. */
 import { AssetType } from '../generated/prisma/client.js';
+import { API_ERROR } from '../common/errors/api-errors.js';
 import type { FileKind } from './file-signatures.js';
 import { detectFileKind } from './file-signatures.js';
 
@@ -64,7 +65,10 @@ export function validateAssetUpload(
   limits: AssetLimits,
 ): SupportedAssetType {
   if (!isSupportedAssetType(type)) {
-    throw new AssetRuleError('ASSET_TYPE_NOT_SUPPORTED', 'Asset type is not supported.');
+    throw new AssetRuleError(
+      API_ERROR.ASSET_TYPE_NOT_SUPPORTED.code,
+      API_ERROR.ASSET_TYPE_NOT_SUPPORTED.message,
+    );
   }
 
   const normalizedMimeType = normalizeMimeType(mimeType);

@@ -19,12 +19,12 @@ describe('User status and password reset endpoints (e2e)', () => {
     expectError(
       await ctx.updateUserStatus('', ctx.fixture.schoolA.teacher.id, UserStatus.INACTIVE),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     expectError(
       await ctx.resetUserPassword('', ctx.fixture.schoolA.teacher.id, 'New password 2026!'),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
   });
 
@@ -48,7 +48,7 @@ describe('User status and password reset endpoints (e2e)', () => {
       .expect(200);
     expect(deactivated.body.status).toBe(UserStatus.INACTIVE);
     expect(JSON.stringify(deactivated.body)).not.toContain('passwordHash');
-    expectError(await ctx.getUser(targetCookie, target.body.id), 401, 'UNAUTHORIZED');
+    expectError(await ctx.getUser(targetCookie, target.body.id), 401, 'AUTHENTICATION_FAILED');
     await request(ctx.app.getHttpServer())
       .post('/api/v1/auth/login')
       .set('Origin', ctx.origin)
@@ -152,7 +152,7 @@ describe('User status and password reset endpoints (e2e)', () => {
         UserStatus.INACTIVE,
       ),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
     expectError(
       await ctx.resetUserPassword(
@@ -161,7 +161,7 @@ describe('User status and password reset endpoints (e2e)', () => {
         'Admin selected password 2026!',
       ),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
   });
 
@@ -187,7 +187,7 @@ describe('User status and password reset endpoints (e2e)', () => {
       .resetUserPassword(adminCookie, target.body.id, newPassword)
       .expect(204);
     expect(JSON.stringify(result.body)).not.toContain('passwordHash');
-    expectError(await ctx.getUser(oldCookie, target.body.id), 401, 'UNAUTHORIZED');
+    expectError(await ctx.getUser(oldCookie, target.body.id), 401, 'AUTHENTICATION_FAILED');
 
     const newLogin = await request(ctx.app.getHttpServer())
       .post('/api/v1/auth/login')

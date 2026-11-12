@@ -26,6 +26,7 @@ import { CourseModulesRepository } from './course-modules.repository.js';
 
 @Injectable()
 export class CourseModulesService {
+  /** Injects module persistence and the structured logger. */
   constructor(
     private readonly modules: CourseModulesRepository,
     private readonly logger: PinoLogger,
@@ -102,6 +103,11 @@ export class CourseModulesService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toCourseModuleResponse(module);
+  }
+
+  /** Finds the narrow course-scoped module fields needed by assignment anchor validation. */
+  findAssignmentAnchor(courseId: string, moduleId: string) {
+    return this.modules.findAssignmentAnchor(courseId, moduleId);
   }
 
   // ─────────────────────────────────────────

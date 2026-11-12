@@ -14,12 +14,22 @@ VALUES
   -- Assets
   ('asset.read',             'Read asset file state'),
   ('asset.write',            'Create assets and upload asset files'),
+  -- Assignment templates
+  ('assignment.manage',          'Create and manage assignments for deliveries'),
+  ('assignment.template.manage', 'Create and manage assignment templates'),
   -- Class sections
   ('classsection.manage',    'Create, update, and delete class sections'),
   ('classsection.read',      'View class sections'),
   -- Curriculum
   ('curriculum.read',        'View global curriculum content'),
   ('curriculum.write',       'Create and manage global curriculum content'),
+  -- Deliveries
+  ('delivery.manage',        'Create deliveries and change delivery status'),
+  ('delivery.read',          'View deliveries'),
+  ('enrollment.manage',      'Enroll students and manage delivery enrollments'),
+  ('learning.read',          'Read assigned learning deliveries and lessons'),
+  ('lesson.complete',        'Complete released student lessons'),
+  ('release.manage',         'Release and un-release lessons for deliveries'),
   -- Schools
   ('school.manage',          'Create and manage schools'),
   ('school.read',            'View schools'),
@@ -36,7 +46,7 @@ VALUES
 ON CONFLICT (key) DO UPDATE
 SET description = EXCLUDED.description;
 
--- ── Admin grants (all current permissions) ──────────────
+-- ── Admin permissions ────────────────────────────────────
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT roles.id, permissions.id
 FROM roles
@@ -45,10 +55,15 @@ WHERE roles.key = 'admin'
   AND permissions.key IN (
     'asset.read',
     'asset.write',
+    'assignment.template.manage',
     'classsection.manage',
     'classsection.read',
     'curriculum.read',
     'curriculum.write',
+    'delivery.manage',
+    'delivery.read',
+    'enrollment.manage',
+    'release.manage',
     'school.manage',
     'school.read',
     'subscription.manage',
@@ -60,4 +75,28 @@ WHERE roles.key = 'admin'
     'user.steamx-id.update',
     'user.update'
   )
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- ── Teacher permissions ──────────────────────────────────
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM roles
+CROSS JOIN permissions
+WHERE roles.key = 'teacher'
+  AND permissions.key IN (
+    'assignment.manage',
+    'delivery.read',
+    'enrollment.manage',
+    'learning.read',
+    'release.manage'
+  )
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- ── Student permissions ─────────────────────────────────
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT roles.id, permissions.id
+FROM roles
+CROSS JOIN permissions
+WHERE roles.key = 'student'
+  AND permissions.key IN ('learning.read', 'lesson.complete')
 ON CONFLICT (role_id, permission_id) DO NOTHING;

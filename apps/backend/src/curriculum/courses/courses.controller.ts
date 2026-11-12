@@ -44,6 +44,7 @@ import { CoursesService } from './courses.service.js';
 })
 @Controller({ path: 'courses' })
 export class CoursesController {
+  /** Injects the service that enforces global course rules. */
   constructor(private readonly courses: CoursesService) {}
 
   // ─────────────────────────────────────────

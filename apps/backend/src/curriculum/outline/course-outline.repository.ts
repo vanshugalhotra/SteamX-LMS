@@ -35,8 +35,10 @@ export type CourseOutlineRecord = Prisma.CourseGetPayload<{
 
 @Injectable()
 export class CourseOutlineRepository {
+  /** Injects Prisma for the nested course-outline query. */
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Finds a course with its modules and lessons ordered by position, or returns null. */
   findByCourseId(courseId: string): Promise<CourseOutlineRecord | null> {
     return this.prisma.course.findUnique({
       where: { id: courseId },

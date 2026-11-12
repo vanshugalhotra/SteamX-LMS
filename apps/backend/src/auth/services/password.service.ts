@@ -27,10 +27,12 @@ function getDummyHash(): Promise<string> {
 /** Centralizes Argon2 hashing and keeps failed-login work comparable for unknown accounts. */
 @Injectable()
 export class PasswordService implements OnModuleInit {
+  /** Precomputes the dummy hash used to keep unknown-account verification work comparable. */
   async onModuleInit(): Promise<void> {
     await getDummyHash();
   }
 
+  /** Hashes a password using the service's configured Argon2id parameters. */
   hash(password: string): Promise<string> {
     return argonHash(password, ARGON2_OPTIONS);
   }
@@ -50,6 +52,7 @@ export class PasswordService implements OnModuleInit {
     }
   }
 
+  /** Performs a verification against the shared dummy hash without exposing its result. */
   private async verifyDummy(password: string): Promise<void> {
     try {
       await argonVerify(await getDummyHash(), password);

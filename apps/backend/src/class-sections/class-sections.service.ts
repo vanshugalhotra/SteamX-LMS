@@ -27,6 +27,7 @@ import { ClassSectionsRepository } from './class-sections.repository.js';
 /** Applies school scope and domain errors around class-section persistence. */
 @Injectable()
 export class ClassSectionsService {
+  /** Injects section persistence, active-school resolution, and the structured logger. */
   constructor(
     private readonly sections: ClassSectionsRepository,
     private readonly activeSchool: ActiveSchoolService,

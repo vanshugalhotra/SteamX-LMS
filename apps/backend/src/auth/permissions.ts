@@ -16,6 +16,14 @@ export const PERMISSION = {
   CLASSSECTION_READ: 'classsection.read',
   CLASSSECTION_MANAGE: 'classsection.manage',
   SUBSCRIPTION_MANAGE: 'subscription.manage',
+  DELIVERY_READ: 'delivery.read',
+  DELIVERY_MANAGE: 'delivery.manage',
+  ENROLLMENT_MANAGE: 'enrollment.manage',
+  RELEASE_MANAGE: 'release.manage',
+  ASSIGNMENT_MANAGE: 'assignment.manage',
+  ASSIGNMENT_TEMPLATE_MANAGE: 'assignment.template.manage',
+  LEARNING_READ: 'learning.read',
+  LESSON_COMPLETE: 'lesson.complete',
 } as const;
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION];

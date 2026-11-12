@@ -42,12 +42,14 @@ import { ClassSectionsService } from './class-sections.service.js';
 })
 @Controller({ path: 'class-sections' })
 export class ClassSectionsController {
+  /** Injects the service that enforces class-section access and business rules. */
   constructor(private readonly sections: ClassSectionsService) {}
 
   // ─────────────────────────────────────────
   // POST /class-sections — Create a class section
   // ─────────────────────────────────────────
 
+  /** Creates a section in one active school; the school ID is required for platform-wide callers. */
   @RequirePermission(PERMISSION.CLASSSECTION_MANAGE)
   @Post()
   @ApiOperation({ summary: 'Create a class section' })
@@ -59,7 +61,6 @@ export class ClassSectionsController {
     description: 'School is inactive or class section already exists.',
   })
   @ApiNotFoundResponse({ description: 'School not found.' })
-  /** Creates a section in one active school; the school ID is required for platform-wide callers. */
   create(
     @CurrentAuth() actor: AuthContext,
     @Body() body: CreateClassSectionDto,
@@ -71,6 +72,7 @@ export class ClassSectionsController {
   // GET /class-sections — List class sections
   // ─────────────────────────────────────────
 
+  /** Returns a paginated section list within the caller's scope, optionally filtered by school and name. */
   @RequirePermission(PERMISSION.CLASSSECTION_READ)
   @Get()
   @ApiOperation({ summary: 'List class sections' })
@@ -79,7 +81,6 @@ export class ClassSectionsController {
     description: 'Query parameters are invalid.',
   })
   @ApiNotFoundResponse({ description: 'School not found.' })
-  /** Returns a paginated section list within the caller's scope, optionally filtered by school and name. */
   findMany(
     @CurrentAuth() actor: AuthContext,
     @Query() query: ClassSectionListQueryDto,
@@ -91,6 +92,7 @@ export class ClassSectionsController {
   // GET /class-sections/:id — Get a class section
   // ─────────────────────────────────────────
 
+  /** Returns a section in the caller's school scope; foreign and missing IDs both return 404. */
   @RequirePermission(PERMISSION.CLASSSECTION_READ)
   @Get(':id')
   @ApiOperation({ summary: 'Get a class section' })
@@ -99,7 +101,6 @@ export class ClassSectionsController {
     description: 'The class-section ID is not a UUID.',
   })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
-  /** Returns a section in the caller's school scope; foreign and missing IDs both return 404. */
   findById(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -111,6 +112,7 @@ export class ClassSectionsController {
   // PATCH /class-sections/:id — Update a class section
   // ─────────────────────────────────────────
 
+  /** Updates class or section names without allowing the section to move to another school. */
   @RequirePermission(PERMISSION.CLASSSECTION_MANAGE)
   @Patch(':id')
   @ApiOperation({ summary: 'Update a class section' })
@@ -120,7 +122,6 @@ export class ClassSectionsController {
   })
   @ApiConflictResponse({ description: 'Class section already exists.' })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
-  /** Updates class or section names without allowing the section to move to another school. */
   update(
     @CurrentAuth() actor: AuthContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -133,6 +134,7 @@ export class ClassSectionsController {
   // DELETE /class-sections/:id — Delete a class section
   // ─────────────────────────────────────────
 
+  /** Deletes a section; dependent student profiles or deliveries produce a conflict response. */
   @RequirePermission(PERMISSION.CLASSSECTION_MANAGE)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -143,7 +145,6 @@ export class ClassSectionsController {
   })
   @ApiConflictResponse({ description: 'Section has dependent records and cannot be deleted.' })
   @ApiNotFoundResponse({ description: 'Class section not found.' })
-  /** Deletes a section; dependent student profiles or deliveries produce a conflict response. */
   delete(@CurrentAuth() actor: AuthContext, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.sections.delete(actor, id);
   }

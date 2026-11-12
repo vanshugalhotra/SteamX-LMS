@@ -142,14 +142,14 @@ describe('User creation endpoints (e2e)', () => {
 
   it('rejects teacher and student creates without authentication', async () => {
     const body = createTeacherBody(ctx.fixture.schoolA.school.id);
-    expectError(await ctx.createTeacher('', body), 401, 'UNAUTHORIZED');
+    expectError(await ctx.createTeacher('', body), 401, 'AUTHENTICATION_FAILED');
     expectError(
       await ctx.createStudent(
         '',
         createStudentBody(ctx.fixture.schoolA.school.id, ctx.fixture.schoolA.section.id),
       ),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
   });
 
@@ -177,13 +177,13 @@ describe('User creation endpoints (e2e)', () => {
         createStudentBody(ctx.fixture.schoolA.school.id, ctx.fixture.schoolA.section.id),
       ),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
     const studentCookie = await loginAs(ctx.app, ctx.fixture.schoolA.student);
     expectError(
       await ctx.createTeacher(studentCookie, createTeacherBody(ctx.fixture.schoolA.school.id)),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
     expectError(
       await ctx.createStudent(
@@ -191,7 +191,7 @@ describe('User creation endpoints (e2e)', () => {
         createStudentBody(ctx.fixture.schoolA.school.id, ctx.fixture.schoolA.section.id),
       ),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
   });
 

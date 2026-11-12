@@ -29,6 +29,7 @@ export class CleanupScheduler implements OnApplicationBootstrap, OnApplicationSh
     this.logger.setContext(CleanupScheduler.name);
   }
 
+  /** Starts scheduled cleanup at application startup when the feature is enabled. */
   onApplicationBootstrap(): void {
     // Skip automatic scheduling in environments such as tests that disable cleanup.
     if (this.enabled) {
@@ -36,6 +37,7 @@ export class CleanupScheduler implements OnApplicationBootstrap, OnApplicationSh
     }
   }
 
+  /** Cancels the scheduled cleanup timer during application shutdown. */
   onApplicationShutdown(): void {
     this.stop();
   }
@@ -71,6 +73,7 @@ export class CleanupScheduler implements OnApplicationBootstrap, OnApplicationSh
     return { queue, assets };
   }
 
+  /** Schedules one unref'ed timer unless cleanup has been stopped. */
   private scheduleNext(): void {
     if (this.stopped) {
       return;
@@ -80,6 +83,7 @@ export class CleanupScheduler implements OnApplicationBootstrap, OnApplicationSh
     this.timer.unref();
   }
 
+  /** Runs cleanup, logs its outcome, and schedules the next run after completion. */
   private async tick(): Promise<void> {
     try {
       const result = await this.runOnce();

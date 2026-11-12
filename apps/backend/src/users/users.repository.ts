@@ -15,6 +15,7 @@ export type { UserDetailRecord, UserListRecord } from './users.types.js';
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Loads a role and its account type by key. */
   findRole(key: string) {
     return this.prisma.role.findUnique({
       where: { key },
@@ -22,6 +23,11 @@ export class UsersRepository {
     });
   }
 
+  /**
+   * Creates a user and teacher profile in one transaction.
+   * @param input Account credentials, school, role, and teacher profile fields.
+   * @returns The created user with its selected profile details.
+   */
   async createTeacher(input: {
     steamxId: string;
     name: string;
@@ -61,6 +67,11 @@ export class UsersRepository {
     });
   }
 
+  /**
+   * Creates a user and student profile in one transaction.
+   * @param input Account credentials, school, role, class, and student profile fields.
+   * @returns The created user with its selected profile details.
+   */
   async createStudent(input: {
     steamxId: string;
     name: string;
@@ -100,6 +111,12 @@ export class UsersRepository {
     });
   }
 
+  /**
+   * Lists matching users in newest-first order.
+   * @param where Caller-provided scope and visibility predicates.
+   * @param pagination Requested page and limit.
+   * @returns The matching page and total count.
+   */
   async findMany(
     where: Prisma.UserWhereInput,
     pagination: { page: number; limit: number },
@@ -122,6 +139,7 @@ export class UsersRepository {
     });
   }
 
+  /** Loads one user matching the supplied scope and visibility predicates. */
   findById(where: Prisma.UserWhereInput): Promise<UserDetailRecord | null> {
     return this.prisma.user.findFirst({
       where,
@@ -129,6 +147,12 @@ export class UsersRepository {
     });
   }
 
+  /**
+   * Renames a matching user's SteamX ID with the database guard enabled only in this transaction.
+   * @param where Caller-provided scope and visibility predicates.
+   * @param steamxId New SteamX ID.
+   * @returns The updated user, or null when no matching user exists.
+   */
   renameSteamxId(where: Prisma.UserWhereInput, steamxId: string): Promise<UserDetailRecord | null> {
     return this.prisma.$transaction(async (tx) => {
       // A database trigger blocks steamx_id changes unless steamx.allow_steamx_id_change is on.
@@ -145,6 +169,15 @@ export class UsersRepository {
     });
   }
 
+  /**
+   * Updates account and profile fields atomically without changing delivery enrollments.
+   * @param userId User whose profile and enrollments may change.
+   * @param where Caller-provided user scope and visibility predicates.
+   * @param userData Account fields to update.
+   * @param schoolId School that owns the user and related records.
+   * @param profileData Optional teacher or student profile changes.
+   * @returns The updated user or null.
+   */
   update(
     userId: string,
     where: Prisma.UserWhereInput,
@@ -192,6 +225,7 @@ export class UsersRepository {
     });
   }
 
+  /** Changes a matching user's status and reloads the updated record. */
   async updateStatus(
     where: Prisma.UserWhereInput,
     status: UserStatus,
@@ -200,6 +234,12 @@ export class UsersRepository {
     return result.count === 0 ? null : this.findById(where);
   }
 
+  /**
+   * Replaces a matching user's password hash and requires a password change at next login.
+   * @param where Caller-provided user scope and visibility predicates.
+   * @param passwordHash New password hash.
+   * @returns Whether a user record was updated.
+   */
   async resetPassword(where: Prisma.UserWhereInput, passwordHash: string): Promise<boolean> {
     const result = await this.prisma.user.updateMany({
       where,

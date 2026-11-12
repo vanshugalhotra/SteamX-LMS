@@ -29,7 +29,7 @@ export class AssetCleanupService {
     this.logger.setContext(AssetCleanupService.name);
   }
 
-  /** Deletes at most one configured batch of stale files and empty assets. */
+  /** Deletes up to one configured batch of stale files and one batch of empty assets. */
   async run(): Promise<AssetCleanupResult> {
     // READY files are live content; only remove incomplete or failed files past the age limit.
     const staleCutoff = new Date(Date.now() - this.staleAfterHours * 60 * 60 * 1_000);

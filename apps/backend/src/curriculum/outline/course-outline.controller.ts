@@ -24,6 +24,7 @@ import { CourseOutlineService } from './course-outline.service.js';
 })
 @Controller()
 export class CourseOutlineController {
+  /** Injects the service that assembles the course outline. */
   constructor(private readonly outlines: CourseOutlineService) {}
 
   /** Returns the complete position-ordered outline or 404 for an unknown course. */

@@ -111,6 +111,7 @@ export class AuthService {
   // Helpers
   // ─────────────────────────────────────────
 
+  /** Rejects a password that violates the configured policy for the supplied account ID. */
   private validateNewPassword(password: string, steamxId: string): void {
     const violations = getPasswordPolicyViolations(password, steamxId);
     if (violations.length > 0) {

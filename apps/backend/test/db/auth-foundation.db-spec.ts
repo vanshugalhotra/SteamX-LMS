@@ -80,7 +80,7 @@ describe('Authentication foundation reference data', () => {
     };
   }
 
-  it('seeds permissions for Admin only', async () => {
+  it('seeds role-specific permissions', async () => {
     const snapshot = await snapshotReferenceData(prisma);
 
     expect(snapshot.roles).toEqual([
@@ -91,10 +91,18 @@ describe('Authentication foundation reference data', () => {
     expect(snapshot.permissions).toEqual([
       'asset.read',
       'asset.write',
+      'assignment.manage',
+      'assignment.template.manage',
       'classsection.manage',
       'classsection.read',
       'curriculum.read',
       'curriculum.write',
+      'delivery.manage',
+      'delivery.read',
+      'enrollment.manage',
+      'learning.read',
+      'lesson.complete',
+      'release.manage',
       'school.manage',
       'school.read',
       'subscription.manage',
@@ -109,10 +117,15 @@ describe('Authentication foundation reference data', () => {
     expect(snapshot.rolePermissions).toEqual([
       { role: 'admin', permission: 'asset.read' },
       { role: 'admin', permission: 'asset.write' },
+      { role: 'admin', permission: 'assignment.template.manage' },
       { role: 'admin', permission: 'classsection.manage' },
       { role: 'admin', permission: 'classsection.read' },
       { role: 'admin', permission: 'curriculum.read' },
       { role: 'admin', permission: 'curriculum.write' },
+      { role: 'admin', permission: 'delivery.manage' },
+      { role: 'admin', permission: 'delivery.read' },
+      { role: 'admin', permission: 'enrollment.manage' },
+      { role: 'admin', permission: 'release.manage' },
       { role: 'admin', permission: 'school.manage' },
       { role: 'admin', permission: 'school.read' },
       { role: 'admin', permission: 'subscription.manage' },
@@ -123,6 +136,13 @@ describe('Authentication foundation reference data', () => {
       { role: 'admin', permission: 'user.read' },
       { role: 'admin', permission: 'user.steamx-id.update' },
       { role: 'admin', permission: 'user.update' },
+      { role: 'student', permission: 'learning.read' },
+      { role: 'student', permission: 'lesson.complete' },
+      { role: 'teacher', permission: 'assignment.manage' },
+      { role: 'teacher', permission: 'delivery.read' },
+      { role: 'teacher', permission: 'enrollment.manage' },
+      { role: 'teacher', permission: 'learning.read' },
+      { role: 'teacher', permission: 'release.manage' },
     ]);
   });
 

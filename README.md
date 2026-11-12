@@ -36,6 +36,9 @@ pnpm --filter @steamx/backend prisma:generate
 pnpm --filter @steamx/backend migrate:dev
 ```
 
+After pulling a change that edits the existing migrations, reset your local database with
+`pnpm --filter @steamx/backend exec prisma migrate reset`.
+
 Set `DATABASE_URL` and `AUTH_JWT_SECRET` in `apps/backend/.env`. To create the initial platform
 admin, also set `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD`, then run:
 
@@ -83,21 +86,16 @@ script across workspace packages.
 - `apps/backend/test/` — database and HTTP integration tests; unit tests also live beside source.
 - `apps/frontend/` — React single-page application workspace.
 - `apps/frontend/src/` — React application, features, and shared UI.
-- `docs/` — architecture, access-control, database, decision, and testing guides.
-- `docs/runbooks/` — operational procedures, including [admin recovery](./docs/runbooks/admin-recovery.md).
+- `docs/` — documentation index and topic-organized guides.
+- `docs/architecture/` — system, AWS, security, database, and domain design.
+- `docs/operations/` — infrastructure and [runbooks](./docs/operations/runbooks/admin-recovery.md).
+- `docs/testing/` — testing guidance, checklists, and seed data.
 - `infra/` — standalone AWS CDK app for staging infrastructure.
 - `packages/` — shared-package workspace (currently no package directories).
 
 ## Documentation
 
-- [Architecture](./docs/architecture.md)
-- [Access control](./docs/access-control.md)
-- [Database](./docs/database.md)
-- [Decisions](./docs/decisions.md)
+- [Documentation index](./docs/README.md)
 - [Backend environment variables](./apps/backend/.env.example)
 - [Frontend setup and structure](./apps/frontend/README.md)
 - [Backend setup reference](./apps/backend/README.md)
-- [API testing checklist](./docs/api-testing.md)
-- [Workflow testing](./docs/workflows-testing.md)
-- [Lesson content contract](./docs/lesson-content.md)
-- [Infrastructure](./docs/infrastructure.md)

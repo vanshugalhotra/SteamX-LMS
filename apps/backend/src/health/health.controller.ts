@@ -10,11 +10,13 @@ import { HealthService } from './health.service.js';
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
+  /** Reports that the API process is responsive without checking dependencies. */
   @Get('live')
   getLiveness(): { status: 'ok' } {
     return { status: 'ok' };
   }
 
+  /** Returns readiness status and sets HTTP 503 when the database check fails. */
   @Get('ready')
   async getReadiness(
     @Res({ passthrough: true }) response: Response,

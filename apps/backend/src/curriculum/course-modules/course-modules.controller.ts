@@ -43,6 +43,7 @@ import { CourseModulesService } from './course-modules.service.js';
 })
 @Controller()
 export class CourseModulesController {
+  /** Injects the service that enforces global module rules. */
   constructor(private readonly modules: CourseModulesService) {}
 
   // ─────────────────────────────────────────

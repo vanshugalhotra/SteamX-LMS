@@ -9,9 +9,10 @@ import { CourseOutlineRepository } from './course-outline.repository.js';
 /** Restricts the global outline read model to platform staff. */
 @Injectable()
 export class CourseOutlineService {
+  /** Injects the repository used by the outline read model. */
   constructor(private readonly outlines: CourseOutlineRepository) {}
 
-  /** Returns every module and lesson, without status or audience filtering. */
+  /** Returns every module and lesson without status or audience filtering, or throws 404. */
   async findByCourseId(actor: AuthContext, id: string): Promise<CourseOutlineResponseDto> {
     assertPlatformStaff(actor);
     const course = await this.outlines.findByCourseId(id);

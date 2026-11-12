@@ -43,6 +43,7 @@ import { LessonsService } from './lessons.service.js';
 })
 @Controller()
 export class LessonsController {
+  /** Injects the service that enforces global lesson rules. */
   constructor(private readonly lessons: LessonsService) {}
 
   // ─────────────────────────────────────────

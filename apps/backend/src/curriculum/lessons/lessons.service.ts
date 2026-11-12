@@ -26,6 +26,7 @@ import { LessonsRepository } from './lessons.repository.js';
 
 @Injectable()
 export class LessonsService {
+  /** Injects lesson persistence and the structured logger. */
   constructor(
     private readonly lessons: LessonsRepository,
     private readonly logger: PinoLogger,
@@ -102,6 +103,11 @@ export class LessonsService {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
     return toLessonResponse(lesson);
+  }
+
+  /** Finds the narrow course-scoped lesson fields needed by assignment validation. */
+  findAssignmentAnchor(courseId: string, lessonId: string) {
+    return this.lessons.findAssignmentAnchor(courseId, lessonId);
   }
 
   // ─────────────────────────────────────────

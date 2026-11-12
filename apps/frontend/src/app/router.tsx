@@ -134,6 +134,68 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: PATHS.admin.courses,
+            lazy: async () => {
+              const { CoursesPage } = await import('@/features/admin/courses/pages/CoursesPage');
+              return { Component: CoursesPage };
+            },
+          },
+          {
+            path: PATHS.admin.courseNew,
+            lazy: async () => {
+              const { CourseCreatePage } =
+                await import('@/features/admin/courses/pages/CourseCreatePage');
+              return { Component: CourseCreatePage };
+            },
+          },
+          {
+            path: PATHS.admin.courseEdit(':id'),
+            lazy: async () => {
+              const { CourseEditPage } =
+                await import('@/features/admin/courses/pages/CourseEditPage');
+              return { Component: CourseEditPage };
+            },
+          },
+          {
+            path: PATHS.admin.courseCurriculum(':id'),
+            lazy: async () => {
+              const { CourseCurriculumPage } =
+                await import('@/features/admin/courses/pages/CourseCurriculumPage');
+              return { Component: CourseCurriculumPage };
+            },
+          },
+          {
+            path: PATHS.admin.lessonEdit(':id'),
+            lazy: async () => {
+              const { LessonEditorPage } =
+                await import('@/features/admin/modules/lessons/pages/LessonEditorPage');
+              return { Component: LessonEditorPage };
+            },
+          },
+          {
+            path: PATHS.admin.assets,
+            lazy: async () => {
+              const { AssetsPage } = await import('@/features/admin/assets/pages/AssetsPage');
+              return { Component: AssetsPage };
+            },
+          },
+          {
+            path: PATHS.admin.assetUpload,
+            lazy: async () => {
+              const { AssetUploadPage } =
+                await import('@/features/admin/assets/pages/AssetUploadPage');
+              return { Component: AssetUploadPage };
+            },
+          },
+          {
+            path: PATHS.admin.assetView(':id'),
+            lazy: async () => {
+              const { AssetDetailPage } =
+                await import('@/features/admin/assets/pages/AssetDetailPage');
+              return { Component: AssetDetailPage };
+            },
+          },
+          {
             path: PATHS.admin.admins,
             lazy: async () => {
               const { AdminsPage } = await import('@/features/admin/admins/pages/AdminsPage');

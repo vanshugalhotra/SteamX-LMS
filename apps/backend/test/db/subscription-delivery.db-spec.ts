@@ -14,6 +14,12 @@ type SubscriptionOptions = {
   maxDeliveries?: number;
 };
 
+type LessonCompletionFixtureOptions = {
+  lessonStatus?: 'ACTIVE' | 'DRAFT';
+  audience?: 'STUDENT' | 'TEACHER_ONLY';
+  released?: boolean;
+};
+
 describe('subscription and delivery database rules', () => {
   let client: Client;
   let db: RawDbContext;
@@ -64,19 +70,19 @@ describe('subscription and delivery database rules', () => {
   async function createDelivery(
     schoolId: string,
     courseId: string,
-    classSectionId: string,
+    label: string,
     options: { status?: 'ACTIVE' | 'INACTIVE'; academicYear?: string } = {},
   ): Promise<string> {
     const id = randomUUID();
     await client.query(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, status, updated_at)
+         (id, school_id, course_id, label, academic_year, status, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, now())`,
       [
         id,
         schoolId,
         courseId,
-        classSectionId,
+        label,
         options.academicYear ?? '2026-27',
         options.status ?? 'ACTIVE',
       ],
@@ -152,6 +158,68 @@ describe('subscription and delivery database rules', () => {
       ],
     );
     return id;
+  }
+
+  async function createLessonCompletionFixture(
+    options: LessonCompletionFixtureOptions = {},
+  ): Promise<{
+    schoolId: string;
+    courseId: string;
+    subscriptionId: string;
+    deliveryId: string;
+    studentId: string;
+    lessonId: string;
+  }> {
+    const schoolId = await db.createSchool();
+    const sectionId = await db.createClassSection(schoolId);
+    const courseId = await createCourse();
+    const subscriptionId = await createSubscription(schoolId, courseId);
+    const deliveryId = await createDelivery(schoolId, courseId, 'Lesson delivery');
+    const studentId = await createStudent(schoolId, sectionId);
+    const moduleId = await createModule(courseId);
+    const lessonId = await createLesson(moduleId, courseId, {
+      status: options.lessonStatus ?? 'ACTIVE',
+      audience: options.audience ?? 'STUDENT',
+    });
+
+    await client.query(
+      `INSERT INTO delivery_enrollments (id, school_id, delivery_id, student_id)
+       VALUES ($1, $2, $3, $4)`,
+      [randomUUID(), schoolId, deliveryId, studentId],
+    );
+
+    if (options.released ?? true) {
+      await client.query(
+        `INSERT INTO delivery_lesson_releases
+           (delivery_id, lesson_id, school_id, course_id)
+         VALUES ($1, $2, $3, $4)`,
+        [deliveryId, lessonId, schoolId, courseId],
+      );
+    }
+
+    return { schoolId, courseId, subscriptionId, deliveryId, studentId, lessonId };
+  }
+
+  async function insertLessonCompletion(fixture: {
+    schoolId: string;
+    courseId: string;
+    deliveryId: string;
+    studentId: string;
+    lessonId: string;
+  }): Promise<void> {
+    await client.query(
+      `INSERT INTO lesson_completions
+         (id, school_id, delivery_id, student_id, lesson_id, course_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        randomUUID(),
+        fixture.schoolId,
+        fixture.deliveryId,
+        fixture.studentId,
+        fixture.lessonId,
+        fixture.courseId,
+      ],
+    );
   }
 
   it('checks subscription access inclusively by date and isolates schools', async () => {
@@ -284,30 +352,33 @@ describe('subscription and delivery database rules', () => {
 
   it('enforces the delivery limit for inserts, reactivation, and missing subscriptions', async () => {
     const schoolId = await db.createSchool();
-    const sectionOne = await db.createClassSection(schoolId);
-    const sectionTwo = await db.createClassSection(schoolId, 'Class 6');
     const courseId = await createCourse();
     await createSubscription(schoolId, courseId, { maxDeliveries: 1 });
-    await createDelivery(schoolId, courseId, sectionOne);
+    await createDelivery(schoolId, courseId, 'Active delivery');
 
     await expectFailure(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, updated_at)
+         (id, school_id, course_id, label, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
-      [randomUUID(), schoolId, courseId, sectionTwo],
+      [randomUUID(), schoolId, courseId, 'Second delivery'],
       '23000',
       'trg_deliveries_require_active_subscription',
     );
 
     const secondCourseId = await createCourse();
     await createSubscription(schoolId, secondCourseId, { maxDeliveries: 1 });
-    const thirdSection = await db.createClassSection(schoolId, 'Class 7');
-    const firstInactiveDeliveryId = await createDelivery(schoolId, secondCourseId, sectionOne, {
-      status: 'INACTIVE',
-    });
-    const secondInactiveDeliveryId = await createDelivery(schoolId, secondCourseId, thirdSection, {
-      status: 'INACTIVE',
-    });
+    const firstInactiveDeliveryId = await createDelivery(
+      schoolId,
+      secondCourseId,
+      'Inactive delivery one',
+      { status: 'INACTIVE' },
+    );
+    const secondInactiveDeliveryId = await createDelivery(
+      schoolId,
+      secondCourseId,
+      'Inactive delivery two',
+      { status: 'INACTIVE' },
+    );
     await client.query(
       `UPDATE deliveries SET status = 'ACTIVE', updated_at = now() WHERE id = $1`,
       [firstInactiveDeliveryId],
@@ -323,9 +394,9 @@ describe('subscription and delivery database rules', () => {
     const noSubscriptionCourseId = await createCourse();
     await expectFailure(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, updated_at)
+         (id, school_id, course_id, label, academic_year, updated_at)
        VALUES ($1, $2, $3, $4, '2026-27', now())`,
-      [randomUUID(), schoolId, noSubscriptionCourseId, sectionTwo],
+      [randomUUID(), schoolId, noSubscriptionCourseId, 'No subscription delivery'],
       '23000',
       'trg_deliveries_require_active_subscription',
     );
@@ -352,13 +423,6 @@ describe('subscription and delivery database rules', () => {
          VALUES ($1, 'Cap race course', 'ACTIVE', now())`,
         [courseId],
       );
-      for (const sectionId of sectionIds) {
-        await setupClient.query(
-          `INSERT INTO class_sections (id, school_id, class_name, section_name, updated_at)
-           VALUES ($1, $2, $3, 'A', now())`,
-          [sectionId, raceSchoolId, `Race ${sectionId.slice(0, 8)}`],
-        );
-      }
       await setupClient.query(
         `INSERT INTO subscriptions
            (id, school_id, course_id, start_date, end_date, max_deliveries, updated_at)
@@ -371,9 +435,9 @@ describe('subscription and delivery database rules', () => {
         try {
           await raceClient.query(
             `INSERT INTO deliveries
-               (id, school_id, course_id, class_section_id, academic_year, updated_at)
+               (id, school_id, course_id, label, academic_year, updated_at)
              VALUES ($1, $2, $3, $4, '2026-27', now())`,
-            [deliveryIds[index], raceSchoolId, courseId, sectionIds[index]],
+            [deliveryIds[index], raceSchoolId, courseId, `Race ${sectionIds[index]}`],
           );
           await raceClient.query('COMMIT');
           return true;
@@ -398,7 +462,6 @@ describe('subscription and delivery database rules', () => {
       try {
         await cleanup.query('DELETE FROM deliveries WHERE id = ANY($1::uuid[])', [deliveryIds]);
         await cleanup.query('DELETE FROM subscriptions WHERE course_id = $1', [courseId]);
-        await cleanup.query('DELETE FROM class_sections WHERE id = ANY($1::uuid[])', [sectionIds]);
         await cleanup.query('DELETE FROM schools WHERE id = $1', [raceSchoolId]);
         await cleanup.query('DELETE FROM courses WHERE id = $1', [courseId]);
       } finally {
@@ -410,12 +473,10 @@ describe('subscription and delivery database rules', () => {
 
   it('rejects lowering a subscription cap below its active delivery count', async () => {
     const schoolId = await db.createSchool();
-    const sectionOne = await db.createClassSection(schoolId);
-    const sectionTwo = await db.createClassSection(schoolId, 'Class 6');
     const courseId = await createCourse();
     const subscriptionId = await createSubscription(schoolId, courseId, { maxDeliveries: 2 });
-    await createDelivery(schoolId, courseId, sectionOne);
-    await createDelivery(schoolId, courseId, sectionTwo);
+    await createDelivery(schoolId, courseId, 'Cap delivery one');
+    await createDelivery(schoolId, courseId, 'Cap delivery two');
 
     await expectFailure(
       'UPDATE subscriptions SET max_deliveries = 1 WHERE id = $1',
@@ -425,15 +486,13 @@ describe('subscription and delivery database rules', () => {
     );
   });
 
-  it('protects delivery identity and validates academic-year format', async () => {
+  it('protects delivery identity, validates labels, and enforces case-insensitive uniqueness', async () => {
     const schoolId = await db.createSchool();
     const otherSchoolId = await db.createSchool();
-    const sectionId = await db.createClassSection(schoolId);
-    const otherSectionId = await db.createClassSection(otherSchoolId);
     const courseId = await createCourse();
     const otherCourseId = await createCourse();
     await createSubscription(schoolId, courseId, { maxDeliveries: 2 });
-    const deliveryId = await createDelivery(schoolId, courseId, sectionId);
+    const deliveryId = await createDelivery(schoolId, courseId, 'Original');
 
     await expectFailure(
       'UPDATE deliveries SET school_id = $1 WHERE id = $2',
@@ -448,51 +507,59 @@ describe('subscription and delivery database rules', () => {
       'trg_deliveries_immutable_identity',
     );
     await expectFailure(
-      'UPDATE deliveries SET class_section_id = $1 WHERE id = $2',
-      [otherSectionId, deliveryId],
-      '23000',
-      'trg_deliveries_immutable_identity',
-    );
-    await expectFailure(
       'UPDATE deliveries SET academic_year = $1 WHERE id = $2',
       ['2026-2027', deliveryId],
       '23000',
       'trg_deliveries_immutable_identity',
     );
+    await client.query('UPDATE deliveries SET label = $1 WHERE id = $2', ['Renamed', deliveryId]);
+    await expectFailure(
+      `INSERT INTO deliveries (id, school_id, course_id, label, academic_year, updated_at)
+       VALUES ($1, $2, $3, 'rENAMED', '2026-27', now())`,
+      [randomUUID(), schoolId, courseId],
+      '23505',
+      'deliveries_school_course_year_label_uq',
+    );
+    for (const label of ['', ' ', ' padded ', 'x'.repeat(101)]) {
+      await expectFailure(
+        `INSERT INTO deliveries (id, school_id, course_id, label, academic_year, updated_at)
+         VALUES ($1, $2, $3, $4, '2026-27', now())`,
+        [randomUUID(), schoolId, courseId, label],
+        '23514',
+        'deliveries_label_valid',
+      );
+    }
     await expectFailure(
       `INSERT INTO deliveries
-         (id, school_id, course_id, class_section_id, academic_year, updated_at)
-       VALUES ($1, $2, $3, $4, '26-27', now())`,
-      [randomUUID(), schoolId, courseId, sectionId],
+         (id, school_id, course_id, label, academic_year, updated_at)
+       VALUES ($1, $2, $3, 'Bad year', '26-27', now())`,
+      [randomUUID(), schoolId, courseId],
       '23514',
       'deliveries_academic_year_fmt',
     );
+    await createSubscription(otherSchoolId, courseId);
+    await client.query(
+      `INSERT INTO deliveries (id, school_id, course_id, label, academic_year, updated_at)
+       VALUES ($1, $2, $3, 'Renamed', '2026-27', now())`,
+      [randomUUID(), otherSchoolId, courseId],
+    );
   });
 
-  it('checks enrollment class placement on insert and reactivation', async () => {
+  it('allows active same-school students from any current class to enroll and reactivate', async () => {
     const schoolId = await db.createSchool();
     const sectionId = await db.createClassSection(schoolId);
     const otherSectionId = await db.createClassSection(schoolId, 'Class 6');
     const courseId = await createCourse();
     await createSubscription(schoolId, courseId);
-    const deliveryId = await createDelivery(schoolId, courseId, sectionId);
+    const deliveryId = await createDelivery(schoolId, courseId, 'Any class');
     const studentId = await createStudent(schoolId, otherSectionId);
 
-    await expectFailure(
-      `INSERT INTO delivery_enrollments (id, school_id, delivery_id, student_id)
-       VALUES ($1, $2, $3, $4)`,
-      [randomUUID(), schoolId, deliveryId, studentId],
-      '23000',
-      'trg_delivery_enrollments_validate',
-    );
-
-    const matchingStudentId = await createStudent(schoolId, sectionId);
+    const firstEnrollmentId = randomUUID();
     await client.query(
       `INSERT INTO delivery_enrollments (id, school_id, delivery_id, student_id)
        VALUES ($1, $2, $3, $4)`,
-      [randomUUID(), schoolId, deliveryId, matchingStudentId],
+      [firstEnrollmentId, schoolId, deliveryId, studentId],
     );
-
     const reactivatingStudentId = await createStudent(schoolId, sectionId);
     const enrollmentId = randomUUID();
     await client.query(
@@ -505,13 +572,11 @@ describe('subscription and delivery database rules', () => {
       otherSectionId,
       reactivatingStudentId,
     ]);
-    await expectFailure(
+    await client.query(
       `UPDATE delivery_enrollments
        SET status = 'ACTIVE', ended_at = NULL
        WHERE id = $1`,
       [enrollmentId],
-      '23000',
-      'trg_delivery_enrollments_validate',
     );
   });
 
@@ -521,13 +586,10 @@ describe('subscription and delivery database rules', () => {
     const sectionId = await db.createClassSection(schoolId);
     const courseId = await createCourse();
     await createSubscription(schoolId, courseId, { maxDeliveries: 2 });
-    const deliveryId = await createDelivery(schoolId, courseId, sectionId);
-    const secondDeliveryId = await createDelivery(
-      schoolId,
-      courseId,
-      await db.createClassSection(schoolId, 'Class 6'),
-      { status: 'INACTIVE' },
-    );
+    const deliveryId = await createDelivery(schoolId, courseId, 'Identity delivery');
+    const secondDeliveryId = await createDelivery(schoolId, courseId, 'Other identity delivery', {
+      status: 'INACTIVE',
+    });
     const studentId = await createStudent(schoolId, sectionId);
     const otherStudentId = await createStudent(schoolId, sectionId);
     const enrollmentId = randomUUID();
@@ -559,10 +621,9 @@ describe('subscription and delivery database rules', () => {
 
   it('checks release lesson and module eligibility', async () => {
     const schoolId = await db.createSchool();
-    const sectionId = await db.createClassSection(schoolId);
     const courseId = await createCourse();
     await createSubscription(schoolId, courseId);
-    const deliveryId = await createDelivery(schoolId, courseId, sectionId);
+    const deliveryId = await createDelivery(schoolId, courseId, 'Release delivery');
     const activeModuleId = await createModule(courseId);
     const draftLessonId = await createLesson(activeModuleId, courseId, {
       status: 'DRAFT',
@@ -597,7 +658,7 @@ describe('subscription and delivery database rules', () => {
 
     const otherCourseId = await createCourse();
     await createSubscription(schoolId, otherCourseId);
-    const otherDeliveryId = await createDelivery(schoolId, otherCourseId, sectionId, {
+    const otherDeliveryId = await createDelivery(schoolId, otherCourseId, 'Other course delivery', {
       status: 'INACTIVE',
     });
     const otherModuleId = await createModule(otherCourseId);
@@ -621,5 +682,150 @@ describe('subscription and delivery database rules', () => {
         'trg_delivery_lesson_releases_immutable_identity',
       );
     }
+  });
+
+  it('accepts a valid lesson completion and an archived lesson released earlier', async () => {
+    const validFixture = await createLessonCompletionFixture();
+    await insertLessonCompletion(validFixture);
+
+    const archivedFixture = await createLessonCompletionFixture();
+    await client.query(`UPDATE lessons SET status = 'ARCHIVED', updated_at = now() WHERE id = $1`, [
+      archivedFixture.lessonId,
+    ]);
+    await insertLessonCompletion(archivedFixture);
+  });
+
+  it('rejects completions without an active enrollment, eligible released lesson, or course access', async () => {
+    for (const status of ['REMOVED', 'COMPLETED']) {
+      const fixture = await createLessonCompletionFixture();
+      await client.query(
+        `UPDATE delivery_enrollments
+         SET status = $1, ended_at = now()
+         WHERE delivery_id = $2 AND student_id = $3`,
+        [status, fixture.deliveryId, fixture.studentId],
+      );
+      await expectFailure(
+        `INSERT INTO lesson_completions
+           (id, school_id, delivery_id, student_id, lesson_id, course_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          randomUUID(),
+          fixture.schoolId,
+          fixture.deliveryId,
+          fixture.studentId,
+          fixture.lessonId,
+          fixture.courseId,
+        ],
+        '23000',
+        'lesson_completions_active_enrollment',
+      );
+    }
+
+    const unreleasedFixture = await createLessonCompletionFixture({ released: false });
+    await expectFailure(
+      `INSERT INTO lesson_completions
+         (id, school_id, delivery_id, student_id, lesson_id, course_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        randomUUID(),
+        unreleasedFixture.schoolId,
+        unreleasedFixture.deliveryId,
+        unreleasedFixture.studentId,
+        unreleasedFixture.lessonId,
+        unreleasedFixture.courseId,
+      ],
+      '23000',
+      'lesson_completions_released_lesson',
+    );
+
+    for (const options of [
+      { audience: 'TEACHER_ONLY' as const },
+      { lessonStatus: 'DRAFT' as const },
+    ]) {
+      const fixture = await createLessonCompletionFixture({ ...options, released: false });
+      await expectFailure(
+        `INSERT INTO lesson_completions
+           (id, school_id, delivery_id, student_id, lesson_id, course_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          randomUUID(),
+          fixture.schoolId,
+          fixture.deliveryId,
+          fixture.studentId,
+          fixture.lessonId,
+          fixture.courseId,
+        ],
+        '23000',
+        'lesson_completions_student_lesson',
+      );
+    }
+
+    const expiredFixture = await createLessonCompletionFixture();
+    await client.query(
+      `UPDATE subscriptions
+       SET start_date = business_today() - 1, end_date = business_today() - 1
+       WHERE id = $1`,
+      [expiredFixture.subscriptionId],
+    );
+    await expectFailure(
+      `INSERT INTO lesson_completions
+         (id, school_id, delivery_id, student_id, lesson_id, course_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        randomUUID(),
+        expiredFixture.schoolId,
+        expiredFixture.deliveryId,
+        expiredFixture.studentId,
+        expiredFixture.lessonId,
+        expiredFixture.courseId,
+      ],
+      '23000',
+      'lesson_completions_course_access',
+    );
+  });
+
+  it('rejects lesson completion updates and duplicate completions', async () => {
+    const fixture = await createLessonCompletionFixture();
+    await insertLessonCompletion(fixture);
+
+    await expectFailure(
+      'UPDATE lesson_completions SET completed_at = now() WHERE delivery_id = $1',
+      [fixture.deliveryId],
+      '23000',
+      'lesson_completions_insert_only',
+    );
+    await expectFailure(
+      `INSERT INTO lesson_completions
+         (id, school_id, delivery_id, student_id, lesson_id, course_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        randomUUID(),
+        fixture.schoolId,
+        fixture.deliveryId,
+        fixture.studentId,
+        fixture.lessonId,
+        fixture.courseId,
+      ],
+      '23505',
+      'lesson_completions_delivery_id_student_id_lesson_id_key',
+    );
+  });
+
+  it('allows un-releasing a completed lesson and keeps the completion row', async () => {
+    const fixture = await createLessonCompletionFixture();
+    await insertLessonCompletion(fixture);
+
+    await client.query(
+      `DELETE FROM delivery_lesson_releases
+       WHERE delivery_id = $1 AND lesson_id = $2`,
+      [fixture.deliveryId, fixture.lessonId],
+    );
+    const result = await client.query(
+      `SELECT count(*)::int AS count
+       FROM lesson_completions
+       WHERE delivery_id = $1 AND student_id = $2 AND lesson_id = $3`,
+      [fixture.deliveryId, fixture.studentId, fixture.lessonId],
+    );
+    expect(result.rows[0]?.count).toBe(1);
   });
 });

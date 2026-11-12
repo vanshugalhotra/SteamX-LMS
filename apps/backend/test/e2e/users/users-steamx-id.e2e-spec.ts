@@ -17,7 +17,7 @@ describe('User SteamX ID rename endpoint (e2e)', () => {
     expectError(
       await ctx.renameSteamxId('', ctx.fixture.schoolA.teacher.id, 'TST-RENAMED001'),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
   });
 
@@ -132,7 +132,7 @@ describe('User SteamX ID rename endpoint (e2e)', () => {
         `${ctx.fixture.schoolA.school.code}-STUDENT001`,
       ),
       403,
-      'FORBIDDEN',
+      'PERMISSION_REQUIRED',
     );
   });
 

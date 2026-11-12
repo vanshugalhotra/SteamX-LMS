@@ -125,7 +125,7 @@ describe('Documented API workflows', () => {
       assertStatus(
         await api.send('GET', '/api/v1/schools', { cookie: session.cookie }),
         403,
-        'FORBIDDEN',
+        'PERMISSION_REQUIRED',
       );
     }
   });
@@ -148,7 +148,7 @@ describe('Documented API workflows', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: current.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     const resetLogin = await api.login({ steamxId: teacher.steamxId, password: resetPassword });
     expect(resetLogin.response.body.mustChangePassword).toBe(true);
@@ -160,7 +160,7 @@ describe('Documented API workflows', () => {
     const oldPassword = await api.send('POST', '/api/v1/auth/login', {
       body: { steamxId: teacher.steamxId, password: current.password },
     });
-    assertStatus(oldPassword, 401, 'UNAUTHORIZED');
+    assertStatus(oldPassword, 401, 'AUTHENTICATION_FAILED');
     const forcedChange = await api.send('POST', '/api/v1/auth/change-password', {
       cookie: resetLogin.cookie,
       body: { currentPassword: resetPassword, newPassword: 'After reset workflow 2026!' },
@@ -206,14 +206,14 @@ describe('Documented API workflows', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: session.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('POST', '/api/v1/auth/login', {
         body: { steamxId: teacher.steamxId, password: session.password },
       }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('PATCH', `/api/v1/users/${teacher.id}/status`, {
@@ -305,7 +305,7 @@ describe('Documented API workflows', () => {
         body: { steamxId: oldId, password: oldSession.password },
       }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('POST', '/api/v1/auth/login', {
@@ -337,18 +337,84 @@ describe('Documented API workflows', () => {
         if (isPublicRoute(route) || isSessionOnlyRoute(route)) {
           continue;
         }
+        if (route.path === '/api/v1/assignments/defaults') {
+          assertStatus(
+            await api.send(route.method, concretePath(route), { cookie: session.cookie }),
+            200,
+          );
+          continue;
+        }
         const options: { body?: object } = {};
         if (route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE') {
           options.body = {};
+          if (route.method === 'POST' && route.path.endsWith('/deliveries/:id/enrollments')) {
+            options.body = { studentIds: [randomUUID()] };
+          }
         }
-        assertStatus(
-          await api.send(route.method, concretePath(route), {
-            cookie: session.cookie,
-            ...options,
-          }),
-          403,
-          'FORBIDDEN',
-        );
+        if (
+          session === teacherSession &&
+          route.path.startsWith('/api/v1/deliveries/:id/assignments')
+        ) {
+          if (route.method === 'POST' && route.path.endsWith('/from-template')) {
+            options.body = { templateId: randomUUID() };
+          } else if (route.method === 'POST') {
+            options.body = { title: 'Permission matrix draft' };
+          } else if (route.method === 'PATCH') {
+            options.body = { title: 'Permission matrix update' };
+          }
+        }
+        const response = await api.send(route.method, concretePath(route), {
+          cookie: session.cookie,
+          ...options,
+        });
+        if (
+          session === teacherSession &&
+          route.path.startsWith('/api/v1/deliveries/:id/assignments')
+        ) {
+          assertStatus(response, 404, 'NOT_FOUND');
+          continue;
+        }
+        if (route.path.startsWith('/api/v1/learning')) {
+          if (session === teacherSession) {
+            if (
+              route.path.endsWith('/lessons/:lessonId/content') ||
+              route.path.endsWith('/lessons/:lessonId/assets/:assetId/access')
+            ) {
+              assertStatus(response, 404, 'NOT_FOUND');
+            } else if (route.path.endsWith('/lessons/:lessonId/completion')) {
+              assertStatus(response, 403, 'PERMISSION_REQUIRED');
+            } else if (route.path.endsWith('/progress')) {
+              assertStatus(response, 404, 'NOT_FOUND');
+            } else if (route.path.includes('/assignments')) {
+              assertStatus(response, 404, 'NOT_FOUND');
+            } else {
+              assertStatus(response, 403, 'FORBIDDEN');
+            }
+          } else if (route.path.endsWith('/courses')) {
+            assertStatus(response, 200);
+          } else {
+            assertStatus(response, 404, 'NOT_FOUND');
+          }
+          continue;
+        }
+        if (session === teacherSession && route.path.includes('/deliveries/:id/enrollments')) {
+          assertStatus(response, 404, 'NOT_FOUND');
+          continue;
+        }
+        if (session === teacherSession && route.path.includes('/deliveries/:id/releases')) {
+          assertStatus(response, 404, 'NOT_FOUND');
+          continue;
+        }
+        if (
+          session === teacherSession &&
+          route.method === 'GET' &&
+          route.path.includes('deliveries') &&
+          !route.path.includes('/teachers')
+        ) {
+          assertStatus(response, route.path.endsWith('/deliveries') ? 200 : 404);
+          continue;
+        }
+        assertStatus(response, 403, 'PERMISSION_REQUIRED');
       }
     }
     assertStatus(await api.send('GET', '/api/v1/schools', { cookie: admin }), 200);

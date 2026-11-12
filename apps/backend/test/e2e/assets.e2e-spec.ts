@@ -1520,8 +1520,7 @@ describe('Assets endpoints (e2e)', () => {
     ).toMatchObject({ status: AssetFileStatus.FAILED, lastError: 'PROCESSING_FAILED' });
   });
 
-  // Known gap: the processing failure logger currently receives the raw provider error.
-  it.fails('does not log internal processor error text or signed URLs', async () => {
+  it('does not log signed URLs from processor errors', async () => {
     const internalError = 'private error https://storage.example.test/signed?token=secret';
     const created = await createAndUpload(AssetType.IMAGE, 'image/jpeg', JPEG_BYTES);
     const processor = app.get(AssetProcessorRegistry).get(AssetType.IMAGE);
@@ -1533,7 +1532,8 @@ describe('Assets endpoints (e2e)', () => {
       const loggedArguments = JSON.stringify(logger.mock.calls, (_key, value: unknown) =>
         value instanceof Error ? { message: value.message, stack: value.stack } : value,
       );
-      expect(loggedArguments).not.toContain(internalError);
+      expect(loggedArguments).not.toContain('https://storage.example.test/signed?token=secret');
+      expect(loggedArguments).toContain('[redacted URL]');
     } finally {
       process.mockRestore();
       logger.mockRestore();

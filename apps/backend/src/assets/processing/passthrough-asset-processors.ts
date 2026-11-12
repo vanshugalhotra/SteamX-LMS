@@ -9,6 +9,7 @@ import type { AssetProcessor } from './asset-processor.js';
 export class NoPlaybackAssetProcessor implements AssetProcessor {
   constructor(readonly type: Extract<SupportedAssetType, 'IMAGE' | 'PDF'>) {}
 
+  /** Returns no playback object because images and PDFs use the original upload. */
   async process(_file: AssetFile): Promise<{ playbackKey: null }> {
     return { playbackKey: null };
   }
@@ -20,6 +21,7 @@ export class VideoPassthroughAssetProcessor implements AssetProcessor {
   readonly type = AssetType.VIDEO;
 
   // HLS can replace this processor and report asynchronously via processing_job_id without a schema change.
+  /** Uses the uploaded MP4 object as its playback object. */
   async process(file: AssetFile): Promise<{ playbackKey: string }> {
     return { playbackKey: file.storageKey };
   }

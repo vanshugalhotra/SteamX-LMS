@@ -151,7 +151,7 @@ describe('Black-box API invariants', () => {
         expect(response.status, `${route.method} ${route.path} is public`).not.toBe(401);
       } else {
         try {
-          assertStatus(response, 401, 'UNAUTHORIZED');
+          assertStatus(response, 401, 'AUTHENTICATION_FAILED');
         } catch (error) {
           throw new Error(`${route.method} ${route.path} did not require authentication.`, {
             cause: error,
@@ -168,13 +168,14 @@ describe('Black-box API invariants', () => {
     );
     expect(swaggerRoutes.length).toBeGreaterThan(0);
     for (const route of swaggerRoutes) {
-      assertStatus(await api.send(route.method, concretePath(route)), 401, 'UNAUTHORIZED');
+      assertStatus(await api.send(route.method, concretePath(route)), 401, 'AUTHENTICATION_FAILED');
     }
   });
 
-  it('requires an explicit permission on every non-public, non-session-only route', async () => {
+  it('enforces an explicit authorization policy on every protected route', async () => {
     expectAssetRoutesAreEnumerated(api.routes);
     expectLessonContentRoutesAreEnumerated(api.routes);
+    expectAuthenticatedOnlyRoutesAreEnumerated(api.routes);
     const admin = await adminCookie();
     const school = await createSchool(admin, 'Permission sweep school');
     const section = await createSection(admin, school.id);
@@ -189,15 +190,20 @@ describe('Black-box API invariants', () => {
         continue;
       }
       const response = await api.send(route.method, concretePath(route), {
-        cookie: studentSession.cookie,
+        // Students have learning.read by design, so use an admin without it to verify the route declares a permission.
+        cookie: route.path.startsWith('/api/v1/learning') ? admin : studentSession.cookie,
         ...(route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE'
           ? { body: {} }
           : {}),
       });
+      if (isAuthenticatedOnlyRoute(route)) {
+        assertStatus(response, 200);
+        continue;
+      }
       try {
-        assertStatus(response, 403, 'FORBIDDEN');
+        assertStatus(response, 403, 'PERMISSION_REQUIRED');
       } catch (error) {
-        throw new Error(`${route.method} ${route.path} did not require a permission.`, {
+        throw new Error(`${route.method} ${route.path} did not enforce its declared permission.`, {
           cause: error,
         });
       }
@@ -422,7 +428,7 @@ describe('Black-box API invariants', () => {
           : {}),
       });
       try {
-        assertStatus(response, 401, 'UNAUTHORIZED');
+        assertStatus(response, 401, 'AUTHENTICATION_FAILED');
       } catch (error) {
         throw new Error(
           `${route.method} ${route.path} did not reject the ${invalidation} account.`,
@@ -449,12 +455,12 @@ describe('Black-box API invariants', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: oldSession.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: secondOldSession.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
 
     const changedSession = cookieFrom(changed);
@@ -477,12 +483,12 @@ describe('Black-box API invariants', () => {
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: resetLogin.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     assertStatus(
       await api.send('GET', '/api/v1/auth/me', { cookie: secondResetLogin.cookie }),
       401,
-      'UNAUTHORIZED',
+      'AUTHENTICATION_FAILED',
     );
     const newLogin = await api.login({
       steamxId: teacher.steamxId,
@@ -753,6 +759,16 @@ function isSessionOnlyRoute(route: ApiRoute): boolean {
   return ['/api/v1/auth/me', '/api/v1/auth/logout', '/api/v1/auth/change-password'].includes(
     route.path,
   );
+}
+
+function isAuthenticatedOnlyRoute(route: ApiRoute): boolean {
+  return route.path === '/api/v1/assignments/defaults';
+}
+
+function expectAuthenticatedOnlyRoutesAreEnumerated(routes: ApiRoute[]): void {
+  expect(
+    routes.filter(isAuthenticatedOnlyRoute).map(({ method, path }) => `${method} ${path}`),
+  ).toEqual(['GET /api/v1/assignments/defaults']);
 }
 
 function cookieFrom(response: { headers: Record<string, string | string[] | undefined> }): string {

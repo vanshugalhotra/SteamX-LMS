@@ -16,6 +16,9 @@ import { UsersModule } from './users/users.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { AssetsModule } from './assets/assets.module.js';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
+import { DeliveriesModule } from './deliveries/deliveries.module.js';
+import { LearningModule } from './learning/learning.module.js';
+import { AssignmentsModule } from './assignments/assignments.module.js';
 
 @Module({
   imports: [
@@ -34,6 +37,9 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
     StorageModule,
     AssetsModule,
     SubscriptionsModule,
+    DeliveriesModule,
+    LearningModule,
+    AssignmentsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OriginGuard },

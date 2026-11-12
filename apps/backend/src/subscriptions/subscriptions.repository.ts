@@ -35,11 +35,16 @@ export type SubscriptionEligibilityError =
   | { courseNotFound: true }
   | { courseNotActive: true };
 
+/**
+ * Reads and writes subscription rows, including transaction-scoped eligibility checks and
+ * school-course summary queries used to build API responses.
+ */
 @Injectable()
 export class SubscriptionsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   // -------------------- Business date and validation lookups --------------------
+  /** Reads the business date from the database clock. */
   getBusinessToday(): Promise<{ today: string }[]> {
     return this.prisma.$queryRaw<{ today: string }[]>`
       SELECT business_today()::text AS today
@@ -47,6 +52,12 @@ export class SubscriptionsRepository {
   }
 
   // -------------------- Reads --------------------
+  /**
+   * Lists terms matching the requested date-derived status and filters.
+   * @param query Filters and page settings.
+   * @param today Database business date used to select date-derived status.
+   * @returns The matching page and total count.
+   */
   findMany(
     query: SubscriptionListQueryDto,
     today: string,
@@ -80,6 +91,7 @@ export class SubscriptionsRepository {
     });
   }
 
+  /** Loads one subscription term by ID. */
   findById(id: string): Promise<SubscriptionRecord | null> {
     return this.prisma.subscription.findUnique({
       where: { id },
@@ -88,6 +100,11 @@ export class SubscriptionsRepository {
   }
 
   // -------------------- Writes --------------------
+  /**
+   * Checks school and course eligibility under row locks, then creates the term atomically.
+   * @param data School-course term details.
+   * @returns The created term or a typed eligibility failure.
+   */
   create(data: CreateSubscriptionDto): Promise<SubscriptionRecord | SubscriptionEligibilityError> {
     return this.prisma.$transaction(async (tx) => {
       const eligibility = await this.checkGrantEligibility(tx, data.schoolId, data.courseId);
@@ -112,6 +129,12 @@ export class SubscriptionsRepository {
     });
   }
 
+  /**
+   * Updates a term and checks its delivery cap in the same transaction.
+   * @param id Subscription ID.
+   * @param data End date and/or delivery cap changes.
+   * @returns The updated term, or a missing/cap-exceeded result.
+   */
   update(
     id: string,
     data: UpdateSubscriptionDto,
@@ -151,6 +174,12 @@ export class SubscriptionsRepository {
     });
   }
 
+  /**
+   * Deletes a future term or changes the end date of a current term atomically.
+   * @param id Subscription ID.
+   * @param decision Service-selected revoke operation.
+   * @returns The removed or updated term, or null when it no longer exists.
+   */
   revoke(
     id: string,
     decision: { action: 'DELETE' } | { action: 'END'; endDate: string },
@@ -185,6 +214,12 @@ export class SubscriptionsRepository {
     });
   }
 
+  /**
+   * Rechecks school and course eligibility under row locks before creating a renewed term.
+   * @param current School-course pair from the source term.
+   * @param data New term dates and delivery cap.
+   * @returns The created term or a typed eligibility failure.
+   */
   async renew(
     current: { schoolId: string; courseId: string },
     data: { startDate: string; endDate: string; maxDeliveries: number },
@@ -212,11 +247,19 @@ export class SubscriptionsRepository {
     });
   }
 
+  /**
+   * Locks the school and course rows while checking grant eligibility.
+   * @param tx Transaction used for the check.
+   * @param schoolId School to validate.
+   * @param courseId Course to validate.
+   * @returns The first eligibility failure, or null when both records are active.
+   */
   private async checkGrantEligibility(
     tx: Prisma.TransactionClient,
     schoolId: string,
     courseId: string,
   ): Promise<SubscriptionEligibilityError | null> {
+    // Keep school and course status stable through the subscription insert in this transaction.
     const [school] = await tx.$queryRaw<{ status: SchoolStatus }[]>`
       SELECT status::text AS status
       FROM schools
@@ -246,6 +289,11 @@ export class SubscriptionsRepository {
     return null;
   }
 
+  /**
+   * Loads the latest term end date and active delivery count for each unique pair.
+   * @param pairs School-course pairs to summarize.
+   * @returns One summary for each unique pair.
+   */
   async findDerivedFieldsBySchoolCourse(
     pairs: { schoolId: string; courseId: string }[],
   ): Promise<SubscriptionSummary[]> {
