@@ -1,9 +1,1 @@
-import StarterKit from '@tiptap/starter-kit';
-
-// Keep in sync with tiptap-whitelist.ts
-export const RICH_TEXT_EXTENSIONS = [
-  StarterKit.configure({
-    heading: { levels: [1, 2, 3] },
-    link: { openOnClick: false, autolink: false, protocols: ['http', 'https', 'mailto'] },
-  }),
-];
+export { RICH_TEXT_EXTENSIONS } from '@/components/lesson-content/rich-text-extensions';
