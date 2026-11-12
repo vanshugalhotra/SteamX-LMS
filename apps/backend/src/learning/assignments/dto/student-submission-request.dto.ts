@@ -1,7 +1,16 @@
 /** Validated answer payload for submitting or replacing a student's assignment submission. */
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsString, IsUUID, ValidateIf, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
+import { ASSIGNMENT_LIMITS } from '../../../assignments/blueprint/constants.js';
 
 export class StudentSubmissionAnswerRequestDto {
   @ApiProperty({ format: 'uuid' })
@@ -13,15 +22,17 @@ export class StudentSubmissionAnswerRequestDto {
   @IsUUID()
   selectedOptionId?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ maxLength: ASSIGNMENT_LIMITS.text.maxLength })
   @ValidateIf((_object, value: unknown) => value !== undefined)
   @IsString()
+  @MaxLength(ASSIGNMENT_LIMITS.text.maxLength)
   answerText?: string;
 }
 
 export class StudentSubmissionRequestDto {
-  @ApiProperty({ type: [StudentSubmissionAnswerRequestDto] })
+  @ApiProperty({ type: [StudentSubmissionAnswerRequestDto], maxItems: ASSIGNMENT_LIMITS.maxItems })
   @IsArray()
+  @ArrayMaxSize(ASSIGNMENT_LIMITS.maxItems)
   @ValidateNested({ each: true })
   @Type(() => StudentSubmissionAnswerRequestDto)
   answers!: StudentSubmissionAnswerRequestDto[];
