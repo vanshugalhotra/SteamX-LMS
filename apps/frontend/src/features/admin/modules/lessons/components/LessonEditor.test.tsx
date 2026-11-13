@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -204,6 +204,22 @@ it('removes and reorders blocks', async () => {
   await user.click(screen.getAllByRole('button', { name: 'Remove Rich text block' })[1]);
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(savedBlocks().map((b) => b.id)).toEqual(['b']);
+});
+
+it('reorders blocks by dragging and saves the new order', async () => {
+  const user = userEvent.setup();
+  renderEditor([textBlock('a'), textBlock('b'), textBlock('c')]);
+  const handles = screen.getAllByRole('button', { name: 'Drag Rich text block to reorder' });
+  fireEvent.dragStart(handles[0], {
+    dataTransfer: {
+      effectAllowed: 'none' as DataTransfer['effectAllowed'],
+      setData: vi.fn(),
+    },
+  });
+  fireEvent.dragOver(handles[2]);
+  fireEvent.drop(handles[2]);
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(savedBlocks().map((block) => block.id)).toEqual(['b', 'c', 'a']);
 });
 
 it('offers a reload on version conflict', async () => {

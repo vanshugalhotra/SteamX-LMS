@@ -76,6 +76,7 @@ export function LessonEditor({
           onAdd={editor.addBlock}
           onAddColumnBlock={editor.addColumnBlock}
           onMove={editor.move}
+          onReorder={editor.reorder}
           onRemove={editor.removeBlock}
           onRichTextChange={editor.updateRichText}
           onAttachAsset={editor.attachAsset}
