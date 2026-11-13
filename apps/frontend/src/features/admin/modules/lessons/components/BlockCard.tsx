@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Trash2, type LucideIcon } from 'lucide-react';
+import type { DragEvent, ReactNode } from 'react';
+import { ArrowDown, ArrowUp, GripVertical, Trash2, type LucideIcon } from 'lucide-react';
 import { BLOCK_META, FALLBACK_ACCENT, getBlockLabel } from '../model/blocks';
 import type { LessonContentBlock } from '../model/types';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,9 @@ export function BlockCard({
   disabled,
   nested = false,
   contextLabel,
+  isDropTarget = false,
+  onDragStart,
+  onDragEnd,
   onMove,
   onRemove,
   children,
@@ -50,6 +53,9 @@ export function BlockCard({
   disabled: boolean;
   nested?: boolean;
   contextLabel?: string;
+  isDropTarget?: boolean;
+  onDragStart?: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd?: () => void;
   onMove?: (direction: -1 | 1) => void;
   onRemove: () => void;
   children: ReactNode;
@@ -60,6 +66,7 @@ export function BlockCard({
     <article
       className={cn(
         'relative rounded-2xl border border-brand-line bg-white before:absolute before:inset-y-3 before:-left-px before:w-1 before:rounded-r',
+        isDropTarget && 'ring-2 ring-primary ring-offset-2',
         accent,
       )}
     >
@@ -69,6 +76,18 @@ export function BlockCard({
         <div className="ml-auto flex">
           {!nested && (
             <>
+              <button
+                type="button"
+                aria-label={`Drag ${label} block to reorder`}
+                title={`Drag ${label} block to reorder`}
+                draggable={!disabled}
+                disabled={disabled}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                className="grid size-8 cursor-grab place-items-center rounded-lg text-gray-600 outline-none hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <GripVertical className="size-4" aria-hidden="true" />
+              </button>
               <BlockAction
                 icon={ArrowUp}
                 label={`Move ${label} block up`}

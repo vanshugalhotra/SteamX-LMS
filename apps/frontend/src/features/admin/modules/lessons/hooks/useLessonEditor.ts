@@ -8,6 +8,7 @@ import {
   findIncompleteBlockIds,
   insertBlock,
   moveBlock,
+  reorderBlock,
   removeBlockById,
   setBlockField,
   updateBlockById,
@@ -124,6 +125,9 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
   const move = (index: number, direction: -1 | 1) => {
     setBlocks((c) => moveBlock(c, index, direction));
   };
+  const reorder = (fromIndex: number, toIndex: number) => {
+    setBlocks((c) => reorderBlock(c, fromIndex, toIndex));
+  };
   const updateRichText = (id: string, doc: JSONContent) => {
     setBlocks((c) =>
       updateBlockById(c, id, (block) => {
@@ -179,6 +183,7 @@ export function useLessonEditor(lesson: Lesson, content: LessonContent) {
     addColumnBlock,
     removeBlock,
     move,
+    reorder,
     updateRichText,
     assets,
     updateBlock,
