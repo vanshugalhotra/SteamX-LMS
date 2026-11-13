@@ -345,6 +345,12 @@ describe('Documented API workflows', () => {
           continue;
         }
         const options: { body?: object } = {};
+        if (
+          route.method === 'PUT' &&
+          route.path.endsWith('/assignments/:assignmentId/submission')
+        ) {
+          options.body = { answers: [] };
+        }
         if (route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE') {
           options.body = {};
           if (route.method === 'POST' && route.path.endsWith('/deliveries/:id/enrollments')) {
@@ -385,6 +391,8 @@ describe('Documented API workflows', () => {
               assertStatus(response, 403, 'PERMISSION_REQUIRED');
             } else if (route.path.endsWith('/progress')) {
               assertStatus(response, 404, 'NOT_FOUND');
+            } else if (route.path.endsWith('/assignments/:assignmentId/submission')) {
+              assertStatus(response, 403, 'PERMISSION_REQUIRED');
             } else if (route.path.includes('/assignments')) {
               assertStatus(response, 404, 'NOT_FOUND');
             } else {

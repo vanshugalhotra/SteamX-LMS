@@ -9,7 +9,8 @@ import type {
 import type {
   StudentAssignmentDetailRecord,
   StudentAssignmentListRecord,
-} from '../../assignments/delivery/delivery-assignments.service.js';
+  StudentSubmissionRecord,
+} from '../../assignments/delivery/delivery-assignments.repository.js';
 
 /** Converts list rows without exposing submission or assignment internals. */
 export function toStudentAssignmentSummary(
@@ -64,34 +65,40 @@ export function toStudentAssignmentDetail(
       config: item.config,
       options: item.options.map(({ id, position, text }) => ({ id, position, text })),
     })),
-    submission:
-      submission === null
+    submission: submission === null ? null : toStudentSubmission(submission, assignment.dueAt, now),
+  };
+}
+
+/** Maps an own submission to the established student-facing response shape. */
+export function toStudentSubmission(
+  submission: StudentSubmissionRecord,
+  dueAt: Date | null,
+  now: Date,
+): NonNullable<StudentAssignmentDetailResponseDto['submission']> {
+  return {
+    state: submission.status,
+    submittedAt: submission.submittedAt,
+    isLate: isLate(submission, dueAt, now),
+    answers: submission.answers.map(({ itemId, answerText, selectedOptionId }) => ({
+      itemId,
+      answerText,
+      selectedOptionId,
+    })),
+    files: submission.files.map(({ id, itemId, filename, mimeType, sizeBytes }) => ({
+      id,
+      itemId,
+      filename,
+      mimeType,
+      sizeBytes: Number(sizeBytes),
+    })),
+    grade:
+      submission.gradePercent === null
         ? null
         : {
-            state: submission.status,
-            submittedAt: submission.submittedAt,
-            isLate: isLate(submission, assignment.dueAt, now),
-            answers: submission.answers.map(({ itemId, answerText, selectedOptionId }) => ({
-              itemId,
-              answerText,
-              selectedOptionId,
-            })),
-            files: submission.files.map(({ id, itemId, filename, mimeType, sizeBytes }) => ({
-              id,
-              itemId,
-              filename,
-              mimeType,
-              sizeBytes: Number(sizeBytes),
-            })),
-            grade:
-              submission.gradePercent === null
-                ? null
-                : {
-                    ...gradeFromPercent(submission.gradePercent.toNumber()),
-                    rubricLevels: levelCodes(submission.rubricLevels),
-                    feedback: submission.overallFeedback,
-                    gradedAt: submission.gradedAt,
-                  },
+            ...gradeFromPercent(submission.gradePercent.toNumber()),
+            rubricLevels: levelCodes(submission.rubricLevels),
+            feedback: submission.overallFeedback,
+            gradedAt: submission.gradedAt,
           },
   };
 }

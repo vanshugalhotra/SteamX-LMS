@@ -409,6 +409,34 @@ student's submission.
 - [auto] Visibility and access failures match the list route: hidden assignments and deliveries return `404 NOT_FOUND`; expired subscription returns `403 SUBSCRIPTION_EXPIRED`; teacher/platform staff return `403 FORBIDDEN`; malformed IDs return `400 BAD_REQUEST`; no cookie returns `401 UNAUTHORIZED`.
 - [auto] `canSubmit`, `isLate`, and `Cache-Control: private, no-store` follow the list route semantics.
 
+### `PUT /learning/deliveries/:id/assignments/:assignmentId/submission`
+
+Caller: a student with `submission.submit`; submits or replaces the complete answer set and returns
+the same own-submission shape used by assignment detail.
+
+- [auto] Every assignment item is required exactly once. Unknown or foreign items, duplicates,
+  missing items, invalid option IDs, answer fields for the wrong item type, empty or oversized text,
+  and HTML text -> expect `422 SUBMISSION_INVALID` with all `{ itemId, rule }` details.
+- [auto] File-upload items -> expect `409 SUBMISSION_FILES_NOT_SUPPORTED` until file submissions
+  are implemented.
+- [auto] A first TEXT submission creates one `SUBMITTED` row; a past due date is captured and
+  returned as `isLate: true`. Late submissions are accepted.
+- [auto] A multiple-choice submission is immediately `GRADED`; percent, level, and letter are
+  derived from the database-computed correct-answer count.
+- [auto] A changed submission with resubmission disabled -> expect `409 SUBMISSION_ALREADY_EXISTS`.
+  An identical retry is `200` and preserves submitted time, late state, and grade, even after the
+  due date.
+- [auto] With resubmission enabled, changed answers replace all prior answers, advance submission
+  time, clear teacher grading fields, and auto-grade multiple-choice answers again.
+- [auto] Concurrent first identical submissions -> all `200`, one identical response, and one row.
+  Concurrent replacements never mix answer sets and return no server errors.
+- [auto] Visibility and access failures match student assignment reads: hidden assignments or
+  deliveries, inactive delivery/enrollment, foreign school, or removed student -> `404 NOT_FOUND`;
+  expired subscription -> `403 SUBSCRIPTION_EXPIRED`; teacher/platform staff -> `403 FORBIDDEN`;
+  malformed IDs -> `400 BAD_REQUEST`; no cookie -> `401 UNAUTHORIZED`.
+- [auto] Responses include `Cache-Control: private, no-store`; another student's submission is
+  never read or changed.
+
 ### `GET /learning/deliveries/:id/lessons/:lessonId/content`
 
 Caller: a student enrolled in the delivery or a teacher actively assigned to it, with `learning.read`.

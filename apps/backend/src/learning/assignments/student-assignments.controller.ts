@@ -1,13 +1,26 @@
 /** Exposes private student assignment reads under an enrolled delivery. */
-import { Controller, Get, Header, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Put,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../../auth/decorators/current-auth.decorator.js';
 import { RequirePermission } from '../../auth/decorators/require-permission.decorator.js';
@@ -18,8 +31,11 @@ import { StudentAssignmentListQueryDto } from './dto/student-assignment-list-que
 import {
   StudentAssignmentDetailResponseDto,
   StudentAssignmentListResponseDto,
+  StudentAssignmentSubmissionDto,
 } from './dto/student-assignment-response.dto.js';
+import { StudentSubmissionRequestDto } from './dto/student-submission-request.dto.js';
 import { StudentAssignmentsService } from './student-assignments.service.js';
+import { StudentSubmissionsService } from './student-submissions.service.js';
 
 @ApiTags('Learning assignments')
 @ApiProtectedController()
@@ -30,7 +46,10 @@ import { StudentAssignmentsService } from './student-assignments.service.js';
 @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
 @Controller({ path: 'learning/deliveries/:id/assignments' })
 export class StudentAssignmentsController {
-  constructor(private readonly assignments: StudentAssignmentsService) {}
+  constructor(
+    private readonly assignments: StudentAssignmentsService,
+    private readonly submissions: StudentSubmissionsService,
+  ) {}
 
   // ─────────────────────────────────────────
   // GET /learning/deliveries/:id/assignments — List student assignments
@@ -74,5 +93,39 @@ export class StudentAssignmentsController {
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
   ): Promise<StudentAssignmentDetailResponseDto> {
     return this.assignments.findById(auth, deliveryId, assignmentId);
+  }
+
+  // ─────────────────────────────────────────
+  // PUT /learning/deliveries/:id/assignments/:assignmentId/submission — Submit assignment
+  // ─────────────────────────────────────────
+  /** Creates or replaces this student's complete answer set. */
+  @Put(':assignmentId/submission')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermission(PERMISSION.SUBMISSION_SUBMIT)
+  @ApiOperation({
+    summary: "Submit or replace a student's assignment answers",
+    description:
+      'Submits one answer for every item. A repeated identical answer set is a no-op, including when resubmission is disabled; different content replaces the prior answer set only when allowResubmission is enabled, clearing any previous grade. Multiple-choice assignments are auto-graded. Late submissions are accepted and lateness uses the due-date snapshot captured by the database.',
+  })
+  @ApiOkResponse({ type: StudentAssignmentSubmissionDto })
+  @ApiBadRequestResponse({ description: 'The request shape or either UUID is invalid.' })
+  @ApiUnprocessableEntityResponse({
+    description: 'SUBMISSION_INVALID with per-item details.',
+  })
+  @ApiConflictResponse({
+    description: 'SUBMISSION_ALREADY_EXISTS or SUBMISSION_FILES_NOT_SUPPORTED.',
+  })
+  @ApiNotFoundResponse({ description: 'Delivery or assignment is not visible.' })
+  @ApiForbiddenResponse({
+    description: 'Requires submission.submit for a student with a current course subscription.',
+  })
+  submit(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) deliveryId: string,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Body() body: StudentSubmissionRequestDto,
+  ): Promise<StudentAssignmentSubmissionDto> {
+    return this.submissions.submit(auth, deliveryId, assignmentId, body);
   }
 }

@@ -14,7 +14,8 @@ scenario you need; API field requirements and individual endpoint cases are in S
 4. Apply committed schema/reference data with `pnpm --filter @steamx/backend migrate:deploy`.
    The reference migration creates `admin`, `teacher`, and `student` roles; current permissions
    include the configured admin grants; teacher also receives `assignment.manage`, `delivery.read`,
-   `enrollment.manage`, and `release.manage`. There is no Prisma seed
+   `enrollment.manage`, and `release.manage`; students receive `learning.read`, `lesson.complete`,
+   and `submission.submit`. There is no Prisma seed
    script and no default admin account.
 5. Set `ADMIN_STEAMX_ID` and `ADMIN_PASSWORD`, then run
    `pnpm --filter @steamx/backend admin:create`. This creates the first admin and sets

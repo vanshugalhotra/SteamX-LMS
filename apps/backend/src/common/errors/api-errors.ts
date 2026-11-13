@@ -129,6 +129,9 @@ export const API_ERROR = {
     ASSIGNMENT_UNPUBLISHED_FROM_DRAFT: 'A draft assignment cannot be unpublished',
     TEMPLATE_ALREADY_PUBLISHED_TO_DELIVERY:
       'This assignment template has already been copied to this delivery',
+    SUBMISSION_ALREADY_EXISTS: 'A submission already exists and resubmission is disabled',
+    SUBMISSION_FILES_NOT_SUPPORTED: 'File submissions are not supported yet',
+    SUBMISSION_INVALID: 'Submission answers are invalid',
   }),
 
   ...defineErrors({
