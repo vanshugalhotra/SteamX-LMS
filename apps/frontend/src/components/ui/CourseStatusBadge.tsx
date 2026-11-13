@@ -1,9 +1,8 @@
 import { Badge } from '@/components/ui/badge';
-import type { ContentStatus } from '@/lib/content-status';
-import { courseStatuses } from '../config/courses.config';
+import { CONTENT_STATUS_PRESENTATION, type ContentStatus } from '@/lib/content-status';
 
 export function CourseStatusBadge({ status }: { status: ContentStatus }) {
-  const presentation = courseStatuses[status];
+  const presentation = CONTENT_STATUS_PRESENTATION[status];
   return (
     <Badge variant="neutral" className={presentation.badgeClassName}>
       {presentation.label}

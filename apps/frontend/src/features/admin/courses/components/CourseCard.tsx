@@ -18,7 +18,7 @@ import {
 import { useCourseOutline, useUpdateCourseStatus } from '../queries';
 import type { Course } from '../model/types';
 import { courseStatuses } from '../config/courses.config';
-import { CourseStatusBadge } from './CourseStatusBadge';
+import { CourseStatusBadge } from '@/components/ui/CourseStatusBadge';
 
 export function CourseCard({ course }: { course: Course }) {
   const updateStatus = useUpdateCourseStatus();

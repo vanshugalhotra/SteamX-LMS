@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Trash2, type LucideIcon } from 'lucide-react';
 import { BLOCK_META, FALLBACK_ACCENT, getBlockLabel } from '../model/blocks';
 import type { LessonContentBlock } from '../model/types';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 function BlockAction({
   icon: Icon,
@@ -21,9 +22,10 @@ function BlockAction({
       type="button"
       aria-label={label}
       title={label}
-      className={`grid size-8 place-items-center rounded-lg text-gray-600 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 ${
-        danger ? 'hover:bg-danger-soft hover:text-danger' : 'hover:bg-gray-100'
-      }`}
+      className={cn(
+        'grid size-8 place-items-center rounded-lg text-gray-600 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40',
+        danger ? 'hover:bg-danger-soft hover:text-danger' : 'hover:bg-gray-100',
+      )}
       {...props}
     >
       <Icon className="size-4" aria-hidden="true" />
@@ -56,7 +58,10 @@ export function BlockCard({
   const accent = BLOCK_META[type]?.accent ?? FALLBACK_ACCENT;
   return (
     <article
-      className={`relative rounded-2xl border border-brand-line bg-white before:absolute before:inset-y-3 before:-left-px before:w-1 before:rounded-r ${accent}`}
+      className={cn(
+        'relative rounded-2xl border border-brand-line bg-white before:absolute before:inset-y-3 before:-left-px before:w-1 before:rounded-r',
+        accent,
+      )}
     >
       <div className="flex items-center gap-2 px-4 pt-3">
         {!nested && <span className="text-[11px] font-semibold text-gray-600">{index + 1}</span>}

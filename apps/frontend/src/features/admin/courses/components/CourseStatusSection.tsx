@@ -4,7 +4,9 @@ import { toast } from 'sonner';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { CourseStatusBadge } from '@/components/ui/CourseStatusBadge';
 import { getErrorMessage } from '@/lib/api-errors';
+import { cn } from '@/lib/utils';
 import type { Course } from '../model/types';
 import {
   getAllowedCourseStatusTransitions,
@@ -14,7 +16,6 @@ import {
   type CourseStatusTransition,
 } from '../model/status-transitions';
 import { useUpdateCourseStatus } from '../queries';
-import { CourseStatusBadge } from './CourseStatusBadge';
 import { COURSE_STATUSES, courseStatuses } from '../config/courses.config';
 
 const statusIcon: Record<CourseStatusTransition, typeof Check> = {
@@ -55,11 +56,12 @@ export function CourseStatusSection({
         key={status}
         type="button"
         variant="secondary"
-        className={
+        className={cn(
+          'rounded-full',
           compact
-            ? 'rounded-full border border-white bg-white text-brand-navy hover:bg-gray-100'
-            : 'w-full justify-center rounded-full'
-        }
+            ? 'border border-white bg-white text-brand-navy hover:bg-gray-100'
+            : 'w-full justify-center',
+        )}
         disabled={updateStatus.isPending}
         onClick={() => {
           setStatusError(null);
@@ -79,13 +81,15 @@ export function CourseStatusSection({
       {...(compact
         ? { role: 'group', 'aria-label': 'Course status actions' }
         : { 'aria-labelledby': 'course-status-title' })}
-      className={
+      className={cn(
         compact
           ? 'flex flex-wrap items-center justify-end gap-2'
-          : 'space-y-4 rounded-3xl bg-white p-5 shadow-md ring-1 ring-gray-200'
-      }
+          : 'space-y-4 rounded-3xl bg-white p-5 shadow-md ring-1 ring-gray-200',
+      )}
     >
-      {statusError && <Alert className={compact ? 'mb-0 basis-full' : 'mb-4'}>{statusError}</Alert>}
+      {statusError && (
+        <Alert className={cn(compact ? 'mb-0 basis-full' : 'mb-4')}>{statusError}</Alert>
+      )}
       {!compact && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -106,11 +110,11 @@ export function CourseStatusSection({
       )}
       {allowedTransitions.length > 0 ? (
         <div
-          className={
+          className={cn(
             compact
               ? 'flex flex-wrap items-center gap-2'
-              : 'space-y-2 border-t border-gray-200 pt-4'
-          }
+              : 'space-y-2 border-t border-gray-200 pt-4',
+          )}
         >
           {!compact && <h3 className="text-xs font-semibold">Change status</h3>}
           {actionButtons}

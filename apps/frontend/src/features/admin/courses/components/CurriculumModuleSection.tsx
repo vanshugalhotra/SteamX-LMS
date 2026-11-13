@@ -4,10 +4,11 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getErrorMessage } from '@/lib/api-errors';
+import { cn } from '@/lib/utils';
 import type { CourseOutlineModule, CourseOutlineLesson } from '../model/types';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { CurriculumLessonRow } from './CurriculumLessonRow';
-import { CourseStatusBadge } from './CourseStatusBadge';
+import { CourseStatusBadge } from '@/components/ui/CourseStatusBadge';
 
 interface CurriculumModuleSectionProps {
   module: CourseOutlineModule;
@@ -68,7 +69,7 @@ export function CurriculumModuleSection({
   const confirmLabel = confirmStatus === 'ACTIVE' ? publishLabel : 'Archive module';
   const isLessonPublishing = lessonStatusAction?.status === 'ACTIVE';
 
-  const move = async (direction: -1 | 1) => {
+  const handleMove = async (direction: -1 | 1) => {
     setActionError(null);
     try {
       await onMove(direction);
@@ -77,7 +78,7 @@ export function CurriculumModuleSection({
     }
   };
 
-  const updateStatus = async () => {
+  const handleUpdateStatus = async () => {
     if (!confirmStatus) return;
     setActionError(null);
     try {
@@ -90,7 +91,7 @@ export function CurriculumModuleSection({
     }
   };
 
-  const updateLessonStatus = async () => {
+  const handleUpdateLessonStatus = async () => {
     if (!lessonStatusAction) return;
     setActionError(null);
     try {
@@ -105,9 +106,7 @@ export function CurriculumModuleSection({
 
   return (
     <section
-      className={`rounded-3xl bg-brand-side p-2 ${
-        module.status === 'ARCHIVED' ? 'opacity-80' : ''
-      }`}
+      className={cn('rounded-3xl bg-brand-side p-2', module.status === 'ARCHIVED' && 'opacity-80')}
     >
       {actionError && <Alert className="mb-3">{actionError}</Alert>}
       <div className="flex flex-wrap items-center gap-2 px-2 py-1.5">
@@ -120,7 +119,7 @@ export function CurriculumModuleSection({
           className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-brand-navy shadow-sm outline-none hover:bg-gray-100 focus-visible:ring-4 focus-visible:ring-ring/40"
         >
           <ChevronDown
-            className={`size-4 transition-transform ${expanded ? '' : '-rotate-90'}`}
+            className={cn('size-4 transition-transform', !expanded && '-rotate-90')}
             aria-hidden="true"
           />
         </button>
@@ -166,7 +165,7 @@ export function CurriculumModuleSection({
               icon: ArrowUp,
               disabled: reordering || index === 0,
               onSelect: () => {
-                void move(-1);
+                void handleMove(-1);
               },
             },
             {
@@ -174,7 +173,7 @@ export function CurriculumModuleSection({
               icon: ArrowDown,
               disabled: reordering || index === count - 1,
               onSelect: () => {
-                void move(1);
+                void handleMove(1);
               },
             },
             ...(canArchive
@@ -230,7 +229,7 @@ export function CurriculumModuleSection({
         pending={statusUpdating}
         pendingLabel={confirmStatus === 'ACTIVE' ? 'Publishing…' : 'Archiving…'}
         onConfirm={() => {
-          void updateStatus();
+          void handleUpdateStatus();
         }}
         onCancel={() => {
           if (!statusUpdating) setConfirmStatus(null);
@@ -248,7 +247,7 @@ export function CurriculumModuleSection({
         pending={lessonStatusUpdating}
         pendingLabel={isLessonPublishing ? 'Publishing…' : 'Archiving…'}
         onConfirm={() => {
-          void updateLessonStatus();
+          void handleUpdateLessonStatus();
         }}
         onCancel={() => {
           if (!lessonStatusUpdating) setLessonStatusAction(null);

@@ -1,10 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CourseStatusBadge } from '@/features/admin/courses/components/CourseStatusBadge';
+import { CourseStatusBadge } from '@/components/ui/CourseStatusBadge';
 import { Spinner } from '@/components/ui/spinner';
 import { SegmentedControl, type SegmentOption } from '@/components/ui/segmented-control';
 import { Eye, PencilLine } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Lesson } from '../model/types';
 import { LESSON_TITLE_MAX_LENGTH } from '../config/lessons.config';
 
@@ -16,17 +17,18 @@ const VIEW_OPTIONS: SegmentOption<LessonEditorView>[] = [
 ];
 
 function SaveStatus({ pending, hasChanges }: { pending: boolean; hasChanges: boolean }) {
-  const { label, dot } = pending
-    ? { label: 'Saving…', dot: 'bg-yellow-500 animate-pulse' }
+  const label = pending ? 'Saving…' : hasChanges ? 'Unsaved changes' : 'All changes saved';
+  const dotClassName = pending
+    ? 'bg-yellow-500 animate-pulse'
     : hasChanges
-      ? { label: 'Unsaved changes', dot: 'bg-yellow-500' }
-      : { label: 'All changes saved', dot: 'bg-teal-400' };
+      ? 'bg-yellow-500'
+      : 'bg-teal-400';
   return (
     <p
       role="status"
       className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700"
     >
-      <span className={`size-2 rounded-full ${dot}`} aria-hidden="true" />
+      <span className={cn('size-2 rounded-full', dotClassName)} aria-hidden="true" />
       {label}
     </p>
   );
