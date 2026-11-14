@@ -26,6 +26,7 @@ export function toAssignmentDefaultsResponse(): AssignmentDefaultsResponseDto {
         maxSizeMb: ASSIGNMENT_LIMITS.fileUpload.maxSizeMb,
         allowedTypes: [...ASSIGNMENT_LIMITS.fileUpload.allowedTypes],
       },
+      feedback: { maxLength: ASSIGNMENT_LIMITS.feedbackMaxLength },
     },
   };
 }

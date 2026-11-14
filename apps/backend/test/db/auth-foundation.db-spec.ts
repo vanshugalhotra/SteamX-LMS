@@ -37,6 +37,7 @@ describe('Authentication foundation reference data', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     prisma = app.get(PrismaService);
+    await replayReferenceMigration(prisma);
     firstAdmin = app.get(FirstAdminService);
     passwords = app.get(PasswordService);
   });
@@ -80,6 +81,32 @@ describe('Authentication foundation reference data', () => {
     };
   }
 
+  async function replayReferenceMigration(
+    database: Prisma.TransactionClient | PrismaService,
+  ): Promise<void> {
+    const migrationDirectories = await readdir(
+      new URL('../../prisma/migrations/', import.meta.url),
+      { withFileTypes: true },
+    );
+    const migrationDirectory = migrationDirectories.find(
+      (entry) => entry.isDirectory() && entry.name.endsWith(REFERENCE_MIGRATION_SUFFIX),
+    );
+    if (!migrationDirectory) {
+      throw new Error('Reference-data migration directory was not found.');
+    }
+
+    const migrationSql = await readFile(
+      new URL(`../../prisma/migrations/${migrationDirectory.name}/migration.sql`, import.meta.url),
+      'utf8',
+    );
+    for (const statement of migrationSql
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter((statement) => statement.length > 0)) {
+      await database.$executeRawUnsafe(statement);
+    }
+  }
+
   it('seeds role-specific permissions', async () => {
     const snapshot = await snapshotReferenceData(prisma);
 
@@ -105,6 +132,7 @@ describe('Authentication foundation reference data', () => {
       'release.manage',
       'school.manage',
       'school.read',
+      'submission.grade',
       'submission.submit',
       'subscription.manage',
       'user.create.student',
@@ -145,38 +173,15 @@ describe('Authentication foundation reference data', () => {
       { role: 'teacher', permission: 'enrollment.manage' },
       { role: 'teacher', permission: 'learning.read' },
       { role: 'teacher', permission: 'release.manage' },
+      { role: 'teacher', permission: 'submission.grade' },
     ]);
   });
 
   it('replays the reference migration idempotently without changing migration history', async () => {
     const before = await snapshotReferenceData(prisma);
-    const migrationDirectories = await readdir(
-      new URL('../../prisma/migrations/', import.meta.url),
-      {
-        withFileTypes: true,
-      },
-    );
-    const migrationDirectory = migrationDirectories.find(
-      (entry) => entry.isDirectory() && entry.name.endsWith(REFERENCE_MIGRATION_SUFFIX),
-    );
-
-    if (!migrationDirectory) {
-      throw new Error('Reference-data migration directory was not found.');
-    }
-
-    const migrationSql = await readFile(
-      new URL(`../../prisma/migrations/${migrationDirectory.name}/migration.sql`, import.meta.url),
-      'utf8',
-    );
-    const statements = migrationSql
-      .split(';')
-      .map((statement) => statement.trim())
-      .filter((statement) => statement.length > 0);
 
     await withRollback(prisma, async (tx) => {
-      for (const statement of statements) {
-        await tx.$executeRawUnsafe(statement);
-      }
+      await replayReferenceMigration(tx);
 
       expect(await snapshotReferenceData(tx)).toEqual(before);
     });

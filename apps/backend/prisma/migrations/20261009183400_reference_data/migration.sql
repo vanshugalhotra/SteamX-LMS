@@ -30,6 +30,7 @@ VALUES
   ('learning.read',          'Read assigned learning deliveries and lessons'),
   ('lesson.complete',        'Complete released student lessons'),
   ('submission.submit',      'Submit and resubmit assignment answers'),
+  ('submission.grade',       'Review and grade assignment submissions'),
   ('release.manage',         'Release and un-release lessons for deliveries'),
   -- Schools
   ('school.manage',          'Create and manage schools'),
@@ -89,7 +90,8 @@ WHERE roles.key = 'teacher'
     'delivery.read',
     'enrollment.manage',
     'learning.read',
-    'release.manage'
+    'release.manage',
+    'submission.grade'
   )
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
