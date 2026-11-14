@@ -15,6 +15,9 @@ import { AssignmentsService } from './assignments.service.js';
 import { AssignmentTemplatesController } from './assignment-template/assignment-templates.controller.js';
 import { AssignmentTemplatesRepository } from './assignment-template/assignment-templates.repository.js';
 import { AssignmentTemplatesService } from './assignment-template/assignment-templates.service.js';
+import { GradingController } from './grading/grading.controller.js';
+import { GradingRepository } from './grading/grading.repository.js';
+import { GradingService } from './grading/grading.service.js';
 
 @Module({
   imports: [PrismaModule, CurriculumModule, DeliveriesModule, SubscriptionsModule],
@@ -22,6 +25,7 @@ import { AssignmentTemplatesService } from './assignment-template/assignment-tem
     AssignmentsController,
     AssignmentTemplatesController,
     DeliveryAssignmentsController,
+    GradingController,
   ],
   providers: [
     AssignmentsService,
@@ -33,6 +37,8 @@ import { AssignmentTemplatesService } from './assignment-template/assignment-tem
     DeliveryAssignmentsService,
     AssignmentTemplateCopyService,
     AssignmentPublishingService,
+    GradingRepository,
+    GradingService,
   ],
   exports: [DeliveryAssignmentsService],
 })

@@ -105,6 +105,7 @@ describe('Authentication foundation reference data', () => {
       'release.manage',
       'school.manage',
       'school.read',
+      'submission.grade',
       'submission.submit',
       'subscription.manage',
       'user.create.student',
@@ -145,6 +146,7 @@ describe('Authentication foundation reference data', () => {
       { role: 'teacher', permission: 'enrollment.manage' },
       { role: 'teacher', permission: 'learning.read' },
       { role: 'teacher', permission: 'release.manage' },
+      { role: 'teacher', permission: 'submission.grade' },
     ]);
   });
 

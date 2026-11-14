@@ -1142,6 +1142,7 @@ Caller: platform admin with `assignment.template.manage`.
 Caller: any authenticated user; no permission is required.
 
 - [auto] When an authenticated teacher or student calls -> expect rubric categories, grade-level code/letter pairs, and the server's assignment limits.
+- [auto] When reading the limits -> expect plain-text feedback maximum length of 5,000 characters.
 - [auto] When no cookie is sent -> expect `401 UNAUTHORIZED`.
 
 ### `/deliveries/:id/assignments`
@@ -1161,3 +1162,19 @@ Caller: teacher with `assignment.manage` and an active teacher assignment to the
 - [auto] When deleting an assignment without submissions -> expect `204`; with a submission -> expect `409`.
 - [auto] When an unassigned or removed teacher, a teacher from another school, or an assignment ID from another delivery is used -> expect `404`. Any active teacher assigned to the delivery can edit.
 - [auto] When platform staff or a student calls -> expect `403`; without a cookie -> expect `401`. Reads continue after subscription expiry; writes return `403 SUBSCRIPTION_EXPIRED`.
+
+### `/deliveries/:id/assignments/:assignmentId/submissions`
+
+Caller: teacher with `submission.grade` and an active teacher assignment to the delivery.
+
+- [auto] When listing submissions -> expect one row per ACTIVE enrollment, ordered by student name and ID; each row includes only student name and SteamX ID, and a submission if one exists. Removed enrollments and students from other deliveries never appear.
+- [auto] When filtering by `NOT_SUBMITTED`, `SUBMITTED`, or `GRADED` and paginating -> expect only matching rows and a total matching the filter.
+- [auto] When reading one submission -> expect answer text and selected option IDs, assignment rubric and ordered items/options without correctness, file metadata only, and the current grade with grader details; auto-grades have `gradedBy: null`. Walk the whole response and assert it has no `isCorrect`, `is_correct`, `blueprint`, `sourceTemplateId`, `storageKey`, `passwordHash`, or `email` key.
+- [auto] When grading an assignment with a rubric -> expect exactly one valid level per rubric category, calculated grade percent/level/letter, trimmed plain-text feedback, and the teacher as grader. When grading a non-rubric, non-MCQ assignment -> expect one valid overall level and null rubric levels.
+- [auto] When a rubric grade includes `level`, an overall grade includes `rubricLevels`, rubric length is wrong, a level code is invalid, or the required grade field is missing -> expect `422 SUBMISSION_GRADE_INVALID` with every `{ field, rule }` problem.
+- [auto] When grading an all-multiple-choice assignment -> expect `409 ASSIGNMENT_AUTO_GRADED`.
+- [auto] When `submittedAt` is not a valid exact ISO timestamp with milliseconds -> expect `422 SUBMISSION_GRADE_INVALID`. When it differs from the latest submission by one second -> expect `409 SUBMISSION_CHANGED` and no grade changes; echoing the current detail timestamp succeeds.
+- [auto] When a second delivery teacher regrades -> expect the grade and `gradedBy` to be overwritten, and the student assignment detail to show the new grade.
+- [auto] When grade and allowed student resubmit run concurrently -> expect no final state combining the new answers with the grade based on the old answers.
+- [auto] When an unassigned or removed teacher, a teacher from another school, or an assignment/submission from another delivery is used -> expect `404`; student or platform staff -> `403`; no cookie -> `401`.
+- [auto] When the subscription is expired -> expect both GET routes to keep working and grading to return `403 SUBSCRIPTION_EXPIRED`. An INACTIVE delivery blocks grading but not reads.

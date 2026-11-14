@@ -23,6 +23,7 @@ import {
 import { PrismaService } from '../../src/prisma/prisma.service.js';
 import {
   createTestStudent,
+  createTestTeacher,
   createTwoSchoolFixture,
   TENANCY_TEST_PASSWORD,
   type TestUserFixture,
@@ -68,6 +69,7 @@ describe('Student assignment reads (e2e)', () => {
   const deliveryIds: string[] = [];
   const assignmentIds: string[] = [];
   const createdStudentIds: string[] = [];
+  const createdTeacherIds: string[] = [];
 
   let moduleAssignmentId: string;
   let submittedAssignmentId: string;
@@ -96,6 +98,7 @@ describe('Student assignment reads (e2e)', () => {
       grantPermissions(setupClient, 'teacher', [
         PERMISSION.ASSIGNMENT_MANAGE,
         PERMISSION.LEARNING_READ,
+        PERMISSION.SUBMISSION_GRADE,
       ]),
       grantPermissions(setupClient, 'admin', [PERMISSION.LEARNING_READ]),
     ]);
@@ -475,6 +478,7 @@ describe('Student assignment reads (e2e)', () => {
           fixture.schoolB.teacher.id,
           fixture.schoolB.student.id,
           ...createdStudentIds,
+          ...createdTeacherIds,
         ],
         [fixture.schoolA.school.id, fixture.schoolB.school.id],
         [fixture.schoolA.section.id, fixture.schoolB.section.id],
@@ -647,6 +651,50 @@ describe('Student assignment reads (e2e)', () => {
       .set('Origin', origin)
       .set('Cookie', cookie)
       .send({ answers });
+  }
+
+  /** Requests the teacher's scoped submission list for an assignment. */
+  function getReviewList(
+    assignmentId: string,
+    query: Record<string, string | number> = {},
+    cookie = teacherCookie,
+    targetDeliveryId = deliveryId,
+  ) {
+    return request(app.getHttpServer())
+      .get(`/api/v1/deliveries/${targetDeliveryId}/assignments/${assignmentId}/submissions`)
+      .set('Cookie', cookie)
+      .query(query);
+  }
+
+  /** Requests one teacher-visible submission detail. */
+  function getReviewDetail(
+    assignmentId: string,
+    submissionId: string,
+    cookie = teacherCookie,
+    targetDeliveryId = deliveryId,
+  ) {
+    return request(app.getHttpServer())
+      .get(
+        `/api/v1/deliveries/${targetDeliveryId}/assignments/${assignmentId}/submissions/${submissionId}`,
+      )
+      .set('Cookie', cookie);
+  }
+
+  /** Sends a complete teacher grade replacement request. */
+  function gradeReview(
+    assignmentId: string,
+    submissionId: string,
+    body: Record<string, unknown>,
+    cookie = teacherCookie,
+    targetDeliveryId = deliveryId,
+  ) {
+    return request(app.getHttpServer())
+      .put(
+        `/api/v1/deliveries/${targetDeliveryId}/assignments/${assignmentId}/submissions/${submissionId}/grade`,
+      )
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .send(body);
   }
 
   function getAssignmentItems(assignmentId: string) {
@@ -1388,6 +1436,412 @@ describe('Student assignment reads (e2e)', () => {
     expectError(await getAssignment(teacherOnlyAssignmentId), 404, 'NOT_FOUND');
   });
 
+  it('lists submission states and returns teacher-safe submission detail', async () => {
+    const listed = await getReviewList(submittedAssignmentId).expect(200);
+    expect(listed.headers['cache-control']).toBe('private, no-store');
+    expect(listed.body.total).toBe(2);
+    const activeEnrollmentOrder = await prisma.deliveryEnrollment.findMany({
+      where: { deliveryId, status: EnrollmentStatus.ACTIVE },
+      orderBy: [{ student: { user: { name: 'asc' } } }, { studentId: 'asc' }],
+      select: { student: { select: { user: { select: { name: true } } } } },
+    });
+    expect(listed.body.items.map((row: { name: string }) => row.name)).toEqual(
+      activeEnrollmentOrder.map(({ student }) => student.user.name),
+    );
+    expect(listed.body.items.map((row: { state: string }) => row.state).sort()).toEqual([
+      'NOT_SUBMITTED',
+      'SUBMITTED',
+    ]);
+    expect(listed.body.items.every((row: Record<string, unknown>) => !('email' in row))).toBe(true);
+    for (const row of listed.body.items as Record<string, unknown>[]) {
+      expect(Object.keys(row).sort()).toEqual(
+        [
+          'studentId',
+          'name',
+          'steamxId',
+          'submissionId',
+          'state',
+          'submittedAt',
+          'isLate',
+          'grade',
+        ].sort(),
+      );
+    }
+    expect(
+      (await getReviewList(submittedAssignmentId, { state: 'NOT_SUBMITTED' }).expect(200)).body
+        .total,
+    ).toBe(1);
+    expect(
+      (await getReviewList(submittedAssignmentId, { state: 'SUBMITTED' }).expect(200)).body.total,
+    ).toBe(1);
+    expect(
+      (await getReviewList(gradedAssignmentId, { state: 'GRADED' }).expect(200)).body.total,
+    ).toBe(1);
+    expect((await getReviewList(gradedAssignmentId).expect(200)).body.items[0].grade).toEqual({
+      percent: 91.25,
+      level: '4',
+      letter: 'A',
+    });
+    expect(
+      (await getReviewList(lateNoSubmissionAssignmentId).expect(200)).body.items.every(
+        (row: { state: string; isLate: boolean }) => row.state === 'NOT_SUBMITTED' && row.isLate,
+      ),
+    ).toBe(true);
+
+    const firstPage = await getReviewList(submittedAssignmentId, { page: 1, limit: 1 }).expect(200);
+    const secondPage = await getReviewList(submittedAssignmentId, { page: 2, limit: 1 }).expect(
+      200,
+    );
+    expect(firstPage.body.total).toBe(2);
+    expect(firstPage.body.items[0].name).toBe(listed.body.items[0].name);
+    expect(secondPage.body.items[0].name).toBe(listed.body.items[1].name);
+    expect(
+      (
+        await getReviewList(otherDeliveryAssignmentId, {}, teacherCookie, otherDeliveryId).expect(
+          200,
+        )
+      ).body.items,
+    ).toEqual([]);
+    await prisma.deliveryEnrollment.create({
+      data: {
+        schoolId: fixture.schoolA.school.id,
+        deliveryId: otherDeliveryId,
+        studentId: unenrolledStudent.id,
+        enrolledById: fixture.schoolA.teacher.id,
+      },
+    });
+    const otherDeliveryRows = (
+      await getReviewList(otherDeliveryAssignmentId, {}, teacherCookie, otherDeliveryId).expect(200)
+    ).body.items;
+    expect(otherDeliveryRows.map((row: { studentId: string }) => row.studentId)).toEqual([
+      unenrolledStudent.id,
+    ]);
+    expect(listed.body.items.map((row: { studentId: string }) => row.studentId)).not.toContain(
+      unenrolledStudent.id,
+    );
+
+    const peerEnrollment = await prisma.deliveryEnrollment.findFirstOrThrow({
+      where: { deliveryId, studentId: otherStudent.id },
+      select: { id: true },
+    });
+    await prisma.deliveryEnrollment.update({
+      where: { id: peerEnrollment.id },
+      data: { status: EnrollmentStatus.REMOVED, endedAt: new Date() },
+    });
+    expect((await getReviewList(submittedAssignmentId).expect(200)).body.total).toBe(1);
+    await prisma.deliveryEnrollment.update({
+      where: { id: peerEnrollment.id },
+      data: { status: EnrollmentStatus.ACTIVE, endedAt: null },
+    });
+
+    const gradedSubmission = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: gradedAssignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { id: true },
+    });
+    const detail = await getReviewDetail(gradedAssignmentId, gradedSubmission.id).expect(200);
+    expect(detail.headers['cache-control']).toBe('private, no-store');
+    expect(detail.body).toMatchObject({
+      student: {
+        id: fixture.schoolA.student.id,
+        steamxId: fixture.schoolA.student.steamxId,
+      },
+      assignment: {
+        id: gradedAssignmentId,
+        title: 'Graded assignment',
+        rubric: [
+          { name: 'Knowledge' },
+          { name: 'Thinking' },
+          { name: 'Application' },
+          { name: 'Communication' },
+        ],
+        items: [{ type: 'TEXT' }, { type: 'FILE_UPLOAD' }],
+      },
+      submission: {
+        state: 'GRADED',
+        answers: [{ answerText: 'My explanation.' }],
+        files: [{ filename: 'student-work.pdf', mimeType: 'application/pdf', sizeBytes: 2048 }],
+        grade: { gradedBy: { id: fixture.schoolA.teacher.id } },
+      },
+    });
+    expect(detail.body.submission.submittedAt).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
+    expect(
+      allJsonKeys(detail.body).filter((key) =>
+        [
+          'isCorrect',
+          'is_correct',
+          'blueprint',
+          'sourceTemplateId',
+          'storageKey',
+          'gradedById',
+          'passwordHash',
+          'email',
+        ].includes(key),
+      ),
+    ).toEqual([]);
+
+    const mcqSubmission = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: mcqAssignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { id: true },
+    });
+    const mcqDetail = await getReviewDetail(mcqAssignmentId, mcqSubmission.id).expect(200);
+    expect(mcqDetail.body.submission.grade.gradedBy).toBeNull();
+    expect(mcqDetail.body.assignment.items[0].options[0]).toEqual(
+      expect.objectContaining({ text: 'First option' }),
+    );
+    expect(mcqDetail.body.assignment.items[0].options[0]).not.toHaveProperty('isCorrect');
+  });
+
+  it('validates, grades, and regrades only against the echoed submission timestamp', async () => {
+    const submission = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: submittedAssignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { id: true },
+    });
+    const detail = await getReviewDetail(submittedAssignmentId, submission.id).expect(200);
+    const submittedAt = detail.body.submission.submittedAt as string;
+    expectError(
+      await gradeReview(submittedAssignmentId, submission.id, {
+        submittedAt: new Date(new Date(submittedAt).getTime() - 1000).toISOString(),
+        level: '3',
+      }),
+      409,
+      'SUBMISSION_CHANGED',
+    );
+    expect(
+      await prisma.submission.findUniqueOrThrow({
+        where: { id: submission.id },
+        select: { status: true, gradePercent: true, gradedById: true },
+      }),
+    ).toMatchObject({ status: SubmissionStatus.SUBMITTED, gradePercent: null, gradedById: null });
+
+    const missingLevel = await gradeReview(submittedAssignmentId, submission.id, {
+      submittedAt,
+    }).expect(422);
+    expect(missingLevel.body).toMatchObject({
+      code: 'SUBMISSION_GRADE_INVALID',
+      details: [{ field: 'level', rule: 'required' }],
+    });
+    await gradeReview(submittedAssignmentId, submission.id, {
+      submittedAt,
+      level: '3',
+      unknown: true,
+    }).expect(400);
+    const allProblems = await gradeReview(submittedAssignmentId, submission.id, {
+      submittedAt: 'not-a-timestamp',
+      rubricLevels: ['bad'],
+    }).expect(422);
+    expect(allProblems.body.details).toEqual(
+      expect.arrayContaining([
+        { field: 'level', rule: 'required' },
+        { field: 'rubricLevels', rule: 'not_allowed_without_rubric' },
+        { field: 'submittedAt', rule: 'must_match_iso_timestamp_with_milliseconds' },
+      ]),
+    );
+
+    const graded = await gradeReview(submittedAssignmentId, submission.id, {
+      submittedAt,
+      level: '3',
+      feedback: '  Clear explanation.  ',
+    }).expect(200);
+    expect(graded.headers['cache-control']).toBe('private, no-store');
+    expect(graded.body.submission.grade).toMatchObject({
+      percent: 74.5,
+      level: '3',
+      letter: 'B',
+      rubricLevels: null,
+      feedback: 'Clear explanation.',
+      gradedBy: { id: fixture.schoolA.teacher.id },
+    });
+    expect(
+      await prisma.submission.findUniqueOrThrow({
+        where: { id: submission.id },
+        select: { overallFeedback: true, gradedById: true },
+      }),
+    ).toEqual({
+      overallFeedback: 'Clear explanation.',
+      gradedById: fixture.schoolA.teacher.id,
+    });
+
+    const rubricSubmission = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: gradedAssignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { id: true },
+    });
+    const rubricDetail = await getReviewDetail(gradedAssignmentId, rubricSubmission.id).expect(200);
+    const rubricModeNotAllowed = await gradeReview(gradedAssignmentId, rubricSubmission.id, {
+      submittedAt: rubricDetail.body.submission.submittedAt,
+      level: '3',
+    }).expect(422);
+    expect(rubricModeNotAllowed.body.details).toEqual(
+      expect.arrayContaining([
+        { field: 'level', rule: 'not_allowed_for_rubric' },
+        { field: 'rubricLevels', rule: 'required' },
+      ]),
+    );
+    const wrongRubricLength = await gradeReview(gradedAssignmentId, rubricSubmission.id, {
+      submittedAt: rubricDetail.body.submission.submittedAt,
+      rubricLevels: ['4', '3'],
+    }).expect(422);
+    expect(wrongRubricLength.body.details).toEqual([
+      { field: 'rubricLevels', rule: 'must_contain_exactly_4_levels' },
+    ]);
+    const invalidRubricLevel = await gradeReview(gradedAssignmentId, rubricSubmission.id, {
+      submittedAt: rubricDetail.body.submission.submittedAt,
+      rubricLevels: ['4', 'bad', '3', '3'],
+    }).expect(422);
+    expect(invalidRubricLevel.body.details).toEqual([
+      { field: 'rubricLevels[1]', rule: 'invalid_level_code' },
+    ]);
+    const passwordHash = await new PasswordService().hash(TENANCY_TEST_PASSWORD);
+    const secondTeacher = await prisma.$transaction((tx) =>
+      createTestTeacher(tx, fixture.schoolA.school.id, passwordHash, 'Second grading teacher'),
+    );
+    createdTeacherIds.push(secondTeacher.id);
+    await prisma.deliveryTeacher.create({
+      data: {
+        schoolId: fixture.schoolA.school.id,
+        deliveryId,
+        teacherId: secondTeacher.id,
+      },
+    });
+    const secondTeacherCookie = await loginAsCookie(app, secondTeacher);
+    const regraded = await gradeReview(
+      gradedAssignmentId,
+      rubricSubmission.id,
+      {
+        submittedAt: rubricDetail.body.submission.submittedAt,
+        rubricLevels: ['4', '4', '3', '3'],
+        feedback: '  Revised rubric feedback.  ',
+      },
+      secondTeacherCookie,
+    ).expect(200);
+    expect(regraded.body.submission.grade).toMatchObject({
+      percent: 82.25,
+      level: '4-',
+      letter: 'A-',
+      rubricLevels: ['4', '4', '3', '3'],
+      feedback: 'Revised rubric feedback.',
+      gradedBy: { id: secondTeacher.id },
+    });
+    expect(
+      (await getAssignment(gradedAssignmentId).expect(200)).body.submission.grade,
+    ).toMatchObject({
+      percent: 82.25,
+      feedback: 'Revised rubric feedback.',
+    });
+    const secondTeacherAssignment = await prisma.deliveryTeacher.findFirstOrThrow({
+      where: { deliveryId, teacherId: secondTeacher.id },
+      select: { id: true },
+    });
+    await prisma.deliveryTeacher.update({
+      where: { id: secondTeacherAssignment.id },
+      data: { removedAt: new Date() },
+    });
+    expectError(
+      await getReviewDetail(gradedAssignmentId, rubricSubmission.id, secondTeacherCookie),
+      404,
+      'NOT_FOUND',
+    );
+
+    const mcqSubmission = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: mcqAssignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { id: true },
+    });
+    expectError(
+      await gradeReview(mcqAssignmentId, mcqSubmission.id, {
+        submittedAt: detail.body.submission.submittedAt,
+        level: '3',
+      }),
+      409,
+      'ASSIGNMENT_AUTO_GRADED',
+    );
+  });
+
+  it('serializes grading and resubmission without grading newly submitted answers', async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const assignmentId = await createPublishedAssignment({
+        title: `Concurrent grade ${attempt}`,
+        dueAt: futureDueDate,
+        blueprint: {
+          allowResubmission: true,
+          items: [{ type: 'TEXT', prompt: 'Explain.' }],
+          rubric: null,
+        },
+      });
+      const [item] = await getAssignmentItems(assignmentId);
+      await submitAssignment(assignmentId, [
+        { itemId: item!.id, answerText: 'Original answer.' },
+      ]).expect(200);
+      const submission = await prisma.submission.findUniqueOrThrow({
+        where: {
+          assignmentId_studentId: {
+            assignmentId,
+            studentId: fixture.schoolA.student.id,
+          },
+        },
+        select: { id: true },
+      });
+      const detail = await getReviewDetail(assignmentId, submission.id).expect(200);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const [gradeResponse] = await Promise.all([
+        gradeReview(assignmentId, submission.id, {
+          submittedAt: detail.body.submission.submittedAt,
+          level: '4',
+        }),
+        submitAssignment(assignmentId, [{ itemId: item!.id, answerText: 'Resubmitted answer.' }]),
+      ]);
+      expect([200, 409]).toContain(gradeResponse.status);
+      expectError(
+        await gradeReview(assignmentId, submission.id, {
+          submittedAt: detail.body.submission.submittedAt,
+          level: '4',
+        }),
+        409,
+        'SUBMISSION_CHANGED',
+      );
+      const final = await prisma.submission.findUniqueOrThrow({
+        where: { id: submission.id },
+        select: {
+          status: true,
+          answers: { select: { answerText: true } },
+          gradePercent: true,
+          gradedById: true,
+        },
+      });
+      expect(final).toMatchObject({
+        status: SubmissionStatus.SUBMITTED,
+        answers: [{ answerText: 'Resubmitted answer.' }],
+        gradePercent: null,
+        gradedById: null,
+      });
+    }
+  });
+
   it('enforces access scope and subscription checks before assignment reads', async () => {
     expectError(await getAssignments({}, unenrolledCookie), 404, 'NOT_FOUND');
     expectError(await getAssignment(moduleAssignmentId, unenrolledCookie), 404, 'NOT_FOUND');
@@ -1418,14 +1872,88 @@ describe('Student assignment reads (e2e)', () => {
     expectError(await getAssignment(moduleAssignmentId, teacherCookie), 403, 'FORBIDDEN');
     expectError(await getAssignments({}, adminCookie), 403, 'FORBIDDEN');
     expectError(await getAssignment(moduleAssignmentId, adminCookie), 403, 'FORBIDDEN');
+    expectError(
+      await getReviewList(submittedAssignmentId, {}, studentCookie),
+      403,
+      'PERMISSION_REQUIRED',
+    );
+    expectError(
+      await getReviewList(submittedAssignmentId, {}, adminCookie),
+      403,
+      'PERMISSION_REQUIRED',
+    );
+    expectError(
+      await getReviewList(submittedAssignmentId, {}, foreignTeacherCookie),
+      404,
+      'NOT_FOUND',
+    );
+    expectError(await getReviewList(otherDeliveryAssignmentId), 404, 'NOT_FOUND');
+    const submission = await prisma.submission.findUniqueOrThrow({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: submittedAssignmentId,
+          studentId: fixture.schoolA.student.id,
+        },
+      },
+      select: { id: true },
+    });
+    expectError(
+      await getReviewDetail(
+        otherDeliveryAssignmentId,
+        submission.id,
+        teacherCookie,
+        otherDeliveryId,
+      ),
+      404,
+      'NOT_FOUND',
+    );
+    const teacherDetail = await getReviewDetail(submittedAssignmentId, submission.id).expect(200);
+    const gradeBody = {
+      submittedAt: teacherDetail.body.submission.submittedAt,
+      level: '3',
+    };
+    const unassignedTeacher = await prisma.$transaction(async (tx) => {
+      const hash = await new PasswordService().hash(TENANCY_TEST_PASSWORD);
+      return createTestTeacher(tx, fixture.schoolA.school.id, hash, 'Unassigned grading teacher');
+    });
+    createdTeacherIds.push(unassignedTeacher.id);
+    const unassignedTeacherCookie = await loginAsCookie(app, unassignedTeacher);
+    expectError(
+      await getReviewList(submittedAssignmentId, {}, unassignedTeacherCookie),
+      404,
+      'NOT_FOUND',
+    );
     await getAssignments().unset('Cookie').expect(401);
     await getAssignment(moduleAssignmentId).unset('Cookie').expect(401);
+    await getReviewList(submittedAssignmentId).unset('Cookie').expect(401);
 
+    await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: DeliveryStatus.INACTIVE },
+    });
+    await getReviewList(submittedAssignmentId).expect(200);
+    await getReviewDetail(submittedAssignmentId, submission.id).expect(200);
+    expectError(
+      await gradeReview(submittedAssignmentId, submission.id, gradeBody),
+      409,
+      'DELIVERY_NOT_ACTIVE',
+    );
+    await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: DeliveryStatus.ACTIVE },
+    });
     await prisma.$executeRaw`
       UPDATE subscriptions
       SET start_date = business_today() - 2, end_date = business_today() - 1
       WHERE id = ${subscriptionId}::uuid
     `;
+    await getReviewList(submittedAssignmentId).expect(200);
+    await getReviewDetail(submittedAssignmentId, submission.id).expect(200);
+    expectError(
+      await gradeReview(submittedAssignmentId, submission.id, gradeBody),
+      403,
+      'SUBSCRIPTION_EXPIRED',
+    );
     expectError(await getAssignments(), 403, 'SUBSCRIPTION_EXPIRED');
     expectError(await getAssignment(moduleAssignmentId), 403, 'SUBSCRIPTION_EXPIRED');
     await prisma.$executeRaw`

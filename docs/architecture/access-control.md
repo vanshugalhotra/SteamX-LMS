@@ -57,6 +57,7 @@ rejects school users while their school is inactive; it does not change their st
   ARCHIVED lessons, including TEACHER_ONLY and unreleased lessons. DRAFT lessons are hidden.
 - Teachers with `assignment.manage` can manage every assignment in a delivery they are actively
   assigned to; unassigned or removed teachers receive 404.
+- Teachers with `submission.grade` can review and grade submissions only in deliveries to which they are actively assigned.
 - School-bound learning actors must match the loaded resource's school and have a current course
   subscription. Hidden or foreign learning resources return 404; expired subscription access
   returns 403 after visibility checks.

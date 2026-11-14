@@ -529,6 +529,7 @@ describe('Assignment template endpoints (e2e)', () => {
         options: { min: 2, max: 6, textMaxLength: 500 },
         rubric: { nameMaxLength: 60, descriptionMaxLength: 500 },
         text: { maxLength: 20000 },
+        feedback: { maxLength: 5000 },
         fileUpload: {
           minFiles: 1,
           maxFiles: 5,
