@@ -87,5 +87,9 @@ export const ADMIN_NAV: NavGroup[] = [
       { label: 'Assignments', icon: ClipboardList },
     ],
   },
-  { id: 'billing', label: 'Billing', items: [{ label: 'Subscriptions', icon: CreditCard }] },
+  {
+    id: 'billing',
+    label: 'Billing',
+    items: [{ label: 'Subscriptions', icon: CreditCard, to: PATHS.admin.subscriptions }],
+  },
 ];
