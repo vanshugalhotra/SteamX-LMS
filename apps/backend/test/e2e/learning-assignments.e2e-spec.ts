@@ -430,6 +430,7 @@ describe('Student assignment reads (e2e)', () => {
     });
     await createSubmission(mcqAssignmentId, fixture.schoolA.student.id, {
       answers: [{ itemIndex: 0, selectedOptionIndex: 0 }],
+      autoGraded: true,
     });
     await createSubmission(lateAssignmentId, fixture.schoolA.student.id);
     await createSubmission(unpublishedAssignmentId, fixture.schoolA.student.id);
@@ -551,6 +552,7 @@ describe('Student assignment reads (e2e)', () => {
         selectedOptionIndex?: number;
       }[];
       fileItemIndex?: number;
+      autoGraded?: boolean;
     } = {},
   ): Promise<void> {
     const submission = await prisma.submission.create({
@@ -581,6 +583,17 @@ describe('Student assignment reads (e2e)', () => {
               answer.selectedOptionIndex === undefined
                 ? null
                 : item.options[answer.selectedOptionIndex]!.id,
+          },
+        });
+      }
+      if (options.autoGraded) {
+        await prisma.submission.update({
+          where: { id: submission.id },
+          data: {
+            status: SubmissionStatus.GRADED,
+            gradePercent: new Prisma.Decimal(50),
+            gradedAt: new Date(),
+            gradedById: null,
           },
         });
       }
@@ -766,9 +779,10 @@ describe('Student assignment reads (e2e)', () => {
     expect(states[1]!.body.items.map((item: { id: string }) => item.id)).toContain(
       submittedAssignmentId,
     );
-    expect(states[2]!.body.items.map((item: { id: string }) => item.id)).toEqual([
-      gradedAssignmentId,
-    ]);
+    expect(states[2]!.body.items.map((item: { id: string }) => item.id)).toEqual(
+      expect.arrayContaining([gradedAssignmentId, mcqAssignmentId]),
+    );
+    expect(states[2]!.body.items).toHaveLength(2);
     expect(states[0]!.body.items.map((item: { id: string }) => item.id)).not.toContain(
       unpublishedAssignmentId,
     );
@@ -1477,7 +1491,12 @@ describe('Student assignment reads (e2e)', () => {
     expect(
       (await getReviewList(gradedAssignmentId, { state: 'GRADED' }).expect(200)).body.total,
     ).toBe(1);
-    expect((await getReviewList(gradedAssignmentId).expect(200)).body.items[0].grade).toEqual({
+    const gradedList = (await getReviewList(gradedAssignmentId).expect(200)).body;
+    expect(
+      gradedList.items.find(
+        (row: { studentId: string }) => row.studentId === fixture.schoolA.student.id,
+      ).grade,
+    ).toEqual({
       percent: 91.25,
       level: '4',
       letter: 'A',
