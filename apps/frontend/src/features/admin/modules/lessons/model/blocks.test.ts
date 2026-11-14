@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { findIncompleteBlockIds, moveBlock, setBlockField } from './blocks';
+import { findIncompleteBlockIds, moveBlock, reorderBlock, setBlockField } from './blocks';
 import type { LessonContentBlock } from './types';
 
 const b = (id: string) => ({ id, type: 'RICH_TEXT', content: {} }) as LessonContentBlock;
@@ -13,6 +13,14 @@ it('returns the same list at the edges', () => {
   const list = [b('a'), b('b')];
   expect(moveBlock(list, 0, -1)).toBe(list);
   expect(moveBlock(list, 1, 1)).toBe(list);
+});
+
+it('reorders blocks to an arbitrary position and ignores invalid positions', () => {
+  const list = [b('a'), b('b'), b('c')];
+  expect(ids(reorderBlock(list, 0, 2))).toEqual(['b', 'c', 'a']);
+  expect(ids(reorderBlock(list, 2, 0))).toEqual(['c', 'a', 'b']);
+  expect(reorderBlock(list, 1, 1)).toBe(list);
+  expect(reorderBlock(list, -1, 1)).toBe(list);
 });
 
 it('finds asset blocks that have no asset yet', () => {

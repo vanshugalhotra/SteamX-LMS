@@ -106,9 +106,22 @@ export function getRichTextDoc(block: LessonContentBlock): JSONContent {
 export function moveBlock(blocks: LessonContentBlock[], index: number, direction: -1 | 1) {
   const target = index + direction;
   if (target < 0 || target >= blocks.length) return blocks;
+  return reorderBlock(blocks, index, target);
+}
+
+export function reorderBlock(blocks: LessonContentBlock[], fromIndex: number, toIndex: number) {
+  if (
+    fromIndex < 0 ||
+    fromIndex >= blocks.length ||
+    toIndex < 0 ||
+    toIndex >= blocks.length ||
+    fromIndex === toIndex
+  ) {
+    return blocks;
+  }
   const next = [...blocks];
-  const [item] = next.splice(index, 1);
-  next.splice(target, 0, item);
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
   return next;
 }
 
