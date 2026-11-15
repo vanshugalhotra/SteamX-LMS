@@ -5,10 +5,6 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import type { AsyncSearchResult } from '@/components/ui/async-select';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { useCourses } from '../courses/queries';
 import {
   createSubscription,
   fetchSubscription,
@@ -51,16 +47,6 @@ export function useSubscription(id: string) {
 }
 
 /** Searches courses for the subscription directory filter. */
-export function useSubscriptionCourseSearch(search: string): AsyncSearchResult {
-  const q = useDebouncedValue(search.trim());
-  const { data, isPending, isError } = useCourses({ page: 1, limit: 20, q });
-  const options = useMemo(
-    () => (data?.items ?? []).map((course) => ({ value: course.id, label: course.title })),
-    [data],
-  );
-  return { options, isPending, isError };
-}
-
 function useInvalidateSubscriptions() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });

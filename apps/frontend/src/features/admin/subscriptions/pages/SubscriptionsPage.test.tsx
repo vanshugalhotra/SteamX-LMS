@@ -4,15 +4,17 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Subscription } from '../model/types';
 
-const { useSubscriptionsMock, schoolSearchMock, courseSearchMock } = vi.hoisted(() => ({
+const { useSubscriptionsMock, schoolSearchMock, useCoursesMock } = vi.hoisted(() => ({
   useSubscriptionsMock: vi.fn(),
   schoolSearchMock: vi.fn(),
-  courseSearchMock: vi.fn(),
+  useCoursesMock: vi.fn(),
 }));
 
 vi.mock('../queries', () => ({
   useSubscriptions: useSubscriptionsMock,
-  useSubscriptionCourseSearch: courseSearchMock,
+}));
+vi.mock('@/features/admin/courses/queries', () => ({
+  useCourses: useCoursesMock,
 }));
 vi.mock('@/features/admin/schools/queries', () => ({
   useAnySchoolSearch: schoolSearchMock,
@@ -38,18 +40,20 @@ const subscription: Subscription = {
 describe('SubscriptionsPage', () => {
   beforeEach(() => {
     useSubscriptionsMock.mockReset().mockReturnValue({
-      data: { items: [subscription], page: 1, limit: 10, total: 1 },
+      data: { items: [subscription], page: 1, limit: 6, total: 1 },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    });
+    useCoursesMock.mockReset().mockReturnValue({
+      data: { items: [{ id: 'course-1', title: 'Robotics' }] },
       isPending: false,
       isError: false,
       refetch: vi.fn(),
     });
     schoolSearchMock.mockReturnValue({
       options: [{ value: 'school-1', label: 'Greenfield School' }],
-      isPending: false,
-      isError: false,
-    });
-    courseSearchMock.mockReturnValue({
-      options: [{ value: 'course-1', label: 'Robotics' }],
       isPending: false,
       isError: false,
     });
@@ -64,18 +68,23 @@ describe('SubscriptionsPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Subscriptions' })).toBeInTheDocument();
     expect(screen.getByText('Greenfield School')).toBeInTheDocument();
-    expect(screen.getByText('Robotics')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Robotics' })).toBeInTheDocument();
     expect(screen.getByText('1 Nov 2026 – 30 Jun 2027')).toBeInTheDocument();
-    expect(screen.getByText('2 of 4')).toBeInTheDocument();
+    expect(screen.getByText(/2 of 4\s+deliveries/)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Active deliveries used' })).toHaveAttribute(
+      'aria-valuenow',
+      '2',
+    );
     expect(screen.getByText('Active', { selector: 'span' })).toBeInTheDocument();
   });
 
   it('distinguishes an empty directory from an empty filtered result', async () => {
     const user = userEvent.setup();
     useSubscriptionsMock.mockReturnValue({
-      data: { items: [], page: 1, limit: 10, total: 0 },
+      data: { items: [], page: 1, limit: 6, total: 0 },
       isPending: false,
       isError: false,
+      isPlaceholderData: false,
       refetch: vi.fn(),
     });
 
@@ -104,13 +113,12 @@ describe('SubscriptionsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Upcoming' }));
     await user.click(screen.getByRole('combobox', { name: 'Filter by school' }));
     await user.click(screen.getByRole('option', { name: 'Greenfield School' }));
-    await user.click(screen.getByRole('combobox', { name: 'Filter by course' }));
-    await user.click(screen.getByRole('option', { name: 'Robotics' }));
+    await user.click(screen.getByRole('button', { name: 'Robotics' }));
 
     await waitFor(() => {
       expect(useSubscriptionsMock).toHaveBeenLastCalledWith({
         page: 1,
-        limit: 10,
+        limit: 6,
         schoolId: 'school-1',
         courseId: 'course-1',
         status: 'UPCOMING',
