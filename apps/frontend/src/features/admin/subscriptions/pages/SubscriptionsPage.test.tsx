@@ -67,6 +67,7 @@ describe('SubscriptionsPage', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Subscriptions' })).toBeInTheDocument();
+    expect(screen.queryByText('Matching terms')).not.toBeInTheDocument();
     expect(screen.getByText('Greenfield School')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Robotics' })).toBeInTheDocument();
     expect(screen.getByText('1 Nov 2026 – 30 Jun 2027')).toBeInTheDocument();

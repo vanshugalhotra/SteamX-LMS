@@ -28,7 +28,7 @@ export function SubscriptionsPage() {
   } = useListParams<SubscriptionStatusFilter>('ALL');
   const [courseId, setCourseId] = useState('');
   const courses = useCourses({ page: 1, limit: 100, q: '' });
-  const { data, isPending, isError, isPlaceholderData, refetch } = useSubscriptions({
+  const { data, isPending, isError, refetch } = useSubscriptions({
     page,
     limit: SUBSCRIPTIONS_PAGE_SIZE,
     schoolId: schoolId || undefined,
@@ -40,19 +40,13 @@ export function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       <BrandBackdrop className="rounded-3xl p-6 text-brand-navy lg:p-8">
-        <div className="relative flex flex-wrap items-end justify-between gap-5">
+        <div className="relative">
           <div className="max-w-xl">
             <h1 className="text-2xl font-semibold">Subscriptions</h1>
             <p className="mt-1 text-xs">
               Control which schools can use each course, for how long, and how many deliveries they
               can run.
             </p>
-          </div>
-          <div className="min-w-32 rounded-2xl bg-white/35 px-5 py-3">
-            <p className="text-2xl font-semibold leading-none">
-              {isPlaceholderData ? '—' : (data?.total ?? '—')}
-            </p>
-            <p className="mt-1 text-[11px] font-medium">Matching terms</p>
           </div>
         </div>
       </BrandBackdrop>
