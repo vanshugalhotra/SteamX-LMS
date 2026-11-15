@@ -32,8 +32,8 @@ export function coursesQueryOptions(params: CourseListParams) {
   });
 }
 
-export function useCourses(params: CourseListParams) {
-  return useQuery(coursesQueryOptions(params));
+export function useCourses(params: CourseListParams, options: { enabled?: boolean } = {}) {
+  return useQuery({ ...coursesQueryOptions(params), ...options });
 }
 
 export function useCourse(id: string) {
