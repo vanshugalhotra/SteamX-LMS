@@ -57,15 +57,20 @@ export function toStudentAssignmentDetail(
     canSubmit: canSubmit(assignment, submission),
     isLate: isLate(submission, assignment.dueAt, now),
     rubric: rubricItems(assignment.rubric),
-    items: assignment.items.map((item) => ({
-      id: item.id,
-      position: item.position,
-      type: item.type,
-      prompt: item.prompt,
-      config: item.config,
-      options: item.options.map(({ id, position, text }) => ({ id, position, text })),
-    })),
+    items: assignment.items.map(toStudentSafeAssignmentItem),
     submission: submission === null ? null : toStudentSubmission(submission, assignment.dueAt, now),
+  };
+}
+
+/** Maps an assignment item without exposing option correctness or other authoring fields. */
+export function toStudentSafeAssignmentItem(item: StudentAssignmentDetailRecord['items'][number]) {
+  return {
+    id: item.id,
+    position: item.position,
+    type: item.type,
+    prompt: item.prompt,
+    config: item.config,
+    options: item.options.map(({ id, position, text }) => ({ id, position, text })),
   };
 }
 

@@ -37,6 +37,7 @@ export const ASSIGNMENT_LIMITS = {
   text: {
     maxLength: 20000,
   },
+  feedbackMaxLength: 5000,
   fileUpload: {
     minFiles: 1,
     maxFiles: 5,

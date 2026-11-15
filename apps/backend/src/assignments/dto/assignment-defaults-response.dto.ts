@@ -67,6 +67,11 @@ export class AssignmentFileUploadLimitsDto {
   allowedTypes!: typeof ASSIGNMENT_LIMITS.fileUpload.allowedTypes;
 }
 
+export class AssignmentFeedbackLimitsDto {
+  @ApiProperty({ example: ASSIGNMENT_LIMITS.feedbackMaxLength })
+  maxLength!: number;
+}
+
 export class AssignmentDefaultLimitsDto {
   @ApiProperty({ example: ASSIGNMENT_LIMITS.titleMaxLength })
   titleMaxLength!: number;
@@ -91,6 +96,9 @@ export class AssignmentDefaultLimitsDto {
 
   @ApiProperty({ type: AssignmentFileUploadLimitsDto })
   fileUpload!: typeof ASSIGNMENT_LIMITS.fileUpload;
+
+  @ApiProperty({ type: AssignmentFeedbackLimitsDto })
+  feedback!: AssignmentFeedbackLimitsDto;
 }
 
 export class AssignmentDefaultsResponseDto {

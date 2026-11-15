@@ -351,6 +351,9 @@ describe('Documented API workflows', () => {
         ) {
           options.body = { answers: [] };
         }
+        if (route.method === 'PUT' && route.path.endsWith('/submissions/:submissionId/grade')) {
+          options.body = { submittedAt: new Date().toISOString(), level: '4' };
+        }
         if (route.method === 'POST' || route.method === 'PATCH' || route.method === 'DELETE') {
           options.body = {};
           if (route.method === 'POST' && route.path.endsWith('/deliveries/:id/enrollments')) {

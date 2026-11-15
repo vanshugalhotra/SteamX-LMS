@@ -25,6 +25,7 @@ fallback mapping.
 | ---------------------------------------- | ----------: | ---------------------------------------------------------------------------- | --------------------------------------- |
 | `ASSET_NOT_READY`                        |         409 | Asset has no ready file.                                                     | None                                    |
 | `ASSET_TYPE_NOT_SUPPORTED`               |         400 | Upload type is unsupported.                                                  | None                                    |
+| `ASSIGNMENT_AUTO_GRADED`                 |         409 | A teacher tries to manually grade an all-multiple-choice assignment.         | None                                    |
 | `ASSIGNMENT_BLUEPRINT_INVALID`           |         409 | An assignment blueprint is incomplete or invalid for publishing.             | Blueprint problem array                 |
 | `ASSIGNMENT_CONTENT_LOCKED`              |         409 | Assignment content is locked by status, submissions, or template-copy rules. | None                                    |
 | `ASSIGNMENT_DUE_DATE_REQUIRED`           |         409 | An assignment has no due date at publish time.                               | None                                    |
@@ -79,6 +80,8 @@ fallback mapping.
 | `STEAMX_ID_UNAVAILABLE`                  |         409 | A SteamX ID cannot be allocated after retries.                               | None                                    |
 | `STUDENT_NOT_ACTIVE`                     |         409 | An inactive student is enrolled.                                             | `{ studentIds: string[] }`              |
 | `STUDENT_NOT_FOUND`                      |         404 | One or more students are outside the delivery school.                        | `{ studentIds: string[] }`              |
+| `SUBMISSION_CHANGED`                     |         409 | The student resubmitted since the teacher reviewed the work.                 | None                                    |
+| `SUBMISSION_GRADE_INVALID`               |         422 | A grade payload does not match the assignment's grading mode.                | `{ field: string, rule: string }[]`     |
 | `SUBSCRIPTION_ALREADY_ENDED`             |         409 | An ended subscription is changed again.                                      | None                                    |
 | `SUBSCRIPTION_EXPIRED`                   |         403 | The school's subscription is not active.                                     | None                                    |
 | `SUBSCRIPTION_INVALID_DATE_RANGE`        |         400 | The end date is before the start date.                                       | None                                    |

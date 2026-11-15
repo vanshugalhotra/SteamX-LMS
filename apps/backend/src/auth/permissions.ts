@@ -25,6 +25,7 @@ export const PERMISSION = {
   LEARNING_READ: 'learning.read',
   LESSON_COMPLETE: 'lesson.complete',
   SUBMISSION_SUBMIT: 'submission.submit',
+  SUBMISSION_GRADE: 'submission.grade',
 } as const;
 
 export type PermissionKey = (typeof PERMISSION)[keyof typeof PERMISSION];

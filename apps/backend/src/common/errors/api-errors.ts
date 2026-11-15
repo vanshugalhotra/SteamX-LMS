@@ -132,6 +132,11 @@ export const API_ERROR = {
     SUBMISSION_ALREADY_EXISTS: 'A submission already exists and resubmission is disabled',
     SUBMISSION_FILES_NOT_SUPPORTED: 'File submissions are not supported yet',
     SUBMISSION_INVALID: 'Submission answers are invalid',
+    SUBMISSION_GRADE_INVALID: 'Submission grade is invalid',
+    SUBMISSION_CHANGED:
+      'The student resubmitted this work. Review the latest submission before grading.',
+    ASSIGNMENT_AUTO_GRADED:
+      'Multiple-choice assignments are auto-graded and cannot be graded manually',
   }),
 
   ...defineErrors({

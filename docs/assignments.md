@@ -75,6 +75,25 @@ Student responses omit answer correctness, answer keys, template and teacher det
 and file URLs. File metadata is available in assignment detail; file downloads are a separate
 workflow.
 
+## Review and grading
+
+Teachers with `submission.grade` can review submissions for a delivery where they are actively
+assigned. The paginated submission list has one row per ACTIVE enrollment and reports `NOT_SUBMITTED`,
+`SUBMITTED`, or `GRADED`; removed enrollments are not included. For `NOT_SUBMITTED`, `isLate` predicts
+whether a submission now would be late.
+
+The grading mode is derived from the assignment, never from the request. A rubric requires one valid
+grade-level code per rubric category. An assignment without a rubric uses one overall grade level,
+except all-multiple-choice assignments, which are auto-graded and cannot be manually graded.
+Teachers can regrade; a new grade replaces the prior grade and grader without keeping history.
+
+The detail response includes student name and SteamX ID, student-safe items and option text, answers,
+file metadata, and the current grade. It never includes option correctness, answer keys, student email,
+or file storage keys/URLs. Before grading, the client must echo `submittedAt` exactly as returned by
+detail (including milliseconds). A changed timestamp means the student resubmitted and the work must
+be reviewed again. Grade feedback is plain text; blank feedback is stored as null.
+Feedback is limited to 5,000 characters.
+
 ## Submitting
 
 Students submit one answer for every item. The PUT replaces the complete answer set when
