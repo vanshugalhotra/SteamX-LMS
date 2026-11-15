@@ -73,9 +73,7 @@ export function SubscriptionAccessFields({
           </div>
         )}
         {!courses.isPending && !courses.isError && courses.data.items.length === 0 && (
-          <p className="text-xs text-gray-600 sm:col-span-2">
-            No active courses are available.
-          </p>
+          <p className="text-xs text-gray-600 sm:col-span-2">No active courses are available.</p>
         )}
         {!courses.isError && (
           <p className="text-xs text-gray-600 sm:col-span-2">

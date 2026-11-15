@@ -147,10 +147,7 @@ export function SubscriptionsPage() {
         ) : data.items.length ? (
           <div className="grid gap-4 p-2 sm:grid-cols-2 xl:grid-cols-3">
             {data.items.map((subscription) => (
-              <SubscriptionCard
-                key={subscription.id}
-                subscription={subscription}
-              />
+              <SubscriptionCard key={subscription.id} subscription={subscription} />
             ))}
           </div>
         ) : (

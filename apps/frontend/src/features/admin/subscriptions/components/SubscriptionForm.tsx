@@ -185,8 +185,7 @@ export function SubscriptionForm({ subscription, onDone, onCancel }: Subscriptio
           type="submit"
           disabled={
             busy ||
-            (!subscription &&
-              (courses.isPending || courses.isError || !courses.data.items.length))
+            (!subscription && (courses.isPending || courses.isError || !courses.data.items.length))
           }
         >
           {busy
