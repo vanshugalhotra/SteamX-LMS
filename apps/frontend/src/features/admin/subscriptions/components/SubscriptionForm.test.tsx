@@ -118,6 +118,7 @@ describe('SubscriptionForm', () => {
     fireEvent.change(screen.getByLabelText('End date *'), {
       target: { value: '2027-06-29' },
     });
+    await user.type(screen.getByLabelText('Max deliveries *'), '4');
     await user.click(screen.getByRole('button', { name: 'Create subscription' }));
 
     expect(
