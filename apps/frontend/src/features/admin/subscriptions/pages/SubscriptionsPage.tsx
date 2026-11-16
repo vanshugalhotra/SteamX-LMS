@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { BrandBackdrop } from '@/features/admin/components/BrandBackdrop';
 import { AsyncSelect } from '@/components/ui/async-select';
 import { Pagination } from '@/components/ui/pagination';
 import { ListToolbar } from '@/components/list/ListToolbar';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { ButtonLink } from '@/components/ui/button-link';
 import { useCourses } from '@/features/admin/courses/queries';
 import { useAnySchoolSearch } from '@/features/admin/schools/queries';
 import { useListParams } from '@/lib/use-list-params';
+import { PATHS } from '@/lib/paths';
 import {
   SUBSCRIPTIONS_PAGE_SIZE,
   SUBSCRIPTION_STATUS_FILTERS,
@@ -40,7 +43,7 @@ export function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       <BrandBackdrop className="rounded-3xl p-6 text-brand-navy lg:p-8">
-        <div className="relative">
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-xl">
             <h1 className="text-2xl font-semibold">Subscriptions</h1>
             <p className="mt-1 text-xs">
@@ -48,6 +51,15 @@ export function SubscriptionsPage() {
               can run.
             </p>
           </div>
+          <ButtonLink
+            to={PATHS.admin.subscriptionNew}
+            variant="dark"
+            size="sm"
+            className="rounded-full bg-brand-navy text-white hover:bg-brand-navy/90"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            New subscription
+          </ButtonLink>
         </div>
       </BrandBackdrop>
 
@@ -144,6 +156,17 @@ export function SubscriptionsPage() {
               {hasFilters ? 'No subscriptions match your filters.' : 'No subscriptions yet.'}
             </p>
             {hasFilters && <p className="mt-1 text-xs text-gray-600">Try a different filter.</p>}
+            {!hasFilters && (
+              <ButtonLink
+                to={PATHS.admin.subscriptionNew}
+                variant="dark"
+                size="sm"
+                className="mt-4 rounded-full"
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                New subscription
+              </ButtonLink>
+            )}
           </div>
         )}
         {data && data.total > 0 && (

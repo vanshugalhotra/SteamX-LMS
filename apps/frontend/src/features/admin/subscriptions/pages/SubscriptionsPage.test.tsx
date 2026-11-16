@@ -21,6 +21,7 @@ vi.mock('@/features/admin/schools/queries', () => ({
 }));
 
 import { SubscriptionsPage } from './SubscriptionsPage';
+import { PATHS } from '@/lib/paths';
 
 const subscription: Subscription = {
   id: 'subscription-1',
@@ -67,6 +68,10 @@ describe('SubscriptionsPage', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Subscriptions' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'New subscription' })).toHaveAttribute(
+      'href',
+      PATHS.admin.subscriptionNew,
+    );
     expect(screen.queryByText('Matching terms')).not.toBeInTheDocument();
     expect(screen.getByText('Greenfield School')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Robotics' })).toBeInTheDocument();
@@ -77,6 +82,12 @@ describe('SubscriptionsPage', () => {
       '2',
     );
     expect(screen.getByText('Active', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Renew' })).toHaveAttribute(
+      'href',
+      PATHS.admin.subscriptionRenew(subscription.id),
+    );
+    expect(screen.getByRole('button', { name: 'Revoke' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Revoke' })).toHaveClass('text-[#b03a55]');
   });
 
   it('distinguishes an empty directory from an empty filtered result', async () => {

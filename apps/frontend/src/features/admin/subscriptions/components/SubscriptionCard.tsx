@@ -1,5 +1,8 @@
 import { CreditCard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ButtonLink } from '@/components/ui/button-link';
 import { formatDate } from '@/lib/date-helper';
+import { PATHS } from '@/lib/paths';
 import { cn } from '@/lib/utils';
 import { SubscriptionStatusBadge } from './SubscriptionStatusBadge';
 import type { Subscription } from '../model/types';
@@ -15,7 +18,11 @@ function formatSubscriptionDate(value: string) {
   return formatDate(`${value}T00:00:00`, 'en-GB', SUBSCRIPTION_DATE_FORMAT);
 }
 
-export function SubscriptionCard({ subscription }: { subscription: Subscription }) {
+interface SubscriptionCardProps {
+  subscription: Subscription;
+}
+
+export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
   const usage = Math.min(100, (subscription.activeDeliveries / subscription.maxDeliveries) * 100);
   const term = `${formatSubscriptionDate(subscription.startDate)} – ${formatSubscriptionDate(subscription.endDate)}`;
 
@@ -64,6 +71,28 @@ export function SubscriptionCard({ subscription }: { subscription: Subscription 
             className="h-full rounded-full bg-brand-teal"
             style={{ width: `${String(usage)}%` }}
           />
+        </div>
+        <div className="flex gap-2">
+          <ButtonLink
+            to={PATHS.admin.subscriptionRenew(subscription.id)}
+            variant="outline"
+            size="sm"
+            className="flex-1"
+          >
+            Renew
+          </ButtonLink>
+          {subscription.status !== 'EXPIRED' && (
+            <Button
+              type="button"
+              variant="dangerOutline"
+              size="sm"
+              className="flex-1"
+              disabled
+              title="Revoke is not available yet."
+            >
+              Revoke
+            </Button>
+          )}
         </div>
       </div>
     </article>
