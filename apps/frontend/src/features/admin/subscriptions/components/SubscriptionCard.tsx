@@ -1,12 +1,17 @@
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ButtonLink } from '@/components/ui/button-link';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatDate } from '@/lib/date-helper';
+import { getErrorMessage } from '@/lib/api-errors';
 import { PATHS } from '@/lib/paths';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { SubscriptionStatusBadge } from './SubscriptionStatusBadge';
 import type { Subscription } from '../model/types';
 import { getSubscriptionCourseAccent } from '../config/subscriptions.config';
+import { useRevokeSubscription } from '../queries';
 
 const SUBSCRIPTION_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   day: 'numeric',
@@ -23,8 +28,19 @@ interface SubscriptionCardProps {
 }
 
 export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const revoke = useRevokeSubscription();
   const usage = Math.min(100, (subscription.activeDeliveries / subscription.maxDeliveries) * 100);
   const term = `${formatSubscriptionDate(subscription.startDate)} – ${formatSubscriptionDate(subscription.endDate)}`;
+  const confirmRevoke = async () => {
+    try {
+      await revoke.mutateAsync(subscription.id);
+      setRevokeOpen(false);
+      toast.success('Subscription revoked');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
 
   return (
     <article className="overflow-hidden rounded-3xl bg-white shadow-md transition-shadow hover:shadow-lg">
@@ -72,7 +88,16 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
             style={{ width: `${String(usage)}%` }}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink
+            to={PATHS.admin.subscriptionEdit(subscription.id)}
+            variant="outline"
+            size="sm"
+            className="flex-1"
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Edit
+          </ButtonLink>
           <ButtonLink
             to={PATHS.admin.subscriptionRenew(subscription.id)}
             variant="outline"
@@ -87,14 +112,30 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
               variant="dangerOutline"
               size="sm"
               className="flex-1"
-              disabled
-              title="Revoke is not available yet."
+              disabled={revoke.isPending}
+              onClick={() => {
+                setRevokeOpen(true);
+              }}
             >
               Revoke
             </Button>
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={revokeOpen}
+        title="Revoke this subscription?"
+        description="Upcoming access will be removed. Current access will end immediately. This action cannot be undone."
+        confirmLabel="Revoke subscription"
+        pending={revoke.isPending}
+        pendingLabel="Revoking…"
+        onConfirm={() => {
+          void confirmRevoke();
+        }}
+        onCancel={() => {
+          if (!revoke.isPending) setRevokeOpen(false);
+        }}
+      />
     </article>
   );
 }

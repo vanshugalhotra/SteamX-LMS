@@ -14,7 +14,7 @@ export function SubscriptionCreatePage() {
       title="New subscription"
       subtitle="Grant a school access to an active course for a defined term."
     >
-      <SubscriptionForm onDone={backToDirectory} onCancel={backToDirectory} />
+      <SubscriptionForm mode="create" onDone={backToDirectory} onCancel={backToDirectory} />
     </SubscriptionFormLayout>
   );
 }

@@ -14,9 +14,10 @@ import type {
   CreateSubscriptionPayload,
   RenewSubscriptionPayload,
   Subscription,
+  UpdateSubscriptionPayload,
 } from '../model/types';
 import { subscriptionFormSchema, type SubscriptionFormValues } from '../model/schemas';
-import { useCreateSubscription, useRenewSubscription } from '../queries';
+import { useCreateSubscription, useRenewSubscription, useUpdateSubscription } from '../queries';
 import { SubscriptionAccessFields } from './SubscriptionAccessFields';
 import { SubscriptionTermsFields } from './SubscriptionTermsFields';
 
@@ -36,37 +37,52 @@ function addDateDays(value: string, days: number) {
   return formatDateOnly(result.getUTCFullYear(), result.getUTCMonth() + 1, result.getUTCDate());
 }
 
-function getDefaultStartDate(subscription?: Subscription) {
+function formatSubscriptionDate(value: string) {
+  return formatDate(`${value}T00:00:00`, 'en-GB', DATE_FORMAT);
+}
+
+type SubscriptionFormProps =
+  | { mode: 'create'; onDone: () => void; onCancel: () => void }
+  | {
+      mode: 'edit' | 'renew';
+      subscription: Subscription;
+      onDone: () => void;
+      onCancel: () => void;
+    };
+
+function getDefaultStartDate(
+  subscription: Subscription | undefined,
+  mode: 'create' | 'edit' | 'renew',
+) {
+  if (subscription && mode === 'edit') return subscription.startDate;
   if (subscription) return addDateDays(subscription.endDate, 1);
   const today = new Date();
   return formatDateOnly(today.getFullYear(), today.getMonth() + 1, today.getDate());
 }
 
-function getDefaultEndDate(startDate: string) {
+function getDefaultEndDate(
+  startDate: string,
+  subscription: Subscription | undefined,
+  mode: SubscriptionFormProps['mode'],
+) {
+  if (subscription && mode === 'edit') return subscription.endDate;
   const [year, month, day] = startDate.split('-').map(Number);
   const result = new Date(Date.UTC(year + 1, month - 1, day - 1));
   return formatDateOnly(result.getUTCFullYear(), result.getUTCMonth() + 1, result.getUTCDate());
 }
 
-function formatSubscriptionDate(value: string) {
-  return formatDate(`${value}T00:00:00`, 'en-GB', DATE_FORMAT);
-}
-
-interface SubscriptionFormProps {
-  subscription?: Subscription;
-  onDone: () => void;
-  onCancel: () => void;
-}
-
-export function SubscriptionForm({ subscription, onDone, onCancel }: SubscriptionFormProps) {
+export function SubscriptionForm(props: SubscriptionFormProps) {
+  const { mode, onDone, onCancel } = props;
+  const subscription = mode === 'create' ? undefined : props.subscription;
   const create = useCreateSubscription();
   const renew = useRenewSubscription();
+  const update = useUpdateSubscription();
   const courses = useCourses(
     { page: 1, limit: 100, q: '', status: 'ACTIVE' },
     { enabled: !subscription },
   );
   const [formError, setFormError] = useState<string | null>(null);
-  const startDate = getDefaultStartDate(subscription);
+  const startDate = getDefaultStartDate(subscription, mode);
   const {
     register,
     control,
@@ -80,11 +96,11 @@ export function SubscriptionForm({ subscription, onDone, onCancel }: Subscriptio
       schoolId: subscription?.schoolId ?? '',
       courseId: subscription?.courseId ?? '',
       startDate,
-      endDate: getDefaultEndDate(startDate),
+      endDate: getDefaultEndDate(startDate, subscription, mode),
       maxDeliveries: subscription?.maxDeliveries,
     },
   });
-  const busy = isSubmitting || create.isPending || renew.isPending;
+  const busy = isSubmitting || create.isPending || renew.isPending || update.isPending;
 
   const showError = (error: unknown) => {
     const fieldErrors = getFieldErrors(error);
@@ -99,8 +115,14 @@ export function SubscriptionForm({ subscription, onDone, onCancel }: Subscriptio
     if (hasMappedFieldError) return;
 
     if (hasErrorCode(error, API_ERROR_CODE.SUBSCRIPTION_OVERLAP)) {
-      setError('startDate', { message: getErrorMessage(error) });
-      setFocus('startDate');
+      const field = mode === 'edit' ? 'endDate' : 'startDate';
+      setError(field, { message: getErrorMessage(error) });
+      setFocus(field);
+      return;
+    }
+    if (hasErrorCode(error, API_ERROR_CODE.DELIVERY_CAP_BELOW_ACTIVE)) {
+      setError('maxDeliveries', { message: getErrorMessage(error) });
+      setFocus('maxDeliveries');
       return;
     }
     setFormError(getErrorMessage(error));
@@ -110,7 +132,14 @@ export function SubscriptionForm({ subscription, onDone, onCancel }: Subscriptio
     if (busy) return;
     setFormError(null);
     try {
-      if (subscription) {
+      if (mode === 'edit' && subscription) {
+        const body: UpdateSubscriptionPayload = {
+          endDate: values.endDate,
+          maxDeliveries: values.maxDeliveries,
+        };
+        await update.mutateAsync({ id: subscription.id, body });
+        toast.success('Subscription updated');
+      } else if (mode === 'renew' && subscription) {
         const body: RenewSubscriptionPayload = {
           startDate: values.startDate,
           endDate: values.endDate,
@@ -146,8 +175,9 @@ export function SubscriptionForm({ subscription, onDone, onCancel }: Subscriptio
       {formError && <Alert>{formError}</Alert>}
       {subscription && (
         <p className="rounded-xl bg-gray-50 p-4 text-xs leading-relaxed text-gray-600">
-          Renewing adds a new term that starts after {formatSubscriptionDate(subscription.endDate)}.
-          The current term stays on record.
+          {mode === 'edit'
+            ? 'Update the subscription end date or delivery limit. School, course, and start date cannot be changed.'
+            : `Renewing adds a new term that starts after ${formatSubscriptionDate(subscription.endDate)}. The current term stays on record.`}
         </p>
       )}
 
@@ -175,7 +205,12 @@ export function SubscriptionForm({ subscription, onDone, onCancel }: Subscriptio
           courses={courses}
         />
       )}
-      <SubscriptionTermsFields register={register} errors={errors} disabled={busy} />
+      <SubscriptionTermsFields
+        register={register}
+        errors={errors}
+        disabled={busy}
+        startDateDisabled={mode === 'edit'}
+      />
 
       <div className="flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-5">
         <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
@@ -189,12 +224,16 @@ export function SubscriptionForm({ subscription, onDone, onCancel }: Subscriptio
           }
         >
           {busy
-            ? subscription
-              ? 'Renewing…'
-              : 'Creating…'
-            : subscription
-              ? 'Renew subscription'
-              : 'Create subscription'}
+            ? mode === 'create'
+              ? 'Creating…'
+              : mode === 'edit'
+                ? 'Saving…'
+                : 'Renewing…'
+            : mode === 'create'
+              ? 'Create subscription'
+              : mode === 'edit'
+                ? 'Save changes'
+                : 'Renew subscription'}
         </Button>
       </div>
     </form>
