@@ -114,7 +114,8 @@ export class LearningController {
   @Get('deliveries/:id/progress')
   @ApiOperation({ summary: 'Get student delivery progress' })
   @ApiOkResponse({
-    description: 'Released student lesson totals and completions grouped by module.',
+    description:
+      'Released student lesson totals and completions grouped by module, plus visible assignment states. Assignment pending means there is no submission; ASG-4 calls this NOT_SUBMITTED.',
     type: LearningProgressResponseDto,
   })
   @ApiBadRequestResponse({ description: 'The delivery ID is not a UUID.' })

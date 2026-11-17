@@ -3,6 +3,7 @@ import { SubmissionStatus } from '../../generated/prisma/client.js';
 import {
   canSubmit,
   isLate,
+  revealCorrectness,
   STUDENT_SUBMISSION_STATE,
   submissionState,
 } from './assignment-student-rules.js';
@@ -61,5 +62,17 @@ describe('student assignment rules', () => {
     expect(
       canSubmit({ allowResubmission: true }, { ...submission, status: SubmissionStatus.GRADED }),
     ).toBe(true);
+  });
+
+  it('reveals correctness only when resubmission is disabled or the deadline has passed', () => {
+    const beforeDeadline = new Date(dueAt.getTime() - 1);
+    const atDeadline = new Date(dueAt);
+    const afterDeadline = new Date(dueAt.getTime() + 1);
+
+    expect(revealCorrectness(false, dueAt, beforeDeadline)).toBe(true);
+    expect(revealCorrectness(true, dueAt, beforeDeadline)).toBe(false);
+    expect(revealCorrectness(true, dueAt, atDeadline)).toBe(false);
+    expect(revealCorrectness(true, dueAt, afterDeadline)).toBe(true);
+    expect(revealCorrectness(true, null, afterDeadline)).toBe(false);
   });
 });

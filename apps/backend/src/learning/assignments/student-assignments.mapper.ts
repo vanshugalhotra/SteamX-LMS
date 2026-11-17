@@ -1,13 +1,28 @@
 /** Maps explicitly selected assignment records to the student-safe API shapes. */
 import { SubmissionStatus, type Prisma } from '../../generated/prisma/client.js';
-import { gradeFromPercent, isLevelCode, type LevelCode } from '../../grading/grade-scale.js';
-import { canSubmit, isLate, submissionState } from './assignment-student-rules.js';
+import {
+  averagePercent,
+  gradeFromPercent,
+  isLevelCode,
+  type LevelCode,
+} from '../../grading/grade-scale.js';
+import {
+  canSubmit,
+  isLate,
+  revealCorrectness,
+  STUDENT_SUBMISSION_STATE,
+  submissionState,
+} from './assignment-student-rules.js';
 import type {
+  StudentAssignmentDetailSubmissionDto,
   StudentAssignmentDetailResponseDto,
+  StudentAssignmentSubmissionDto,
   StudentAssignmentSummaryDto,
 } from './dto/student-assignment-response.dto.js';
+import type { StudentAssignmentGradesResponseDto } from './dto/student-assignment-grades-response.dto.js';
 import type {
   StudentAssignmentDetailRecord,
+  StudentAssignmentGradeRecord,
   StudentAssignmentListRecord,
   StudentSubmissionRecord,
 } from '../../assignments/delivery/delivery-assignments.repository.js';
@@ -58,7 +73,15 @@ export function toStudentAssignmentDetail(
     isLate: isLate(submission, assignment.dueAt, now),
     rubric: rubricItems(assignment.rubric),
     items: assignment.items.map(toStudentSafeAssignmentItem),
-    submission: submission === null ? null : toStudentSubmission(submission, assignment.dueAt, now),
+    submission:
+      submission === null
+        ? null
+        : toStudentSubmission(submission, assignment.dueAt, now, {
+            reveal: revealCorrectness(assignment.allowResubmission, assignment.dueAt, now),
+            singleChoiceItemIds: new Set(
+              assignment.items.filter((item) => item.type === 'SINGLE_CHOICE').map(({ id }) => id),
+            ),
+          }),
   };
 }
 
@@ -74,21 +97,33 @@ export function toStudentSafeAssignmentItem(item: StudentAssignmentDetailRecord[
   };
 }
 
-/** Maps an own submission to the established student-facing response shape. */
+type StudentAnswerCorrectness = {
+  reveal: boolean;
+  singleChoiceItemIds: ReadonlySet<string>;
+};
+
+/** Maps an own submission, adding correctness only for the assignment detail response. */
 export function toStudentSubmission(
-  submission: StudentSubmissionRecord,
+  submission: StudentSubmissionForMapping,
   dueAt: Date | null,
   now: Date,
-): NonNullable<StudentAssignmentDetailResponseDto['submission']> {
-  return {
+  answerCorrectness: StudentAnswerCorrectness,
+): NonNullable<StudentAssignmentDetailResponseDto['submission']>;
+export function toStudentSubmission(
+  submission: StudentSubmissionForMapping,
+  dueAt: Date | null,
+  now: Date,
+): StudentAssignmentSubmissionDto;
+export function toStudentSubmission(
+  submission: StudentSubmissionForMapping,
+  dueAt: Date | null,
+  now: Date,
+  answerCorrectness?: StudentAnswerCorrectness,
+): StudentAssignmentSubmissionDto | StudentAssignmentDetailSubmissionDto {
+  const common = {
     state: submission.status,
     submittedAt: submission.submittedAt,
     isLate: isLate(submission, dueAt, now),
-    answers: submission.answers.map(({ itemId, answerText, selectedOptionId }) => ({
-      itemId,
-      answerText,
-      selectedOptionId,
-    })),
     files: submission.files.map(({ id, itemId, filename, mimeType, sizeBytes }) => ({
       id,
       itemId,
@@ -99,12 +134,86 @@ export function toStudentSubmission(
     grade:
       submission.gradePercent === null
         ? null
-        : {
-            ...gradeFromPercent(submission.gradePercent.toNumber()),
-            rubricLevels: levelCodes(submission.rubricLevels),
-            feedback: submission.overallFeedback,
+        : toStudentDetailedGrade({
+            gradePercent: submission.gradePercent.toNumber(),
+            rubricLevels: submission.rubricLevels,
+            overallFeedback: submission.overallFeedback,
             gradedAt: submission.gradedAt,
-          },
+          }),
+  };
+  if (answerCorrectness === undefined) {
+    return {
+      ...common,
+      answers: submission.answers.map(({ itemId, answerText, selectedOptionId }) => ({
+        itemId,
+        answerText,
+        selectedOptionId,
+      })),
+    };
+  }
+  return {
+    ...common,
+    answers: submission.answers.map(({ itemId, answerText, selectedOptionId, isCorrect }) => ({
+      itemId,
+      answerText,
+      selectedOptionId,
+      isCorrect:
+        submission.status === SubmissionStatus.GRADED &&
+        answerCorrectness.reveal &&
+        answerCorrectness.singleChoiceItemIds.has(itemId)
+          ? (isCorrect ?? null)
+          : null,
+    })),
+  };
+}
+
+/** Maps the stored grade fields consistently for detail and delivery grade-list responses. */
+export function toStudentDetailedGrade(grade: StudentGradeFields) {
+  if (grade.gradedAt === null) {
+    throw new Error('Expected a graded timestamp for a graded submission.');
+  }
+  return {
+    ...gradeFromPercent(
+      typeof grade.gradePercent === 'number'
+        ? grade.gradePercent
+        : typeof grade.gradePercent === 'string'
+          ? Number(grade.gradePercent)
+          : grade.gradePercent.toNumber(),
+    ),
+    rubricLevels: levelCodes(grade.rubricLevels),
+    feedback: grade.overallFeedback,
+    gradedAt: grade.gradedAt,
+  };
+}
+
+/** Maps all visible grades and computes an equal-weight average over this student's graded work. */
+export function toStudentAssignmentGrades(
+  records: StudentAssignmentGradeRecord[],
+  now: Date,
+): StudentAssignmentGradesResponseDto {
+  const items = records.map((record) => {
+    if (submissionState({ status: record.submissionStatus }) !== STUDENT_SUBMISSION_STATE.GRADED) {
+      throw new Error('Expected only graded submissions in the student grades query.');
+    }
+    return {
+      assignmentId: record.id,
+      title: record.title,
+      dueAt: record.dueAt,
+      moduleId: record.moduleId,
+      lessonId: record.lessonId,
+      submittedAt: record.submittedAt,
+      isLate: isLate(
+        { submittedAt: record.submittedAt, dueAtAtSubmission: record.dueAtAtSubmission },
+        record.dueAt,
+        now,
+      ),
+      grade: toStudentDetailedGrade(record),
+    };
+  });
+  const percent = averagePercent(items.map(({ grade }) => grade.percent));
+  return {
+    average: percent === null ? null : { ...gradeFromPercent(percent), gradedCount: items.length },
+    items,
   };
 }
 
@@ -169,3 +278,16 @@ function levelCodes(value: Prisma.JsonValue | null): LevelCode[] | null {
   }
   return levels;
 }
+
+type StudentGradeFields = {
+  gradePercent: number | string | { toNumber(): number };
+  rubricLevels: Prisma.JsonValue | null;
+  overallFeedback: string | null;
+  gradedAt: Date | null;
+};
+
+type StudentSubmissionForMapping = Omit<StudentSubmissionRecord, 'answers'> & {
+  answers: (StudentSubmissionRecord['answers'][number] & {
+    isCorrect?: boolean | null;
+  })[];
+};
