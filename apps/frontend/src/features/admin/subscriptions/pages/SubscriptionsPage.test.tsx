@@ -4,14 +4,20 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Subscription } from '../model/types';
 
-const { useSubscriptionsMock, schoolSearchMock, useCoursesMock } = vi.hoisted(() => ({
-  useSubscriptionsMock: vi.fn(),
-  schoolSearchMock: vi.fn(),
-  useCoursesMock: vi.fn(),
-}));
+const { useSubscriptionsMock, schoolSearchMock, useCoursesMock, useRevokeSubscriptionMock } =
+  vi.hoisted(() => ({
+    useSubscriptionsMock: vi.fn(),
+    schoolSearchMock: vi.fn(),
+    useCoursesMock: vi.fn(),
+    useRevokeSubscriptionMock: vi.fn(),
+  }));
 
 vi.mock('../queries', () => ({
   useSubscriptions: useSubscriptionsMock,
+  useRevokeSubscription: useRevokeSubscriptionMock,
+}));
+vi.mock('@/components/ui/confirm-dialog', () => ({
+  ConfirmDialog: () => null,
 }));
 vi.mock('@/features/admin/courses/queries', () => ({
   useCourses: useCoursesMock,
@@ -53,6 +59,10 @@ describe('SubscriptionsPage', () => {
       isError: false,
       refetch: vi.fn(),
     });
+    useRevokeSubscriptionMock.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    });
     schoolSearchMock.mockReturnValue({
       options: [{ value: 'school-1', label: 'Greenfield School' }],
       isPending: false,
@@ -86,8 +96,11 @@ describe('SubscriptionsPage', () => {
       'href',
       PATHS.admin.subscriptionRenew(subscription.id),
     );
-    expect(screen.getByRole('button', { name: 'Revoke' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Revoke' })).toHaveClass('text-[#b03a55]');
+    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute(
+      'href',
+      PATHS.admin.subscriptionEdit(subscription.id),
+    );
+    expect(screen.getByRole('button', { name: 'Revoke' })).toBeEnabled();
   });
 
   it('distinguishes an empty directory from an empty filtered result', async () => {

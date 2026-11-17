@@ -57,6 +57,14 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: PATHS.admin.subscriptionEdit(':id'),
+            lazy: async () => {
+              const { SubscriptionEditPage } =
+                await import('@/features/admin/subscriptions/pages/SubscriptionEditPage');
+              return { Component: SubscriptionEditPage };
+            },
+          },
+          {
             path: PATHS.admin.subscriptionRenew(':id'),
             lazy: async () => {
               const { SubscriptionRenewPage } =

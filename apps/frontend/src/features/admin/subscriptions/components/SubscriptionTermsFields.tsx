@@ -8,12 +8,14 @@ interface SubscriptionTermsFieldsProps {
   register: UseFormRegister<SubscriptionFormValues>;
   errors: FieldErrors<SubscriptionFormValues>;
   disabled: boolean;
+  startDateDisabled?: boolean;
 }
 
 export function SubscriptionTermsFields({
   register,
   errors,
   disabled,
+  startDateDisabled = false,
 }: SubscriptionTermsFieldsProps) {
   return (
     <FormSection title="Subscription terms" accent="teal">
@@ -24,7 +26,7 @@ export function SubscriptionTermsFields({
               {...aria}
               {...register('startDate')}
               type="date"
-              disabled={disabled}
+              disabled={disabled || startDateDisabled}
               className="h-10.5"
             />
           )}
