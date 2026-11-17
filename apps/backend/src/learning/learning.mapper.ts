@@ -18,6 +18,7 @@ import type {
 } from './learning-access.repository.js';
 import type { LessonContentTree } from '../curriculum/lesson-content/lesson-content.types.js';
 import type { AssetAccessResponseDto } from '../assets/dto/asset-access-response.dto.js';
+import type { StudentAssignmentCounts } from '../assignments/delivery/delivery-assignments.service.js';
 
 /** Maps one enrollment and its aggregated state to the student course-list response. */
 export function toLearningCourseResponse(
@@ -52,6 +53,7 @@ export function toLearningLessonCompletion(
 export function toLearningProgress(
   deliveryId: string,
   modules: LearningProgressModuleRecord[],
+  assignments: StudentAssignmentCounts,
 ): LearningProgressResponseDto {
   const mappedModules: LearningProgressModuleDto[] = modules.map((module) => ({
     moduleId: module.moduleId,
@@ -65,6 +67,7 @@ export function toLearningProgress(
     totalLessons: mappedModules.reduce((total, module) => total + module.totalLessons, 0),
     completedLessons: mappedModules.reduce((total, module) => total + module.completedLessons, 0),
     modules: mappedModules,
+    assignments,
   };
 }
 

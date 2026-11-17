@@ -49,3 +49,12 @@ export function canSubmit(
 ): boolean {
   return submission === null || assignment.allowResubmission;
 }
+
+/** Reveals selected-answer correctness only when resubmission is disabled or the deadline passed. */
+export function revealCorrectness(
+  allowResubmission: boolean,
+  dueAt: Date | null,
+  now: Date,
+): boolean {
+  return !allowResubmission || (dueAt !== null && now > dueAt);
+}

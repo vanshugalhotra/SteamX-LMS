@@ -71,8 +71,21 @@ The list reports `NOT_SUBMITTED`, `SUBMITTED`, or `GRADED` for the student's own
 `isLate` compares its submitted time with the due date captured for that submission; without a
 submission, `isLate` predicts whether submitting now would be late. A null due date is not late.
 
-Student responses omit answer correctness, answer keys, template and teacher details, storage keys,
-and file URLs. File metadata is available in assignment detail; file downloads are a separate
+`GET /api/v1/learning/deliveries/:id/grades` returns the student's graded submissions for visible
+published assignments in that delivery, newest grade first. It is not paginated; the result is
+bounded by the assignments in one delivery. Its average gives every graded assignment equal weight
+and uses the shared grade-scale rounding rule. Unsubmitted and ungraded work is excluded.
+
+`GET /api/v1/learning/deliveries/:id/progress` also returns visible assignment counts. `pending`
+means there is no submission; ASG-4 calls this `NOT_SUBMITTED`. `submitted` and `graded` match the
+student assignment states, and the three states sum to `total`.
+
+Student responses omit answer keys, template and teacher details, storage keys, and file URLs.
+Only assignment detail may include `isCorrect` on the student's own SINGLE_CHOICE answers, and
+only for a graded submission when resubmission is disabled or the assignment deadline has passed.
+With resubmission enabled before or at the deadline, correctness remains hidden. TEXT answers and
+all other cases return `isCorrect: null`. Correctness is never included in the assignment list or
+grades response. File metadata is available in assignment detail; file downloads are a separate
 workflow.
 
 ## Review and grading
@@ -88,10 +101,11 @@ except all-multiple-choice assignments, which are auto-graded and cannot be manu
 Teachers can regrade; a new grade replaces the prior grade and grader without keeping history.
 
 The detail response includes student name and SteamX ID, student-safe items and option text, answers,
-file metadata, and the current grade. It never includes option correctness, answer keys, student email,
-or file storage keys/URLs. Before grading, the client must echo `submittedAt` exactly as returned by
-detail (including milliseconds). A changed timestamp means the student resubmitted and the work must
-be reviewed again. Grade feedback is plain text; blank feedback is stored as null.
+file metadata, and the current grade. It never includes option-level correctness, answer keys,
+student email, or file storage keys/URLs. Per-answer correctness follows the student-view reveal
+rule above. Before grading, the client must echo `submittedAt` exactly as returned by detail
+(including milliseconds). A changed timestamp means the student resubmitted and the work must be
+reviewed again. Grade feedback is plain text; blank feedback is stored as null.
 Feedback is limited to 5,000 characters.
 
 ## Submitting

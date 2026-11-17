@@ -7,6 +7,7 @@ import { paginate } from '../../common/pagination/paginate.js';
 import type { PaginationResponseDto } from '../../common/pagination/pagination-response.dto.js';
 import { LearningAccessService } from '../learning-access.service.js';
 import {
+  toStudentAssignmentGrades,
   toStudentAssignmentDetail,
   toStudentAssignmentSummary,
 } from './student-assignments.mapper.js';
@@ -15,6 +16,7 @@ import type {
   StudentAssignmentDetailResponseDto,
   StudentAssignmentSummaryDto,
 } from './dto/student-assignment-response.dto.js';
+import type { StudentAssignmentGradesResponseDto } from './dto/student-assignment-grades-response.dto.js';
 
 /** Provides access-checked student assignment list and detail reads. */
 @Injectable()
@@ -60,14 +62,33 @@ export class StudentAssignmentsService {
       throw new ForbiddenException(API_ERROR.FORBIDDEN);
     }
 
+    const now = new Date();
     const assignment = await this.assignments.findStudentAssignmentById(
       access.deliveryId,
       access.studentId,
       assignmentId,
+      now,
     );
     if (!assignment) {
       throw new NotFoundException(API_ERROR.NOT_FOUND);
     }
-    return toStudentAssignmentDetail(assignment, new Date());
+    return toStudentAssignmentDetail(assignment, now);
+  }
+
+  /** Lists this student's graded work for the delivery after shared access and visibility checks. */
+  async findGrades(
+    auth: AuthContext,
+    deliveryId: string,
+  ): Promise<StudentAssignmentGradesResponseDto> {
+    const access = await this.access.assertDeliveryAccess(auth, deliveryId);
+    if (access.studentId === undefined) {
+      throw new ForbiddenException(API_ERROR.FORBIDDEN);
+    }
+
+    const records = await this.assignments.findStudentAssignmentGrades(
+      access.deliveryId,
+      access.studentId,
+    );
+    return toStudentAssignmentGrades(records, new Date());
   }
 }

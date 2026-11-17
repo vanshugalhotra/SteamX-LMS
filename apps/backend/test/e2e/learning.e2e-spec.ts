@@ -811,12 +811,13 @@ describe('Student learning navigation (e2e)', () => {
   it('returns released lesson progress grouped by module and consistent with course counts', async () => {
     const progress = await getProgress(studentCookie, deliveries.firstYear).expect(200);
     expect(Object.keys(progress.body).sort()).toEqual(
-      ['completedLessons', 'deliveryId', 'modules', 'totalLessons'].sort(),
+      ['assignments', 'completedLessons', 'deliveryId', 'modules', 'totalLessons'].sort(),
     );
     expect(progress.body).toMatchObject({
       deliveryId: deliveries.firstYear,
       totalLessons: 3,
       completedLessons: 1,
+      assignments: { total: 0, pending: 0, submitted: 0, graded: 0 },
     });
     expect(progress.body.modules).toEqual([
       {

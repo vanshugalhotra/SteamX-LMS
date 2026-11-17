@@ -121,6 +121,15 @@ export class StudentAssignmentAnswerDto {
   selectedOptionId!: string | null;
 }
 
+export class StudentAssignmentDetailAnswerDto extends StudentAssignmentAnswerDto {
+  @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description: 'Correctness of this own SINGLE_CHOICE answer when the assignment allows reveal.',
+  })
+  isCorrect!: boolean | null;
+}
+
 export class StudentAssignmentFileDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -156,6 +165,11 @@ export class StudentAssignmentSubmissionDto {
 
   @ApiProperty({ type: StudentAssignmentDetailedGradeDto, nullable: true })
   grade!: StudentAssignmentDetailedGradeDto | null;
+}
+
+export class StudentAssignmentDetailSubmissionDto extends StudentAssignmentSubmissionDto {
+  @ApiProperty({ type: [StudentAssignmentDetailAnswerDto] })
+  declare answers: StudentAssignmentDetailAnswerDto[];
 }
 
 export class StudentAssignmentDetailResponseDto {
@@ -194,6 +208,6 @@ export class StudentAssignmentDetailResponseDto {
   @ApiProperty({ type: [StudentAssignmentItemDto] })
   items!: StudentAssignmentItemDto[];
 
-  @ApiProperty({ type: StudentAssignmentSubmissionDto, nullable: true })
-  submission!: StudentAssignmentSubmissionDto | null;
+  @ApiProperty({ type: StudentAssignmentDetailSubmissionDto, nullable: true })
+  submission!: StudentAssignmentDetailSubmissionDto | null;
 }

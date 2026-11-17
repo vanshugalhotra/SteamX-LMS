@@ -10,6 +10,7 @@ import { LearningAccessService } from './learning-access.service.js';
 import { LearningController } from './learning.controller.js';
 import { LearningService } from './learning.service.js';
 import { StudentAssignmentsController } from './assignments/student-assignments.controller.js';
+import { StudentAssignmentGradesController } from './assignments/student-assignment-grades.controller.js';
 import { StudentAssignmentsService } from './assignments/student-assignments.service.js';
 import { StudentSubmissionsRepository } from './assignments/student-submissions.repository.js';
 import { StudentSubmissionsService } from './assignments/student-submissions.service.js';
@@ -23,7 +24,11 @@ import { StudentSubmissionsService } from './assignments/student-submissions.ser
     AssetsModule,
     AssignmentsModule,
   ],
-  controllers: [LearningController, StudentAssignmentsController],
+  controllers: [
+    LearningController,
+    StudentAssignmentsController,
+    StudentAssignmentGradesController,
+  ],
   providers: [
     LearningAccessRepository,
     LearningAccessService,

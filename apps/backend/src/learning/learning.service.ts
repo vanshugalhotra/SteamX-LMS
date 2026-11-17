@@ -31,6 +31,7 @@ import { LearningAccessRepository } from './learning-access.repository.js';
 import type { LearningLessonCompletionRecord } from './learning-access.repository.js';
 import { AssetAccessService } from '../assets/asset-access.service.js';
 import type { LearningAssetAccessResponseDto } from './dto/learning-asset-access-response.dto.js';
+import { DeliveryAssignmentsService } from '../assignments/delivery/delivery-assignments.service.js';
 
 /** Provides learning navigation and access-checked student/teacher lesson content. */
 @Injectable()
@@ -41,6 +42,7 @@ export class LearningService {
     private readonly courseAccess: CourseAccessService,
     private readonly lessonContent: LessonContentService,
     private readonly assetAccess: AssetAccessService,
+    private readonly assignments: DeliveryAssignmentsService,
   ) {}
 
   /** Lists the student's active enrollments with page-level progress and subscription state. */
@@ -150,12 +152,11 @@ export class LearningService {
     if (access.studentId === undefined) {
       throw new ForbiddenException(API_ERROR.FORBIDDEN);
     }
-    const modules = await this.learning.findStudentProgress(
-      access.deliveryId,
-      access.courseId,
-      access.studentId,
-    );
-    return toLearningProgress(access.deliveryId, modules);
+    const [modules, assignments] = await Promise.all([
+      this.learning.findStudentProgress(access.deliveryId, access.courseId, access.studentId),
+      this.assignments.countStudentAssignmentStates(access.deliveryId, access.studentId),
+    ]);
+    return toLearningProgress(access.deliveryId, modules, assignments);
   }
 
   /** Returns a lesson tree only after the shared delivery and lesson access check succeeds. */
