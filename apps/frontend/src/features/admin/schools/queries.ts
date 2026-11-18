@@ -72,9 +72,16 @@ export function useSchoolNames() {
   return useMemo(() => new Map((data?.items ?? []).map((s) => [s.id, s.name])), [data]);
 }
 
-function useSchoolSearchBy(search: string, status: 'ACTIVE' | 'ALL'): AsyncSearchResult {
+function useSchoolSearchBy(
+  search: string,
+  status: 'ACTIVE' | 'ALL',
+  enabled = true,
+): AsyncSearchResult {
   const q = useDebouncedValue(search.trim());
-  const { data, isPending, isError } = useSchools({ page: 1, limit: 20, q, status });
+  const { data, isPending, isError } = useQuery({
+    ...schoolsQueryOptions({ page: 1, limit: 20, q, status }),
+    enabled,
+  });
   const options = useMemo(
     () => (data?.items ?? []).map((s) => ({ value: s.id, label: s.name, description: s.code })),
     [data],
@@ -86,3 +93,5 @@ function useSchoolSearchBy(search: string, status: 'ACTIVE' | 'ALL'): AsyncSearc
 export const useSchoolSearch = (search: string) => useSchoolSearchBy(search, 'ACTIVE');
 /** For filters: every school. */
 export const useAnySchoolSearch = (search: string) => useSchoolSearchBy(search, 'ALL');
+export const useAnySchoolSearchWhenEnabled = (search: string, enabled: boolean) =>
+  useSchoolSearchBy(search, 'ALL', enabled);

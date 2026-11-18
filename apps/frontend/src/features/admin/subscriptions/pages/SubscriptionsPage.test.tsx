@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,11 +19,20 @@ vi.mock('../queries', () => ({
 vi.mock('@/components/ui/confirm-dialog', () => ({
   ConfirmDialog: () => null,
 }));
+vi.mock('@/features/admin/components/HeaderSlot', () => ({
+  HeaderSlot: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 vi.mock('@/features/admin/courses/queries', () => ({
   useCourses: useCoursesMock,
+  useCourseSearch: () => ({
+    options: [{ value: 'course-1', label: 'Robotics' }],
+    isPending: false,
+    isError: false,
+  }),
 }));
 vi.mock('@/features/admin/schools/queries', () => ({
   useAnySchoolSearch: schoolSearchMock,
+  useAnySchoolSearchWhenEnabled: schoolSearchMock,
 }));
 
 import { SubscriptionsPage } from './SubscriptionsPage';
@@ -147,6 +156,37 @@ describe('SubscriptionsPage', () => {
         schoolId: 'school-1',
         courseId: 'course-1',
         status: 'UPCOMING',
+      });
+    });
+  });
+
+  it('lets the header search select a course filter', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <SubscriptionsPage />
+      </MemoryRouter>,
+    );
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search by course or school' }),
+      'Robotics',
+    );
+    await user.click(
+      within(screen.getByRole('list', { name: 'Course and school search results' })).getByRole(
+        'button',
+        { name: 'Robotics (Course)' },
+      ),
+    );
+
+    await waitFor(() => {
+      expect(useSubscriptionsMock).toHaveBeenLastCalledWith({
+        page: 1,
+        limit: 6,
+        schoolId: undefined,
+        courseId: 'course-1',
+        status: undefined,
       });
     });
   });

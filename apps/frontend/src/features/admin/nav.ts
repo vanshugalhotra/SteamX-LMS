@@ -11,6 +11,7 @@ import {
   School,
   ShieldCheck,
   User,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import { PATHS } from '@/lib/paths';
@@ -84,6 +85,7 @@ export const ADMIN_NAV: NavGroup[] = [
       },
       { label: 'Asset Library', icon: FileImage, to: PATHS.admin.assets },
       { label: 'Curriculum Access', icon: KeyRound },
+      { label: 'Deliveries', icon: UsersRound, to: PATHS.admin.deliveries },
       { label: 'Assignments', icon: ClipboardList },
     ],
   },

@@ -9,14 +9,3 @@ export const SUBSCRIPTION_STATUS_FILTERS: { value: SubscriptionStatusFilter; lab
   { value: 'EXPIRED', label: 'Expired' },
 ];
 
-export const SUBSCRIPTION_COURSE_ACCENTS = [
-  'bg-brand-coral text-brand-navy',
-  'bg-brand-teal text-brand-navy',
-  'bg-brand-sun text-brand-navy',
-  'bg-[#5b4fc7] text-white',
-] as const;
-
-export function getSubscriptionCourseAccent(courseId: string) {
-  const hash = courseId.charCodeAt(courseId.length - 1);
-  return SUBSCRIPTION_COURSE_ACCENTS[hash % SUBSCRIPTION_COURSE_ACCENTS.length];
-}

@@ -10,8 +10,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { SubscriptionStatusBadge } from './SubscriptionStatusBadge';
 import type { Subscription } from '../model/types';
-import { getSubscriptionCourseAccent } from '../config/subscriptions.config';
 import { useRevokeSubscription } from '../queries';
+import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
 
 const SUBSCRIPTION_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   day: 'numeric',
@@ -47,7 +47,7 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
       <div
         className={cn(
           'relative grid min-h-36 place-items-center overflow-hidden p-4 text-center',
-          getSubscriptionCourseAccent(subscription.courseId),
+          getCourseAccent(subscription.courseId),
         )}
       >
         <span
