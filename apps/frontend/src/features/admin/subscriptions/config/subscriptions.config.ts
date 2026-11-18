@@ -8,4 +8,3 @@ export const SUBSCRIPTION_STATUS_FILTERS: { value: SubscriptionStatusFilter; lab
   { value: 'UPCOMING', label: 'Upcoming' },
   { value: 'EXPIRED', label: 'Expired' },
 ];
-

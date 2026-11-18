@@ -51,9 +51,9 @@ function seedDeliveryQueries(queryClient: QueryClient) {
 }
 
 function expectDeliveryQueriesInvalidated(queryClient: QueryClient) {
-  expect(
-    queryClient.getQueryState(deliveryKeys.list({ page: 1, limit: 20 }))?.isInvalidated,
-  ).toBe(true);
+  expect(queryClient.getQueryState(deliveryKeys.list({ page: 1, limit: 20 }))?.isInvalidated).toBe(
+    true,
+  );
   expect(queryClient.getQueryState(deliveryKeys.detail('delivery-id'))?.isInvalidated).toBe(true);
 }
 
