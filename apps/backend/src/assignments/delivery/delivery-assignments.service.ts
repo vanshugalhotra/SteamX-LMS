@@ -17,7 +17,9 @@ import type {
   DeliveryAssignmentSummaryDto,
 } from '../dto/delivery-assignment-response.dto.js';
 import type {
+  StudentAssignmentCounts,
   StudentAssignmentDetailRecord,
+  StudentAssignmentGradeRecord,
   StudentAssignmentListRecord,
 } from './delivery-assignments.repository.js';
 import type { StudentSubmissionState } from '../../learning/assignments/assignment-student-rules.js';
@@ -27,7 +29,9 @@ import { toDeliveryAssignmentSummary } from './delivery-assignments.mapper.js';
 import { DeliveryAssignmentsRepository } from './delivery-assignments.repository.js';
 
 export type {
+  StudentAssignmentCounts,
   StudentAssignmentDetailRecord,
+  StudentAssignmentGradeRecord,
   StudentAssignmentListRecord,
 } from './delivery-assignments.repository.js';
 
@@ -119,13 +123,30 @@ export class DeliveryAssignmentsService {
     return this.assignments.findStudentAssignments(deliveryId, studentId, query);
   }
 
+  /** Delegates one student-scoped read of graded visible assignments. */
+  findStudentAssignmentGrades(
+    deliveryId: string,
+    studentId: string,
+  ): Promise<StudentAssignmentGradeRecord[]> {
+    return this.assignments.findStudentAssignmentGrades(deliveryId, studentId);
+  }
+
+  /** Delegates one grouped read of the student's visible assignment states. */
+  countStudentAssignmentStates(
+    deliveryId: string,
+    studentId: string,
+  ): Promise<StudentAssignmentCounts> {
+    return this.assignments.countStudentAssignmentStates(deliveryId, studentId);
+  }
+
   /** Delegates a student-scoped detail read to the assignments repository. */
   findStudentAssignmentById(
     deliveryId: string,
     studentId: string,
     assignmentId: string,
+    now?: Date,
   ): Promise<StudentAssignmentDetailRecord | null> {
-    return this.assignments.findStudentAssignmentById(deliveryId, studentId, assignmentId);
+    return this.assignments.findStudentAssignmentById(deliveryId, studentId, assignmentId, now);
   }
 
   /** Validates optional module and lesson anchors using the curriculum's scoped services. */

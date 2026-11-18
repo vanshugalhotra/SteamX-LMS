@@ -5,6 +5,7 @@ import { releasedStudentLessonFilter } from '../../learning/learning-access.repo
 import {
   STUDENT_SUBMISSION_STATE,
   type StudentSubmissionState,
+  revealCorrectness,
 } from '../../learning/assignments/assignment-student-rules.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AssignmentBlueprint } from '../blueprint/blueprint.schema.js';
@@ -113,9 +114,37 @@ export type StudentAssignmentListRecord = {
   dueAtAtSubmission: Date | null;
   gradePercent: string | null;
 };
-export type StudentAssignmentDetailRecord = Prisma.AssignmentGetPayload<{
+export type StudentAssignmentGradeRecord = {
+  id: string;
+  title: string;
+  dueAt: Date | null;
+  moduleId: string | null;
+  lessonId: string | null;
+  allowResubmission: boolean;
+  submissionStatus: SubmissionStatus;
+  submittedAt: Date;
+  dueAtAtSubmission: Date | null;
+  gradePercent: string;
+  rubricLevels: Prisma.JsonValue | null;
+  overallFeedback: string | null;
+  gradedAt: Date;
+};
+export type StudentAssignmentCounts = {
+  total: number;
+  pending: number;
+  submitted: number;
+  graded: number;
+};
+type StudentAssignmentDetailPayload = Prisma.AssignmentGetPayload<{
   select: typeof STUDENT_ASSIGNMENT_DETAIL_SELECT;
 }>;
+export type StudentAssignmentDetailRecord = Omit<StudentAssignmentDetailPayload, 'submissions'> & {
+  submissions: (Omit<StudentAssignmentDetailPayload['submissions'][number], 'answers'> & {
+    answers: (StudentAssignmentDetailPayload['submissions'][number]['answers'][number] & {
+      isCorrect?: boolean | null;
+    })[];
+  })[];
+};
 export type StudentSubmissionRecord = Prisma.SubmissionGetPayload<{
   select: typeof STUDENT_SUBMISSION_SELECT;
 }>;
@@ -303,17 +332,97 @@ export class DeliveryAssignmentsRepository {
     return { items, total: totals[0]?.total ?? 0 };
   }
 
+  /** Loads all visible graded assignments and only the authenticated student's grade data. */
+  findStudentAssignmentGrades(
+    deliveryId: string,
+    studentId: string,
+  ): Promise<StudentAssignmentGradeRecord[]> {
+    return this.prisma.$queryRaw<StudentAssignmentGradeRecord[]>(Prisma.sql`
+      SELECT
+        a.id::text AS id,
+        a.title,
+        a.due_at AS "dueAt",
+        a.module_id::text AS "moduleId",
+        a.lesson_id::text AS "lessonId",
+        a.allow_resubmission AS "allowResubmission",
+        s.status AS "submissionStatus",
+        s.submitted_at AS "submittedAt",
+        s.due_at_at_submission AS "dueAtAtSubmission",
+        s.grade_percent::text AS "gradePercent",
+        s.rubric_levels AS "rubricLevels",
+        s.overall_feedback AS "overallFeedback",
+        s.graded_at AS "gradedAt"
+      FROM assignments a
+      JOIN submissions s
+        ON s.assignment_id = a.id
+       AND s.delivery_id = a.delivery_id
+       AND s.student_id = ${studentId}::uuid
+      WHERE ${this.studentAssignmentVisibilityWhere(deliveryId)}
+        AND s.status = 'GRADED'::submission_status
+        AND s.grade_percent IS NOT NULL
+      ORDER BY s.graded_at DESC, a.id ASC
+    `);
+  }
+
+  /** Counts the student's states across every assignment passing the shared visibility rule. */
+  async countStudentAssignmentStates(
+    deliveryId: string,
+    studentId: string,
+  ): Promise<StudentAssignmentCounts> {
+    const [counts] = await this.prisma.$queryRaw<StudentAssignmentCounts[]>(Prisma.sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE s.id IS NULL)::int AS pending,
+        COUNT(*) FILTER (
+          WHERE s.status = 'SUBMITTED'::submission_status
+        )::int AS submitted,
+        COUNT(*) FILTER (
+          WHERE s.status = 'GRADED'::submission_status
+        )::int AS graded
+      FROM assignments a
+      LEFT JOIN submissions s
+        ON s.assignment_id = a.id
+       AND s.delivery_id = a.delivery_id
+       AND s.student_id = ${studentId}::uuid
+      WHERE ${this.studentAssignmentVisibilityWhere(deliveryId)}
+    `);
+    if (!counts) {
+      throw new Error('Expected assignment count aggregates for a delivery.');
+    }
+    return counts;
+  }
+
   /** Reads a visible assignment and the student's submission from one stable snapshot. */
   findStudentAssignmentById(
     deliveryId: string,
     studentId: string,
     assignmentId: string,
+    now?: Date,
   ): Promise<StudentAssignmentDetailRecord | null> {
     return this.prisma.$transaction(
       async (tx) => {
-        const [visible] = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
-          SELECT a.id::text AS id
+        const [visible] = await tx.$queryRaw<
+          {
+            id: string;
+            allowResubmission: boolean;
+            dueAt: Date | null;
+            submissionId: string | null;
+            submissionStatus: SubmissionStatus | null;
+            hasGrade: boolean;
+          }[]
+        >(Prisma.sql`
+          SELECT
+            a.id::text AS id,
+            a.allow_resubmission AS "allowResubmission",
+            a.due_at AS "dueAt",
+            s.id::text AS "submissionId",
+            s.status AS "submissionStatus",
+            s.grade_percent IS NOT NULL AS "hasGrade"
           FROM assignments a
+          LEFT JOIN submissions s
+            ON s.assignment_id = a.id
+           AND s.delivery_id = a.delivery_id
+           AND s.student_id = ${studentId}::uuid
           WHERE ${this.studentAssignmentVisibilityWhere(deliveryId, assignmentId)}
           LIMIT 1
         `);
@@ -321,17 +430,48 @@ export class DeliveryAssignmentsRepository {
           return null;
         }
 
-        const select = {
-          ...STUDENT_ASSIGNMENT_DETAIL_SELECT,
-          submissions: {
-            ...STUDENT_ASSIGNMENT_DETAIL_SELECT.submissions,
-            where: { studentId },
-          },
-        } satisfies Prisma.AssignmentSelect;
-        return tx.assignment.findFirst({
+        const assignment = await tx.assignment.findFirst({
           where: { id: visible.id, deliveryId },
-          select,
+          select: {
+            ...STUDENT_ASSIGNMENT_DETAIL_SELECT,
+            submissions: {
+              ...STUDENT_ASSIGNMENT_DETAIL_SELECT.submissions,
+              where: { studentId },
+            },
+          } satisfies Prisma.AssignmentSelect,
         });
+        if (
+          !assignment ||
+          visible.submissionId === null ||
+          visible.submissionStatus !== SubmissionStatus.GRADED ||
+          !visible.hasGrade ||
+          now === undefined ||
+          !revealCorrectness(visible.allowResubmission, visible.dueAt, now)
+        ) {
+          return assignment;
+        }
+
+        const answers = await tx.submissionAnswer.findMany({
+          where: { submissionId: visible.submissionId },
+          select: { itemId: true, isCorrect: true },
+        });
+        const correctness = new Map(answers.map(({ itemId, isCorrect }) => [itemId, isCorrect]));
+        const submission = assignment.submissions[0];
+        if (!submission) {
+          return assignment;
+        }
+        return {
+          ...assignment,
+          submissions: [
+            {
+              ...submission,
+              answers: submission.answers.map((answer) => ({
+                ...answer,
+                isCorrect: correctness.get(answer.itemId) ?? null,
+              })),
+            },
+          ],
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

@@ -649,6 +649,12 @@ describe('Student assignment reads (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  function getGrades(cookie = studentCookie, targetDeliveryId = deliveryId) {
+    return request(app.getHttpServer())
+      .get(`/api/v1/learning/deliveries/${targetDeliveryId}/grades`)
+      .set('Cookie', cookie);
+  }
+
   function submitAssignment(
     assignmentId: string,
     answers: Array<{
@@ -730,6 +736,74 @@ describe('Student assignment reads (e2e)', () => {
     }
     return [];
   }
+
+  function allJsonKeyPaths(value: unknown, parent = ''): string[] {
+    if (Array.isArray(value)) {
+      return value.flatMap((child, index) => allJsonKeyPaths(child, `${parent}.${index}`));
+    }
+    if (value !== null && typeof value === 'object') {
+      return Object.entries(value).flatMap(([key, child]) => {
+        const path = parent ? `${parent}.${key}` : key;
+        return [path, ...allJsonKeyPaths(child, path)];
+      });
+    }
+    return [];
+  }
+
+  it('counts assignment states in progress using the student-visible assignment set', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/learning/deliveries/${deliveryId}/progress`)
+      .set('Cookie', studentCookie)
+      .expect(200);
+    expect(response.body.assignments).toEqual({
+      total: 9,
+      pending: 4,
+      submitted: 3,
+      graded: 2,
+    });
+  });
+
+  it('lists only this student’s visible graded work and computes an equal-weight average', async () => {
+    const response = await getGrades().expect(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.body.average).toEqual({
+      percent: 70.63,
+      level: '3-',
+      letter: 'B-',
+      gradedCount: 2,
+    });
+    expect(response.body.items).toHaveLength(2);
+    expect(response.body.items.map((item: { assignmentId: string }) => item.assignmentId)).toEqual(
+      expect.arrayContaining([gradedAssignmentId, mcqAssignmentId]),
+    );
+    const gradedAt = response.body.items.map(
+      (item: { grade: { gradedAt: string } }) => item.grade.gradedAt,
+    );
+    expect(gradedAt).toEqual(
+      gradedAt.slice().sort((left: string, right: string) => right.localeCompare(left)),
+    );
+    expect(response.body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          assignmentId: gradedAssignmentId,
+          title: 'Graded assignment',
+          lessonId,
+          grade: {
+            percent: 91.25,
+            level: '4',
+            letter: 'A',
+            rubricLevels: ['4', '4-', '3+', '4'],
+            feedback: 'Well reasoned and clearly presented.',
+            gradedAt: expect.any(String),
+          },
+        }),
+      ]),
+    );
+    expect(allJsonKeys(response.body)).not.toContain('gradedBy');
+    expect(allJsonKeys(response.body)).not.toContain('isCorrect');
+    await getGrades(teacherCookie).expect(403);
+    await getGrades(studentCookie, otherDeliveryId).expect(404);
+  });
 
   it('lists only own submission states with filters, grade mapping, ordering, and pagination', async () => {
     const response = await getAssignments().expect(200);
@@ -846,14 +920,21 @@ describe('Student assignment reads (e2e)', () => {
 
     const mcq = await getAssignment(mcqAssignmentId).expect(200);
     expect(mcq.body.items.map((item: { position: number }) => item.position)).toEqual([1, 2]);
+    expect(mcq.body.submission.answers[0]).toMatchObject({
+      selectedOptionId: expect.any(String),
+      isCorrect: true,
+    });
     expect(
       mcq.body.items[0].options.map((option: { position: number }) => option.position),
     ).toEqual([1, 2]);
     for (const option of mcq.body.items.flatMap((item: { options: unknown[] }) => item.options)) {
       expect(Object.keys(option).sort()).toEqual(['id', 'position', 'text']);
     }
+    const correctnessPaths = allJsonKeyPaths(mcq.body).filter(
+      (path) => path.endsWith('.isCorrect') || path.endsWith('.is_correct'),
+    );
+    expect(correctnessPaths).toEqual(['submission.answers.0.isCorrect']);
     const hiddenKeys = [
-      'isCorrect',
       'is_correct',
       'blueprint',
       'sourceTemplateId',
@@ -865,6 +946,11 @@ describe('Student assignment reads (e2e)', () => {
     ];
     for (const body of [mcq.body, (await getAssignments()).body]) {
       expect(allJsonKeys(body).filter((key) => hiddenKeys.includes(key))).toEqual([]);
+      expect(
+        allJsonKeyPaths(body)
+          .filter((path) => path.endsWith('.isCorrect') || path.endsWith('.is_correct'))
+          .every((path) => /^submission\.answers\.\d+\.isCorrect$/.test(path)),
+      ).toBe(true);
     }
     const otherStudentRead = await getAssignment(moduleAssignmentId).expect(200);
     expect(otherStudentRead.body.submission).toBeNull();
@@ -874,6 +960,53 @@ describe('Student assignment reads (e2e)', () => {
       submission: { isLate: true },
     });
     expect((await getAssignment(lateNoSubmissionAssignmentId).expect(200)).body.isLate).toBe(true);
+  });
+
+  it('hides MCQ correctness until a resubmission-enabled assignment passes its deadline', async () => {
+    const assignmentId = await createPublishedAssignment({
+      title: 'Reveal correctness after the deadline',
+      dueAt: futureDueDate,
+      blueprint: {
+        allowResubmission: true,
+        items: [
+          {
+            type: 'SINGLE_CHOICE',
+            prompt: 'Choose one.',
+            options: [
+              { text: 'Correct option', isCorrect: true },
+              { text: 'Incorrect option', isCorrect: false },
+            ],
+          },
+        ],
+        rubric: null,
+      },
+    });
+    const [item] = await getAssignmentItems(assignmentId);
+    await submitAssignment(assignmentId, [
+      { itemId: item!.id, selectedOptionId: item!.options[1]!.id },
+    ]).expect(200);
+
+    const beforeDeadline = await getAssignment(assignmentId).expect(200);
+    expect(beforeDeadline.body.submission.answers).toEqual([
+      expect.objectContaining({ itemId: item!.id, isCorrect: null }),
+    ]);
+
+    await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { dueAt: new Date('2000-01-01T00:00:00.000Z') },
+    });
+    const afterDeadline = await getAssignment(assignmentId).expect(200);
+    expect(afterDeadline.body.submission.answers).toEqual([
+      expect.objectContaining({ itemId: item!.id, isCorrect: false }),
+    ]);
+    expect(
+      allJsonKeyPaths(afterDeadline.body)
+        .filter((path) => path.endsWith('.isCorrect') || path.endsWith('.is_correct'))
+        .every((path) => /^submission\.answers\.\d+\.isCorrect$/.test(path)),
+    ).toBe(true);
+    for (const option of afterDeadline.body.items[0].options) {
+      expect(Object.keys(option).sort()).toEqual(['id', 'position', 'text']);
+    }
   });
 
   it('submits TEXT answers and reports lateness from the database due-date snapshot', async () => {
@@ -966,6 +1099,7 @@ describe('Student assignment reads (e2e)', () => {
       state: 'GRADED',
       grade: { percent: 100, level: '4+', letter: 'A+', rubricLevels: null, feedback: null },
     });
+    expect(allJsonKeys(response.body)).not.toContain('isCorrect');
     const stored = await prisma.submission.findUniqueOrThrow({
       where: {
         assignmentId_studentId: {

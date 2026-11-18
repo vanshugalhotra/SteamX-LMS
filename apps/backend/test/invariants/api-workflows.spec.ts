@@ -394,6 +394,8 @@ describe('Documented API workflows', () => {
               assertStatus(response, 403, 'PERMISSION_REQUIRED');
             } else if (route.path.endsWith('/progress')) {
               assertStatus(response, 404, 'NOT_FOUND');
+            } else if (route.path.endsWith('/grades')) {
+              assertStatus(response, 404, 'NOT_FOUND');
             } else if (route.path.endsWith('/assignments/:assignmentId/submission')) {
               assertStatus(response, 403, 'PERMISSION_REQUIRED');
             } else if (route.path.includes('/assignments')) {
