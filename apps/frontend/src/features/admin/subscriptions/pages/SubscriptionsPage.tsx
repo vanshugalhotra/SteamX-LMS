@@ -7,6 +7,8 @@ import { ListToolbar } from '@/components/list/ListToolbar';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ButtonLink } from '@/components/ui/button-link';
+import { CourseSchoolSearch } from '@/features/admin/components/CourseSchoolSearch';
+import { HeaderSlot } from '@/features/admin/components/HeaderSlot';
 import { useCourses } from '@/features/admin/courses/queries';
 import { useAnySchoolSearch } from '@/features/admin/schools/queries';
 import { useListParams } from '@/lib/use-list-params';
@@ -14,9 +16,9 @@ import { PATHS } from '@/lib/paths';
 import {
   SUBSCRIPTIONS_PAGE_SIZE,
   SUBSCRIPTION_STATUS_FILTERS,
-  getSubscriptionCourseAccent,
 } from '../config/subscriptions.config';
 import type { SubscriptionStatusFilter } from '../model/types';
+import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
 import { SubscriptionCard } from '../components/SubscriptionCard';
 import { useSubscriptions } from '../queries';
 
@@ -42,6 +44,15 @@ export function SubscriptionsPage() {
 
   return (
     <div className="space-y-6">
+      <HeaderSlot>
+        <CourseSchoolSearch
+          onSelect={({ type, id }) => {
+            if (type === 'course') setCourseId(id);
+            else setSchoolId(id);
+            setPage(1);
+          }}
+        />
+      </HeaderSlot>
       <BrandBackdrop className="rounded-3xl p-6 text-brand-navy lg:p-8">
         <div className="relative flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-xl">
@@ -80,7 +91,7 @@ export function SubscriptionsPage() {
           All courses
         </button>
         {courses.data?.items.map((course) => {
-          const dotColor = getSubscriptionCourseAccent(course.id).split(' ')[0];
+          const dotColor = getCourseAccent(course.id).split(' ')[0];
           return (
             <button
               key={course.id}

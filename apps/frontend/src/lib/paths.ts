@@ -24,6 +24,7 @@ export const PATHS = {
     courseEdit: (id: string) => `${ADMIN_BASE}/courses/${id}/edit`,
     courseCurriculum: (id: string) => `${ADMIN_BASE}/courses/${id}/curriculum`,
     lessonEdit: (id: string) => `${ADMIN_BASE}/lessons/${id}/edit`,
+    deliveries: `${ADMIN_BASE}/deliveries`,
     subscriptions: `${ADMIN_BASE}/subscriptions`,
     subscriptionNew: `${ADMIN_BASE}/subscriptions/new`,
     subscriptionEdit: (id: string) => `${ADMIN_BASE}/subscriptions/${id}/edit`,

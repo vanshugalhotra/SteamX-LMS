@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   keepPreviousData,
   queryOptions,
@@ -16,6 +17,8 @@ import {
 } from './api/api';
 import type { CourseListParams, UpdateCoursePayload } from './model/types';
 import type { ContentStatus } from '@/lib/content-status';
+import type { AsyncSearchResult } from '@/components/ui/async-select';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 
 export const courseKeys = {
   all: ['courses'] as const,
@@ -34,6 +37,16 @@ export function coursesQueryOptions(params: CourseListParams) {
 
 export function useCourses(params: CourseListParams, options: { enabled?: boolean } = {}) {
   return useQuery({ ...coursesQueryOptions(params), ...options });
+}
+
+export function useCourseSearch(search: string, enabled = true): AsyncSearchResult {
+  const q = useDebouncedValue(search.trim());
+  const { data, isPending, isError } = useCourses({ page: 1, limit: 20, q }, { enabled });
+  const options = useMemo(
+    () => (data?.items ?? []).map((course) => ({ value: course.id, label: course.title })),
+    [data],
+  );
+  return { options, isPending, isError };
 }
 
 export function useCourse(id: string) {
