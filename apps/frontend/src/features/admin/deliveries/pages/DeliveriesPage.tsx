@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { AsyncSelect } from '@/components/ui/async-select';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { ButtonLink } from '@/components/ui/button-link';
 import { Pagination } from '@/components/ui/pagination';
 import { ListToolbar } from '@/components/list/ListToolbar';
 import { BrandBackdrop } from '@/features/admin/components/BrandBackdrop';
@@ -10,6 +12,7 @@ import { HeaderSlot } from '@/features/admin/components/HeaderSlot';
 import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
 import { useCourses } from '@/features/admin/courses/queries';
 import { useAnySchoolSearch, useSchoolNames } from '@/features/admin/schools/queries';
+import { PATHS } from '@/lib/paths';
 import { useListParams } from '@/lib/use-list-params';
 import {
   DELIVERIES_PAGE_SIZE,
@@ -52,11 +55,17 @@ export function DeliveriesPage() {
         />
       </HeaderSlot>
       <BrandBackdrop className="rounded-3xl p-6 text-brand-navy lg:p-8">
-        <div className="relative max-w-xl">
-          <h1 className="text-2xl font-semibold">Deliveries</h1>
-          <p className="mt-1 text-xs">
-            Run a course for a class, assign teachers, and enroll students.
-          </p>
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-xl">
+            <h1 className="text-2xl font-semibold">Deliveries</h1>
+            <p className="mt-1 text-xs">
+              Run a course for a class, assign teachers, and enroll students.
+            </p>
+          </div>
+          <ButtonLink to={PATHS.admin.deliveryNew} variant="brand" className="rounded-full">
+            <Plus className="size-4" aria-hidden="true" />
+            Create delivery
+          </ButtonLink>
         </div>
       </BrandBackdrop>
 
