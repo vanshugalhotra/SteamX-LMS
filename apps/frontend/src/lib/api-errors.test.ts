@@ -35,6 +35,9 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage(apiError(409, 'SCHOOL_CODE_EXISTS'))).toBe(
       'This school code is already in use.',
     );
+    expect(getErrorMessage(apiError(409, API_ERROR_CODE.TEACHER_ALREADY_ASSIGNED))).toBe(
+      'This teacher is already assigned to this delivery.',
+    );
   });
 
   it('maps curriculum error codes to their default messages', () => {

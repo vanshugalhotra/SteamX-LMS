@@ -57,6 +57,14 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: `${PATHS.admin.deliveries}/:id/:kind`,
+            lazy: async () => {
+              const { DeliveryManagementPage } =
+                await import('@/features/admin/deliveries/pages/DeliveryManagementPage');
+              return { Component: DeliveryManagementPage };
+            },
+          },
+          {
             path: PATHS.admin.subscriptions,
             lazy: async () => {
               const { SubscriptionsPage } =

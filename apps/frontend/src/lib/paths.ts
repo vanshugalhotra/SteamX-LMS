@@ -26,6 +26,8 @@ export const PATHS = {
     lessonEdit: (id: string) => `${ADMIN_BASE}/lessons/${id}/edit`,
     deliveries: `${ADMIN_BASE}/deliveries`,
     deliveryNew: `${ADMIN_BASE}/deliveries/new`,
+    deliveryTeachers: (id: string) => `${ADMIN_BASE}/deliveries/${id}/teachers`,
+    deliveryStudents: (id: string) => `${ADMIN_BASE}/deliveries/${id}/students`,
     subscriptions: `${ADMIN_BASE}/subscriptions`,
     subscriptionNew: `${ADMIN_BASE}/subscriptions/new`,
     subscriptionEdit: (id: string) => `${ADMIN_BASE}/subscriptions/${id}/edit`,

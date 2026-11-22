@@ -1,16 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiFetch } from '@/lib/api-client';
 import {
   buildDeliveryListSearchParams,
+  assignDeliveryTeacher,
   createDelivery,
+  enrollDeliveryStudents,
   fetchDeliveries,
   fetchDelivery,
+  fetchDeliveryEnrollments,
+  fetchDeliveryTeachers,
+  removeDeliveryStudent,
+  removeDeliveryTeacher,
   updateDeliveryLabel,
   updateDeliveryStatus,
 } from './api';
 
 vi.mock('@/lib/api-client', () => ({ apiFetch: vi.fn() }));
 const mockedApiFetch = vi.mocked(apiFetch);
+
+beforeEach(() => mockedApiFetch.mockReset());
 
 describe('delivery API', () => {
   it('omits empty filters and serializes supported filters', () => {
@@ -61,5 +69,54 @@ describe('delivery API', () => {
       method: 'PATCH',
       body: JSON.stringify({ status: 'INACTIVE' }),
     });
+  });
+
+  it('lists, assigns, and removes teachers from a delivery', async () => {
+    await fetchDeliveryTeachers({
+      deliveryId: 'delivery-id',
+      page: 2,
+      limit: 20,
+    });
+    await assignDeliveryTeacher('delivery-id', 'teacher-id');
+    await removeDeliveryTeacher('delivery-id', 'teacher-id');
+
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      1,
+      '/deliveries/delivery-id/teachers?page=2&limit=20',
+    );
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(2, '/deliveries/delivery-id/teachers', {
+      method: 'POST',
+      body: JSON.stringify({ teacherId: 'teacher-id' }),
+    });
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      3,
+      '/deliveries/delivery-id/teachers/teacher-id',
+      { method: 'DELETE' },
+    );
+  });
+
+  it('lists, enrolls, and removes students from a delivery', async () => {
+    await fetchDeliveryEnrollments({
+      deliveryId: 'delivery-id',
+      page: 1,
+      limit: 20,
+      status: 'ACTIVE',
+    });
+    await enrollDeliveryStudents('delivery-id', { studentIds: ['student-id'] });
+    await removeDeliveryStudent('delivery-id', 'student-id');
+
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      1,
+      '/deliveries/delivery-id/enrollments?page=1&limit=20&status=ACTIVE',
+    );
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(2, '/deliveries/delivery-id/enrollments', {
+      method: 'POST',
+      body: JSON.stringify({ studentIds: ['student-id'] }),
+    });
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      3,
+      '/deliveries/delivery-id/enrollments/student-id',
+      { method: 'DELETE' },
+    );
   });
 });

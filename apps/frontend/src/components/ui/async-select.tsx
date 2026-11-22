@@ -25,6 +25,7 @@ interface AsyncSelectProps {
   searchContext?: string;
   /** Label to show for `value` before the user picks anything (edit forms). */
   initialLabel?: string;
+  excludeValues?: readonly string[];
   placeholder?: string;
   maxLength?: number;
   disabled?: boolean;
@@ -40,6 +41,7 @@ export function AsyncSelect({
   useSearch,
   searchContext = '',
   initialLabel = '',
+  excludeValues = [],
   placeholder,
   maxLength = 120,
   disabled,
@@ -49,7 +51,8 @@ export function AsyncSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [label, setLabel] = useState(initialLabel);
-  const { options, isPending, isError } = useSearch(query, searchContext);
+  const { options: searchOptions, isPending, isError } = useSearch(query, searchContext);
+  const options = searchOptions.filter((option) => !excludeValues.includes(option.value));
   const [active, setActive] = useState(0);
 
   // Clearing the field also clears the chosen value.

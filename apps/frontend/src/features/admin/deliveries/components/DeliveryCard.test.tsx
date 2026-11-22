@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Delivery } from '../model/types';
 
@@ -45,6 +46,14 @@ const delivery: Delivery = {
   updatedAt: '2026-11-18T00:00:00.000Z',
 };
 
+function renderCard() {
+  return render(
+    <MemoryRouter>
+      <DeliveryCard delivery={delivery} schoolName="North School" />
+    </MemoryRouter>,
+  );
+}
+
 describe('DeliveryCard', () => {
   beforeEach(() => {
     updateStatusMock.mockReset().mockResolvedValue({ ...delivery, status: 'INACTIVE' });
@@ -53,7 +62,7 @@ describe('DeliveryCard', () => {
 
   it('confirms before deactivating a delivery', async () => {
     const user = userEvent.setup();
-    render(<DeliveryCard delivery={delivery} schoolName="North School" />);
+    renderCard();
 
     await user.click(screen.getByRole('button', { name: 'Deactivate' }));
     expect(updateStatusMock).not.toHaveBeenCalled();
@@ -71,7 +80,11 @@ describe('DeliveryCard', () => {
     const user = userEvent.setup();
     const inactiveDelivery = { ...delivery, status: 'INACTIVE' as const };
     updateStatusMock.mockResolvedValue({ ...inactiveDelivery, status: 'ACTIVE' });
-    render(<DeliveryCard delivery={inactiveDelivery} schoolName="North School" />);
+    render(
+      <MemoryRouter>
+        <DeliveryCard delivery={inactiveDelivery} schoolName="North School" />
+      </MemoryRouter>,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Activate' }));
     expect(
@@ -88,13 +101,26 @@ describe('DeliveryCard', () => {
   it('shows an error when the status update fails', async () => {
     const user = userEvent.setup();
     updateStatusMock.mockRejectedValue(new Error('Request failed'));
-    render(<DeliveryCard delivery={delivery} schoolName="North School" />);
+    renderCard();
 
     await user.click(screen.getByRole('button', { name: 'Deactivate' }));
     await user.click(screen.getByRole('button', { name: 'Confirm Deactivate delivery' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Something went wrong. Please try again.',
+    );
+  });
+
+  it('links to separate teacher and student management pages', () => {
+    renderCard();
+
+    expect(screen.getByRole('link', { name: 'Teachers' })).toHaveAttribute(
+      'href',
+      '/steamx/admin/deliveries/delivery-1/teachers',
+    );
+    expect(screen.getByRole('link', { name: 'Students' })).toHaveAttribute(
+      'href',
+      '/steamx/admin/deliveries/delivery-1/students',
     );
   });
 });
