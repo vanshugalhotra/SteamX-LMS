@@ -25,6 +25,7 @@ function renderLogin(state?: unknown) {
         <Routes>
           <Route path={PATHS.login} element={<LoginPage />} />
           <Route path={PATHS.admin.dashboard} element={<div>Dashboard home</div>} />
+          <Route path={PATHS.teacher.deliveries} element={<div>Teacher deliveries</div>} />
           <Route path={PATHS.changePassword} element={<div>Change password screen</div>} />
         </Routes>
       </MemoryRouter>
@@ -56,7 +57,7 @@ describe('LoginPage', () => {
   });
 
   it('signs in and goes to the home page', async () => {
-    loginApi.mockResolvedValue({ mustChangePassword: false });
+    loginApi.mockResolvedValue({ mustChangePassword: false, roleKey: 'admin' });
     renderLogin();
 
     await fillAndSubmit('SCH-001', 'secret-pass');
@@ -66,6 +67,15 @@ describe('LoginPage', () => {
       { steamxId: 'SCH-001', password: 'secret-pass' },
       expect.anything(),
     );
+  });
+
+  it('sends a teacher to My Deliveries after sign in', async () => {
+    loginApi.mockResolvedValue({ mustChangePassword: false, roleKey: 'teacher' });
+    renderLogin();
+
+    await fillAndSubmit('TCH-001', 'secret-pass');
+
+    expect(await screen.findByText('Teacher deliveries')).toBeInTheDocument();
   });
 
   it('goes to change-password when the account requires it', async () => {

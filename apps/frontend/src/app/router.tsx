@@ -1,6 +1,10 @@
 import { createBrowserRouter, redirect } from 'react-router';
 import { LandingPage } from '@/features/landing/LandingPage';
-import { guestOnlyLoader, changePasswordLoader, protectedLoader } from '@/features/auth/loaders';
+import {
+  guestOnlyLoader,
+  changePasswordLoader,
+  roleProtectedLoader,
+} from '@/features/auth/loaders';
 import { PATHS } from '@/lib/paths';
 import { RootFallback, RootError } from './route-fallbacks';
 
@@ -27,7 +31,7 @@ export const router = createBrowserRouter([
         },
       },
       {
-        loader: protectedLoader,
+        loader: roleProtectedLoader('admin'),
         lazy: async () => {
           const { AdminLayout } = await import('@/features/admin/components/AdminLayout');
           return { Component: AdminLayout };
@@ -266,6 +270,32 @@ export const router = createBrowserRouter([
             },
           },
           { path: PATHS.admin.base, loader: () => redirect(PATHS.admin.dashboard) },
+        ],
+      },
+      {
+        loader: roleProtectedLoader('teacher'),
+        lazy: async () => {
+          const { TeacherLayout } = await import('@/features/teacher/components/TeacherLayout');
+          return { Component: TeacherLayout };
+        },
+        children: [
+          {
+            path: PATHS.teacher.deliveries,
+            lazy: async () => {
+              const { TeacherDeliveriesPage } =
+                await import('@/features/teacher/pages/TeacherDeliveriesPage');
+              return { Component: TeacherDeliveriesPage };
+            },
+          },
+          {
+            path: `${PATHS.teacher.deliveries}/:id`,
+            lazy: async () => {
+              const { TeacherDeliveryPage } =
+                await import('@/features/teacher/pages/TeacherDeliveryPage');
+              return { Component: TeacherDeliveryPage };
+            },
+          },
+          { path: PATHS.teacher.base, loader: () => redirect(PATHS.teacher.deliveries) },
         ],
       },
       { path: '*', element: <div className="p-6">Page not found</div> },

@@ -1,4 +1,5 @@
 const ADMIN_BASE = '/steamx/admin';
+const TEACHER_BASE = '/steamx/teacher';
 
 export const PATHS = {
   home: '/',
@@ -37,5 +38,10 @@ export const PATHS = {
     assetView: (id: string) => `${ADMIN_BASE}/assets/${id}`,
     admins: `${ADMIN_BASE}/admins`,
     adminView: (id: string) => `${ADMIN_BASE}/admins/${id}`,
+  },
+  teacher: {
+    base: TEACHER_BASE,
+    deliveries: `${TEACHER_BASE}/deliveries`,
+    delivery: (id: string) => `${TEACHER_BASE}/deliveries/${id}`,
   },
 } as const;
