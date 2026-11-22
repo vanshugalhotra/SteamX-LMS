@@ -52,6 +52,7 @@ export const API_ERROR_CODE = {
   SUBSCRIPTION_INVALID_DATE_RANGE: 'SUBSCRIPTION_INVALID_DATE_RANGE',
   DELIVERY_ALREADY_EXISTS: 'DELIVERY_ALREADY_EXISTS',
   DELIVERY_LIMIT_REACHED: 'DELIVERY_LIMIT_REACHED',
+  TEACHER_ALREADY_ASSIGNED: 'TEACHER_ALREADY_ASSIGNED',
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODE)[keyof typeof API_ERROR_CODE];
@@ -107,6 +108,7 @@ const DEFAULT_MESSAGES: Record<ApiErrorCode, string> = {
   SUBSCRIPTION_INVALID_DATE_RANGE: 'The end date must be on or after the start date.',
   DELIVERY_ALREADY_EXISTS: 'A delivery already exists for this class, course, and school year.',
   DELIVERY_LIMIT_REACHED: 'The active delivery limit has been reached.',
+  TEACHER_ALREADY_ASSIGNED: 'This teacher is already assigned to this delivery.',
 };
 
 // Mirrors PASSWORD_POLICY_VIOLATION in apps/backend/src/auth/validators/password-policy.ts.

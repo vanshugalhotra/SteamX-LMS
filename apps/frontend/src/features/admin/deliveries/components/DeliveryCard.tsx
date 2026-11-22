@@ -5,8 +5,10 @@ import { ActionMenu } from '@/components/ui/action-menu';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ButtonLink } from '@/components/ui/button-link';
 import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
 import { getErrorMessage } from '@/lib/api-errors';
+import { PATHS } from '@/lib/paths';
 import { DeliveryFormDialog } from './DeliveryFormDialog';
 import { useUpdateDeliveryStatus } from '../queries';
 import type { Delivery } from '../model/types';
@@ -90,6 +92,24 @@ export function DeliveryCard({ delivery, schoolName }: DeliveryCardProps) {
           <Badge variant={delivery.subscriptionActive ? 'success' : 'warning'}>
             {delivery.subscriptionActive ? 'Subscription active' : 'Subscription inactive'}
           </Badge>
+        </div>
+        <div className="flex gap-2">
+          <ButtonLink
+            to={PATHS.admin.deliveryTeachers(delivery.id)}
+            variant="secondary"
+            size="sm"
+            className="flex-1"
+          >
+            Teachers
+          </ButtonLink>
+          <ButtonLink
+            to={PATHS.admin.deliveryStudents(delivery.id)}
+            variant="outline"
+            size="sm"
+            className="flex-1"
+          >
+            Students
+          </ButtonLink>
         </div>
         {statusError && <Alert>{statusError}</Alert>}
       </div>
