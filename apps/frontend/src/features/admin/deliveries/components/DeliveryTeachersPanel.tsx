@@ -11,7 +11,11 @@ import type { Delivery } from '../model/types';
 import { getPageAfterRemoval } from '../model/rules';
 import { DELIVERY_ASSIGNMENTS_PAGE_SIZE } from '../config/deliveries.config';
 import { getDeliveryTeacherColumns } from '../config/delivery-teachers.config';
-import { useAssignDeliveryTeacher, useDeliveryTeachers, useRemoveDeliveryTeacher } from '../queries';
+import {
+  useAssignDeliveryTeacher,
+  useDeliveryTeachers,
+  useRemoveDeliveryTeacher,
+} from '../queries';
 
 export function DeliveryTeachersPanel({ delivery }: { delivery: Delivery }) {
   const [teacherId, setTeacherId] = useState('');

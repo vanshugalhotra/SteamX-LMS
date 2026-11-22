@@ -9,13 +9,7 @@ import { DeliveryStudentsPanel } from '../components/DeliveryStudentsPanel';
 import { DeliveryTeachersPanel } from '../components/DeliveryTeachersPanel';
 import { useDelivery } from '../queries';
 
-function DeliveryPageError({
-  error,
-  onRetry,
-}: {
-  error: unknown;
-  onRetry: () => void;
-}) {
+function DeliveryPageError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const notFound = error instanceof ApiError && error.status === 404;
   return (
     <div role="alert" className="space-y-3">
@@ -51,12 +45,10 @@ export function DeliveryManagementPage() {
   } else if (error) {
     content = <DeliveryPageError error={error} onRetry={() => void refetch()} />;
   } else {
-    content = (
-      isTeacherPage ? (
-        <DeliveryTeachersPanel delivery={delivery} />
-      ) : (
-        <DeliveryStudentsPanel delivery={delivery} />
-      )
+    content = isTeacherPage ? (
+      <DeliveryTeachersPanel delivery={delivery} />
+    ) : (
+      <DeliveryStudentsPanel delivery={delivery} />
     );
   }
 

@@ -11,7 +11,11 @@ import type { Delivery } from '../model/types';
 import { getDeliveryEnrollmentBlockReason, getPageAfterRemoval } from '../model/rules';
 import { DELIVERY_ASSIGNMENTS_PAGE_SIZE } from '../config/deliveries.config';
 import { getDeliveryEnrollmentColumns } from '../config/delivery-students.config';
-import { useDeliveryEnrollments, useEnrollDeliveryStudents, useRemoveDeliveryStudent } from '../queries';
+import {
+  useDeliveryEnrollments,
+  useEnrollDeliveryStudents,
+  useRemoveDeliveryStudent,
+} from '../queries';
 
 export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
   const [studentId, setStudentId] = useState('');
@@ -85,7 +89,9 @@ export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
               onChange={setStudentId}
               useSearch={useActiveStudentSearch}
               searchContext={delivery.schoolId}
-              excludeValues={enrollments.data?.items.map((enrollment) => enrollment.studentId) ?? []}
+              excludeValues={
+                enrollments.data?.items.map((enrollment) => enrollment.studentId) ?? []
+              }
               placeholder="Search students by name or SteamX ID"
               disabled={pending || enrollLocked}
             />

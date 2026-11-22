@@ -63,11 +63,7 @@ export function updateDeliveryStatus(id: string, status: DeliveryStatus) {
 }
 
 /** GET /deliveries/:id/teachers */
-export function fetchDeliveryTeachers({
-  deliveryId,
-  page,
-  limit,
-}: DeliveryTeacherListParams) {
+export function fetchDeliveryTeachers({ deliveryId, page, limit }: DeliveryTeacherListParams) {
   const search = new URLSearchParams({ page: String(page), limit: String(limit) });
   return apiFetch<Paginated<DeliveryTeacher>>(
     `${DELIVERY_ENDPOINTS.teachers(deliveryId)}?${search.toString()}`,
@@ -104,10 +100,7 @@ export function fetchDeliveryEnrollments({
 }
 
 /** POST /deliveries/:id/enrollments */
-export function enrollDeliveryStudents(
-  deliveryId: string,
-  payload: EnrollDeliveryStudentsPayload,
-) {
+export function enrollDeliveryStudents(deliveryId: string, payload: EnrollDeliveryStudentsPayload) {
   return apiFetch<EnrollmentCounts>(DELIVERY_ENDPOINTS.enrollments(deliveryId), {
     method: 'POST',
     body: JSON.stringify(payload),
