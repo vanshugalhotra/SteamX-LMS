@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchDeliveries } from '../api/api';
 import type { Delivery } from '../model/types';
+import { PATHS } from '@/lib/paths';
 import { DeliveriesPage } from './DeliveriesPage';
 
 vi.mock('../api/api', () => ({
@@ -65,9 +67,11 @@ function renderPage() {
     defaultOptions: { queries: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <DeliveriesPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <DeliveriesPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -82,6 +86,14 @@ beforeEach(() => {
 });
 
 describe('DeliveriesPage', () => {
+  it('links to the dedicated delivery creation page with the brand button style', () => {
+    renderPage();
+
+    const createLink = screen.getByRole('link', { name: 'Create delivery' });
+    expect(createLink).toHaveAttribute('href', PATHS.admin.deliveryNew);
+    expect(createLink).toHaveClass('bg-brand-navy', 'text-white');
+  });
+
   it('combines status, course, and school filters', async () => {
     const user = userEvent.setup();
     renderPage();
