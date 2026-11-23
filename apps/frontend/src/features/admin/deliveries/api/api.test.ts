@@ -102,7 +102,9 @@ describe('delivery API', () => {
       limit: 20,
       status: 'ACTIVE',
     });
-    await enrollDeliveryStudents('delivery-id', { studentIds: ['student-id'] });
+    await enrollDeliveryStudents('delivery-id', {
+      studentIds: ['student-id', 'another-student-id'],
+    });
     await removeDeliveryStudent('delivery-id', 'student-id');
 
     expect(mockedApiFetch).toHaveBeenNthCalledWith(
@@ -111,7 +113,7 @@ describe('delivery API', () => {
     );
     expect(mockedApiFetch).toHaveBeenNthCalledWith(2, '/deliveries/delivery-id/enrollments', {
       method: 'POST',
-      body: JSON.stringify({ studentIds: ['student-id'] }),
+      body: JSON.stringify({ studentIds: ['student-id', 'another-student-id'] }),
     });
     expect(mockedApiFetch).toHaveBeenNthCalledWith(
       3,

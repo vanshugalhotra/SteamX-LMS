@@ -63,7 +63,7 @@ describe('delivery management panels', () => {
     render(<DeliveryStudentsPanel delivery={{ ...delivery, subscriptionActive: false }} />);
 
     expect(screen.getByRole('combobox', { name: 'Search active students' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Enroll student' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Enroll students' })).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent('subscription');
   });
 });

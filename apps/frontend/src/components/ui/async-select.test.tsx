@@ -30,4 +30,27 @@ describe('AsyncSelect', () => {
     expect(screen.queryByRole('option', { name: 'Already assigned' })).not.toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Available teacher' })).toBeInTheDocument();
   });
+
+  it('reports the selected option without changing existing selection behavior', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onSelectOption = vi.fn();
+    const option = { value: 'student-1', label: 'Ada Student', description: 'STU-001' };
+    const useSearch = () => ({ options: [option], isPending: false, isError: false });
+
+    render(
+      <AsyncSelect
+        aria-label="Search students"
+        value=""
+        onChange={onChange}
+        onSelectOption={onSelectOption}
+        useSearch={useSearch}
+      />,
+    );
+    await user.click(screen.getByRole('combobox', { name: 'Search students' }));
+    await user.click(screen.getByRole('option', { name: 'Ada Student STU-001' }));
+
+    expect(onChange).toHaveBeenCalledWith('student-1');
+    expect(onSelectOption).toHaveBeenCalledWith(option);
+  });
 });
