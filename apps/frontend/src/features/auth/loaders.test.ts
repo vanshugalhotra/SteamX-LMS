@@ -78,16 +78,12 @@ describe('auth route guards', () => {
   describe('roleProtectedLoader', () => {
     it('sends teachers away from admin routes to their deliveries', async () => {
       query.mockResolvedValue(profile(false, 'teacher'));
-      expect(redirectTarget(await roleProtectedLoader('admin')())).toBe(
-        PATHS.teacher.deliveries,
-      );
+      expect(redirectTarget(await roleProtectedLoader('admin')())).toBe(PATHS.teacher.deliveries);
     });
 
     it('sends admins away from teacher routes to the admin dashboard', async () => {
       query.mockResolvedValue(profile(false, 'admin'));
-      expect(redirectTarget(await roleProtectedLoader('teacher')())).toBe(
-        PATHS.admin.dashboard,
-      );
+      expect(redirectTarget(await roleProtectedLoader('teacher')())).toBe(PATHS.admin.dashboard);
     });
 
     it('allows a user with the required role through', async () => {
