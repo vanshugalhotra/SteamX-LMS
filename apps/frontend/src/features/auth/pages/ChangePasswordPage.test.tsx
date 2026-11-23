@@ -58,7 +58,7 @@ describe('ChangePasswordPage', () => {
   });
 
   it('sends only current and new password, then goes home', async () => {
-    changePasswordApi.mockResolvedValue({ mustChangePassword: false });
+    changePasswordApi.mockResolvedValue({ mustChangePassword: false, roleKey: 'admin' });
     renderPage();
     await fill('old-pass', 'new-pass-1', 'new-pass-1');
 
