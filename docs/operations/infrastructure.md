@@ -1,7 +1,7 @@
 # AWS infrastructure
 
 This guide describes the resources and storage operations implemented by the AWS CDK app in
-`infra/`; production application hosting is only a proposal.
+`infra/`; production application hosting is not deployed yet.
 
 ## Stacks
 
@@ -14,8 +14,18 @@ This guide describes the resources and storage operations implemented by the AWS
 
 `SteamxStagingBase` currently contains only the monthly USD 25 cost budget named
 `steamx-staging-budget`, with alerts at 80% actual and 100% forecast spend. Alerts do not cap cost.
-Base is persistent and survives teardown; the App stack (added later) is the part destroyed to save
-cost.
+Base is persistent and survives teardown; `SteamxStagingApp` is the destroyable part. The App stack
+owns the VPC because nothing in Base uses it.
+
+`SteamxStagingApp` currently contains only networking: a VPC with two public `/24` subnets across
+two AZs and two isolated `/24` subnets, with no NAT gateways or bastion. Public subnets are intended
+for the future ALB and Fargate tasks (with public IPs); isolated subnets have no internet route and
+are intended for RDS. Its security-group chain allows HTTPS from the AWS-managed CloudFront
+origin-facing prefix list to the ALB, API traffic on port 3333 from ALB to ECS, and PostgreSQL on
+5432 from ECS to the database. ECS has outbound access; the database security group does not.
+
+The CloudFront prefix list includes requests from any CloudFront distribution, not just ours. A
+secret origin header check is needed when the ALB is added in a later issue.
 
 The environment defaults to `staging`; select it with CDK context `--context env=staging`. Staging
 is the only defined environment. The region resolves from CDK context `region`, then `AWS_REGION`,
@@ -39,19 +49,22 @@ $env:STEAMX_BUDGET_EMAIL = "YOUR_EMAIL_ADDRESS"
 $env:STEAMX_CORS_ORIGINS = "http://localhost:5173"
 ```
 
-Inspect and deploy either stack by name:
+Inspect or deploy a stack by name. To deploy only the App stack:
 
 ```powershell
 pnpm infra:synth
 pnpm infra:diff SteamxStagingBase
 pnpm infra:deploy SteamxStagingBase
+pnpm infra:diff SteamxStagingApp
+pnpm infra:deploy SteamxStagingApp
 pnpm infra:diff SteamxStagingStack
 pnpm infra:deploy SteamxStagingStack
 ```
 
-`pnpm infra:destroy SteamxStagingStack` tears down the legacy stack, including its bucket and
-contents. The legacy stack outputs `BucketName`, `Region`, and `BackendUserName`. Do not destroy
-the persistent Base stack during normal teardown.
+`pnpm infra:destroy SteamxStagingApp` tears down the App networking stack; Base persists and should
+not be destroyed during normal teardown. `pnpm infra:destroy SteamxStagingStack` tears down the
+legacy stack, including its bucket and contents. The legacy stack outputs `BucketName`, `Region`,
+and `BackendUserName`.
 
 For local use, configure the backend's `AWS_REGION` and `S3_BUCKET` from the stack outputs. Static
 AWS credentials are optional, but `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` must be set

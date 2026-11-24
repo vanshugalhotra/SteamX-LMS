@@ -2,6 +2,7 @@
 import { App } from 'aws-cdk-lib';
 import { getInfrastructureConfig } from '../lib/config.js';
 import { loadEnvironmentConfig } from '../lib/environments/index.js';
+import { AppStack } from '../lib/app-stack.js';
 import { BaseStack } from '../lib/base-stack.js';
 import { SteamxStack } from '../lib/steamx-stack.js';
 
@@ -27,6 +28,15 @@ const baseEnvironment = loadEnvironmentConfig(
   process.env,
 );
 const baseStackName = `Steamx${baseEnvironment.config.envName[0]?.toUpperCase()}${baseEnvironment.config.envName.slice(1)}Base`;
+const appStackName = `Steamx${baseEnvironment.config.envName[0]?.toUpperCase()}${baseEnvironment.config.envName.slice(1)}App`;
+
+new AppStack(app, appStackName, baseEnvironment.config, {
+  stackName: appStackName,
+  env: {
+    account: baseEnvironment.account,
+    region: baseEnvironment.config.region,
+  },
+});
 
 new BaseStack(app, baseStackName, baseEnvironment.config, baseEnvironment.budgetEmail, {
   stackName: baseStackName,
