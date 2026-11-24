@@ -1,0 +1,34 @@
+import { stagingConfig } from './staging.js';
+import type { EnvConfig } from './types.js';
+
+export interface LoadedEnvironment {
+  config: EnvConfig;
+  account: string | undefined;
+  budgetEmail: string;
+}
+
+export function loadEnvironmentConfig(
+  context: { env?: unknown; region?: unknown },
+  environment: NodeJS.ProcessEnv,
+): LoadedEnvironment {
+  const envName = context.env === undefined ? 'staging' : String(context.env);
+  if (envName !== 'staging') {
+    throw new Error(`Unknown environment "${envName}"; only staging is defined.`);
+  }
+
+  const budgetEmail = environment.STEAMX_BUDGET_EMAIL?.trim();
+  if (!budgetEmail) {
+    throw new Error('STEAMX_BUDGET_EMAIL is required to synthesize the Base stack.');
+  }
+
+  const contextRegion = context.region === undefined ? undefined : String(context.region).trim();
+
+  return {
+    config: {
+      ...stagingConfig,
+      region: contextRegion || environment.AWS_REGION || stagingConfig.region,
+    },
+    account: environment.CDK_DEFAULT_ACCOUNT,
+    budgetEmail,
+  };
+}

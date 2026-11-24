@@ -3,48 +3,55 @@
 This guide describes the resources and storage operations implemented by the AWS CDK app in
 `infra/`; production application hosting is only a proposal.
 
-## Current stack
+## Stacks
 
-The CDK stack provisions:
+`SteamxStagingStack` is the legacy stack, to be replaced. It provisions:
 
 - A private, encrypted S3 bucket with public access blocked and HTTPS enforced. It is not versioned;
   incomplete multipart uploads are removed after one day.
 - Browser `PUT`, `GET`, and `HEAD` CORS access for configured origins.
 - A backend IAM user with access to `assets/*` and `submissions/*`.
-- A monthly USD 25 budget alert at 80% actual spend and 100% forecast spend. Alerts do not cap cost.
 
-The default CDK context is `env=staging`, region `ap-south-1`. Staging stack deletion removes the
-bucket and its objects. Other environment names retain the bucket and enable termination
-protection. Review the planned changes and target account before deploying or deleting resources.
+`SteamxStagingBase` currently contains only the monthly USD 25 cost budget named
+`steamx-staging-budget`, with alerts at 80% actual and 100% forecast spend. Alerts do not cap cost.
+Base is persistent and survives teardown; the App stack (added later) is the part destroyed to save
+cost.
+
+The environment defaults to `staging`; select it with CDK context `--context env=staging`. Staging
+is the only defined environment. The region resolves from CDK context `region`, then `AWS_REGION`,
+then `ap-south-1`. The account resolves from `CDK_DEFAULT_ACCOUNT`. Set `STEAMX_BUDGET_EMAIL`
+before synthesizing or deploying.
 
 ## Deploy and inspect
 
 The deployer needs AWS credentials and CDK permissions. Install the CDK dependencies and bootstrap
-the AWS account/region once:
+the target AWS account/region once:
 
 ```powershell
 pnpm infra:install
-pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/ap-south-1
+pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/REGION
 ```
 
-Set the required budget email before synthesizing. Optionally override the allowed bucket CORS
-origins:
+Set the required budget email. The legacy bucket also supports an optional CORS override:
 
 ```powershell
-$env:STEAMX_BUDGET_EMAIL = "alerts@example.com"
+$env:STEAMX_BUDGET_EMAIL = "YOUR_EMAIL_ADDRESS"
 $env:STEAMX_CORS_ORIGINS = "http://localhost:5173"
 ```
 
-Review changes before deployment:
+Inspect and deploy either stack by name:
 
 ```powershell
 pnpm infra:synth
-pnpm infra:diff
-pnpm infra:deploy
+pnpm infra:diff SteamxStagingBase
+pnpm infra:deploy SteamxStagingBase
+pnpm infra:diff SteamxStagingStack
+pnpm infra:deploy SteamxStagingStack
 ```
 
-`pnpm infra:destroy` deletes `SteamxStagingStack`, including its bucket and bucket contents. The
-stack outputs `BucketName`, `Region`, and `BackendUserName`.
+`pnpm infra:destroy SteamxStagingStack` tears down the legacy stack, including its bucket and
+contents. The legacy stack outputs `BucketName`, `Region`, and `BackendUserName`. Do not destroy
+the persistent Base stack during normal teardown.
 
 For local use, configure the backend's `AWS_REGION` and `S3_BUCKET` from the stack outputs. Static
 AWS credentials are optional, but `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` must be set
