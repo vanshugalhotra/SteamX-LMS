@@ -9,8 +9,12 @@ import {
   fetchDelivery,
   fetchDeliveryEnrollments,
   fetchDeliveryTeachers,
+  fetchDeliveryReleaseOutline,
   removeDeliveryStudent,
   removeDeliveryTeacher,
+  releaseDeliveryLesson,
+  releaseDeliveryModule,
+  unreleaseDeliveryLesson,
   updateDeliveryLabel,
   updateDeliveryStatus,
 } from './api';
@@ -102,7 +106,9 @@ describe('delivery API', () => {
       limit: 20,
       status: 'ACTIVE',
     });
-    await enrollDeliveryStudents('delivery-id', { studentIds: ['student-id'] });
+    await enrollDeliveryStudents('delivery-id', {
+      studentIds: ['student-id', 'another-student-id'],
+    });
     await removeDeliveryStudent('delivery-id', 'student-id');
 
     expect(mockedApiFetch).toHaveBeenNthCalledWith(
@@ -111,7 +117,7 @@ describe('delivery API', () => {
     );
     expect(mockedApiFetch).toHaveBeenNthCalledWith(2, '/deliveries/delivery-id/enrollments', {
       method: 'POST',
-      body: JSON.stringify({ studentIds: ['student-id'] }),
+      body: JSON.stringify({ studentIds: ['student-id', 'another-student-id'] }),
     });
     expect(mockedApiFetch).toHaveBeenNthCalledWith(
       3,
@@ -125,6 +131,30 @@ describe('delivery API', () => {
 
     expect(mockedApiFetch).toHaveBeenCalledWith(
       '/deliveries/delivery-id/enrollments?page=1&limit=20',
+    );
+  });
+
+  it('fetches and changes delivery release state', async () => {
+    await fetchDeliveryReleaseOutline('delivery-id');
+    await releaseDeliveryLesson('delivery-id', 'lesson-id');
+    await unreleaseDeliveryLesson('delivery-id', 'lesson-id');
+    await releaseDeliveryModule('delivery-id', 'module-id');
+
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(1, '/deliveries/delivery-id/releases');
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      2,
+      '/deliveries/delivery-id/releases/lessons/lesson-id',
+      { method: 'PUT' },
+    );
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      3,
+      '/deliveries/delivery-id/releases/lessons/lesson-id',
+      { method: 'DELETE' },
+    );
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      4,
+      '/deliveries/delivery-id/releases/modules/module-id',
+      { method: 'POST' },
     );
   });
 });

@@ -12,6 +12,9 @@ import type {
   DeliveryTeacherListParams,
   EnrollDeliveryStudentsPayload,
   EnrollmentCounts,
+  LessonReleaseResponse,
+  ModuleReleaseResponse,
+  ReleaseOutlineResponse,
   UpdateDeliveryLabelPayload,
 } from '../model/types';
 
@@ -111,5 +114,31 @@ export function enrollDeliveryStudents(deliveryId: string, payload: EnrollDelive
 export async function removeDeliveryStudent(deliveryId: string, studentId: string): Promise<void> {
   await apiFetch<undefined>(DELIVERY_ENDPOINTS.enrollment(deliveryId, studentId), {
     method: 'DELETE',
+  });
+}
+
+/** GET /deliveries/:id/releases */
+export function fetchDeliveryReleaseOutline(deliveryId: string) {
+  return apiFetch<ReleaseOutlineResponse>(DELIVERY_ENDPOINTS.releases(deliveryId));
+}
+
+/** PUT /deliveries/:id/releases/lessons/:lessonId */
+export function releaseDeliveryLesson(deliveryId: string, lessonId: string) {
+  return apiFetch<LessonReleaseResponse>(DELIVERY_ENDPOINTS.releaseLesson(deliveryId, lessonId), {
+    method: 'PUT',
+  });
+}
+
+/** DELETE /deliveries/:id/releases/lessons/:lessonId */
+export async function unreleaseDeliveryLesson(deliveryId: string, lessonId: string): Promise<void> {
+  await apiFetch<undefined>(DELIVERY_ENDPOINTS.releaseLesson(deliveryId, lessonId), {
+    method: 'DELETE',
+  });
+}
+
+/** POST /deliveries/:id/releases/modules/:moduleId */
+export function releaseDeliveryModule(deliveryId: string, moduleId: string) {
+  return apiFetch<ModuleReleaseResponse>(DELIVERY_ENDPOINTS.releaseModule(deliveryId, moduleId), {
+    method: 'POST',
   });
 }
