@@ -5,27 +5,34 @@ This guide describes the resources and storage operations implemented by the AWS
 
 ## Stacks
 
-`SteamxStagingStack` is the legacy stack, to be replaced. It provisions:
+`SteamxStagingBase` owns the monthly USD 25 cost budget named `steamx-staging-budget` (alerts at
+80% actual and 100% forecast; alerts do not cap cost), and all storage buckets. It is a separate
+stack from `SteamxStagingApp`, so Base and its storage survive App teardown. Destroying Base deletes
+the buckets and their contents. The `media` bucket is for curriculum media and SPA assets;
+`uploads` is for student submissions. Both are private,
+versioned, HTTPS-only S3 buckets. Staging CORS allows the configured app origin and the local
+development origins `http://localhost:3000` and `http://localhost:5173`. Their keys are:
 
-- A private, encrypted S3 bucket with public access blocked and HTTPS enforced. It is not versioned;
-  incomplete multipart uploads are removed after one day.
-- Browser `PUT`, `GET`, and `HEAD` CORS access for configured origins.
-- A backend IAM user with access to `assets/*` and `submissions/*`.
+- `media`: `spa/` and `assets/<assetId>/<fileId>/original` or
+  `assets/<assetId>/<fileId>/hls/`
+- `uploads`: `submissions/<schoolId>/...`
 
-`SteamxStagingBase` currently contains only the monthly USD 25 cost budget named
-`steamx-staging-budget`, with alerts at 80% actual and 100% forecast spend. Alerts do not cap cost.
-Base is persistent and survives teardown; `SteamxStagingApp` is the destroyable part. The App stack
-owns the VPC because nothing in Base uses it.
+Noncurrent object versions expire after 30 days, incomplete multipart uploads are aborted after one
+day, and expired delete markers are removed. Current objects have no expiration. Consequently,
+purged data can persist in noncurrent versions for up to 30 days.
 
-`SteamxStagingApp` currently contains only networking: a VPC with two public `/24` subnets across
-two AZs and two isolated `/24` subnets, with no NAT gateways or bastion. Public subnets are intended
-for the future ALB and Fargate tasks (with public IPs); isolated subnets have no internet route and
-are intended for RDS. Its security-group chain allows HTTPS from the AWS-managed CloudFront
-origin-facing prefix list to the ALB, API traffic on port 3333 from ALB to ECS, and PostgreSQL on
-5432 from ECS to the database. ECS has outbound access; the database security group does not.
+Base creates a `steamx-staging-local-dev` IAM user for local backend access to these same buckets:
+`assets/*` in `media` and `submissions/*` in `uploads`. CDK does not create access keys; create
+local credentials manually in the AWS console when needed. Do not include localhost origins in
+production CORS, and do not use static keys for deployed services.
 
-The CloudFront prefix list includes requests from any CloudFront distribution, not just ours. A
-secret origin header check is needed when the ALB is added in a later issue.
+Base storage replaces the previous S3/IAM-only CDK stack. Removing that stack from the CDK app does
+not automatically delete an already-deployed CloudFormation stack; any remaining old resources
+require separate cleanup.
+
+`SteamxStagingApp` contains a VPC with two public `/24` subnets across two AZs and two isolated
+`/24` subnets, with no NAT gateways or bastion, plus security groups. It does not provision a load
+balancer, application compute, or database.
 
 The environment defaults to `staging`; select it with CDK context `--context env=staging`. Staging
 is the only defined environment. The region resolves from CDK context `region`, then `AWS_REGION`,
@@ -42,14 +49,14 @@ pnpm infra:install
 pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/REGION
 ```
 
-Set the required budget email. The legacy bucket also supports an optional CORS override:
+Set the required budget email:
 
 ```powershell
 $env:STEAMX_BUDGET_EMAIL = "YOUR_EMAIL_ADDRESS"
-$env:STEAMX_CORS_ORIGINS = "http://localhost:5173"
 ```
 
-Inspect or deploy a stack by name. To deploy only the App stack:
+The root `infra:synth` script synthesizes both current stacks. The `infra:diff`, `infra:deploy`, and
+`infra:destroy` scripts accept a stack name; target Base or App explicitly. For example:
 
 ```powershell
 pnpm infra:synth
@@ -57,21 +64,23 @@ pnpm infra:diff SteamxStagingBase
 pnpm infra:deploy SteamxStagingBase
 pnpm infra:diff SteamxStagingApp
 pnpm infra:deploy SteamxStagingApp
-pnpm infra:diff SteamxStagingStack
-pnpm infra:deploy SteamxStagingStack
 ```
 
-`pnpm infra:destroy SteamxStagingApp` tears down the App networking stack; Base persists and should
-not be destroyed during normal teardown. `pnpm infra:destroy SteamxStagingStack` tears down the
-legacy stack, including its bucket and contents. The legacy stack outputs `BucketName`, `Region`,
-and `BackendUserName`.
+The Base outputs include both bucket names and the local-dev user name. Configure the backend with
+the media and uploads bucket outputs:
 
-For local use, configure the backend's `AWS_REGION` and `S3_BUCKET` from the stack outputs. Static
-AWS credentials are optional, but `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` must be set
-together. The supported runtime variables and defaults are in
-[`apps/backend/.env.example`](../../apps/backend/.env.example). The current stack does not create
-ECS or an ECS task role; the [proposed AWS design](../architecture/aws-architecture.md) describes
-the planned role-based deployment.
+```text
+S3_MEDIA_BUCKET=<MediaBucketName>
+S3_UPLOADS_BUCKET=<UploadsBucketName>
+AWS_REGION=<region>
+AWS_ACCESS_KEY_ID=<manually-created local-dev key>
+AWS_SECRET_ACCESS_KEY=<manually-created local-dev secret>
+```
+
+Create local credentials manually in the AWS console, never in code. Deployed services do not use
+static credentials. The backend routes `assets/` keys to media and `submissions/` keys to uploads.
+The existing asset upload flow uses media; a student-submission file upload endpoint is not
+implemented yet.
 
 ## Asset storage operations
 

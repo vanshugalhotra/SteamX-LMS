@@ -152,8 +152,8 @@ async function verifyCleanup(state: SmokeState, database: Pool, s3: S3Client): P
     throw new Error('Database rows from the last smoke run still exist.');
   }
 
-  const bucket = process.env.S3_BUCKET;
-  if (!bucket) throw new Error('S3_BUCKET is required to verify S3 cleanup.');
+  const bucket = process.env.S3_MEDIA_BUCKET;
+  if (!bucket) throw new Error('S3_MEDIA_BUCKET is required to verify S3 cleanup.');
   for (const asset of state.assets) {
     for (const key of asset.objectKeys) {
       try {
@@ -565,8 +565,8 @@ async function main(): Promise<void> {
           sendJson(response, 409, { error: 'API-created resources must be deleted first.' });
           return;
         }
-        const bucket = process.env.S3_BUCKET;
-        if (!bucket) throw new Error('S3_BUCKET is required to clean up smoke objects.');
+        const bucket = process.env.S3_MEDIA_BUCKET;
+        if (!bucket) throw new Error('S3_MEDIA_BUCKET is required to clean up smoke objects.');
         const existence = await database.query<{ has_resources: boolean }>(
           `SELECT
              EXISTS (SELECT 1 FROM assets WHERE id = ANY($1::uuid[]))

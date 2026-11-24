@@ -14,7 +14,8 @@ function createTokenService(nodeEnv: Env['NODE_ENV'] = 'test', secret = JWT_SECR
   const env = validateEnv({
     DATABASE_URL,
     AWS_REGION: 'ap-south-1',
-    S3_BUCKET: 'test-bucket',
+    S3_MEDIA_BUCKET: 'media-test-bucket',
+    S3_UPLOADS_BUCKET: 'uploads-test-bucket',
     NODE_ENV: nodeEnv,
     AUTH_JWT_SECRET: secret,
     AUTH_TOKEN_TTL_SECONDS: TOKEN_TTL_SECONDS,

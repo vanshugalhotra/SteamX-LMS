@@ -3,7 +3,8 @@ import { validateEnv } from './env.schema.js';
 const VALID_SECRET = 'test-auth-secret-with-at-least-thirty-two-characters';
 const STORAGE_CONFIG = {
   AWS_REGION: 'ap-south-1',
-  S3_BUCKET: 'test-bucket',
+  S3_MEDIA_BUCKET: 'media-test-bucket',
+  S3_UPLOADS_BUCKET: 'uploads-test-bucket',
 };
 
 describe('validateEnv', () => {
@@ -29,7 +30,8 @@ describe('validateEnv', () => {
       SWAGGER_ENABLED: true,
       storage: {
         region: 'ap-south-1',
-        bucket: 'test-bucket',
+        mediaBucket: 'media-test-bucket',
+        uploadsBucket: 'uploads-test-bucket',
         accessKeyId: undefined,
         secretAccessKey: undefined,
         uploadUrlTtlSeconds: 900,
@@ -221,20 +223,30 @@ describe('validateEnv', () => {
     ).toBe(86_400);
   });
 
-  it('requires an S3 bucket and AWS region', () => {
+  it('requires both S3 buckets and AWS region', () => {
     expect(() =>
       validateEnv({
         AUTH_JWT_SECRET: VALID_SECRET,
         DATABASE_URL: 'postgresql://localhost/steamx_test',
         AWS_REGION: 'ap-south-1',
       }),
-    ).toThrow('- S3_BUCKET: is required');
+    ).toThrow('- S3_MEDIA_BUCKET: is required');
 
     expect(() =>
       validateEnv({
         AUTH_JWT_SECRET: VALID_SECRET,
         DATABASE_URL: 'postgresql://localhost/steamx_test',
-        S3_BUCKET: 'test-bucket',
+        S3_MEDIA_BUCKET: 'media-test-bucket',
+        AWS_REGION: 'ap-south-1',
+      }),
+    ).toThrow('- S3_UPLOADS_BUCKET: is required');
+
+    expect(() =>
+      validateEnv({
+        AUTH_JWT_SECRET: VALID_SECRET,
+        DATABASE_URL: 'postgresql://localhost/steamx_test',
+        S3_MEDIA_BUCKET: 'media-test-bucket',
+        S3_UPLOADS_BUCKET: 'uploads-test-bucket',
       }),
     ).toThrow('- AWS_REGION: is required');
   });

@@ -95,7 +95,8 @@ function isInvalidRange(error: unknown): boolean {
 /** S3 implementation behind the application-facing StorageService abstraction. */
 @Injectable()
 export class S3StorageService extends StorageService implements OnModuleDestroy {
-  private readonly bucket: string;
+  private readonly mediaBucket: string;
+  private readonly uploadsBucket: string;
   private readonly uploadUrlTtlSeconds: number;
 
   /** Sets up the S3 client, bucket, and upload-link lifetime from injected dependencies. */
@@ -105,7 +106,8 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
     private readonly logger: PinoLogger,
   ) {
     super();
-    this.bucket = config.get('storage.bucket', { infer: true });
+    this.mediaBucket = config.get('storage.mediaBucket', { infer: true });
+    this.uploadsBucket = config.get('storage.uploadsBucket', { infer: true });
     this.uploadUrlTtlSeconds = config.get('storage.uploadUrlTtlSeconds', { infer: true });
     this.logger.setContext(S3StorageService.name);
   }
@@ -123,7 +125,7 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
     }
 
     const command = new PutObjectCommand({
-      Bucket: this.bucket,
+      Bucket: this.bucketForKey(key),
       Key: key,
       ContentType: contentType,
       ContentLength: sizeBytes,
@@ -159,7 +161,7 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
     }
 
     const command = new GetObjectCommand({
-      Bucket: this.bucket,
+      Bucket: this.bucketForKey(key),
       Key: key,
       ResponseContentDisposition: buildContentDisposition(filename),
       ...(contentType ? { ResponseContentType: contentType } : {}),
@@ -179,7 +181,7 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
 
     try {
       const result = await this.client.send(
-        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+        new HeadObjectCommand({ Bucket: this.bucketForKey(key), Key: key }),
       );
       const sizeBytes = result.ContentLength ?? 0;
       if (result.ContentLength === undefined) {
@@ -210,7 +212,7 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
     try {
       const result = await this.client.send(
         new GetObjectCommand({
-          Bucket: this.bucket,
+          Bucket: this.bucketForKey(key),
           Key: key,
           Range: `bytes=0-${length - 1}`,
         }),
@@ -243,7 +245,7 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
     do {
       const page = await this.client.send(
         new ListObjectsV2Command({
-          Bucket: this.bucket,
+          Bucket: this.bucketForKey(prefix),
           Prefix: prefix,
           ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
         }),
@@ -261,7 +263,7 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
 
         const result = await this.client.send(
           new DeleteObjectsCommand({
-            Bucket: this.bucket,
+            Bucket: this.bucketForKey(prefix),
             Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
           }),
         );
@@ -285,5 +287,15 @@ export class S3StorageService extends StorageService implements OnModuleDestroy 
   /** Closes the shared S3 client when Nest shuts down. */
   async onModuleDestroy(): Promise<void> {
     this.client.destroy();
+  }
+
+  private bucketForKey(key: string): string {
+    if (key.startsWith('assets/')) {
+      return this.mediaBucket;
+    }
+    if (key.startsWith('submissions/')) {
+      return this.uploadsBucket;
+    }
+    throw new StorageInvalidArgumentError('Storage key is invalid');
   }
 }
