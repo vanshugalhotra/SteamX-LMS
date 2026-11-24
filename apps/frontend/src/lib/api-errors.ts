@@ -52,6 +52,8 @@ export const API_ERROR_CODE = {
   SUBSCRIPTION_INVALID_DATE_RANGE: 'SUBSCRIPTION_INVALID_DATE_RANGE',
   DELIVERY_ALREADY_EXISTS: 'DELIVERY_ALREADY_EXISTS',
   DELIVERY_LIMIT_REACHED: 'DELIVERY_LIMIT_REACHED',
+  DELIVERY_NOT_ACTIVE: 'DELIVERY_NOT_ACTIVE',
+  STUDENT_NOT_ACTIVE: 'STUDENT_NOT_ACTIVE',
   TEACHER_ALREADY_ASSIGNED: 'TEACHER_ALREADY_ASSIGNED',
 } as const;
 
@@ -108,6 +110,8 @@ const DEFAULT_MESSAGES: Record<ApiErrorCode, string> = {
   SUBSCRIPTION_INVALID_DATE_RANGE: 'The end date must be on or after the start date.',
   DELIVERY_ALREADY_EXISTS: 'A delivery already exists for this class, course, and school year.',
   DELIVERY_LIMIT_REACHED: 'The active delivery limit has been reached.',
+  DELIVERY_NOT_ACTIVE: 'This delivery is inactive.',
+  STUDENT_NOT_ACTIVE: 'This student is inactive.',
   TEACHER_ALREADY_ASSIGNED: 'This teacher is already assigned to this delivery.',
 };
 

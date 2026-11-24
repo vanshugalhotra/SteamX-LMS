@@ -119,4 +119,12 @@ describe('delivery API', () => {
       { method: 'DELETE' },
     );
   });
+
+  it('omits the status query when listing all enrollments', async () => {
+    await fetchDeliveryEnrollments({ deliveryId: 'delivery-id', page: 1, limit: 20 });
+
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/deliveries/delivery-id/enrollments?page=1&limit=20',
+    );
+  });
 });

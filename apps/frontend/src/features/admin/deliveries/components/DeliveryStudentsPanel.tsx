@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ListToolbar } from '@/components/list/ListToolbar';
 import { AsyncSelect } from '@/components/ui/async-select';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -7,10 +8,15 @@ import { DataTable } from '@/components/ui/data-table';
 import { Pagination } from '@/components/ui/pagination';
 import { useActiveStudentSearch } from '@/features/admin/users/queries';
 import { getErrorMessage } from '@/lib/api-errors';
+import { useListParams } from '@/lib/use-list-params';
 import type { Delivery } from '../model/types';
 import { getDeliveryEnrollmentBlockReason, getPageAfterRemoval } from '../model/rules';
 import { DELIVERY_ASSIGNMENTS_PAGE_SIZE } from '../config/deliveries.config';
-import { getDeliveryEnrollmentColumns } from '../config/delivery-students.config';
+import {
+  DELIVERY_ENROLLMENT_STATUS_FILTERS,
+  getDeliveryEnrollmentColumns,
+  type DeliveryEnrollmentStatusFilter,
+} from '../config/delivery-students.config';
 import {
   useDeliveryEnrollments,
   useEnrollDeliveryStudents,
@@ -19,13 +25,18 @@ import {
 
 export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
   const [studentId, setStudentId] = useState('');
-  const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState<string | null>(null);
+  const {
+    filter: statusFilter,
+    setFilter: setStatusFilter,
+    page,
+    setPage,
+  } = useListParams<DeliveryEnrollmentStatusFilter>('ACTIVE');
   const enrollments = useDeliveryEnrollments({
     deliveryId: delivery.id,
     page,
     limit: DELIVERY_ASSIGNMENTS_PAGE_SIZE,
-    status: 'ACTIVE',
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
   });
   const enrollStudents = useEnrollDeliveryStudents();
   const removeStudent = useRemoveDeliveryStudent();
@@ -60,9 +71,7 @@ export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
     try {
       await removeStudent.mutateAsync({ deliveryId: delivery.id, studentId: id });
       if (total !== undefined) {
-        setPage((currentPage) =>
-          getPageAfterRemoval(currentPage, total, DELIVERY_ASSIGNMENTS_PAGE_SIZE),
-        );
+        setPage(getPageAfterRemoval(page, total, DELIVERY_ASSIGNMENTS_PAGE_SIZE));
       }
       toast.success('Student removed');
     } catch (error) {
@@ -70,10 +79,27 @@ export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
     }
   };
 
+  const reactivate = async (id: string) => {
+    if (enrollLocked) return;
+    setActionError(null);
+    try {
+      const counts = await enrollStudents.mutateAsync({
+        deliveryId: delivery.id,
+        body: { studentIds: [id] },
+      });
+      toast.success(counts.reactivated ? 'Student reactivated' : 'Student is already active');
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    }
+  };
+
   const columns = getDeliveryEnrollmentColumns(
     (id) => void remove(id),
+    (id) => void reactivate(id),
     pending,
     removeStudent.isPending ? removeStudent.variables.studentId : null,
+    enrollStudents.isPending ? enrollStudents.variables.body.studentIds[0] : null,
+    enrollLocked,
   );
   return (
     <div className="space-y-5">
@@ -109,9 +135,21 @@ export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
       {actionError && <Alert>{actionError}</Alert>}
 
       <section aria-label="Enrolled students" className="space-y-3">
-        <h2 className="text-sm font-semibold">
-          Enrolled students{enrollments.data ? ` (${String(enrollments.data.total)})` : ''}
-        </h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-sm font-semibold">
+            Enrolled students{enrollments.data ? ` (${String(enrollments.data.total)})` : ''}
+          </h2>
+          <ListToolbar
+            variant="segmented"
+            filters={DELIVERY_ENROLLMENT_STATUS_FILTERS}
+            filter={statusFilter}
+            onFilterChange={(filter) => {
+              setStatusFilter(filter);
+              setActionError(null);
+            }}
+            filterLabel="Filter by enrollment status"
+          />
+        </div>
         <DataTable
           columns={columns}
           rows={enrollments.data?.items}

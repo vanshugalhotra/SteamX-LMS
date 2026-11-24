@@ -38,6 +38,12 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage(apiError(409, API_ERROR_CODE.TEACHER_ALREADY_ASSIGNED))).toBe(
       'This teacher is already assigned to this delivery.',
     );
+    expect(getErrorMessage(apiError(409, API_ERROR_CODE.DELIVERY_NOT_ACTIVE))).toBe(
+      'This delivery is inactive.',
+    );
+    expect(getErrorMessage(apiError(409, API_ERROR_CODE.STUDENT_NOT_ACTIVE))).toBe(
+      'This student is inactive.',
+    );
   });
 
   it('maps curriculum error codes to their default messages', () => {

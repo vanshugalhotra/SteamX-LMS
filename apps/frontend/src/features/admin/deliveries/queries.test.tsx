@@ -2,12 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDelivery, fetchDelivery } from './api/api';
+import { createDelivery, enrollDeliveryStudents, fetchDelivery } from './api/api';
 import type { Delivery } from './model/types';
-import { deliveryKeys, useCreateDelivery, useDelivery } from './queries';
+import { deliveryKeys, useCreateDelivery, useDelivery, useEnrollDeliveryStudents } from './queries';
 
 vi.mock('./api/api', () => ({
   createDelivery: vi.fn(),
+  enrollDeliveryStudents: vi.fn(),
   fetchDeliveries: vi.fn(),
   fetchDelivery: vi.fn(),
   updateDeliveryLabel: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock('./api/api', () => ({
 }));
 
 const mockedCreateDelivery = vi.mocked(createDelivery);
+const mockedEnrollDeliveryStudents = vi.mocked(enrollDeliveryStudents);
 const mockedFetchDelivery = vi.mocked(fetchDelivery);
 
 const deliveryResponse: Delivery = {
@@ -95,5 +97,58 @@ describe('delivery mutations', () => {
     });
 
     expectDeliveryQueriesInvalidated(queryClient);
+  });
+
+  it('invalidates enrollment lists for every status after enrolling or reactivating', async () => {
+    mockedEnrollDeliveryStudents.mockResolvedValue({
+      enrolled: 0,
+      reactivated: 1,
+      alreadyEnrolled: 0,
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    const activeParams = {
+      deliveryId: 'delivery-id',
+      page: 1,
+      limit: 20,
+      status: 'ACTIVE' as const,
+    };
+    const completedParams = {
+      deliveryId: 'delivery-id',
+      page: 2,
+      limit: 20,
+      status: 'COMPLETED' as const,
+    };
+    const otherDeliveryParams = {
+      deliveryId: 'other-delivery',
+      page: 1,
+      limit: 20,
+      status: 'ACTIVE' as const,
+    };
+    for (const params of [activeParams, completedParams, otherDeliveryParams]) {
+      queryClient.setQueryData(deliveryKeys.enrollments(params), {
+        items: [],
+        page: params.page,
+        limit: params.limit,
+        total: 0,
+      });
+    }
+    const { result } = renderHook(() => useEnrollDeliveryStudents(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        deliveryId: 'delivery-id',
+        body: { studentIds: ['student-id'] },
+      });
+    });
+
+    expect(queryClient.getQueryState(deliveryKeys.enrollments(activeParams))?.isInvalidated).toBe(
+      true,
+    );
+    expect(
+      queryClient.getQueryState(deliveryKeys.enrollments(completedParams))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      queryClient.getQueryState(deliveryKeys.enrollments(otherDeliveryParams))?.isInvalidated,
+    ).toBe(false);
   });
 });
