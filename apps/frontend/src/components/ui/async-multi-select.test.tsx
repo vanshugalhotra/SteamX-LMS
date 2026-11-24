@@ -38,9 +38,7 @@ describe('AsyncMultiSelect', () => {
     );
 
     await user.click(search);
-    expect(
-      screen.queryByRole('option', { name: 'Ada Student STU-001' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Ada Student STU-001' })).not.toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Bea Student STU-002' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove Ada Student (STU-001)' }));

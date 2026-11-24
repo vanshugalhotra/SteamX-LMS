@@ -60,9 +60,7 @@ export function AsyncMultiSelect({
               >
                 {option.label}
                 {option.description && (
-                  <span className="text-xs font-normal text-gray-600">
-                    {option.description}
-                  </span>
+                  <span className="text-xs font-normal text-gray-600">{option.description}</span>
                 )}
                 <X className="size-3.5" aria-hidden="true" />
               </Button>

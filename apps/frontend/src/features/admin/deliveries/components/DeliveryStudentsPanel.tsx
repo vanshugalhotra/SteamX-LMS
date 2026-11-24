@@ -154,9 +154,8 @@ export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
         </div>
         <p className="mt-2 text-xs text-gray-600" aria-live="polite">
           {String(selectedStudents.length)} selected (maximum{' '}
-          {String(MAX_DELIVERY_ENROLLMENT_BATCH_SIZE)}).
-          Already-active students on the current roster page are excluded; other roster pages may
-          contain more active enrollments.
+          {String(MAX_DELIVERY_ENROLLMENT_BATCH_SIZE)}). Already-active students on the current
+          roster page are excluded; other roster pages may contain more active enrollments.
         </p>
       </section>
 
