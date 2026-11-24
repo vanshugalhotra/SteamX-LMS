@@ -17,6 +17,10 @@ import {
   removeDeliveryStudent,
   updateDeliveryLabel,
   updateDeliveryStatus,
+  fetchDeliveryReleaseOutline,
+  releaseDeliveryLesson,
+  unreleaseDeliveryLesson,
+  releaseDeliveryModule,
 } from './api/api';
 import type {
   CreateDeliveryPayload,
@@ -36,6 +40,10 @@ export const deliveryKeys = {
     [...deliveryKeys.all, 'teachers', params] as const,
   enrollments: (params: DeliveryEnrollmentListParams) =>
     [...deliveryKeys.all, 'enrollments', params] as const,
+  releaseOutline: (deliveryId: string) =>
+    [...deliveryKeys.all, 'release-outline', deliveryId] as const,
+  lessonMutations: ['deliveries', 'lesson-mutations'] as const,
+  moduleMutations: ['deliveries', 'module-mutations'] as const,
 };
 
 export function deliveriesQueryOptions(params: DeliveryListParams) {
@@ -74,6 +82,18 @@ export function useDeliveryEnrollments(params: DeliveryEnrollmentListParams) {
   });
 }
 
+export function deliveryReleaseOutlineQueryOptions(deliveryId: string) {
+  return queryOptions({
+    queryKey: deliveryKeys.releaseOutline(deliveryId),
+    queryFn: () => fetchDeliveryReleaseOutline(deliveryId),
+    enabled: deliveryId !== '',
+  });
+}
+
+export function useDeliveryReleaseOutline(deliveryId: string) {
+  return useQuery(deliveryReleaseOutlineQueryOptions(deliveryId));
+}
+
 function useInvalidateDeliveries() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: deliveryKeys.all });
@@ -92,6 +112,14 @@ function useInvalidateDeliveryEnrollments() {
   return (deliveryId: string) =>
     queryClient.invalidateQueries({
       queryKey: [...deliveryKeys.all, 'enrollments', { deliveryId }],
+    });
+}
+
+function useInvalidateDeliveryReleaseOutline() {
+  const queryClient = useQueryClient();
+  return (deliveryId: string) =>
+    queryClient.invalidateQueries({
+      queryKey: deliveryKeys.releaseOutline(deliveryId),
     });
 }
 
@@ -132,6 +160,36 @@ export function useRemoveDeliveryStudent() {
   return useMutation({
     mutationFn: ({ deliveryId, studentId }: { deliveryId: string; studentId: string }) =>
       removeDeliveryStudent(deliveryId, studentId),
+    onSuccess: (_data, variables) => invalidate(variables.deliveryId),
+  });
+}
+
+export function useReleaseDeliveryLesson() {
+  const invalidate = useInvalidateDeliveryReleaseOutline();
+  return useMutation({
+    mutationKey: deliveryKeys.lessonMutations,
+    mutationFn: ({ deliveryId, lessonId }: { deliveryId: string; lessonId: string }) =>
+      releaseDeliveryLesson(deliveryId, lessonId),
+    onSuccess: (_data, variables) => invalidate(variables.deliveryId),
+  });
+}
+
+export function useUnreleaseDeliveryLesson() {
+  const invalidate = useInvalidateDeliveryReleaseOutline();
+  return useMutation({
+    mutationKey: deliveryKeys.lessonMutations,
+    mutationFn: ({ deliveryId, lessonId }: { deliveryId: string; lessonId: string }) =>
+      unreleaseDeliveryLesson(deliveryId, lessonId),
+    onSuccess: (_data, variables) => invalidate(variables.deliveryId),
+  });
+}
+
+export function useReleaseDeliveryModule() {
+  const invalidate = useInvalidateDeliveryReleaseOutline();
+  return useMutation({
+    mutationKey: deliveryKeys.moduleMutations,
+    mutationFn: ({ deliveryId, moduleId }: { deliveryId: string; moduleId: string }) =>
+      releaseDeliveryModule(deliveryId, moduleId),
     onSuccess: (_data, variables) => invalidate(variables.deliveryId),
   });
 }
