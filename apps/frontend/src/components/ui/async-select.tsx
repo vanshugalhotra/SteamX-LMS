@@ -15,10 +15,11 @@ export interface AsyncSearchResult {
   isError: boolean;
 }
 
-interface AsyncSelectProps {
+export interface AsyncSelectProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
+  onSelectOption?: (option: AsyncOption) => void;
   /** Hook that searches the API for the typed text. `context` is e.g. the chosen school id. */
   useSearch: (search: string, context: string) => AsyncSearchResult;
   /** Extra value the search depends on (e.g. a school id). */
@@ -38,6 +39,7 @@ export function AsyncSelect({
   id,
   value,
   onChange,
+  onSelectOption,
   useSearch,
   searchContext = '',
   initialLabel = '',
@@ -60,6 +62,7 @@ export function AsyncSelect({
 
   const choose = (option: AsyncOption) => {
     onChange(option.value);
+    onSelectOption?.(option);
     setLabel(option.label);
     setQuery('');
     setOpen(false);
@@ -105,6 +108,9 @@ export function AsyncSelect({
         placeholder={placeholder}
         disabled={disabled}
         className="h-10.5 pr-10"
+        onClick={() => {
+          setOpen(true);
+        }}
         onFocus={() => {
           setOpen(true);
         }}
@@ -137,6 +143,7 @@ export function AsyncSelect({
               key={option.value}
               id={`${listId}-${String(index)}`}
               role="option"
+              aria-label={`${option.label}${option.description ? ` ${option.description}` : ''}`}
               aria-selected={option.value === value}
               // mousedown (not click) so the input does not blur first.
               onMouseDown={(e) => {

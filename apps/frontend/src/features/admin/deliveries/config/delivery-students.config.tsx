@@ -5,6 +5,7 @@ import type { DataTableColumn } from '@/components/ui/data-table';
 import type { DeliveryEnrollment, DeliveryEnrollmentStatus } from '../model/types';
 
 export type DeliveryEnrollmentStatusFilter = DeliveryEnrollmentStatus | 'ALL';
+export const MAX_DELIVERY_ENROLLMENT_BATCH_SIZE = 500;
 
 export const DELIVERY_ENROLLMENT_STATUS_FILTERS: FilterOption<DeliveryEnrollmentStatusFilter>[] = [
   { value: 'ACTIVE', label: 'Active' },

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ListToolbar } from '@/components/list/ListToolbar';
-import { AsyncSelect } from '@/components/ui/async-select';
+import { AsyncMultiSelect } from '@/components/ui/async-multi-select';
+import type { AsyncOption } from '@/components/ui/async-select';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
@@ -15,6 +16,7 @@ import { DELIVERY_ASSIGNMENTS_PAGE_SIZE } from '../config/deliveries.config';
 import {
   DELIVERY_ENROLLMENT_STATUS_FILTERS,
   getDeliveryEnrollmentColumns,
+  MAX_DELIVERY_ENROLLMENT_BATCH_SIZE,
   type DeliveryEnrollmentStatusFilter,
 } from '../config/delivery-students.config';
 import {
@@ -24,7 +26,7 @@ import {
 } from '../queries';
 
 export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
-  const [studentId, setStudentId] = useState('');
+  const [selectedStudents, setSelectedStudents] = useState<AsyncOption[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const {
     filter: statusFilter,
@@ -45,20 +47,23 @@ export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
   const enrollLocked = blockReason !== null;
 
   const enroll = async () => {
-    if (!studentId || enrollLocked) return;
+    if (
+      selectedStudents.length === 0 ||
+      selectedStudents.length > MAX_DELIVERY_ENROLLMENT_BATCH_SIZE ||
+      pending ||
+      enrollLocked
+    ) {
+      return;
+    }
     setActionError(null);
     try {
       const counts = await enrollStudents.mutateAsync({
         deliveryId: delivery.id,
-        body: { studentIds: [studentId] },
+        body: { studentIds: selectedStudents.map((student) => student.value) },
       });
-      setStudentId('');
+      setSelectedStudents([]);
       toast.success(
-        counts.enrolled
-          ? 'Student enrolled'
-          : counts.reactivated
-            ? 'Student re-enrolled'
-            : 'Student is already enrolled',
+        `Enrollment results: ${String(counts.enrolled)} enrolled, ${String(counts.reactivated)} reactivated, ${String(counts.alreadyEnrolled)} already enrolled`,
       );
     } catch (error) {
       setActionError(getErrorMessage(error));
@@ -105,31 +110,53 @@ export function DeliveryStudentsPanel({ delivery }: { delivery: Delivery }) {
     <div className="space-y-5">
       {blockReason && <Alert>{blockReason}</Alert>}
 
-      <section aria-label="Enroll student" className="rounded-2xl bg-gray-50 p-4">
-        <h2 className="text-sm font-semibold">Add a student</h2>
+      <section aria-label="Enroll students" className="rounded-2xl bg-gray-50 p-4">
+        <h2 className="text-sm font-semibold">Add students</h2>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <div className="min-w-0 flex-1">
-            <AsyncSelect
+            <AsyncMultiSelect
               aria-label="Search active students"
-              value={studentId}
-              onChange={setStudentId}
+              selectedLabel="Selected students"
+              selectedOptions={selectedStudents}
+              onChange={(options) => {
+                setSelectedStudents(options);
+                setActionError(null);
+              }}
               useSearch={useActiveStudentSearch}
               searchContext={delivery.schoolId}
               excludeValues={
-                enrollments.data?.items.map((enrollment) => enrollment.studentId) ?? []
+                enrollments.data?.items
+                  .filter((enrollment) => enrollment.status === 'ACTIVE')
+                  .map((enrollment) => enrollment.studentId) ?? []
               }
+              maxSelected={MAX_DELIVERY_ENROLLMENT_BATCH_SIZE}
               placeholder="Search students by name or SteamX ID"
               disabled={pending || enrollLocked}
+              disableRemove={pending}
             />
           </div>
           <Button
             type="button"
-            disabled={!studentId || pending || enrollLocked}
+            disabled={
+              selectedStudents.length === 0 ||
+              selectedStudents.length > MAX_DELIVERY_ENROLLMENT_BATCH_SIZE ||
+              pending ||
+              enrollLocked
+            }
             onClick={() => void enroll()}
           >
-            {enrollStudents.isPending ? 'Enrolling…' : 'Enroll student'}
+            {enrollStudents.isPending
+              ? 'Enrolling…'
+              : selectedStudents.length > 0
+                ? `Enroll ${String(selectedStudents.length)} student${selectedStudents.length === 1 ? '' : 's'}`
+                : 'Enroll students'}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-gray-600" aria-live="polite">
+          {String(selectedStudents.length)} selected (maximum{' '}
+          {String(MAX_DELIVERY_ENROLLMENT_BATCH_SIZE)}). Already-active students on the current
+          roster page are excluded; other roster pages may contain more active enrollments.
+        </p>
       </section>
 
       {actionError && <Alert>{actionError}</Alert>}
