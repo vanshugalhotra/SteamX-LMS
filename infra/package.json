@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run test",
     "synth": "cdk synth"
   },
   "dependencies": {
