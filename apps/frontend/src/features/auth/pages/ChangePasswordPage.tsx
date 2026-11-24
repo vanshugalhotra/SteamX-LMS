@@ -47,7 +47,7 @@ export function ChangePasswordPage() {
     try {
       const profile = await changePassword({ currentPassword, newPassword });
       queryClient.setQueryData(sessionQueryOptions.queryKey, profile);
-      await navigate(getHomePath(), { replace: true });
+      await navigate(getHomePath(profile), { replace: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) return;
       setErrorMessages(getErrorMessages(error));
