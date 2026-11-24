@@ -1,6 +1,8 @@
-import { Stack, Tags, aws_budgets as budgets } from 'aws-cdk-lib';
+import { CfnOutput, Stack, Tags, aws_budgets as budgets } from 'aws-cdk-lib';
 import type { StackProps } from 'aws-cdk-lib';
 import type { Construct } from 'constructs';
+import { LocalDevAccess } from './constructs/local-dev-access.js';
+import { PrivateBucket } from './constructs/private-bucket.js';
 import type { EnvConfig } from './environments/types.js';
 
 export class BaseStack extends Stack {
@@ -15,6 +17,22 @@ export class BaseStack extends Stack {
 
     Tags.of(this).add('project', 'steamx');
     Tags.of(this).add('environment', config.envName);
+
+    const corsOrigins = [config.appOrigin, ...config.localDevCorsOrigins];
+    const media = new PrivateBucket(this, 'Media', {
+      corsOrigins,
+      retainOnDelete: false,
+    });
+    const uploads = new PrivateBucket(this, 'Uploads', {
+      corsOrigins,
+      retainOnDelete: false,
+    });
+    // Keep this construct path so CloudFormation updates the existing local-dev user in place.
+    const localDevAccess = new LocalDevAccess(this, 'DevStorage', config.envName, media, uploads);
+
+    new CfnOutput(this, 'MediaBucketName', { value: media.bucketName });
+    new CfnOutput(this, 'UploadsBucketName', { value: uploads.bucketName });
+    new CfnOutput(this, 'LocalDevUserName', { value: localDevAccess.user.userName });
 
     new budgets.CfnBudget(this, 'MonthlyBudget', {
       budget: {
