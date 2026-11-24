@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { App } from 'aws-cdk-lib';
 import { getInfrastructureConfig } from '../lib/config.js';
+import { loadEnvironmentConfig } from '../lib/environments/index.js';
+import { BaseStack } from '../lib/base-stack.js';
 import { SteamxStack } from '../lib/steamx-stack.js';
 
 const app = new App();
@@ -15,4 +17,21 @@ new SteamxStack(app, stackName, config, {
     region: config.region,
   },
   terminationProtection: config.terminationProtection,
+});
+
+const baseEnvironment = loadEnvironmentConfig(
+  {
+    env: app.node.tryGetContext('env'),
+    region: app.node.tryGetContext('region'),
+  },
+  process.env,
+);
+const baseStackName = `Steamx${baseEnvironment.config.envName[0]?.toUpperCase()}${baseEnvironment.config.envName.slice(1)}Base`;
+
+new BaseStack(app, baseStackName, baseEnvironment.config, baseEnvironment.budgetEmail, {
+  stackName: baseStackName,
+  env: {
+    account: baseEnvironment.account,
+    region: baseEnvironment.config.region,
+  },
 });

@@ -34,7 +34,7 @@
     "infra:synth": "pnpm --dir infra exec cdk synth",
     "infra:diff": "pnpm --dir infra exec cdk diff",
     "infra:deploy": "pnpm --dir infra exec cdk deploy --require-approval broadening",
-    "infra:destroy": "pnpm --dir infra exec cdk destroy SteamxStagingStack --context env=staging",
+    "infra:destroy": "pnpm --dir infra exec cdk destroy",
     "infra:test": "pnpm --dir infra exec vitest run",
     "assets:smoke": "pnpm --dir apps/backend asset:smoke",
     "infra:stop": "node -e \"console.log('Nothing to stop/start yet: staging is S3 only')\"",
