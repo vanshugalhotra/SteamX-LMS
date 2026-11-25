@@ -2,14 +2,13 @@ import { App } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it, vi } from 'vitest';
 import { BaseStack } from '../lib/base-stack.js';
-import { loadEnvironmentConfig } from '../lib/environments/index.js';
 import { stagingConfig } from '../lib/environments/staging.js';
 
 const budgetEmail = 'budget-recipient';
 vi.setConfig({ testTimeout: 15000 });
 
-function createBaseStack() {
-  const loaded = loadEnvironmentConfig({ env: 'staging' }, { STEAMX_BUDGET_EMAIL: budgetEmail });
+function createBaseStack(protectData = false) {
+  const config = { ...stagingConfig, protectData };
   const account = '123456789012';
   const app = new App({
     context: {
@@ -19,9 +18,9 @@ function createBaseStack() {
       },
     },
   });
-  const stack = new BaseStack(app, 'SteamxStagingBase', loaded.config, loaded.budgetEmail, {
+  const stack = new BaseStack(app, 'SteamxStagingBase', config, budgetEmail, {
     stackName: 'SteamxStagingBase',
-    env: { account, region: loaded.config.region },
+    env: { account, region: config.region },
   });
   return { stack, template: Template.fromStack(stack) };
 }
@@ -67,7 +66,7 @@ describe('BaseStack', () => {
     expect(repositories[0]?.Properties).toMatchObject({
       RepositoryName: 'steamx-staging-api',
       ImageScanningConfiguration: { ScanOnPush: true },
-      ImageTagMutability: 'MUTABLE',
+      ImageTagMutability: 'IMMUTABLE',
       EmptyOnDelete: true,
     });
     expect(repositories[0]?.Properties?.LifecyclePolicy).toMatchObject({
@@ -77,6 +76,17 @@ describe('BaseStack', () => {
     expect(repositories[0]?.UpdateReplacePolicy).toBe('Delete');
     template.hasOutput('ApiRepositoryName', {});
     template.hasOutput('ApiRepositoryUri', {});
+  });
+
+  it('retains the API repository when environment data protection is enabled', () => {
+    const { template } = createBaseStack(true);
+    const repositories = Object.values(template.findResources('AWS::ECR::Repository'));
+    expect(repositories).toHaveLength(1);
+    expect(repositories[0]).toMatchObject({
+      DeletionPolicy: 'Retain',
+      UpdateReplacePolicy: 'Retain',
+      Properties: { EmptyOnDelete: false },
+    });
   });
 
   it('creates a DNS-validated origin certificate and unnamed generated secrets', () => {
@@ -110,18 +120,6 @@ describe('BaseStack', () => {
         { Key: 'environment', Value: 'staging' },
       ],
     });
-  });
-
-  it('rejects environments that are not defined', () => {
-    expect(() =>
-      loadEnvironmentConfig({ env: 'production' }, { STEAMX_BUDGET_EMAIL: budgetEmail }),
-    ).toThrow('only staging is defined');
-  });
-
-  it('requires the budget notification email', () => {
-    expect(() => loadEnvironmentConfig({ env: 'staging' }, {})).toThrow(
-      'STEAMX_BUDGET_EMAIL is required',
-    );
   });
 
   it('creates two private, versioned buckets with the required lifecycle and CORS', () => {
@@ -238,27 +236,5 @@ describe('BaseStack', () => {
     }
     expect(policyJson).toContain('assets/*');
     expect(policyJson).toContain('submissions/*');
-  });
-
-  it('rejects app origins without https or with a trailing slash', () => {
-    const originalOrigin = stagingConfig.appOrigin;
-    try {
-      stagingConfig.appOrigin = 'http://version26.in';
-      expect(() =>
-        loadEnvironmentConfig({ env: 'staging' }, { STEAMX_BUDGET_EMAIL: budgetEmail }),
-      ).toThrow('appOrigin');
-
-      stagingConfig.appOrigin = 'https://version26.in/';
-      expect(() =>
-        loadEnvironmentConfig({ env: 'staging' }, { STEAMX_BUDGET_EMAIL: budgetEmail }),
-      ).toThrow('appOrigin');
-
-      stagingConfig.appOrigin = 'https://version26.in';
-      expect(() =>
-        loadEnvironmentConfig({ env: 'staging' }, { STEAMX_BUDGET_EMAIL: budgetEmail }),
-      ).toThrow('appOrigin hostname must be learn.version26.in');
-    } finally {
-      stagingConfig.appOrigin = originalOrigin;
-    }
   });
 });

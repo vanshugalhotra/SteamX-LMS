@@ -33,7 +33,12 @@ export class BaseStack extends Stack {
     Tags.of(this).add('project', 'steamx');
     Tags.of(this).add('environment', config.envName);
 
-    this.repository = new ContainerRegistry(this, 'ApiRepository', config.envName);
+    this.repository = new ContainerRegistry(
+      this,
+      'ApiRepository',
+      config.envName,
+      config.protectData,
+    );
     this.hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
       domainName: config.domainName,
     });

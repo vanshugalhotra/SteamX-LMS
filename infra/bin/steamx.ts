@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { App } from 'aws-cdk-lib';
 import { loadEnvironmentConfig } from '../lib/environments/index.js';
+import { stagingConfig } from '../lib/environments/staging.js';
 import { AppStack } from '../lib/app-stack.js';
 import { BaseStack } from '../lib/base-stack.js';
 
 const app = new App();
 const baseEnvironment = loadEnvironmentConfig(
+  stagingConfig,
   {
     env: app.node.tryGetContext('env'),
     region: app.node.tryGetContext('region'),
