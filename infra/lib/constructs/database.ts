@@ -7,6 +7,7 @@ export interface DatabaseProps {
   securityGroup: ec2.ISecurityGroup;
   instanceType: string;
   backupRetentionDays: number;
+  maxAllocatedStorageGb: number;
   retainOnDelete: boolean;
 }
 
@@ -43,7 +44,7 @@ export class Database extends Construct {
       publiclyAccessible: false,
       storageType: rds.StorageType.GP3,
       allocatedStorage: 20,
-      maxAllocatedStorage: 50,
+      maxAllocatedStorage: props.maxAllocatedStorageGb,
       storageEncrypted: true,
       autoMinorVersionUpgrade: true,
       backupRetention: Duration.days(props.backupRetentionDays),

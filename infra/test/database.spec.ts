@@ -21,6 +21,7 @@ describe('Database', () => {
       securityGroup,
       instanceType: 't4g.micro',
       backupRetentionDays: 1,
+      maxAllocatedStorageGb: 25,
       retainOnDelete: true,
     });
 

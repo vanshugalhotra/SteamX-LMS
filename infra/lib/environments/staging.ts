@@ -11,5 +11,6 @@ export const stagingConfig: EnvConfig = {
   localDevCorsOrigins: LOCAL_DEV_CORS_ORIGINS,
   dbInstanceType: 't4g.micro',
   dbBackupRetentionDays: 1,
+  dbMaxAllocatedStorageGb: 25,
   protectData: false,
 };

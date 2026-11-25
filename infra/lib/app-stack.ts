@@ -18,6 +18,7 @@ export class AppStack extends Stack {
       securityGroup: network.dbSg,
       instanceType: config.dbInstanceType,
       backupRetentionDays: config.dbBackupRetentionDays,
+      maxAllocatedStorageGb: config.dbMaxAllocatedStorageGb,
       retainOnDelete: config.protectData,
     });
 

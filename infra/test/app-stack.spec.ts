@@ -88,7 +88,7 @@ describe('AppStack', () => {
         PubliclyAccessible: false,
         StorageType: 'gp3',
         AllocatedStorage: '20',
-        MaxAllocatedStorage: 50,
+        MaxAllocatedStorage: stagingConfig.dbMaxAllocatedStorageGb,
         BackupRetentionPeriod: stagingConfig.dbBackupRetentionDays,
         DeletionProtection: false,
         PreferredBackupWindow: '19:00-19:30',

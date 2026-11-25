@@ -33,10 +33,11 @@ require separate cleanup.
 `SteamxStagingApp` contains a VPC with two public `/24` subnets across two AZs and two isolated
 `/24` subnets, with no NAT gateways or bastion, plus security groups.
 
-The App stack also contains one encrypted, single-AZ PostgreSQL 18 RDS instance (`t4g.micro`,
-20 GB gp3 storage, expanding to 50 GB) in the isolated subnets. It is not public and accepts
-traffic only from the ECS security group. TLS is enforced with `rds.force_ssl=1`. Staging retains
-automated backups for one day. Backups run at `19:00-19:30 UTC` and maintenance at
+The App stack also contains one encrypted, single-AZ PostgreSQL 18 RDS instance (`t4g.micro`)
+with 20 GB gp3 storage and autoscaling capped at 25 GB in staging, in the isolated subnets. The
+limit is environment-configured. It is not public and accepts traffic only from the ECS security
+group. TLS is enforced with `rds.force_ssl=1`.
+Staging retains automated backups for one day. Backups run at `19:00-19:30 UTC` and maintenance at
 `sun:20:00-sun:20:30 UTC`, outside typical IST working hours.
 
 The instance has a generated Secrets Manager JSON secret containing the `steamx_owner` credentials.
