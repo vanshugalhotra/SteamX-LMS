@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface FormPageLayoutProps {
   title: string;
@@ -11,6 +12,7 @@ interface FormPageLayoutProps {
   backLabel: string;
   tag?: string;
   tagVariant?: 'success' | 'warning';
+  className?: string;
   children: ReactNode;
   /** Extra content below the form card (e.g. the school directory). */
   below?: ReactNode;
@@ -23,11 +25,12 @@ export function FormPageLayout({
   backLabel,
   tag,
   tagVariant = 'success',
+  className,
   children,
   below,
 }: FormPageLayoutProps) {
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className={cn('max-w-4xl space-y-5', className)}>
       <div>
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-600">
           <Link

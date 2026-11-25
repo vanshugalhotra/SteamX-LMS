@@ -66,6 +66,18 @@ export function useDelivery(id: string) {
   });
 }
 
+export function deliveryReleaseOutlineQueryOptions(deliveryId: string) {
+  return queryOptions({
+    queryKey: deliveryKeys.releaseOutline(deliveryId),
+    queryFn: () => fetchDeliveryReleaseOutline(deliveryId),
+    enabled: deliveryId !== '',
+  });
+}
+
+export function useDeliveryReleaseOutline(deliveryId: string) {
+  return useQuery(deliveryReleaseOutlineQueryOptions(deliveryId));
+}
+
 export function useDeliveryTeachers(params: DeliveryTeacherListParams) {
   return useQuery({
     queryKey: deliveryKeys.teachers(params),
@@ -80,18 +92,6 @@ export function useDeliveryEnrollments(params: DeliveryEnrollmentListParams) {
     queryFn: () => fetchDeliveryEnrollments(params),
     enabled: params.deliveryId !== '',
   });
-}
-
-export function deliveryReleaseOutlineQueryOptions(deliveryId: string) {
-  return queryOptions({
-    queryKey: deliveryKeys.releaseOutline(deliveryId),
-    queryFn: () => fetchDeliveryReleaseOutline(deliveryId),
-    enabled: deliveryId !== '',
-  });
-}
-
-export function useDeliveryReleaseOutline(deliveryId: string) {
-  return useQuery(deliveryReleaseOutlineQueryOptions(deliveryId));
 }
 
 function useInvalidateDeliveries() {
