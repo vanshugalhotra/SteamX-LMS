@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { SubscriptionStatusBadge } from './SubscriptionStatusBadge';
 import type { Subscription } from '../model/types';
 import { useRevokeSubscription } from '../queries';
-import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
+import { getCourseAccent } from '@/lib/course-accent';
 
 const SUBSCRIPTION_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   day: 'numeric',

@@ -9,7 +9,7 @@ import { ListToolbar } from '@/components/list/ListToolbar';
 import { BrandBackdrop } from '@/features/admin/components/BrandBackdrop';
 import { CourseSchoolSearch } from '@/features/admin/components/CourseSchoolSearch';
 import { HeaderSlot } from '@/features/admin/components/HeaderSlot';
-import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
+import { getCourseAccent } from '@/lib/course-accent';
 import { useCourses } from '@/features/admin/courses/queries';
 import { useAnySchoolSearch, useSchoolNames } from '@/features/admin/schools/queries';
 import { PATHS } from '@/lib/paths';
