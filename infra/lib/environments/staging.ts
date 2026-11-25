@@ -9,4 +9,8 @@ export const stagingConfig: EnvConfig = {
   monthlyBudgetUsd: 25,
   appOrigin: APP_ORIGIN,
   localDevCorsOrigins: LOCAL_DEV_CORS_ORIGINS,
+  dbInstanceType: 't4g.micro',
+  dbBackupRetentionDays: 1,
+  dbMaxAllocatedStorageGb: 25,
+  protectData: false,
 };

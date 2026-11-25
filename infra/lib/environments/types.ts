@@ -4,4 +4,8 @@ export interface EnvConfig {
   monthlyBudgetUsd: number;
   appOrigin: string;
   localDevCorsOrigins: string[];
+  dbInstanceType: string;
+  dbBackupRetentionDays: number;
+  dbMaxAllocatedStorageGb: number;
+  protectData: boolean;
 }
