@@ -1,21 +1,10 @@
 import type { LessonAudience } from '@/features/admin/modules/lessons/model/types';
 
-export type DeliveryStatus = 'ACTIVE' | 'INACTIVE';
-export interface Delivery {
-  id: string;
-  schoolId: string;
-  course: {
-    id: string;
-    title: string;
-  };
-  label: string;
-  academicYear: string;
-  status: DeliveryStatus;
-  displayName: string;
-  subscriptionActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+export type {
+  Delivery,
+  DeliveryListParams,
+  DeliveryStatus,
+} from '@/features/deliveries/model/types';
 
 export interface DeliveryTeacher {
   id: string;
@@ -64,15 +53,6 @@ export interface EnrollmentCounts {
   enrolled: number;
   reactivated: number;
   alreadyEnrolled: number;
-}
-
-export interface DeliveryListParams {
-  page: number;
-  limit: number;
-  schoolId?: string;
-  courseId?: string;
-  academicYear?: string;
-  status?: DeliveryStatus;
 }
 
 export interface CreateDeliveryPayload {

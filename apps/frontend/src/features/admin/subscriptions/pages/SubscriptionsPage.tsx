@@ -18,7 +18,7 @@ import {
   SUBSCRIPTION_STATUS_FILTERS,
 } from '../config/subscriptions.config';
 import type { SubscriptionStatusFilter } from '../model/types';
-import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
+import { getCourseAccent } from '@/lib/course-accent';
 import { SubscriptionCard } from '../components/SubscriptionCard';
 import { useSubscriptions } from '../queries';
 
