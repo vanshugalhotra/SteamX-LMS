@@ -1,11 +1,26 @@
-import { CfnOutput, Stack, Tags, aws_budgets as budgets } from 'aws-cdk-lib';
+import {
+  CfnOutput,
+  Stack,
+  Tags,
+  aws_budgets as budgets,
+  aws_certificatemanager as acm,
+  aws_route53 as route53,
+  aws_secretsmanager as secretsmanager,
+} from 'aws-cdk-lib';
 import type { StackProps } from 'aws-cdk-lib';
 import type { Construct } from 'constructs';
+import { ContainerRegistry } from './constructs/container-registry.js';
 import { LocalDevAccess } from './constructs/local-dev-access.js';
 import { PrivateBucket } from './constructs/private-bucket.js';
 import type { EnvConfig } from './environments/types.js';
 
 export class BaseStack extends Stack {
+  public readonly repository: ContainerRegistry;
+  public readonly hostedZone: route53.IHostedZone;
+  public readonly originCertificate: acm.Certificate;
+  public readonly jwtSecret: secretsmanager.Secret;
+  public readonly originVerifySecret: secretsmanager.Secret;
+
   constructor(
     scope: Construct,
     id: string,
@@ -17,6 +32,27 @@ export class BaseStack extends Stack {
 
     Tags.of(this).add('project', 'steamx');
     Tags.of(this).add('environment', config.envName);
+
+    this.repository = new ContainerRegistry(this, 'ApiRepository', config.envName);
+    this.hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+      domainName: config.domainName,
+    });
+    this.originCertificate = new acm.Certificate(this, 'OriginCertificate', {
+      domainName: `origin.${config.domainName}`,
+      validation: acm.CertificateValidation.fromDns(this.hostedZone),
+    });
+    this.jwtSecret = new secretsmanager.Secret(this, 'JwtSecret', {
+      generateSecretString: {
+        passwordLength: 64,
+        excludePunctuation: true,
+      },
+    });
+    this.originVerifySecret = new secretsmanager.Secret(this, 'OriginVerifySecret', {
+      generateSecretString: {
+        passwordLength: 40,
+        excludePunctuation: true,
+      },
+    });
 
     const corsOrigins = [config.appOrigin, ...config.localDevCorsOrigins];
     const media = new PrivateBucket(this, 'Media', {
@@ -33,6 +69,11 @@ export class BaseStack extends Stack {
     new CfnOutput(this, 'MediaBucketName', { value: media.bucketName });
     new CfnOutput(this, 'UploadsBucketName', { value: uploads.bucketName });
     new CfnOutput(this, 'LocalDevUserName', { value: localDevAccess.user.userName });
+    new CfnOutput(this, 'ApiRepositoryName', { value: this.repository.repositoryName });
+    new CfnOutput(this, 'ApiRepositoryUri', { value: this.repository.repositoryUri });
+    new CfnOutput(this, 'OriginVerifySecretArn', {
+      value: this.originVerifySecret.secretArn,
+    });
 
     new budgets.CfnBudget(this, 'MonthlyBudget', {
       budget: {

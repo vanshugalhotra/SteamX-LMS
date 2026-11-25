@@ -21,10 +21,31 @@ export function loadEnvironmentConfig(
     throw new Error('STEAMX_BUDGET_EMAIL is required to synthesize the Base stack.');
   }
 
+  if (
+    stagingConfig.domainName !== stagingConfig.domainName.toLowerCase() ||
+    stagingConfig.domainName.includes('://') ||
+    stagingConfig.domainName.endsWith('.')
+  ) {
+    throw new Error(
+      'The configured domainName must be lowercase, have no scheme, and have no trailing dot.',
+    );
+  }
+
   if (!stagingConfig.appOrigin.startsWith('https://') || stagingConfig.appOrigin.endsWith('/')) {
     throw new Error(
       'The configured appOrigin must start with https:// and have no trailing slash.',
     );
+  }
+
+  let appOriginHostname: string;
+  try {
+    appOriginHostname = new URL(stagingConfig.appOrigin).hostname;
+  } catch {
+    throw new Error('The configured appOrigin must be a valid URL.');
+  }
+
+  if (appOriginHostname !== `learn.${stagingConfig.domainName}`) {
+    throw new Error(`The configured appOrigin hostname must be learn.${stagingConfig.domainName}.`);
   }
 
   const contextRegion = context.region === undefined ? undefined : String(context.region).trim();

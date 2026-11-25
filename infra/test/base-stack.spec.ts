@@ -10,10 +10,18 @@ vi.setConfig({ testTimeout: 15000 });
 
 function createBaseStack() {
   const loaded = loadEnvironmentConfig({ env: 'staging' }, { STEAMX_BUDGET_EMAIL: budgetEmail });
-  const app = new App();
+  const account = '123456789012';
+  const app = new App({
+    context: {
+      'hosted-zone:account=123456789012:domainName=version26.in:region=ap-south-1': {
+        Id: 'Z1234567890',
+        Name: 'version26.in',
+      },
+    },
+  });
   const stack = new BaseStack(app, 'SteamxStagingBase', loaded.config, loaded.budgetEmail, {
     stackName: 'SteamxStagingBase',
-    env: { region: loaded.config.region },
+    env: { account, region: loaded.config.region },
   });
   return { stack, template: Template.fromStack(stack) };
 }
@@ -50,6 +58,44 @@ describe('BaseStack', () => {
         },
       ],
     });
+  });
+
+  it('creates the API repository with scan-on-push and a ten-image lifecycle limit', () => {
+    const { template } = createBaseStack();
+    const repositories = Object.values(template.findResources('AWS::ECR::Repository'));
+    expect(repositories).toHaveLength(1);
+    expect(repositories[0]?.Properties).toMatchObject({
+      RepositoryName: 'steamx-staging-api',
+      ImageScanningConfiguration: { ScanOnPush: true },
+      ImageTagMutability: 'MUTABLE',
+      EmptyOnDelete: true,
+    });
+    expect(repositories[0]?.Properties?.LifecyclePolicy).toMatchObject({
+      LifecyclePolicyText: expect.stringContaining('"countNumber":10'),
+    });
+    expect(repositories[0]?.DeletionPolicy).toBe('Delete');
+    expect(repositories[0]?.UpdateReplacePolicy).toBe('Delete');
+    template.hasOutput('ApiRepositoryName', {});
+    template.hasOutput('ApiRepositoryUri', {});
+  });
+
+  it('creates a DNS-validated origin certificate and unnamed generated secrets', () => {
+    const { template } = createBaseStack();
+    template.hasResourceProperties('AWS::CertificateManager::Certificate', {
+      DomainName: 'origin.version26.in',
+      DomainValidationOptions: [{ DomainName: 'origin.version26.in', HostedZoneId: 'Z1234567890' }],
+      ValidationMethod: 'DNS',
+    });
+    const secrets = Object.values(template.findResources('AWS::SecretsManager::Secret'));
+    expect(secrets).toHaveLength(2);
+    expect(secrets.map((secret) => secret.Properties?.Name)).toEqual([undefined, undefined]);
+    expect(secrets.map((secret) => secret.Properties?.GenerateSecretString)).toEqual(
+      expect.arrayContaining([
+        { ExcludePunctuation: true, PasswordLength: 64 },
+        { ExcludePunctuation: true, PasswordLength: 40 },
+      ]),
+    );
+    template.hasOutput('OriginVerifySecretArn', {});
   });
 
   it('applies project and environment tags to the stack', () => {
@@ -135,7 +181,7 @@ describe('BaseStack', () => {
       const allowedOrigins = rule?.AllowedOrigins;
       expect(allowedOrigins).toBeDefined();
       expect(allowedOrigins).toEqual([
-        'https://version26.in',
+        stagingConfig.appOrigin,
         'http://localhost:3000',
         'http://localhost:5173',
       ]);
@@ -206,6 +252,11 @@ describe('BaseStack', () => {
       expect(() =>
         loadEnvironmentConfig({ env: 'staging' }, { STEAMX_BUDGET_EMAIL: budgetEmail }),
       ).toThrow('appOrigin');
+
+      stagingConfig.appOrigin = 'https://version26.in';
+      expect(() =>
+        loadEnvironmentConfig({ env: 'staging' }, { STEAMX_BUDGET_EMAIL: budgetEmail }),
+      ).toThrow('appOrigin hostname must be learn.version26.in');
     } finally {
       stagingConfig.appOrigin = originalOrigin;
     }
