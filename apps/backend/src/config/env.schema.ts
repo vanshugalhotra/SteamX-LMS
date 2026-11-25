@@ -54,7 +54,8 @@ const envSchema = z
       .transform((value) => value === 'true')
       .optional(),
     AWS_REGION: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
-    S3_BUCKET: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
+    S3_MEDIA_BUCKET: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
+    S3_UPLOADS_BUCKET: z.string({ error: 'is required' }).min(1, { error: 'is required' }),
     AWS_ACCESS_KEY_ID: z.preprocess(
       (value) => (value === '' ? undefined : value),
       z.string().min(1).optional(),
@@ -159,7 +160,8 @@ const envSchema = z
     SWAGGER_ENABLED: env.SWAGGER_ENABLED ?? env.NODE_ENV === 'development',
     storage: {
       region: env.AWS_REGION,
-      bucket: env.S3_BUCKET,
+      mediaBucket: env.S3_MEDIA_BUCKET,
+      uploadsBucket: env.S3_UPLOADS_BUCKET,
       accessKeyId: env.AWS_ACCESS_KEY_ID,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
       uploadUrlTtlSeconds: env.UPLOAD_URL_TTL_SECONDS,

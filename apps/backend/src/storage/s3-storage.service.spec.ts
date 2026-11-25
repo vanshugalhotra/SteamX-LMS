@@ -16,6 +16,9 @@ import { MAX_SNIFF_BYTES, StorageObjectNotFoundError } from './storage.service.j
 
 const UUID = '123e4567-e89b-12d3-a456-426614174000';
 const KEY = `assets/${UUID}/original`;
+const SUBMISSION_KEY = `submissions/${UUID}/submission.pdf`;
+const MEDIA_BUCKET = 'media-test-bucket';
+const UPLOADS_BUCKET = 'uploads-test-bucket';
 
 function createService(send = vi.fn()) {
   const config = new ConfigService<Env, true>(
@@ -23,7 +26,8 @@ function createService(send = vi.fn()) {
       DATABASE_URL: 'postgresql://localhost/steamx_test',
       AUTH_JWT_SECRET: 'test-auth-secret-with-at-least-thirty-two-characters',
       AWS_REGION: 'ap-south-1',
-      S3_BUCKET: 'test-bucket',
+      S3_MEDIA_BUCKET: MEDIA_BUCKET,
+      S3_UPLOADS_BUCKET: UPLOADS_BUCKET,
       AWS_ACCESS_KEY_ID: 'dummy-access-key',
       AWS_SECRET_ACCESS_KEY: 'dummy-secret-key',
       UPLOAD_URL_TTL_SECONDS: 321,
@@ -40,7 +44,8 @@ function createPresigningService() {
       DATABASE_URL: 'postgresql://localhost/steamx_test',
       AUTH_JWT_SECRET: 'test-auth-secret-with-at-least-thirty-two-characters',
       AWS_REGION: 'ap-south-1',
-      S3_BUCKET: 'test-bucket',
+      S3_MEDIA_BUCKET: MEDIA_BUCKET,
+      S3_UPLOADS_BUCKET: UPLOADS_BUCKET,
       UPLOAD_URL_TTL_SECONDS: 321,
     }),
   );
@@ -78,6 +83,7 @@ describe('S3StorageService presigned URLs', () => {
     const url = new URL(result.url);
 
     expect(result.method).toBe('PUT');
+    expect(url.hostname).toContain(MEDIA_BUCKET);
     expect(result.headers).toEqual({
       'Content-Type': 'application/pdf',
       'If-None-Match': '*',
@@ -109,6 +115,23 @@ describe('S3StorageService presigned URLs', () => {
     );
     expect(parsed.searchParams.get('response-content-type')).toBe('application/pdf');
     expect(parsed.searchParams.get('X-Amz-Expires')).toBe('120');
+    expect(parsed.hostname).toContain(MEDIA_BUCKET);
+  });
+
+  it('presigns submission PUT and GET requests against the uploads bucket', async () => {
+    const service = createPresigningService();
+    const upload = await service.createUploadUrl({
+      key: SUBMISSION_KEY,
+      contentType: 'application/pdf',
+      sizeBytes: 123,
+    });
+    const download = await service.createDownloadUrl({
+      key: SUBMISSION_KEY,
+      expiresInSeconds: 120,
+    });
+
+    expect(new URL(upload.url).hostname).toContain(UPLOADS_BUCKET);
+    expect(new URL(download.url).hostname).toContain(UPLOADS_BUCKET);
   });
 
   it.each([0, -1, 1.5, 12 * 60 * 60 + 1])('rejects download TTL %s', async (expiresInSeconds) => {
@@ -137,7 +160,9 @@ describe('S3StorageService object operations', () => {
     const failure = new Error('S3 unavailable');
     send.mockRejectedValueOnce(failure);
     await expect(service.head(KEY)).rejects.toBe(failure);
-    expect(send.mock.calls[0]?.[0]).toBeInstanceOf(HeadObjectCommand);
+    const command = send.mock.calls[0]?.[0] as HeadObjectCommand;
+    expect(command).toBeInstanceOf(HeadObjectCommand);
+    expect(command.input.Bucket).toBe(MEDIA_BUCKET);
   });
 
   it('does not mistake a missing bucket for a missing object', async () => {
@@ -165,6 +190,7 @@ describe('S3StorageService object operations', () => {
     await expect(service.readFirstBytes(KEY, 3)).resolves.toEqual(Buffer.from([1, 2, 3]));
     const command = send.mock.calls[0]?.[0] as GetObjectCommand;
     expect(command.input.Range).toBe('bytes=0-2');
+    expect(command.input.Bucket).toBe(MEDIA_BUCKET);
   });
 
   it('rejects invalid sniff lengths', async () => {
@@ -225,6 +251,11 @@ describe('S3StorageService object operations', () => {
       command instanceof ListObjectsV2Command ? [command] : [],
     );
     expect(listCommands).toHaveLength(3);
+    expect(listCommands.map((command) => command.input.Bucket)).toEqual([
+      MEDIA_BUCKET,
+      MEDIA_BUCKET,
+      MEDIA_BUCKET,
+    ]);
     expect(
       send.mock.calls.filter(([command]) => command instanceof DeleteObjectsCommand),
     ).toHaveLength(3);
@@ -247,8 +278,15 @@ describe('S3StorageService object operations', () => {
     await expect(service.deleteByPrefix(`assets/${UUID}/`)).resolves.toBe(2_001);
     const batches = send.mock.calls
       .filter(([command]) => command instanceof DeleteObjectsCommand)
-      .map(([command]) => (command as DeleteObjectsCommand).input.Delete?.Objects?.length);
-    expect(batches).toEqual([1_000, 1_000, 1]);
+      .map(([command]) => command as DeleteObjectsCommand);
+    expect(batches.map((command) => command.input.Bucket)).toEqual([
+      MEDIA_BUCKET,
+      MEDIA_BUCKET,
+      MEDIA_BUCKET,
+    ]);
+    expect(batches.map((command) => command.input.Delete?.Objects?.length)).toEqual([
+      1_000, 1_000, 1,
+    ]);
   });
 
   it('throws when S3 reports per-object delete errors', async () => {
@@ -274,5 +312,21 @@ describe('S3StorageService object operations', () => {
     const { service, send } = createService();
     await expect(service.deleteByPrefix('assets/')).rejects.toThrow(StorageInvalidArgumentError);
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('deletes submission prefixes from the uploads bucket', async () => {
+    const { service, send } = createService();
+    send
+      .mockResolvedValueOnce({
+        Contents: [{ Key: `${SUBMISSION_KEY}/page-1` }],
+        IsTruncated: false,
+      })
+      .mockResolvedValueOnce({});
+
+    await expect(service.deleteByPrefix(`submissions/${UUID}/`)).resolves.toBe(1);
+    const listCommand = send.mock.calls[0]?.[0] as ListObjectsV2Command;
+    const deleteCommand = send.mock.calls[1]?.[0] as DeleteObjectsCommand;
+    expect(listCommand.input.Bucket).toBe(UPLOADS_BUCKET);
+    expect(deleteCommand.input.Bucket).toBe(UPLOADS_BUCKET);
   });
 });

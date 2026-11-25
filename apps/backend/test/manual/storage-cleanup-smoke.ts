@@ -80,7 +80,7 @@ async function main(): Promise<void> {
 
     await s3.send(
       new PutObjectCommand({
-        Bucket: env.storage.bucket,
+        Bucket: env.storage.mediaBucket,
         Key: eligibleKey,
         Body: TEST_OBJECT_BODY,
         ContentType: 'text/plain',
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     createdPrefixes.push(eligiblePrefix);
     await s3.send(
       new PutObjectCommand({
-        Bucket: env.storage.bucket,
+        Bucket: env.storage.mediaBucket,
         Key: youngKey,
         Body: TEST_OBJECT_BODY,
         ContentType: 'text/plain',

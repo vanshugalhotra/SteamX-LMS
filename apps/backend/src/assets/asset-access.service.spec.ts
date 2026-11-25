@@ -48,7 +48,8 @@ function createService(
       AUTH_JWT_SECRET: 'test-auth-secret-with-at-least-thirty-two-characters',
       DATABASE_URL: 'postgresql://localhost/steamx_test',
       AWS_REGION: 'ap-south-1',
-      S3_BUCKET: 'test-bucket',
+      S3_MEDIA_BUCKET: 'media-test-bucket',
+      S3_UPLOADS_BUCKET: 'uploads-test-bucket',
       ASSET_ACCESS_TTL_IMAGE_SECONDS: access.imageTtlSeconds,
       ASSET_ACCESS_TTL_PDF_SECONDS: access.pdfTtlSeconds,
       ASSET_ACCESS_TTL_VIDEO_SECONDS: access.videoTtlSeconds,
@@ -126,7 +127,8 @@ describe('AssetAccessService', () => {
         AUTH_JWT_SECRET: 'test-auth-secret-with-at-least-thirty-two-characters',
         DATABASE_URL: 'postgresql://localhost/steamx_test',
         AWS_REGION: 'ap-south-1',
-        S3_BUCKET: 'test-bucket',
+        S3_MEDIA_BUCKET: 'media-test-bucket',
+        S3_UPLOADS_BUCKET: 'uploads-test-bucket',
       }),
     );
     const service = new AssetAccessService(repository, storage, config, {
@@ -155,7 +157,8 @@ describe('AssetAccessService', () => {
           AUTH_JWT_SECRET: 'test-auth-secret-with-at-least-thirty-two-characters',
           DATABASE_URL: 'postgresql://localhost/steamx_test',
           AWS_REGION: 'ap-south-1',
-          S3_BUCKET: 'test-bucket',
+          S3_MEDIA_BUCKET: 'media-test-bucket',
+          S3_UPLOADS_BUCKET: 'uploads-test-bucket',
         }),
       );
       const service = new AssetAccessService(repository, storage, config, {

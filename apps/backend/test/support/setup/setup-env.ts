@@ -8,6 +8,8 @@ if (testEnv.error || !testEnv.parsed) {
 process.env.ASSET_ACCESS_TTL_IMAGE_SECONDS ??= '600';
 process.env.ASSET_ACCESS_TTL_PDF_SECONDS ??= '1800';
 process.env.ASSET_ACCESS_TTL_VIDEO_SECONDS ??= '7200';
+process.env.S3_MEDIA_BUCKET ??= 'media-test-bucket';
+process.env.S3_UPLOADS_BUCKET ??= 'uploads-test-bucket';
 process.env.CLEANUP_ENABLED = 'false';
 
 export function getTestDatabaseUrl(): string {

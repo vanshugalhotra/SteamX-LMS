@@ -21,6 +21,12 @@ export function loadEnvironmentConfig(
     throw new Error('STEAMX_BUDGET_EMAIL is required to synthesize the Base stack.');
   }
 
+  if (!stagingConfig.appOrigin.startsWith('https://') || stagingConfig.appOrigin.endsWith('/')) {
+    throw new Error(
+      'The configured appOrigin must start with https:// and have no trailing slash.',
+    );
+  }
+
   const contextRegion = context.region === undefined ? undefined : String(context.region).trim();
 
   return {
