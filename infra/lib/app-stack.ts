@@ -18,7 +18,7 @@ export class AppStack extends Stack {
       securityGroup: network.dbSg,
       instanceType: config.dbInstanceType,
       backupRetentionDays: config.dbBackupRetentionDays,
-      retainOnDelete: false,
+      retainOnDelete: config.protectData,
     });
 
     new CfnOutput(this, 'DatabaseEndpointAddress', {

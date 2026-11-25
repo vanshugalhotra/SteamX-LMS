@@ -6,4 +6,5 @@ export interface EnvConfig {
   localDevCorsOrigins: string[];
   dbInstanceType: string;
   dbBackupRetentionDays: number;
+  protectData: boolean;
 }
