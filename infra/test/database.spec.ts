@@ -11,9 +11,7 @@ describe('Database', () => {
     const vpc = new ec2.Vpc(stack, 'Vpc', {
       maxAzs: 2,
       natGateways: 0,
-      subnetConfiguration: [
-        { name: 'isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      ],
+      subnetConfiguration: [{ name: 'isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED }],
     });
     const securityGroup = new ec2.SecurityGroup(stack, 'DatabaseSecurityGroup', { vpc });
     new Database(stack, 'Database', {
