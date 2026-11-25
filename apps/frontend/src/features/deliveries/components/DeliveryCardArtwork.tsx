@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { UsersRound } from 'lucide-react';
-import { getCourseAccent } from '@/features/admin/courses/config/course-accent';
+import { getCourseAccent } from '@/lib/course-accent';
 
 interface DeliveryCardArtworkProps {
   delivery: {
