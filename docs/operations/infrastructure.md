@@ -31,8 +31,23 @@ not automatically delete an already-deployed CloudFormation stack; any remaining
 require separate cleanup.
 
 `SteamxStagingApp` contains a VPC with two public `/24` subnets across two AZs and two isolated
-`/24` subnets, with no NAT gateways or bastion, plus security groups. It does not provision a load
-balancer, application compute, or database.
+`/24` subnets, with no NAT gateways or bastion, plus security groups.
+
+The App stack also contains one encrypted, single-AZ PostgreSQL 18 RDS instance (`t4g.micro`,
+20 GB gp3 storage, expanding to 50 GB) in the isolated subnets. It is not public and accepts
+traffic only from the ECS security group. TLS is enforced with `rds.force_ssl=1`. Staging retains
+automated backups for one day. Backups run at `19:00-19:30 UTC` and maintenance at
+`sun:20:00-sun:20:30 UTC`, outside typical IST working hours.
+
+The instance has a generated Secrets Manager JSON secret containing the `steamx_owner` credentials.
+The secret has no fixed physical name so that staging App teardown and recreation do not encounter
+a deleted secret scheduled for recovery. The owner/migration user is used by the app initially.
+A separate least-privilege application user is a documented hardening item; implementing it requires
+purge procedures and triggers to have their required privileges planned first.
+
+The backend needs the RDS CA bundle to validate TLS certificates (tracked in `BE-INFRA`). Staging
+App teardown deletes the database and its data, with no restoration copy. Run the staging `up`
+procedure afterward to reseed data. The first RDS instance create takes about 10 minutes.
 
 The environment defaults to `staging`; select it with CDK context `--context env=staging`. Staging
 is the only defined environment. The region resolves from CDK context `region`, then `AWS_REGION`,

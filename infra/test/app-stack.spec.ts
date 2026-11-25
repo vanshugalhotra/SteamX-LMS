@@ -73,6 +73,80 @@ function getIngressGroupId(rule: unknown): string | undefined {
 }
 
 describe('AppStack', () => {
+  it('creates the staging PostgreSQL database with the expected storage, backup, and deletion settings', () => {
+    const template = createAppTemplate();
+    const instances = Object.values(template.findResources('AWS::RDS::DBInstance'));
+    expect(instances).toHaveLength(1);
+    expect(instances[0]).toMatchObject({
+      DeletionPolicy: 'Delete',
+      Properties: {
+        DBInstanceClass: 'db.t4g.micro',
+        Engine: 'postgres',
+        EngineVersion: '18',
+        MultiAZ: false,
+        StorageEncrypted: true,
+        PubliclyAccessible: false,
+        StorageType: 'gp3',
+        AllocatedStorage: '20',
+        MaxAllocatedStorage: 50,
+        BackupRetentionPeriod: stagingConfig.dbBackupRetentionDays,
+        DeletionProtection: false,
+        PreferredBackupWindow: '19:00-19:30',
+        PreferredMaintenanceWindow: 'sun:20:00-sun:20:30',
+      },
+    });
+
+    const parameterGroups = Object.values(template.findResources('AWS::RDS::DBParameterGroup'));
+    expect(parameterGroups).toHaveLength(1);
+    expect(parameterGroups[0]?.Properties).toMatchObject({
+      Family: 'postgres18',
+      Parameters: {
+        'rds.force_ssl': '1',
+      },
+    });
+  });
+
+  it('places the database in isolated subnets and attaches only the database security group', () => {
+    const template = createAppTemplate();
+    const isolatedSubnetIds = new Set(
+      Object.entries(template.findResources('AWS::EC2::Subnet'))
+        .filter(([, subnet]) => hasSubnetName(subnet, 'isolated'))
+        .map(([id]) => id),
+    );
+    const dbSubnetGroups = Object.values(template.findResources('AWS::RDS::DBSubnetGroup'));
+    expect(dbSubnetGroups).toHaveLength(1);
+    const subnetIds = getProperties(dbSubnetGroups[0]).SubnetIds;
+    expect(Array.isArray(subnetIds)).toBe(true);
+    if (!Array.isArray(subnetIds)) {
+      throw new Error('Expected the database subnet group to contain subnet IDs.');
+    }
+    const dbSubnetIds = new Set(subnetIds.map(getReferenceId));
+    expect(dbSubnetIds.size).toBe(2);
+    expect([...dbSubnetIds].every((id) => id !== undefined && isolatedSubnetIds.has(id))).toBe(
+      true,
+    );
+
+    const db = getSecurityGroup(template, 'Allow PostgreSQL traffic only from ECS tasks.');
+    const instances = Object.values(template.findResources('AWS::RDS::DBInstance'));
+    expect(instances).toHaveLength(1);
+    expect(instances[0]?.Properties?.VPCSecurityGroups).toEqual([
+      { 'Fn::GetAtt': [db.logicalId, 'GroupId'] },
+    ]);
+  });
+
+  it('generates credentials without a fixed secret name or URL-unsafe characters', () => {
+    const template = createAppTemplate();
+    const secrets = Object.values(template.findResources('AWS::SecretsManager::Secret'));
+    expect(secrets).toHaveLength(1);
+    expect(secrets[0]?.Properties).not.toHaveProperty('Name');
+    expect(secrets[0]?.Properties).toMatchObject({
+      GenerateSecretString: {
+        ExcludeCharacters: ' %+~#$&*()|[]{}:;<>?!\'/@"\\=`',
+        SecretStringTemplate: JSON.stringify({ username: 'steamx_owner' }),
+      },
+    });
+  });
+
   it('creates a two-AZ VPC with public and isolated subnets and no NAT gateways', () => {
     const template = createAppTemplate();
     template.resourceCountIs('AWS::EC2::VPC', 1);
