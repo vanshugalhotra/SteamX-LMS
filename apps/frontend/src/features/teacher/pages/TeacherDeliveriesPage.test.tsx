@@ -5,6 +5,8 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchAllTeacherDeliveries, fetchTeacherDeliveries } from '../deliveries/api/api';
 import type { TeacherDelivery } from '../deliveries/model/types';
+import { fetchDeliveryReleaseOutline } from '@/features/deliveries/api/api';
+import type { ReleaseOutlineResponse } from '@/features/deliveries/model/types';
 import { PATHS } from '@/lib/paths';
 import type { Paginated } from '@/lib/pagination';
 import { TeacherDeliveriesPage } from './TeacherDeliveriesPage';
@@ -13,9 +15,46 @@ vi.mock('../deliveries/api/api', () => ({
   fetchAllTeacherDeliveries: vi.fn(),
   fetchTeacherDeliveries: vi.fn(),
 }));
+vi.mock('@/features/deliveries/api/api', () => ({
+  fetchDelivery: vi.fn(),
+  fetchDeliveryReleaseOutline: vi.fn(),
+}));
 
 const mockedFetchAllTeacherDeliveries = vi.mocked(fetchAllTeacherDeliveries);
 const mockedFetchTeacherDeliveries = vi.mocked(fetchTeacherDeliveries);
+const mockedFetchDeliveryReleaseOutline = vi.mocked(fetchDeliveryReleaseOutline);
+const outline: ReleaseOutlineResponse = {
+  modules: [
+    {
+      id: 'module-1',
+      title: 'Module 1',
+      position: 1,
+      releaseState: 'PARTIAL',
+      releasedCount: 1,
+      releasableLessonCount: 2,
+      lessons: [
+        {
+          id: 'lesson-1',
+          title: 'Lesson 1',
+          position: 1,
+          audience: 'STUDENT',
+          released: true,
+          releasedAt: '2026-11-18T12:00:00.000Z',
+          releasable: true,
+        },
+        {
+          id: 'lesson-2',
+          title: 'Lesson 2',
+          position: 2,
+          audience: 'STUDENT',
+          released: false,
+          releasedAt: null,
+          releasable: true,
+        },
+      ],
+    },
+  ],
+};
 const delivery: TeacherDelivery = {
   id: 'delivery-1',
   schoolId: 'school-1',
@@ -61,6 +100,8 @@ beforeEach(() => {
     limit: 20,
     total: 1,
   });
+  mockedFetchDeliveryReleaseOutline.mockReset();
+  mockedFetchDeliveryReleaseOutline.mockResolvedValue(outline);
 });
 
 describe('TeacherDeliveriesPage', () => {
@@ -112,6 +153,25 @@ describe('TeacherDeliveriesPage', () => {
     expect(screen.getByText('Robotics')).toBeInTheDocument();
     expect(cardLink).toHaveTextContent('Inactive');
     expect(cardLink).toHaveTextContent('Subscription inactive');
+    expect(await screen.findByText('1 of 2 lessons released')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Release lessons' })).toHaveAttribute(
+      'href',
+      PATHS.teacher.delivery(delivery.id),
+    );
+  });
+
+  it('can retry loading a delivery card release outline', async () => {
+    const user = userEvent.setup();
+    mockedFetchDeliveryReleaseOutline
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce(outline);
+    renderPage();
+
+    await screen.findByText("Lesson progress couldn't be loaded.");
+    await user.click(screen.getByRole('button', { name: 'Retry progress' }));
+
+    expect(await screen.findByText('1 of 2 lessons released')).toBeInTheDocument();
+    expect(mockedFetchDeliveryReleaseOutline).toHaveBeenCalledTimes(2);
   });
 
   it('filters assigned deliveries by status through the server-scoped list', async () => {
