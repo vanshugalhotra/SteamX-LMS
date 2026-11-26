@@ -51,3 +51,16 @@ export interface ReleaseModule {
 export interface ReleaseOutlineResponse {
   modules: ReleaseModule[];
 }
+
+export interface LessonReleaseResponse {
+  lessonId: string;
+  released: boolean;
+  releasedAt: string;
+}
+
+export interface ModuleReleaseResponse {
+  moduleId: string;
+  newlyReleased: number;
+  alreadyReleased: number;
+  skippedNotReleasable: number;
+}

@@ -1,5 +1,3 @@
-import type { LessonAudience } from '@/features/admin/modules/lessons/model/types';
-
 export type {
   Delivery,
   DeliveryListParams,
@@ -66,41 +64,11 @@ export interface UpdateDeliveryLabelPayload {
   label: string;
 }
 
-export type ModuleReleaseState = 'NONE' | 'PARTIAL' | 'ALL';
-
-export interface ReleaseLesson {
-  id: string;
-  title: string;
-  position: number;
-  audience: LessonAudience;
-  released: boolean;
-  releasedAt: string | null;
-  releasable: boolean;
-}
-
-export interface ReleaseModule {
-  id: string;
-  title: string;
-  position: number;
-  releaseState: ModuleReleaseState;
-  releasedCount: number;
-  releasableLessonCount: number;
-  lessons: ReleaseLesson[];
-}
-
-export interface ReleaseOutlineResponse {
-  modules: ReleaseModule[];
-}
-
-export interface LessonReleaseResponse {
-  lessonId: string;
-  released: boolean;
-  releasedAt: string;
-}
-
-export interface ModuleReleaseResponse {
-  moduleId: string;
-  newlyReleased: number;
-  alreadyReleased: number;
-  skippedNotReleasable: number;
-}
+export type {
+  LessonReleaseResponse,
+  ModuleReleaseResponse,
+  ModuleReleaseState,
+  ReleaseLesson,
+  ReleaseModule,
+  ReleaseOutlineResponse,
+} from '@/features/deliveries/model/types';
