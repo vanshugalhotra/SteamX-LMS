@@ -37,8 +37,14 @@ FROM base AS runtime
 
 WORKDIR /app
 
+RUN mkdir -p /app/certs
+ADD https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/certs/rds-global-bundle.pem
+RUN chown node:node /app/certs/rds-global-bundle.pem
+
 ENV NODE_ENV=production
 ENV PORT=3333
+ENV NODE_EXTRA_CA_CERTS=/app/certs/rds-global-bundle.pem
+ENV SSL_CERT_FILE=/app/certs/rds-global-bundle.pem
 
 COPY --from=prod-deps /prod/node_modules ./node_modules
 COPY --from=prod-deps /prod/package.json ./package.json
