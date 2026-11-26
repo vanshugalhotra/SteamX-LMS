@@ -107,9 +107,7 @@ export function DeliveryReleaseOutline({
           `${String(succeeded)} of ${String(lessons.length)} lessons unreleased; ${String(failures.length)} failed. ${getErrorMessage(failures[0])}`,
         );
       } else {
-        toast.success(
-          `${String(succeeded)} ${succeeded === 1 ? 'lesson' : 'lessons'} unreleased`,
-        );
+        toast.success(`${String(succeeded)} ${succeeded === 1 ? 'lesson' : 'lessons'} unreleased`);
       }
     } catch (error) {
       toast.error(`Module unrelease failed. ${getErrorMessage(error)}`);

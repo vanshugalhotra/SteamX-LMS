@@ -60,13 +60,7 @@ export function useUnreleaseDeliveryLesson() {
 export function useUnreleaseDeliveryModule() {
   const invalidate = useInvalidateDeliveryReleaseOutline();
   return useMutation({
-    mutationFn: async ({
-      deliveryId,
-      lessonIds,
-    }: {
-      deliveryId: string;
-      lessonIds: string[];
-    }) => {
+    mutationFn: async ({ deliveryId, lessonIds }: { deliveryId: string; lessonIds: string[] }) => {
       const results = await Promise.allSettled(
         lessonIds.map((lessonId) => unreleaseDeliveryLesson(deliveryId, lessonId)),
       );
