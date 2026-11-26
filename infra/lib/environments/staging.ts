@@ -10,6 +10,11 @@ export const stagingConfig: EnvConfig = {
   domainName: DOMAIN_NAME,
   appOrigin: `https://learn.${DOMAIN_NAME}`,
   localDevCorsOrigins: LOCAL_DEV_CORS_ORIGINS,
+  apiScaling: {
+    minTasks: 1,
+    maxTasks: 2,
+    cpuTargetPercent: 60,
+  },
   dbInstanceType: 't4g.micro',
   dbBackupRetentionDays: 1,
   dbMaxAllocatedStorageGb: 25,

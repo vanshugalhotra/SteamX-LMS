@@ -16,17 +16,29 @@ const baseEnvironment = loadEnvironmentConfig(
 );
 const baseStackName = `Steamx${baseEnvironment.config.envName[0]?.toUpperCase()}${baseEnvironment.config.envName.slice(1)}Base`;
 const appStackName = `Steamx${baseEnvironment.config.envName[0]?.toUpperCase()}${baseEnvironment.config.envName.slice(1)}App`;
+const baseStack = new BaseStack(
+  app,
+  baseStackName,
+  baseEnvironment.config,
+  baseEnvironment.budgetEmail,
+  {
+    stackName: baseStackName,
+    env: {
+      account: baseEnvironment.account,
+      region: baseEnvironment.config.region,
+    },
+  },
+);
 
 new AppStack(app, appStackName, baseEnvironment.config, {
+  repository: baseStack.repository,
+  mediaBucket: baseStack.mediaBucket,
+  uploadsBucket: baseStack.uploadsBucket,
+  hostedZone: baseStack.hostedZone,
+  originCertificate: baseStack.originCertificate,
+  jwtSecret: baseStack.jwtSecret,
+  originVerifySecret: baseStack.originVerifySecret,
   stackName: appStackName,
-  env: {
-    account: baseEnvironment.account,
-    region: baseEnvironment.config.region,
-  },
-});
-
-new BaseStack(app, baseStackName, baseEnvironment.config, baseEnvironment.budgetEmail, {
-  stackName: baseStackName,
   env: {
     account: baseEnvironment.account,
     region: baseEnvironment.config.region,

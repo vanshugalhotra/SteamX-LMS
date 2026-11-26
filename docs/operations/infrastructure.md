@@ -1,7 +1,6 @@
 # AWS infrastructure
 
-This guide describes the resources and storage operations implemented by the AWS CDK app in
-`infra/`; production application hosting is not deployed yet.
+This guide describes the resources and operations implemented by the AWS CDK app in `infra/`.
 
 ## Stacks
 
@@ -46,9 +45,21 @@ a deleted secret scheduled for recovery. The owner/migration user is used by the
 A separate least-privilege application user is a documented hardening item; implementing it requires
 purge procedures and triggers to have their required privileges planned first.
 
-The backend needs the RDS CA bundle to validate TLS certificates (tracked in `BE-INFRA`). Staging
-App teardown deletes the database and its data, with no restoration copy. Run the staging `up`
-procedure afterward to reseed data. The first RDS instance create takes about 10 minutes.
+The App stack runs the API on ARM64 Fargate behind an internet-facing HTTPS ALB. The ALB accepts
+443 only from the CloudFront managed prefix list and forwards requests only when the
+`X-Origin-Verify` header matches the generated origin verification secret. The task role is scoped
+to the media `assets/` and uploads `submissions/` prefixes. ECS Exec is enabled. Task-count
+autoscaling is configured per environment; staging runs 1–2 tasks and targets 60% average CPU.
+
+The backend image includes the RDS global CA bundle and sets `NODE_EXTRA_CA_CERTS` and
+`SSL_CERT_FILE` so Node.js and Prisma can validate RDS TLS certificates. These variables do not
+force TLS for local non-TLS PostgreSQL.
+
+Staging App teardown deletes the database and its data, with no restoration copy. Run the staging
+`up` procedure afterward to reseed data. The first RDS instance create takes about 10 minutes.
+Keep App deployed only while needed: the ALB and Fargate service incur ongoing costs, and the RDS
+instance continues to incur costs while App exists. Destroy App when idle; Base is persistent and
+survives App teardown.
 
 The environment defaults to `staging`; select it with CDK context `--context env=staging`. Staging
 is the only defined environment. The region resolves from CDK context `region`, then `AWS_REGION`,
@@ -81,6 +92,55 @@ pnpm infra:deploy SteamxStagingBase
 pnpm infra:diff SteamxStagingApp
 pnpm infra:deploy SteamxStagingApp
 ```
+
+Deploy in this order: Base, API image, then App. Use an immutable image tag such as the Git commit
+SHA, and always pass the same tag as CDK context when deploying App. If `imageTag` is omitted, the
+template uses `missing-image-tag`; that fallback is for synthesis and teardown, not deployment.
+
+```powershell
+pnpm --dir infra exec cdk deploy SteamxStagingBase
+$region = "ap-south-1"
+$accountId = "<account-id>"
+$repositoryUri = "<ApiRepositoryUri output from Base>"
+$imageTag = "<git-commit-sha>"
+aws ecr get-login-password --region $region | docker login --username AWS --password-stdin "$accountId.dkr.ecr.$region.amazonaws.com"
+docker buildx build --platform linux/arm64 -f apps/backend/Dockerfile --build-arg GIT_SHA=$imageTag -t "$repositoryUri`:$imageTag" --push .
+pnpm --dir infra exec cdk deploy SteamxStagingApp -c imageTag=$imageTag
+```
+
+For ECS Exec, find the running task in the ECS console or with `aws ecs list-tasks`, then substitute
+its ARN below. Run migrations after deployment and create the initial admin only during initial
+provisioning. The API image is slim and has no `curl`; check readiness with Node's built-in `fetch`:
+
+```powershell
+aws ecs execute-command --cluster steamx-staging --task "<task-arn>" --container api --interactive --command "./node_modules/.bin/prisma migrate deploy"
+aws ecs execute-command --cluster steamx-staging --task "<task-arn>" --container api --interactive --command "node dist/scripts/admin-create.js"
+aws ecs execute-command --cluster steamx-staging --task "<task-arn>" --container api --interactive --command "node -e `"fetch('http://127.0.0.1:3333/health/ready').then(async r => { console.log(r.status, await r.text()); process.exit(r.ok ? 0 : 1) }).catch(e => { console.error(e); process.exit(1) })`""
+```
+
+To test the origin-header rule from your workstation, temporarily add your public IP as a 443
+ingress source on the ALB security group, then remove that rule immediately after testing. Send
+`X-Origin-Verify` with the current origin verification secret to `https://origin.version26.in`;
+a request without the header should return 403. For example, assign the Base output ARN and fetch
+the secret into a shell variable (do not print it):
+
+```powershell
+$secretArn = "<OriginVerifySecretArn output from Base>"
+$originVerifySecret = aws secretsmanager get-secret-value --secret-id $secretArn --query SecretString --output text
+Invoke-WebRequest -Uri "https://origin.version26.in/health/live" -Headers @{ "X-Origin-Verify" = $originVerifySecret }
+Remove-Variable originVerifySecret
+```
+
+Do not leave the temporary ingress rule in place.
+
+For a rollback smoke test, deploy a deliberately bad image tag and observe the ECS deployment
+circuit breaker revert to the prior task definition. It can take about 10–20 minutes for the
+circuit breaker to give up. Immutable tags ensure the prior task definition still refers to its
+original image. The origin verification secret is also intended for CloudFront when that is added;
+rotating it will require redeploying both the origin and CloudFront configuration.
+
+The backend `trust proxy` setting and throttler are part of the planned `BE-INFRA` work and are not
+implemented by this infrastructure change.
 
 The Base outputs include both bucket names and the local-dev user name. Configure the backend with
 the media and uploads bucket outputs:

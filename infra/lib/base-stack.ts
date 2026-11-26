@@ -16,6 +16,8 @@ import type { EnvConfig } from './environments/types.js';
 
 export class BaseStack extends Stack {
   public readonly repository: ContainerRegistry;
+  public readonly mediaBucket: PrivateBucket;
+  public readonly uploadsBucket: PrivateBucket;
   public readonly hostedZone: route53.IHostedZone;
   public readonly originCertificate: acm.Certificate;
   public readonly jwtSecret: secretsmanager.Secret;
@@ -60,19 +62,25 @@ export class BaseStack extends Stack {
     });
 
     const corsOrigins = [config.appOrigin, ...config.localDevCorsOrigins];
-    const media = new PrivateBucket(this, 'Media', {
+    this.mediaBucket = new PrivateBucket(this, 'Media', {
       corsOrigins,
       retainOnDelete: false,
     });
-    const uploads = new PrivateBucket(this, 'Uploads', {
+    this.uploadsBucket = new PrivateBucket(this, 'Uploads', {
       corsOrigins,
       retainOnDelete: false,
     });
     // Keep this construct path so CloudFormation updates the existing local-dev user in place.
-    const localDevAccess = new LocalDevAccess(this, 'DevStorage', config.envName, media, uploads);
+    const localDevAccess = new LocalDevAccess(
+      this,
+      'DevStorage',
+      config.envName,
+      this.mediaBucket,
+      this.uploadsBucket,
+    );
 
-    new CfnOutput(this, 'MediaBucketName', { value: media.bucketName });
-    new CfnOutput(this, 'UploadsBucketName', { value: uploads.bucketName });
+    new CfnOutput(this, 'MediaBucketName', { value: this.mediaBucket.bucketName });
+    new CfnOutput(this, 'UploadsBucketName', { value: this.uploadsBucket.bucketName });
     new CfnOutput(this, 'LocalDevUserName', { value: localDevAccess.user.userName });
     new CfnOutput(this, 'ApiRepositoryName', { value: this.repository.repositoryName });
     new CfnOutput(this, 'ApiRepositoryUri', { value: this.repository.repositoryUri });

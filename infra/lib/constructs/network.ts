@@ -48,7 +48,6 @@ export class Network extends Construct {
       description: 'Allow API traffic only from the application load balancer.',
       allowAllOutbound: true,
     });
-    this.ecsSg.addIngressRule(this.albSg, ec2.Port.tcp(API_PORT), 'API traffic from ALB');
 
     this.dbSg = new ec2.SecurityGroup(this, 'DatabaseSecurityGroup', {
       vpc: this.vpc,
