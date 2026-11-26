@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseOutlineResponse } from '../model/types';
 import { createReleaseLesson, releaseOutlineFixture } from '@/test/fixtures/release-outline';
+import { formatDate } from '@/lib/date-helper';
 
 const mocks = vi.hoisted(() => ({
   releaseLesson: vi.fn(),
@@ -77,7 +78,9 @@ describe('DeliveryReleaseOutline release controls', () => {
     const user = userEvent.setup();
     renderOutline();
 
-    expect(screen.getAllByText('Released 18 Nov 2026')).toHaveLength(2);
+    expect(screen.getAllByText(`Released ${formatDate('2026-11-18T12:00:00.000Z')}`)).toHaveLength(
+      2,
+    );
     expect(screen.getByText('Not released')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Release What plants need' }));
     expect(mocks.releaseLesson).toHaveBeenCalledWith({
