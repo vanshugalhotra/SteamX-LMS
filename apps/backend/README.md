@@ -17,6 +17,11 @@ docker buildx build --platform linux/arm64 -f apps/backend/Dockerfile --build-ar
 docker run --rm --env-file apps/backend/.env -p 3333:3333 steamx-api
 ```
 
+The runtime image includes the Amazon RDS global CA bundle at
+`/app/certs/rds-global-bundle.pem`; `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` point to it so
+Node.js and Prisma can validate TLS connections to RDS. These settings provide trusted certificates
+but do not force TLS, so a local non-TLS PostgreSQL connection continues to work.
+
 Run migrations with the same runtime environment, and create the first admin once during initial provisioning:
 
 ```sh

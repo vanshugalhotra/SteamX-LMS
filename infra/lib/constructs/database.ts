@@ -1,4 +1,4 @@
-import { Duration, RemovalPolicy } from 'aws-cdk-lib';
+import { Duration, RemovalPolicy, SecretValue } from 'aws-cdk-lib';
 import { aws_ec2 as ec2, aws_rds as rds, aws_secretsmanager as secretsmanager } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 
@@ -14,6 +14,7 @@ export interface DatabaseProps {
 export class Database extends Construct {
   public readonly instance: rds.DatabaseInstance;
   public readonly secret: secretsmanager.ISecret;
+  public readonly urlSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: DatabaseProps) {
     super(scope, id);
@@ -60,5 +61,11 @@ export class Database extends Construct {
       throw new Error('Generated RDS credentials secret was not attached to the instance.');
     }
     this.secret = this.instance.secret;
+
+    // checkSecretUsage is enabled; unsafeUnwrap preserves these as Secrets Manager dynamic references.
+    const databaseUrl = `postgresql://${this.secret.secretValueFromJson('username').unsafeUnwrap()}:${this.secret.secretValueFromJson('password').unsafeUnwrap()}@${this.instance.dbInstanceEndpointAddress}:${this.instance.dbInstanceEndpointPort}/steamx?sslmode=require`;
+    this.urlSecret = new secretsmanager.Secret(this, 'UrlSecret', {
+      secretStringValue: SecretValue.unsafePlainText(databaseUrl),
+    });
   }
 }

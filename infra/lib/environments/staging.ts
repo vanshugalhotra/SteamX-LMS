@@ -1,14 +1,20 @@
 import type { EnvConfig } from './types.js';
 
-const APP_ORIGIN = 'https://version26.in';
+const DOMAIN_NAME = 'version26.in';
 const LOCAL_DEV_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'];
 
 export const stagingConfig: EnvConfig = {
   envName: 'staging',
   region: 'ap-south-1',
   monthlyBudgetUsd: 25,
-  appOrigin: APP_ORIGIN,
+  domainName: DOMAIN_NAME,
+  appOrigin: `https://learn.${DOMAIN_NAME}`,
   localDevCorsOrigins: LOCAL_DEV_CORS_ORIGINS,
+  apiScaling: {
+    minTasks: 1,
+    maxTasks: 2,
+    cpuTargetPercent: 60,
+  },
   dbInstanceType: 't4g.micro',
   dbBackupRetentionDays: 1,
   dbMaxAllocatedStorageGb: 25,
