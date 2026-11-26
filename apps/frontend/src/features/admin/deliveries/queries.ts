@@ -17,11 +17,8 @@ import {
   removeDeliveryStudent,
   updateDeliveryLabel,
   updateDeliveryStatus,
-  fetchDeliveryReleaseOutline,
-  releaseDeliveryLesson,
-  unreleaseDeliveryLesson,
-  releaseDeliveryModule,
 } from './api/api';
+import { deliveryReadKeys } from '@/features/deliveries/queries';
 import type {
   CreateDeliveryPayload,
   DeliveryEnrollmentListParams,
@@ -40,8 +37,7 @@ export const deliveryKeys = {
     [...deliveryKeys.all, 'teachers', params] as const,
   enrollments: (params: DeliveryEnrollmentListParams) =>
     [...deliveryKeys.all, 'enrollments', params] as const,
-  releaseOutline: (deliveryId: string) =>
-    [...deliveryKeys.all, 'release-outline', deliveryId] as const,
+  releaseOutline: deliveryReadKeys.releaseOutline,
   lessonMutations: ['deliveries', 'lesson-mutations'] as const,
   moduleMutations: ['deliveries', 'module-mutations'] as const,
 };
@@ -64,18 +60,6 @@ export function useDelivery(id: string) {
     queryFn: () => fetchDelivery(id),
     enabled: id !== '',
   });
-}
-
-export function deliveryReleaseOutlineQueryOptions(deliveryId: string) {
-  return queryOptions({
-    queryKey: deliveryKeys.releaseOutline(deliveryId),
-    queryFn: () => fetchDeliveryReleaseOutline(deliveryId),
-    enabled: deliveryId !== '',
-  });
-}
-
-export function useDeliveryReleaseOutline(deliveryId: string) {
-  return useQuery(deliveryReleaseOutlineQueryOptions(deliveryId));
 }
 
 export function useDeliveryTeachers(params: DeliveryTeacherListParams) {
@@ -112,14 +96,6 @@ function useInvalidateDeliveryEnrollments() {
   return (deliveryId: string) =>
     queryClient.invalidateQueries({
       queryKey: [...deliveryKeys.all, 'enrollments', { deliveryId }],
-    });
-}
-
-function useInvalidateDeliveryReleaseOutline() {
-  const queryClient = useQueryClient();
-  return (deliveryId: string) =>
-    queryClient.invalidateQueries({
-      queryKey: deliveryKeys.releaseOutline(deliveryId),
     });
 }
 
@@ -164,35 +140,14 @@ export function useRemoveDeliveryStudent() {
   });
 }
 
-export function useReleaseDeliveryLesson() {
-  const invalidate = useInvalidateDeliveryReleaseOutline();
-  return useMutation({
-    mutationKey: deliveryKeys.lessonMutations,
-    mutationFn: ({ deliveryId, lessonId }: { deliveryId: string; lessonId: string }) =>
-      releaseDeliveryLesson(deliveryId, lessonId),
-    onSuccess: (_data, variables) => invalidate(variables.deliveryId),
-  });
-}
-
-export function useUnreleaseDeliveryLesson() {
-  const invalidate = useInvalidateDeliveryReleaseOutline();
-  return useMutation({
-    mutationKey: deliveryKeys.lessonMutations,
-    mutationFn: ({ deliveryId, lessonId }: { deliveryId: string; lessonId: string }) =>
-      unreleaseDeliveryLesson(deliveryId, lessonId),
-    onSuccess: (_data, variables) => invalidate(variables.deliveryId),
-  });
-}
-
-export function useReleaseDeliveryModule() {
-  const invalidate = useInvalidateDeliveryReleaseOutline();
-  return useMutation({
-    mutationKey: deliveryKeys.moduleMutations,
-    mutationFn: ({ deliveryId, moduleId }: { deliveryId: string; moduleId: string }) =>
-      releaseDeliveryModule(deliveryId, moduleId),
-    onSuccess: (_data, variables) => invalidate(variables.deliveryId),
-  });
-}
+export {
+  deliveryReleaseOutlineQueryOptions,
+  useDeliveryReleaseOutline,
+  useReleaseDeliveryLesson,
+  useReleaseDeliveryModule,
+  useUnreleaseDeliveryModule,
+  useUnreleaseDeliveryLesson,
+} from '@/features/deliveries/queries';
 
 export function useCreateDelivery() {
   const invalidate = useInvalidateDeliveries();

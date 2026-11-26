@@ -2,15 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createDelivery, enrollDeliveryStudents, fetchDelivery } from './api/api';
 import {
-  createDelivery,
-  enrollDeliveryStudents,
-  fetchDelivery,
   fetchDeliveryReleaseOutline,
   releaseDeliveryLesson,
   releaseDeliveryModule,
   unreleaseDeliveryLesson,
-} from './api/api';
+} from '@/features/deliveries/api/api';
 import type { Delivery, ReleaseOutlineResponse } from './model/types';
 import {
   deliveryKeys,
@@ -20,6 +18,7 @@ import {
   useEnrollDeliveryStudents,
   useReleaseDeliveryLesson,
   useReleaseDeliveryModule,
+  useUnreleaseDeliveryModule,
   useUnreleaseDeliveryLesson,
 } from './queries';
 
@@ -29,11 +28,15 @@ vi.mock('./api/api', () => ({
   fetchDeliveries: vi.fn(),
   fetchDelivery: vi.fn(),
   fetchDeliveryReleaseOutline: vi.fn(),
+  updateDeliveryLabel: vi.fn(),
+  updateDeliveryStatus: vi.fn(),
+}));
+
+vi.mock('@/features/deliveries/api/api', () => ({
+  fetchDeliveryReleaseOutline: vi.fn(),
   releaseDeliveryLesson: vi.fn(),
   unreleaseDeliveryLesson: vi.fn(),
   releaseDeliveryModule: vi.fn(),
-  updateDeliveryLabel: vi.fn(),
-  updateDeliveryStatus: vi.fn(),
 }));
 
 const mockedCreateDelivery = vi.mocked(createDelivery);
@@ -204,6 +207,32 @@ describe('delivery mutations', () => {
       });
     });
     expectReleaseOutlineInvalidation();
+    mockedUnreleaseDeliveryLesson.mockClear();
+    mockedUnreleaseDeliveryLesson.mockImplementation((_deliveryId, lessonId) =>
+      lessonId === 'failed-lesson' ? Promise.reject(new Error('failed')) : Promise.resolve(),
+    );
+    queryClient.setQueryData(deliveryKeys.releaseOutline('delivery-id'), releaseOutlineResponse);
+    queryClient.setQueryData(deliveryKeys.releaseOutline('other-delivery'), releaseOutlineResponse);
+    const unreleaseModule = renderHook(() => useUnreleaseDeliveryModule(), { wrapper: Wrapper });
+
+    let result: Awaited<ReturnType<typeof unreleaseModule.result.current.mutateAsync>> | undefined;
+    await act(async () => {
+      result = await unreleaseModule.result.current.mutateAsync({
+        deliveryId: 'delivery-id',
+        lessonIds: ['lesson-id', 'failed-lesson'],
+      });
+    });
+
+    expect(mockedUnreleaseDeliveryLesson).toHaveBeenCalledTimes(2);
+    expect(result?.succeeded).toBe(1);
+    expect(result?.failures).toHaveLength(1);
+    expect(result?.failures[0]).toEqual(new Error('failed'));
+    expect(
+      queryClient.getQueryState(deliveryKeys.releaseOutline('delivery-id'))?.isInvalidated,
+    ).toBe(true);
+    expect(
+      queryClient.getQueryState(deliveryKeys.releaseOutline('other-delivery'))?.isInvalidated,
+    ).toBe(false);
   });
 
   it('invalidates list and detail queries after creating a delivery', async () => {

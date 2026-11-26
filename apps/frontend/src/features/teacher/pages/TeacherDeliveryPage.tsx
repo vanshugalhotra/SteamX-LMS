@@ -49,6 +49,12 @@ export function TeacherDeliveryPage() {
   } else if (!delivery || !outline) {
     content = <Alert>Delivery details could not be loaded.</Alert>;
   } else {
+    const releaseDisabledReason =
+      delivery.status !== 'ACTIVE'
+        ? 'Releasing lessons requires an active delivery.'
+        : !delivery.subscriptionActive
+          ? 'Releasing lessons requires a current subscription.'
+          : undefined;
     content = (
       <div className="space-y-7">
         <section
@@ -61,7 +67,11 @@ export function TeacherDeliveryPage() {
           />
         </section>
         <section aria-label="Course modules">
-          <DeliveryReleaseOutline outline={outline} />
+          <DeliveryReleaseOutline
+            deliveryId={id}
+            outline={outline}
+            releaseDisabledReason={releaseDisabledReason}
+          />
         </section>
       </div>
     );

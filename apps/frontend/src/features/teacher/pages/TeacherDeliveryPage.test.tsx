@@ -5,15 +5,24 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { ApiError } from '@/lib/api-client';
 import { PATHS } from '@/lib/paths';
 import type { Delivery, ReleaseOutlineResponse } from '@/features/deliveries/model/types';
+import { releaseOutlineFixture } from '@/test/fixtures/release-outline';
 
-const { useDeliveryMock, useDeliveryReleaseOutlineMock } = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
   useDeliveryMock: vi.fn(),
   useDeliveryReleaseOutlineMock: vi.fn(),
+  releaseLesson: vi.fn(),
+  unreleaseLesson: vi.fn(),
+  unreleaseModule: vi.fn(),
+  releaseModule: vi.fn(),
 }));
 
 vi.mock('@/features/deliveries/queries', () => ({
-  useDelivery: useDeliveryMock,
-  useDeliveryReleaseOutline: useDeliveryReleaseOutlineMock,
+  useDelivery: mocks.useDeliveryMock,
+  useDeliveryReleaseOutline: mocks.useDeliveryReleaseOutlineMock,
+  useReleaseDeliveryLesson: () => ({ mutateAsync: mocks.releaseLesson, isPending: false }),
+  useUnreleaseDeliveryLesson: () => ({ mutateAsync: mocks.unreleaseLesson, isPending: false }),
+  useUnreleaseDeliveryModule: () => ({ mutateAsync: mocks.unreleaseModule, isPending: false }),
+  useReleaseDeliveryModule: () => ({ mutateAsync: mocks.releaseModule, isPending: false }),
 }));
 
 import { TeacherDeliveryPage } from './TeacherDeliveryPage';
@@ -31,48 +40,6 @@ const delivery: Delivery = {
   updatedAt: '2026-11-18T00:00:00.000Z',
 };
 
-const outline: ReleaseOutlineResponse = {
-  modules: [
-    {
-      id: 'module-1',
-      title: 'Plants and Energy',
-      position: 1,
-      releaseState: 'PARTIAL',
-      releasedCount: 1,
-      releasableLessonCount: 2,
-      lessons: [
-        {
-          id: 'lesson-1',
-          title: 'How plants make food',
-          position: 1,
-          audience: 'STUDENT',
-          released: true,
-          releasedAt: '2026-11-18T12:00:00.000Z',
-          releasable: true,
-        },
-        {
-          id: 'lesson-2',
-          title: 'What plants need',
-          position: 2,
-          audience: 'STUDENT',
-          released: false,
-          releasedAt: null,
-          releasable: true,
-        },
-        {
-          id: 'lesson-3',
-          title: 'Teacher lab notes',
-          position: 3,
-          audience: 'TEACHER_ONLY',
-          released: false,
-          releasedAt: null,
-          releasable: false,
-        },
-      ],
-    },
-  ],
-};
-
 interface QueryResult<T> {
   data?: T;
   error?: unknown;
@@ -87,18 +54,18 @@ function mockDelivery(overrides: Partial<QueryResult<Delivery>> = {}) {
     refetch: vi.fn(),
     ...overrides,
   };
-  useDeliveryMock.mockReturnValue(result);
+  mocks.useDeliveryMock.mockReturnValue(result);
   return result;
 }
 
 function mockOutline(overrides: Partial<QueryResult<ReleaseOutlineResponse>> = {}) {
   const result: QueryResult<ReleaseOutlineResponse> = {
-    data: outline,
+    data: releaseOutlineFixture,
     isPending: false,
     refetch: vi.fn(),
     ...overrides,
   };
-  useDeliveryReleaseOutlineMock.mockReturnValue(result);
+  mocks.useDeliveryReleaseOutlineMock.mockReturnValue(result);
   return result;
 }
 
@@ -115,8 +82,17 @@ function renderPage() {
 
 describe('TeacherDeliveryPage', () => {
   beforeEach(() => {
-    useDeliveryMock.mockReset();
-    useDeliveryReleaseOutlineMock.mockReset();
+    mocks.useDeliveryMock.mockReset();
+    mocks.useDeliveryReleaseOutlineMock.mockReset();
+    mocks.releaseLesson.mockReset().mockResolvedValue({});
+    mocks.unreleaseLesson.mockReset().mockResolvedValue(undefined);
+    mocks.unreleaseModule.mockReset().mockResolvedValue({ succeeded: 1, failures: [] });
+    mocks.releaseModule.mockReset().mockResolvedValue({
+      moduleId: 'module-1',
+      newlyReleased: 1,
+      alreadyReleased: 0,
+      skippedNotReleasable: 0,
+    });
   });
 
   it('shows a loading state while the delivery details are loading', () => {
@@ -128,7 +104,7 @@ describe('TeacherDeliveryPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading delivery details');
   });
 
-  it('shows delivery details, student progress, a read-only outline, and back navigation', async () => {
+  it('shows delivery details, release controls, student progress, and back navigation', async () => {
     mockDelivery();
     mockOutline();
 
@@ -138,7 +114,7 @@ describe('TeacherDeliveryPage', () => {
     expect(screen.getByText('Subscription active')).toBeInTheDocument();
     expect(screen.getByText('Plants and Energy')).toBeInTheDocument();
     expect(screen.getByText('How plants make food')).toBeInTheDocument();
-    expect(screen.getByText('Released')).toBeInTheDocument();
+    expect(screen.getAllByText('Released')).toHaveLength(2);
     expect(screen.getByText('1 of 2 student lessons released')).toBeInTheDocument();
     expect(screen.getAllByText('Teacher only')).toHaveLength(2);
     const teacherOnlyRow = screen.getByText('Teacher lab notes').closest('li');
@@ -146,9 +122,8 @@ describe('TeacherDeliveryPage', () => {
       throw new Error('Expected the teacher-only lesson row to be rendered.');
     }
     expect(within(teacherOnlyRow).queryByRole('button')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /Release module|Unrelease/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Release module' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unrelease module' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Lessons in Plants and Energy' }),
     ).toBeInTheDocument();
@@ -156,6 +131,20 @@ describe('TeacherDeliveryPage', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Back to my deliveries' }));
     expect(screen.getByText('My deliveries')).toBeInTheDocument();
+  });
+
+  it.each([
+    [{ status: 'INACTIVE' as const, subscriptionActive: true }],
+    [{ status: 'ACTIVE' as const, subscriptionActive: false }],
+  ])('disables release controls when delivery or subscription is ineligible', (eligibility) => {
+    mockDelivery({ data: { ...delivery, ...eligibility } });
+    mockOutline();
+
+    renderPage();
+
+    expect(screen.getByRole('button', { name: 'Release module' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Release What plants need' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Unrelease How plants make food' })).toBeEnabled();
   });
 
   it('shows and expands modules and lessons returned by the release outline endpoint', async () => {
