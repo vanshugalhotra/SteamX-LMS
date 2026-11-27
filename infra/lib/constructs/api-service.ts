@@ -15,6 +15,7 @@ import type { EnvConfig } from '../environments/types.js';
 
 export interface ApiServiceProps {
   config: EnvConfig;
+  migrationsOnly: boolean;
   vpc: ec2.IVpc;
   ecsSecurityGroup: ec2.ISecurityGroup;
   repository: ecr.IRepository;
@@ -118,6 +119,7 @@ export class ApiService extends Construct {
       cluster: this.cluster,
       taskDefinition,
       serviceName: 'api',
+      desiredCount: props.migrationsOnly ? 0 : props.config.apiScaling.minTasks,
       assignPublicIp: true,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       securityGroups: [props.ecsSecurityGroup],
@@ -130,7 +132,7 @@ export class ApiService extends Construct {
     const scaling = props.config.apiScaling;
     this.service
       .autoScaleTaskCount({
-        minCapacity: scaling.minTasks,
+        minCapacity: props.migrationsOnly ? 0 : scaling.minTasks,
         maxCapacity: scaling.maxTasks,
       })
       .scaleOnCpuUtilization('CpuScaling', {
