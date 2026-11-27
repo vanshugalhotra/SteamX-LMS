@@ -56,9 +56,6 @@ The App stack runs the API on ARM64 Fargate behind an internet-facing HTTPS ALB.
 `X-Origin-Verify` header matches the generated origin verification secret. The task role is scoped
 to the media `assets/` and uploads `submissions/` prefixes. ECS Exec is enabled. Task-count
 autoscaling is configured per environment; staging runs 1–2 tasks and targets 60% average CPU.
-The API log group keeps 30 days of events and is retained when App is rolled back or destroyed, so
-startup failures can still be diagnosed. Delete the retained log group manually once its logs are no
-longer needed; a later App deployment uses the same log group name.
 
 The backend image includes the RDS global CA bundle and sets `NODE_EXTRA_CA_CERTS` and
 `SSL_CERT_FILE` so Node.js and Prisma can validate RDS TLS certificates. These variables do not

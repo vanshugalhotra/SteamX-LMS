@@ -280,13 +280,12 @@ describe('AppStack', () => {
     expect(targets[0]?.Properties.MinCapacity).toBe(0);
   });
 
-  it('retains the 30-day API log group when the App stack is removed', () => {
+  it('creates a 30-day log group with delete-on-stack-removal behavior', () => {
     const template = createAppTemplate();
     const logGroups = Object.values(template.findResources('AWS::Logs::LogGroup'));
     expect(logGroups).toHaveLength(1);
     expect(logGroups[0]).toMatchObject({
-      DeletionPolicy: 'Retain',
-      UpdateReplacePolicy: 'Retain',
+      DeletionPolicy: 'Delete',
       Properties: { RetentionInDays: 30 },
     });
   });

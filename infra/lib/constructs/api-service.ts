@@ -89,7 +89,7 @@ export class ApiService extends Construct {
     this.logGroup = new logs.LogGroup(this, 'ApiLogGroup', {
       logGroupName: `/steamx/${props.config.envName}/api`,
       retention: logs.RetentionDays.ONE_MONTH,
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
     const imageTag = resolveImageTag(this);
     const container = taskDefinition.addContainer('ApiContainer', {
