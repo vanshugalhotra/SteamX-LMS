@@ -63,7 +63,7 @@ export function UploadStepper({
                     : complete
                       ? 'bg-gray-900 text-white'
                       : current
-                        ? 'bg-coral-500 text-white'
+                        ? 'bg-coral-500 text-brand-navy'
                         : 'bg-white text-gray-900'
                 }`}
               >

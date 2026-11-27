@@ -21,7 +21,7 @@ export function AvatarInitial({
     <span
       aria-hidden="true"
       className={cn(
-        'grid size-10 shrink-0 place-items-center rounded-xl text-sm font-semibold text-white',
+        'grid size-10 shrink-0 place-items-center rounded-xl text-sm font-semibold text-brand-navy',
         colorFor(seed),
         className,
       )}
