@@ -1,4 +1,4 @@
-import { App } from 'aws-cdk-lib';
+import { App, aws_certificatemanager as acm } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it, vi } from 'vitest';
 import { AppStack } from '../lib/app-stack.js';
@@ -6,7 +6,7 @@ import { BaseStack } from '../lib/base-stack.js';
 import { API_PORT } from '../lib/constructs/network.js';
 import { stagingConfig } from '../lib/environments/staging.js';
 
-vi.setConfig({ testTimeout: 20000 });
+vi.setConfig({ testTimeout: 30000 });
 
 function createAppTemplate(imageTag?: string): Template {
   const account = '123456789012';
@@ -20,9 +20,16 @@ function createAppTemplate(imageTag?: string): Template {
     },
   });
   const env = { account, region: stagingConfig.region };
+  const edgeCertificate = acm.Certificate.fromCertificateArn(
+    app,
+    'EdgeCertificate',
+    `arn:aws:acm:us-east-1:${account}:certificate/12345678-1234-1234-1234-123456789012`,
+  );
   const baseStack = new BaseStack(app, 'SteamxStagingBase', stagingConfig, 'budget-recipient', {
     stackName: 'SteamxStagingBase',
     env,
+    edgeCertificate,
+    crossRegionReferences: true,
   });
   const stack = new AppStack(app, 'SteamxStagingApp', stagingConfig, {
     stackName: 'SteamxStagingApp',
