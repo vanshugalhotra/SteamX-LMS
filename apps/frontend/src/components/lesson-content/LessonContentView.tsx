@@ -189,7 +189,7 @@ function AssetBlockView({
                 });
               }}
             >
-              <span className="grid size-14 place-items-center rounded-full bg-brand-coral text-white shadow-lg">
+              <span className="grid size-14 place-items-center rounded-full bg-brand-coral text-brand-navy shadow-lg">
                 <Play className="ml-1 size-6 fill-current" aria-hidden="true" />
               </span>
             </button>
@@ -203,7 +203,7 @@ function AssetBlockView({
   return (
     <figure className="overflow-hidden rounded-2xl border border-brand-line bg-brand-side">
       <div className="flex flex-wrap items-center gap-3 p-4 sm:p-5">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-coral text-white">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-coral text-brand-navy">
           <FileText className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
@@ -216,7 +216,7 @@ function AssetBlockView({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-xl bg-brand-coral px-4 py-2.5 text-xs font-semibold text-white outline-none hover:bg-coral-700 focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-xl bg-brand-coral px-4 py-2.5 text-xs font-semibold text-brand-navy outline-none hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring"
         >
           Open PDF
         </a>

@@ -53,7 +53,7 @@ export function TeacherDeliveryCard({ delivery }: { delivery: TeacherDelivery })
           to={PATHS.teacher.delivery(delivery.id)}
           variant="default"
           size="default"
-          className="w-full rounded-full bg-brand-coral text-sm font-semibold text-white hover:bg-brand-coral hover:brightness-95"
+          className="w-full rounded-full bg-brand-coral text-sm font-semibold text-brand-navy hover:bg-brand-coral hover:brightness-95"
         >
           Release lessons
         </ButtonLink>

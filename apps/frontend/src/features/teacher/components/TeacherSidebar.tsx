@@ -40,7 +40,7 @@ export function TeacherSidebar() {
             My Deliveries
           </NavLink>
         </nav>
-        <div className="hidden rounded-3xl bg-coral-500 p-4 text-white lg:mt-auto lg:block">
+        <div className="hidden rounded-3xl bg-coral-500 p-4 text-brand-navy lg:mt-auto lg:block">
           <p className="text-[11px]">Signed in as</p>
           <p className="text-sm font-semibold">{profile?.name}</p>
           <p className="text-[11px] capitalize">{profile?.roleKey}</p>

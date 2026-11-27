@@ -5,12 +5,13 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-coral-800 active:bg-coral-900',
+        default: 'bg-primary text-primary-foreground hover:brightness-95 active:brightness-90',
         brand: 'bg-brand-navy text-white hover:bg-brand-navy/90 active:bg-brand-navy/80',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-teal-300',
-        dark: 'bg-ink text-white hover:bg-ink/85',
+        secondary:
+          'bg-secondary text-secondary-foreground hover:brightness-95 active:brightness-90',
+        dark: 'bg-brand-navy text-white hover:bg-brand-navy/90 active:bg-brand-navy/80',
         outline: 'border border-gray-200 bg-white text-foreground hover:bg-gray-100',
-        dangerOutline: 'border border-[#e8b8c2] bg-white text-[#b03a55] hover:bg-[#fbe6ec]',
+        dangerOutline: 'border border-danger-line bg-white text-danger hover:bg-danger-soft',
         neo: 'border-2 border-ink bg-white text-ink shadow-[4px_4px_0_0_var(--color-ink)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_0_var(--color-ink)]',
       },
       size: {
