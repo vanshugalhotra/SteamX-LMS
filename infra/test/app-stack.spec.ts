@@ -8,7 +8,7 @@ import { stagingConfig } from '../lib/environments/staging.js';
 
 vi.setConfig({ testTimeout: 30000 });
 
-function createAppTemplate(imageTag?: string): Template {
+function createAppTemplate(imageTag?: string, migrationsOnly = false): Template {
   const account = '123456789012';
   const app = new App({
     context: {
@@ -17,6 +17,7 @@ function createAppTemplate(imageTag?: string): Template {
         Name: 'version26.in',
       },
       ...(imageTag === undefined ? {} : { imageTag }),
+      ...(migrationsOnly ? { migrationsOnly: 'true' } : {}),
     },
   });
   const env = { account, region: stagingConfig.region };
@@ -224,7 +225,7 @@ describe('AppStack', () => {
     expect(JSON.stringify(container?.Image)).toContain(':missing-image-tag');
   });
 
-  it('configures the API service and CPU autoscaling without a desired count', () => {
+  it('configures the API service at its minimum capacity with CPU autoscaling', () => {
     const template = createAppTemplate();
     const services = Object.values(template.findResources('AWS::ECS::Service'));
     expect(services).toHaveLength(1);
@@ -240,8 +241,8 @@ describe('AppStack', () => {
       NetworkConfiguration: {
         AwsvpcConfiguration: { AssignPublicIp: 'ENABLED' },
       },
+      DesiredCount: stagingConfig.apiScaling.minTasks,
     });
-    expect(service?.Properties).not.toHaveProperty('DesiredCount');
 
     const targets = Object.values(
       template.findResources('AWS::ApplicationAutoScaling::ScalableTarget'),
@@ -266,12 +267,26 @@ describe('AppStack', () => {
     });
   });
 
-  it('creates a 30-day log group with delete-on-stack-removal behavior', () => {
+  it('allows the App stack to deploy with zero API tasks for database migrations', () => {
+    const template = createAppTemplate(undefined, true);
+    const services = Object.values(template.findResources('AWS::ECS::Service'));
+    expect(services).toHaveLength(1);
+    expect(services[0]?.Properties.DesiredCount).toBe(0);
+
+    const targets = Object.values(
+      template.findResources('AWS::ApplicationAutoScaling::ScalableTarget'),
+    ).filter((target) => target.Properties.ServiceNamespace === 'ecs');
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.Properties.MinCapacity).toBe(0);
+  });
+
+  it('retains the 30-day API log group when the App stack is removed', () => {
     const template = createAppTemplate();
     const logGroups = Object.values(template.findResources('AWS::Logs::LogGroup'));
     expect(logGroups).toHaveLength(1);
     expect(logGroups[0]).toMatchObject({
-      DeletionPolicy: 'Delete',
+      DeletionPolicy: 'Retain',
+      UpdateReplacePolicy: 'Retain',
       Properties: { RetentionInDays: 30 },
     });
   });

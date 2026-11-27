@@ -54,6 +54,7 @@ export class AppStack extends Stack {
     });
     const api = new ApiService(this, 'Api', {
       config,
+      migrationsOnly: resolveMigrationsOnly(this),
       vpc: network.vpc,
       ecsSecurityGroup: network.ecsSg,
       repository,
@@ -85,4 +86,15 @@ export class AppStack extends Stack {
     new CfnOutput(this, 'ApiServiceName', { value: api.service.serviceName });
     new CfnOutput(this, 'ApiLogGroupName', { value: api.logGroup.logGroupName });
   }
+}
+
+function resolveMigrationsOnly(scope: Construct): boolean {
+  const value: unknown = scope.node.tryGetContext('migrationsOnly');
+  if (value === undefined || value === false || value === 'false') {
+    return false;
+  }
+  if (value === true || value === 'true') {
+    return true;
+  }
+  throw new Error('CDK context migrationsOnly must be true or false.');
 }

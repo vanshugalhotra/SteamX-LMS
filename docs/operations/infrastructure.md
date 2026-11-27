@@ -56,6 +56,9 @@ The App stack runs the API on ARM64 Fargate behind an internet-facing HTTPS ALB.
 `X-Origin-Verify` header matches the generated origin verification secret. The task role is scoped
 to the media `assets/` and uploads `submissions/` prefixes. ECS Exec is enabled. Task-count
 autoscaling is configured per environment; staging runs 1–2 tasks and targets 60% average CPU.
+The API log group keeps 30 days of events and is retained when App is rolled back or destroyed, so
+startup failures can still be diagnosed. Delete the retained log group manually once its logs are no
+longer needed; a later App deployment uses the same log group name.
 
 The backend image includes the RDS global CA bundle and sets `NODE_EXTRA_CA_CERTS` and
 `SSL_CERT_FILE` so Node.js and Prisma can validate RDS TLS certificates. These variables do not
@@ -116,15 +119,38 @@ $repositoryUri = "<ApiRepositoryUri output from Base>"
 $imageTag = "<git-commit-sha>"
 aws ecr get-login-password --region $region | docker login --username AWS --password-stdin "$accountId.dkr.ecr.$region.amazonaws.com"
 docker buildx build --platform linux/arm64 -f apps/backend/Dockerfile --build-arg GIT_SHA=$imageTag -t "$repositoryUri`:$imageTag" --push .
-pnpm --dir infra exec cdk deploy SteamxStagingApp -c imageTag=$imageTag
+pnpm --dir infra exec cdk deploy SteamxStagingApp --exclusively --context "imageTag=$imageTag" --context "migrationsOnly=true"
 ```
 
-For ECS Exec, find the running task in the ECS console or with `aws ecs list-tasks`, then substitute
-its ARN below. Run migrations after deployment and create the initial admin only during initial
-provisioning. The API image is slim and has no `curl`; check readiness with Node's built-in `fetch`:
+For an empty database, the first App deployment uses `migrationsOnly=true` to create the database,
+network, task definition, and ECS service with zero API tasks. This avoids starting the API before
+its migration-managed tables exist. Run the migration as a one-off Fargate task using the service's
+task definition, network, and injected Secrets Manager values:
 
 ```powershell
-aws ecs execute-command --cluster steamx-staging --task "<task-arn>" --container api --interactive --command "./node_modules/.bin/prisma migrate deploy"
+$service = aws ecs describe-services --cluster steamx-staging --services api --region $region --query "services[0]" --output json | ConvertFrom-Json
+$network = $service.networkConfiguration.awsvpcConfiguration
+$networkConfiguration = "awsvpcConfiguration={subnets=[$($network.subnets -join ',')],securityGroups=[$($network.securityGroups -join ',')],assignPublicIp=$($network.assignPublicIp)}"
+$migrationTask = aws ecs run-task --cluster steamx-staging --task-definition $service.taskDefinition --launch-type FARGATE --network-configuration $networkConfiguration --overrides '{"containerOverrides":[{"name":"api","command":["./node_modules/.bin/prisma","migrate","deploy"]}]}' --region $region --output json | ConvertFrom-Json
+if ($migrationTask.failures -or $migrationTask.tasks.Count -ne 1) { throw ($migrationTask | ConvertTo-Json -Depth 8) }
+$migrationTaskArn = $migrationTask.tasks[0].taskArn
+aws ecs wait tasks-stopped --cluster steamx-staging --tasks $migrationTaskArn --region $region
+$migrationExitCode = aws ecs describe-tasks --cluster steamx-staging --tasks $migrationTaskArn --region $region --query "tasks[0].containers[?name=='api']|[0].exitCode" --output text
+if ($migrationExitCode -ne "0") { throw "Migration task failed with exit code $migrationExitCode" }
+```
+
+After migrations succeed, redeploy App without the `migrationsOnly` context to start the API tasks.
+For staging releases that include migrations, this same sequence uses the new image and temporarily
+scales the API to zero. It causes downtime. Production should instead run a migration task from the
+new release image before the ECS rolling update, while the old compatible API tasks remain running;
+the current CDK workflow does not automate that release gate.
+
+Create the initial admin only during initial provisioning. For ECS Exec, find a running API task
+in the ECS console or with `aws ecs list-tasks`, then substitute its ARN below. The API image is
+slim and has no `curl`; check readiness with Node's built-in `fetch`:
+
+```powershell
+pnpm --dir infra exec cdk deploy SteamxStagingApp --exclusively --context "imageTag=$imageTag"
 aws ecs execute-command --cluster steamx-staging --task "<task-arn>" --container api --interactive --command "node dist/scripts/admin-create.js"
 aws ecs execute-command --cluster steamx-staging --task "<task-arn>" --container api --interactive --command "node -e `"fetch('http://127.0.0.1:3333/health/ready').then(async r => { console.log(r.status, await r.text()); process.exit(r.ok ? 0 : 1) }).catch(e => { console.error(e); process.exit(1) })`""
 ```
