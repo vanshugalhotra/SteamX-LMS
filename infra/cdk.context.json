@@ -13,5 +13,9 @@
   "hosted-zone:account=761774876116:domainName=version26.in:region=ap-south-1": {
     "Id": "/hostedzone/Z0495181NVVQPJI5NF5T",
     "Name": "version26.in."
+  },
+  "hosted-zone:account=761774876116:domainName=version26.in:region=us-east-1": {
+    "Id": "/hostedzone/Z0495181NVVQPJI5NF5T",
+    "Name": "version26.in."
   }
 }

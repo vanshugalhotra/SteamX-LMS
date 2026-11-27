@@ -12,7 +12,12 @@ import type { Construct } from 'constructs';
 import { ContainerRegistry } from './constructs/container-registry.js';
 import { LocalDevAccess } from './constructs/local-dev-access.js';
 import { PrivateBucket } from './constructs/private-bucket.js';
+import { WebDistribution } from './constructs/web-distribution.js';
 import type { EnvConfig } from './environments/types.js';
+
+export interface BaseStackProps extends StackProps {
+  edgeCertificate: acm.ICertificate;
+}
 
 export class BaseStack extends Stack {
   public readonly repository: ContainerRegistry;
@@ -28,9 +33,10 @@ export class BaseStack extends Stack {
     id: string,
     config: EnvConfig,
     budgetEmail: string,
-    props: StackProps = {},
+    props: BaseStackProps,
   ) {
-    super(scope, id, props);
+    const { edgeCertificate, ...stackProps } = props;
+    super(scope, id, stackProps);
 
     Tags.of(this).add('project', 'steamx');
     Tags.of(this).add('environment', config.envName);
@@ -78,6 +84,15 @@ export class BaseStack extends Stack {
       this.mediaBucket,
       this.uploadsBucket,
     );
+
+    new WebDistribution(this, 'WebDistribution', {
+      appOrigin: config.appOrigin,
+      domainName: config.domainName,
+      hostedZone: this.hostedZone,
+      mediaBucket: this.mediaBucket,
+      certificate: edgeCertificate,
+      originVerifySecret: this.originVerifySecret,
+    });
 
     new CfnOutput(this, 'MediaBucketName', { value: this.mediaBucket.bucketName });
     new CfnOutput(this, 'UploadsBucketName', { value: this.uploadsBucket.bucketName });

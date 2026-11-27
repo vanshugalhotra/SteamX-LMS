@@ -4,10 +4,16 @@ This guide describes the resources and operations implemented by the AWS CDK app
 
 ## Stacks
 
+`SteamxStagingCert` runs in `us-east-1` and owns the DNS-validated ACM certificate for
+`learn.version26.in`. CloudFront requires its viewer certificate to be in `us-east-1`; this is a
+separate stack because the application resources run in `ap-south-1`.
+
 `SteamxStagingBase` owns the monthly USD 25 cost budget named `steamx-staging-budget` (alerts at
-80% actual and 100% forecast; alerts do not cap cost), and all storage buckets. It is a separate
-stack from `SteamxStagingApp`, so Base and its storage survive App teardown. Destroying Base deletes
-the buckets and their contents. The `media` bucket is for curriculum media and SPA assets;
+80% actual and 100% forecast; alerts do not cap cost), storage buckets, and the CloudFront
+distribution with its `learn.version26.in` alias. It is separate from `SteamxStagingApp`, so the
+distribution and storage survive App teardown. While App is destroyed, the SPA still loads from
+S3, but API requests return 502 because the ALB origin is unavailable. Destroying Base deletes the
+buckets and their contents. The `media` bucket is for curriculum media and SPA assets;
 `uploads` is for student submissions. Both are private,
 versioned, HTTPS-only S3 buckets. Staging CORS allows the configured app origin and the local
 development origins `http://localhost:3000` and `http://localhost:5173`. Their keys are:
@@ -69,11 +75,13 @@ before synthesizing or deploying.
 ## Deploy and inspect
 
 The deployer needs AWS credentials and CDK permissions. Install the CDK dependencies and bootstrap
-the target AWS account/region once:
+the target AWS account/region once. CloudFront's certificate stack requires a bootstrap in
+`us-east-1` as well as the application region:
 
 ```powershell
 pnpm infra:install
 pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/REGION
+pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/us-east-1
 ```
 
 Set the required budget email:
@@ -82,22 +90,25 @@ Set the required budget email:
 $env:STEAMX_BUDGET_EMAIL = "YOUR_EMAIL_ADDRESS"
 ```
 
-The root `infra:synth` script synthesizes both current stacks. The `infra:diff`, `infra:deploy`, and
-`infra:destroy` scripts accept a stack name; target Base or App explicitly. For example:
+The root `infra:synth` script synthesizes all stacks. The `infra:diff`, `infra:deploy`, and
+`infra:destroy` scripts accept a stack name; target Cert, Base, or App explicitly. For example:
 
 ```powershell
 pnpm infra:synth
+pnpm infra:diff SteamxStagingCert
 pnpm infra:diff SteamxStagingBase
 pnpm infra:deploy SteamxStagingBase
 pnpm infra:diff SteamxStagingApp
 pnpm infra:deploy SteamxStagingApp
 ```
 
-Deploy in this order: Base, API image, then App. Use an immutable image tag such as the Git commit
-SHA, and always pass the same tag as CDK context when deploying App. If `imageTag` is omitted, the
-template uses `missing-image-tag`; that fallback is for synthesis and teardown, not deployment.
+Deploy Cert, then Base, then the API image, then App. Base depends on Cert. Use an immutable image
+tag such as the Git commit SHA, and always pass the same tag as CDK context when deploying App. If
+`imageTag` is omitted, the template uses `missing-image-tag`; that fallback is for synthesis and
+teardown, not deployment.
 
 ```powershell
+pnpm --dir infra exec cdk deploy SteamxStagingCert
 pnpm --dir infra exec cdk deploy SteamxStagingBase
 $region = "ap-south-1"
 $accountId = "<account-id>"
@@ -136,8 +147,8 @@ Do not leave the temporary ingress rule in place.
 For a rollback smoke test, deploy a deliberately bad image tag and observe the ECS deployment
 circuit breaker revert to the prior task definition. It can take about 10–20 minutes for the
 circuit breaker to give up. Immutable tags ensure the prior task definition still refers to its
-original image. The origin verification secret is also intended for CloudFront when that is added;
-rotating it will require redeploying both the origin and CloudFront configuration.
+original image. The origin verification secret is used by both the ALB and CloudFront; rotating it
+requires redeploying both the origin and CloudFront configuration.
 
 The backend `trust proxy` setting and throttler are part of the planned `BE-INFRA` work and are not
 implemented by this infrastructure change.
@@ -157,6 +168,28 @@ Create local credentials manually in the AWS console, never in code. Deployed se
 static credentials. The backend routes `assets/` keys to media and `submissions/` keys to uploads.
 The existing asset upload flow uses media; a student-submission file upload endpoint is not
 implemented yet.
+
+## Web delivery
+
+The single CloudFront distribution serves `learn.version26.in`. Its default behavior reads the
+private `media` bucket's `spa/` prefix through Origin Access Control (OAC); `/api/*` and `/health/*`
+go to the HTTPS ALB origin with the `X-Origin-Verify` header. The API behaviors forward viewer
+cookies, authorization, origin, and query strings, but not the viewer `Host`.
+
+| Path        | Origin and handling                                                          |
+| ----------- | ---------------------------------------------------------------------------- |
+| Default     | `media` bucket `spa/` via OAC; extension-less paths rewrite to `/index.html` |
+| `/api/*`    | ALB `origin.version26.in`; all HTTP methods, uncached                        |
+| `/health/*` | ALB `origin.version26.in`; GET/HEAD, uncached                                |
+
+`/health/*` must be routed to the API so the SPA rewrite does not answer health checks with
+`index.html`. Missing static files return S3's 403 response; there are no custom error responses.
+Cache lifetimes come from `Cache-Control` metadata on uploaded objects; CloudFront invalidation
+automation is tracked by INFRA-9. CSP and the CloudFront flat-rate plan decision are deferred.
+
+If AWS blocks distribution creation pending CloudFront account verification, complete the
+verification requested in the AWS console, then retry deployment. Staging uses the Route 53 hosted
+zone for `version26.in`; confirm production DNS hosting and delegation before go-live.
 
 ## Asset storage operations
 
