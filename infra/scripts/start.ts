@@ -1,9 +1,8 @@
 /** staging:start — Start RDS and restore ECS service. */
-import { getConfig, isRdsStopped, run, startRdsAndWait, verifyAccount } from './helpers.js';
+import { getConfig, isRdsStopped, run, startRdsAndWait } from './helpers.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
-  verifyAccount(config);
 
   console.log('This will:');
   console.log('  1. Start RDS and wait for it to become available');

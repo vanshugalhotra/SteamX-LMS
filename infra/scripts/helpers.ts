@@ -32,22 +32,6 @@ export function runCapture(command: string): string {
   return execSync(command, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
-export function verifyAccount(config: EnvConfig): void {
-  let identity: { Account?: string };
-  try {
-    identity = JSON.parse(runCapture('aws sts get-caller-identity'));
-  } catch {
-    throw new Error('Failed to call aws sts get-caller-identity. Are AWS credentials configured?');
-  }
-  if (identity.Account !== config.account) {
-    throw new Error(
-      `AWS account mismatch: expected ${config.account}, got ${identity.Account}. ` +
-        'Are you using the right AWS profile?',
-    );
-  }
-  console.log(`✓ Verified AWS account ${config.account}`);
-}
-
 export async function promptHidden(prompt: string): Promise<string> {
   // On Windows, we can use a simple readline approach
   const rl = createInterface({ input: process.stdin, output: process.stderr });

@@ -79,16 +79,16 @@ is needed.
 ## Lifecycle scripts
 
 All scripts live in `infra/scripts/` and are exposed as `pnpm` scripts in `infra/package.json`.
-Every command verifies that `aws sts get-caller-identity` returns the configured account before
-doing anything. Scripts are TypeScript run with `tsx` and work on Windows (no bash).
+Scripts are TypeScript run with `tsx` and work on Windows (no bash).
 
-### staging:deploy [cert|foundation|app]
+### staging:deploy [all|cert|foundation|app]
 
-Deploys one or all stacks. Runs `cdk diff` before each `cdk deploy`. When targeting `app`:
+The deploy target is required; omitting it is an error. `all` deploys the Cert, Foundation, and App
+stacks in order. A single target deploys only that stack. Runs `cdk diff` before each `cdk deploy`.
+When targeting `app`:
 builds the ARM64 Docker image, pushes it to ECR tagged with the git short SHA (skips if the tag
 already exists), then runs `cdk deploy --exclusively -c imageTag=<sha>`. If RDS is stopped,
-starts it first and waits for available. With no argument, deploys Cert → Foundation → App in
-order.
+starts it first and waits for available.
 
 ### staging:stop
 
@@ -141,7 +141,7 @@ pnpm infra:install
 pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/ap-south-1
 pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/us-east-1
 $env:STEAMX_BUDGET_EMAIL = "YOUR_EMAIL"
-pnpm --dir infra staging:deploy
+pnpm --dir infra staging:deploy all
 ```
 
 Create the initial admin:

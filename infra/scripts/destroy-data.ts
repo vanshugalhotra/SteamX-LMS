@@ -6,12 +6,10 @@ import {
   run,
   runCapture,
   stackPrefix,
-  verifyAccount,
 } from './helpers.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
-  verifyAccount(config);
 
   if (config.protectData) {
     throw new Error('Cannot destroy data: protectData is true for this environment.');

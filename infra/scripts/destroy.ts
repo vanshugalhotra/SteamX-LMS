@@ -1,9 +1,8 @@
 /** staging:destroy — Destroy the App stack and stop RDS. */
-import { getConfig, promptConfirmation, run, stackPrefix, stopRds, verifyAccount } from './helpers.js';
+import { getConfig, promptConfirmation, run, stackPrefix, stopRds } from './helpers.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
-  verifyAccount(config);
 
   const prefix = stackPrefix(config);
   const appStack = `${prefix}App`;

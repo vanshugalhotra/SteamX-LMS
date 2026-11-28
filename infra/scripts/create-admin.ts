@@ -1,9 +1,8 @@
 /** staging:create-admin — Run the admin-create script as a one-off ECS Fargate task. */
-import { getConfig, promptHidden, run, runCapture, verifyAccount } from './helpers.js';
+import { getConfig, promptHidden, run, runCapture } from './helpers.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
-  verifyAccount(config);
 
   const steamxId = process.argv[2];
   const name = process.argv[3];

@@ -1,4 +1,4 @@
-/** staging:deploy — Deploy one or all stacks. */
+/** staging:deploy — Deploy an explicit stack target or all stacks. */
 import {
   getConfig,
   getGitShortSha,
@@ -7,10 +7,9 @@ import {
   runCapture,
   stackPrefix,
   startRdsAndWait,
-  verifyAccount,
 } from './helpers.js';
 
-const VALID_TARGETS = ['cert', 'foundation', 'app'] as const;
+const VALID_TARGETS = ['all', 'cert', 'foundation', 'app'] as const;
 type Target = (typeof VALID_TARGETS)[number];
 
 function deployStack(stackName: string, extraArgs = ''): void {
@@ -28,18 +27,24 @@ function deployStack(stackName: string, extraArgs = ''): void {
 
 async function main(): Promise<void> {
   const config = getConfig();
-  verifyAccount(config);
 
   const prefix = stackPrefix(config);
   const target = process.argv[2] as Target | undefined;
 
-  if (target && !VALID_TARGETS.includes(target)) {
+  if (!target) {
     throw new Error(
-      `Unknown deploy target "${target}". Valid targets: ${VALID_TARGETS.join(', ')} (or omit for all).`,
+      `Deploy target is required. Valid targets: ${VALID_TARGETS.join(', ')}.`,
     );
   }
 
-  const targets: Target[] = target ? [target] : ['cert', 'foundation', 'app'];
+  if (!VALID_TARGETS.includes(target)) {
+    throw new Error(
+      `Unknown deploy target "${target}". Valid targets: ${VALID_TARGETS.join(', ')}.`,
+    );
+  }
+
+  const targets: Target[] =
+    target === 'all' ? ['cert', 'foundation', 'app'] : [target];
 
   for (const t of targets) {
     switch (t) {

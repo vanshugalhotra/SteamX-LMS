@@ -1,9 +1,8 @@
 /** staging:stop — Scale to zero and stop RDS. */
-import { getConfig, run, stackPrefix, stopRds, verifyAccount } from './helpers.js';
+import { getConfig, run, stackPrefix, stopRds } from './helpers.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
-  verifyAccount(config);
 
   console.log('This will:');
   console.log('  1. Set ECS autoscaling min/max to 0 and desired count to 0');
