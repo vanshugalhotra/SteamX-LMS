@@ -53,12 +53,12 @@ concurrent attempts during rolling deploys. Set `SKIP_MIGRATIONS=true` to skip.
 
 All in `infra/scripts/`, exposed via `pnpm` scripts. TypeScript + tsx, works on Windows.
 
-| Command                                  | What it does                                                                                                  |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Command                                       | What it does                                                                                                  |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `staging:deploy [all\|cert\|foundation\|app]` | Deploy the requested stack(s). App: builds ARM64 image → pushes to ECR → `cdk deploy`. Starts RDS if stopped. |
-| `staging:start`                          | Start RDS, restore ECS autoscaling, wait for stable.                                                          |
-| `staging:stop`                           | Scale ECS to 0, stop RDS.                                                                                     |
-| `staging:destroy`                        | Destroy App stack, stop RDS. Requires confirmation.                                                           |
-| `staging:destroy-data`                   | Destroy Foundation (all data). Requires `protectData: false`, App already destroyed, and confirmation phrase. |
-| `staging:destroy-all`                    | Destroy Foundation + Cert. Same guards as destroy-data.                                                       |
-| `staging:create-admin <id> [name]`       | Run admin-create as a one-off ECS task. Prompts for password.                                                 |
+| `staging:start`                               | Start RDS, restore ECS autoscaling, wait for stable.                                                          |
+| `staging:stop`                                | Scale ECS to 0, stop RDS.                                                                                     |
+| `staging:destroy`                             | Destroy App stack, stop RDS. Requires confirmation.                                                           |
+| `staging:destroy-data`                        | Destroy Foundation (all data). Requires `protectData: false`, App already destroyed, and confirmation phrase. |
+| `staging:destroy-all`                         | Destroy Foundation + Cert. Same guards as destroy-data.                                                       |
+| `staging:create-admin <id> [name]`            | Run admin-create as a one-off ECS task. Prompts for password.                                                 |
