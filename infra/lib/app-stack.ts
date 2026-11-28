@@ -3,6 +3,7 @@ import {
   Stack,
   Tags,
   aws_certificatemanager as acm,
+  aws_ec2 as ec2,
   aws_ecr as ecr,
   aws_route53 as route53,
   aws_s3 as s3,
@@ -12,11 +13,12 @@ import type { StackProps } from 'aws-cdk-lib';
 import type { Construct } from 'constructs';
 import type { EnvConfig } from './environments/types.js';
 import { ApiService } from './constructs/api-service.js';
-import { Network } from './constructs/network.js';
-import { Database } from './constructs/database.js';
 import { OriginLoadBalancer } from './constructs/origin-load-balancer.js';
 
 export interface AppStackProps extends StackProps {
+  vpc: ec2.IVpc;
+  ecsSg: ec2.ISecurityGroup;
+  albSg: ec2.ISecurityGroup;
   repository: ecr.IRepository;
   mediaBucket: s3.IBucket;
   uploadsBucket: s3.IBucket;
@@ -24,11 +26,16 @@ export interface AppStackProps extends StackProps {
   originCertificate: acm.ICertificate;
   jwtSecret: secretsmanager.ISecret;
   originVerifySecret: secretsmanager.ISecret;
+  databaseUrlSecret: secretsmanager.ISecret;
+  databaseCredentialsSecret: secretsmanager.ISecret;
 }
 
 export class AppStack extends Stack {
   constructor(scope: Construct, id: string, config: EnvConfig, props: AppStackProps) {
     const {
+      vpc,
+      ecsSg,
+      albSg,
       repository,
       mediaBucket,
       uploadsBucket,
@@ -36,6 +43,8 @@ export class AppStack extends Stack {
       originCertificate,
       jwtSecret,
       originVerifySecret,
+      databaseUrlSecret,
+      databaseCredentialsSecret,
       ...stackProps
     } = props;
     super(scope, id, stackProps);
@@ -43,41 +52,27 @@ export class AppStack extends Stack {
     Tags.of(this).add('project', 'steamx');
     Tags.of(this).add('environment', config.envName);
 
-    const network = new Network(this, 'Network');
-    const database = new Database(this, 'Database', {
-      vpc: network.vpc,
-      securityGroup: network.dbSg,
-      instanceType: config.dbInstanceType,
-      backupRetentionDays: config.dbBackupRetentionDays,
-      maxAllocatedStorageGb: config.dbMaxAllocatedStorageGb,
-      retainOnDelete: config.protectData,
-    });
     const api = new ApiService(this, 'Api', {
       config,
-      migrationsOnly: resolveMigrationsOnly(this),
-      vpc: network.vpc,
-      ecsSecurityGroup: network.ecsSg,
+      vpc,
+      ecsSecurityGroup: ecsSg,
       repository,
       mediaBucket,
       uploadsBucket,
       jwtSecret,
-      databaseUrlSecret: database.urlSecret,
+      databaseUrlSecret,
+      databaseCredentialsSecret,
     });
     const origin = new OriginLoadBalancer(this, 'Origin', {
-      vpc: network.vpc,
-      securityGroup: network.albSg,
+      vpc,
+      securityGroup: albSg,
+      ecsSecurityGroup: ecsSg,
       service: api.service,
       hostedZone,
       certificate: originCertificate,
       originVerifySecret,
     });
 
-    new CfnOutput(this, 'DatabaseEndpointAddress', {
-      value: database.instance.dbInstanceEndpointAddress,
-    });
-    new CfnOutput(this, 'DatabaseCredentialsSecretArn', {
-      value: database.secret.secretArn,
-    });
     new CfnOutput(this, 'ApiLoadBalancerDnsName', {
       value: origin.loadBalancer.loadBalancerDnsName,
     });
@@ -86,15 +81,4 @@ export class AppStack extends Stack {
     new CfnOutput(this, 'ApiServiceName', { value: api.service.serviceName });
     new CfnOutput(this, 'ApiLogGroupName', { value: api.logGroup.logGroupName });
   }
-}
-
-function resolveMigrationsOnly(scope: Construct): boolean {
-  const value: unknown = scope.node.tryGetContext('migrationsOnly');
-  if (value === undefined || value === false || value === 'false') {
-    return false;
-  }
-  if (value === true || value === 'true') {
-    return true;
-  }
-  throw new Error('CDK context migrationsOnly must be true or false.');
 }

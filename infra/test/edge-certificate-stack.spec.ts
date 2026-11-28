@@ -17,7 +17,8 @@ describe('EdgeCertificateStack', () => {
         },
       },
     });
-    const stack = new EdgeCertificateStack(app, 'SteamxStagingCert', stagingConfig, {
+    const config = { ...stagingConfig, account };
+    const stack = new EdgeCertificateStack(app, 'SteamxStagingCert', config, {
       stackName: 'SteamxStagingCert',
       env: { account, region: 'us-east-1' },
       crossRegionReferences: true,

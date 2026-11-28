@@ -11,7 +11,14 @@
   "scripts": {
     "build": "tsc --noEmit",
     "test": "vitest run test",
-    "synth": "cdk synth"
+    "synth": "cdk synth",
+    "staging:deploy": "tsx scripts/deploy.ts",
+    "staging:stop": "tsx scripts/stop.ts",
+    "staging:start": "tsx scripts/start.ts",
+    "staging:destroy": "tsx scripts/destroy.ts",
+    "staging:destroy-data": "tsx scripts/destroy-data.ts",
+    "staging:destroy-all": "tsx scripts/destroy-all.ts",
+    "staging:create-admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "aws-cdk-lib": "2.274.0",

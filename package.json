@@ -36,6 +36,13 @@
     "infra:deploy": "pnpm --dir infra exec cdk deploy --require-approval broadening",
     "infra:destroy": "pnpm --dir infra exec cdk destroy",
     "infra:test": "pnpm --dir infra exec vitest run",
+    "staging:deploy": "pnpm --dir infra staging:deploy",
+    "staging:stop": "pnpm --dir infra staging:stop",
+    "staging:start": "pnpm --dir infra staging:start",
+    "staging:destroy": "pnpm --dir infra staging:destroy",
+    "staging:destroy-data": "pnpm --dir infra staging:destroy-data",
+    "staging:destroy-all": "pnpm --dir infra staging:destroy-all",
+    "staging:create-admin": "pnpm --dir infra staging:create-admin",
     "assets:smoke": "pnpm --dir apps/backend asset:smoke"
   },
   "devDependencies": {

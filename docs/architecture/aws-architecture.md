@@ -15,8 +15,14 @@ Use [infrastructure operations](../operations/infrastructure.md) for the current
 | Origin host           | `origin.thesteamx.com`, used only by CloudFront |
 | Browser origins       | One host; no app/API CORS and no subdomains     |
 
-The current CDK stack is limited to S3, an IAM user, and a budget. Database backup, restore, ECS,
-and ALB operations described here are not implemented in the repository.
+The current CDK stack deploys three stacks per environment: `<Env>Cert` (us-east-1 ACM
+certificate for CloudFront), `<Env>Foundation` (VPC, RDS, secrets, buckets, ECR, CloudFront,
+budget), and `<Env>App` (ECS cluster, task definition, service, ALB, Route53 origin record,
+log group). App depends on Foundation; Foundation never references App.
+
+Database migrations run automatically at container startup via `docker-entrypoint.sh` (calls
+`prisma migrate deploy` before `node dist/main.js`). A single `cdk deploy` of App is sufficient;
+no separate migration task is needed.
 
 ## Diagram
 
@@ -55,7 +61,7 @@ Use an ACM certificate in `us-east-1` for CloudFront and a separate ACM certific
 - Autoscaling: minimum 1 and maximum 2 tasks, targeting about 60% CPU.
 - Rolling deployment: minimum healthy 100%, maximum 200%; deployment circuit breaker with rollback.
 - Private ECR repository. Build the image for `linux/arm64` on Debian slim, not Alpine.
-- Run `prisma migrate deploy` as a one-off ECS task in CI before the ECS rolling update.
+- Run `prisma migrate deploy` automatically at container startup in `docker-entrypoint.sh`.
 - Migrations must remain backward-compatible with the previous app version: expand first, then
   contract in a later release while old and new tasks can overlap.
 - In-process storage cleanup and MediaConvert polling use `FOR UPDATE SKIP LOCKED`.
