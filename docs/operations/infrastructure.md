@@ -55,7 +55,7 @@ All in `infra/scripts/`, exposed via `pnpm` scripts. TypeScript + tsx, works on 
 
 | Command                                  | What it does                                                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `staging:deploy [cert\|foundation\|app]` | Deploy one or all stacks. App: builds ARM64 image → pushes to ECR → `cdk deploy`. Starts RDS if stopped.      |
+| `staging:deploy [all\|cert\|foundation\|app]` | Deploy the requested stack(s). App: builds ARM64 image → pushes to ECR → `cdk deploy`. Starts RDS if stopped. |
 | `staging:start`                          | Start RDS, restore ECS autoscaling, wait for stable.                                                          |
 | `staging:stop`                           | Scale ECS to 0, stop RDS.                                                                                     |
 | `staging:destroy`                        | Destroy App stack, stop RDS. Requires confirmation.                                                           |

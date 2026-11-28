@@ -14,7 +14,7 @@ pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/us-east-1
 
 # 3. Deploy all stacks
 $env:STEAMX_BUDGET_EMAIL = "alerts@example.com"
-pnpm --dir infra staging:deploy
+pnpm --dir infra staging:deploy all
 
 # 4. Create the first admin
 pnpm --dir infra staging:create-admin admin@example.com "Admin Name"
