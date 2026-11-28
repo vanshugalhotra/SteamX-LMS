@@ -1,18 +1,21 @@
 /** staging:create-admin — Run the admin-create script as a one-off ECS Fargate task. */
-import { getConfig, promptHidden, run, runCapture } from './helpers.js';
+import { execFileSync } from 'node:child_process';
+import { getConfig, run, runCapture } from './helpers.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
 
-  const steamxId = process.argv[2];
-  const name = process.argv[3];
-  if (!steamxId) {
-    throw new Error('Usage: pnpm staging:create-admin <steamxId> [name]');
+  const args = process.argv.slice(2);
+  const reset = args.length === 1 && args[0] === '--reset';
+  if (args.length > 0 && !reset) {
+    throw new Error('Usage: pnpm staging:create-admin [--reset]');
   }
 
-  const password = await promptHidden('Admin password: ');
-  if (!password) {
-    throw new Error('Password is required.');
+  const steamxId = process.env.ADMIN_STEAMX_ID;
+  const password = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME;
+  if (!steamxId || !password) {
+    throw new Error('Set ADMIN_STEAMX_ID and ADMIN_PASSWORD in apps/backend/.env.');
   }
 
   const cluster = `steamx-${config.envName}`;
@@ -49,15 +52,43 @@ async function main(): Promise<void> {
     containerOverrides: [
       {
         name: 'api',
-        command: ['node', 'dist/scripts/admin-create.js'],
+        command: ['node', 'dist/scripts/admin-create.js', ...(reset ? ['--reset'] : [])],
         environment: envOverrides,
       },
     ],
   });
 
-  const taskResult = runCapture(
-    `aws ecs run-task --cluster ${cluster} --task-definition ${service.taskDefinition} --launch-type FARGATE --network-configuration "${networkConfiguration}" --overrides ${JSON.stringify(overrides)} --region ${config.region} --output json`,
-  );
+  let taskResult: string;
+  try {
+    taskResult = execFileSync(
+      'aws',
+      [
+        'ecs',
+        'run-task',
+        '--cluster',
+        cluster,
+        '--task-definition',
+        service.taskDefinition,
+        '--launch-type',
+        'FARGATE',
+        '--network-configuration',
+        networkConfiguration,
+        '--overrides',
+        JSON.stringify(overrides),
+        '--region',
+        config.region,
+        '--output',
+        'json',
+      ],
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'inherit'] },
+    ).trim();
+  } catch (error: unknown) {
+    const status =
+      typeof error === 'object' && error !== null && 'status' in error
+        ? ` (exit code ${String(error.status)})`
+        : '';
+    throw new Error(`AWS ECS run-task failed${status}. See the AWS CLI output above.`);
+  }
 
   const parsed = JSON.parse(taskResult) as {
     failures?: unknown[];
@@ -85,7 +116,9 @@ async function main(): Promise<void> {
     );
   }
 
-  console.log('✓ Admin account created successfully.');
+  console.log(
+    reset ? '✓ Admin password reset successfully.' : '✓ Admin account created successfully.',
+  );
 }
 
 main().catch((error: unknown) => {

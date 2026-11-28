@@ -32,18 +32,6 @@ export function runCapture(command: string): string {
   return execSync(command, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
-export async function promptHidden(prompt: string): Promise<string> {
-  // On Windows, we can use a simple readline approach
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
-  return new Promise((resolve) => {
-    process.stderr.write(prompt);
-    rl.question('', (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
 export async function promptConfirmation(phrase: string): Promise<void> {
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   const answer = await new Promise<string>((resolve) => {

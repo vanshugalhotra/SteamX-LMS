@@ -18,7 +18,7 @@
     "staging:destroy": "tsx scripts/destroy.ts",
     "staging:destroy-data": "tsx scripts/destroy-data.ts",
     "staging:destroy-all": "tsx scripts/destroy-all.ts",
-    "staging:create-admin": "tsx scripts/create-admin.ts"
+    "staging:create-admin": "node --env-file=../apps/backend/.env --import tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "aws-cdk-lib": "2.274.0",

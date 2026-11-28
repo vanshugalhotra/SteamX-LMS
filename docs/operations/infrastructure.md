@@ -61,4 +61,4 @@ All in `infra/scripts/`, exposed via `pnpm` scripts. TypeScript + tsx, works on 
 | `staging:destroy`                             | Destroy App stack, stop RDS. Requires confirmation.                                                           |
 | `staging:destroy-data`                        | Destroy Foundation (all data). Requires `protectData: false`, App already destroyed, and confirmation phrase. |
 | `staging:destroy-all`                         | Destroy Foundation + Cert. Same guards as destroy-data.                                                       |
-| `staging:create-admin <id> [name]`            | Run admin-create as a one-off ECS task. Prompts for password.                                                 |
+| `staging:create-admin [--reset]`              | Run admin-create as a one-off ECS task using credentials from `apps/backend/.env`.                            |

@@ -16,8 +16,9 @@ pnpm --dir infra exec cdk bootstrap aws://ACCOUNT_ID/us-east-1
 $env:STEAMX_BUDGET_EMAIL = "alerts@example.com"
 pnpm --dir infra staging:deploy all
 
-# 4. Create the first admin
-pnpm --dir infra staging:create-admin admin@example.com "Admin Name"
+# 4. Set ADMIN_STEAMX_ID and ADMIN_PASSWORD in apps/backend/.env,
+#    optionally set ADMIN_NAME, then create the first staging admin.
+pnpm staging:create-admin
 ```
 
 After deploy, configure local backend `.env` with the Foundation stack outputs:
