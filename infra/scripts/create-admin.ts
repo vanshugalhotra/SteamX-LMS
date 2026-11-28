@@ -1,5 +1,6 @@
 /** staging:create-admin — Run the admin-create script as a one-off ECS Fargate task. */
 import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { getConfig, run, runCapture } from './helpers.js';
 
 async function main(): Promise<void> {
@@ -11,9 +12,23 @@ async function main(): Promise<void> {
     throw new Error('Usage: pnpm staging:create-admin [--reset]');
   }
 
-  const steamxId = process.env.ADMIN_STEAMX_ID;
-  const password = process.env.ADMIN_PASSWORD;
-  const name = process.env.ADMIN_NAME;
+  const existingEnvironmentKeys = new Set(Object.keys(process.env));
+  let steamxId: string | undefined;
+  let password: string | undefined;
+  let name: string | undefined;
+  try {
+    process.loadEnvFile(resolve(process.cwd(), '../apps/backend/.env'));
+    steamxId = process.env.ADMIN_STEAMX_ID;
+    password = process.env.ADMIN_PASSWORD;
+    name = process.env.ADMIN_NAME;
+  } finally {
+    for (const key of Object.keys(process.env)) {
+      if (!existingEnvironmentKeys.has(key)) {
+        delete process.env[key];
+      }
+    }
+  }
+
   if (!steamxId || !password) {
     throw new Error('Set ADMIN_STEAMX_ID and ADMIN_PASSWORD in apps/backend/.env.');
   }
@@ -74,20 +89,22 @@ async function main(): Promise<void> {
         '--network-configuration',
         networkConfiguration,
         '--overrides',
-        JSON.stringify(overrides),
+        overrides,
         '--region',
         config.region,
         '--output',
         'json',
       ],
-      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'inherit'] },
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
     ).trim();
   } catch (error: unknown) {
     const status =
       typeof error === 'object' && error !== null && 'status' in error
         ? ` (exit code ${String(error.status)})`
         : '';
-    throw new Error(`AWS ECS run-task failed${status}. See the AWS CLI output above.`);
+    throw new Error(
+      `AWS ECS run-task failed${status}. Error details were withheld to protect admin credentials.`,
+    );
   }
 
   const parsed = JSON.parse(taskResult) as {
