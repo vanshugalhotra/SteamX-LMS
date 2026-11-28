@@ -1,5 +1,5 @@
 /** staging:destroy — Destroy the App stack and stop RDS. */
-import { getConfig, run, stackPrefix, stopRds, verifyAccount } from './helpers.js';
+import { getConfig, promptConfirmation, run, stackPrefix, stopRds, verifyAccount } from './helpers.js';
 
 async function main(): Promise<void> {
   const config = getConfig();
@@ -12,6 +12,8 @@ async function main(): Promise<void> {
   console.log(`  1. Run cdk destroy ${appStack} --exclusively`);
   console.log('  2. Stop RDS');
   console.log(`  Region: ${config.region}\n`);
+
+  await promptConfirmation(`destroy ${config.envName} app`);
 
   run(`pnpm exec cdk destroy ${appStack} --exclusively --force`);
   stopRds(config);

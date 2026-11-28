@@ -49,7 +49,6 @@ const appStack = new AppStack(app, `${prefix}App`, config, {
   originCertificate: foundationStack.originCertificate,
   jwtSecret: foundationStack.jwtSecret,
   originVerifySecret: foundationStack.originVerifySecret,
-  databaseUrlSecret: foundationStack.database.urlSecret,
   databaseCredentialsSecret: foundationStack.database.secret,
   stackName: `${prefix}App`,
   env: { account: config.account, region: config.region },

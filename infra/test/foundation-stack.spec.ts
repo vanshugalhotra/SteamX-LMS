@@ -153,23 +153,16 @@ describe('FoundationStack', () => {
   it('generates credentials without a fixed secret name or URL-unsafe characters', () => {
     const { template } = createFoundationStack();
     const secrets = Object.values(template.findResources('AWS::SecretsManager::Secret'));
-    // Foundation: JWT, OriginVerify, DB credentials, DB URL = 4 secrets
-    expect(secrets.length).toBeGreaterThanOrEqual(4);
+    // Foundation: JWT, OriginVerify, DB credentials = 3 secrets
+    expect(secrets.length).toBeGreaterThanOrEqual(3);
     const credentialsSecret = secrets.find(
       (secret) => secret.Properties?.GenerateSecretString?.SecretStringTemplate !== undefined,
-    );
-    const databaseUrlSecret = secrets.find(
-      (secret) => secret.Properties?.SecretString !== undefined,
     );
     expect(credentialsSecret?.Properties).not.toHaveProperty('Name');
     expect(credentialsSecret?.Properties?.GenerateSecretString).toMatchObject({
       SecretStringTemplate: JSON.stringify({ username: 'steamx_owner' }),
     });
     // The ExcludeCharacters is validated by the database.spec.ts; skip string-literal escaping here.
-    expect(databaseUrlSecret?.Properties).not.toHaveProperty('Name');
-    const databaseUrlTemplate = JSON.stringify(databaseUrlSecret?.Properties?.SecretString);
-    expect(databaseUrlTemplate).toContain('resolve:secretsmanager');
-    expect(databaseUrlTemplate).toContain('sslmode=require');
   });
 
   it('creates a two-AZ VPC with public and isolated subnets and no NAT gateways', () => {

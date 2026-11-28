@@ -1,5 +1,5 @@
 export interface EnvConfig {
-  envName: 'staging';
+  envName: string;
   account: string;
   region: string;
   monthlyBudgetUsd: number;

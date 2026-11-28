@@ -21,7 +21,6 @@ export interface ApiServiceProps {
   mediaBucket: s3.IBucket;
   uploadsBucket: s3.IBucket;
   jwtSecret: secretsmanager.ISecret;
-  databaseUrlSecret: secretsmanager.ISecret;
   databaseCredentialsSecret: secretsmanager.ISecret;
 }
 
@@ -83,7 +82,6 @@ export class ApiService extends Construct {
       }),
     );
 
-    props.databaseUrlSecret.grantRead(executionRole);
     props.databaseCredentialsSecret.grantRead(executionRole);
     props.jwtSecret.grantRead(executionRole);
 
@@ -106,7 +104,10 @@ export class ApiService extends Construct {
         CORS_ORIGINS: props.config.appOrigin,
       },
       secrets: {
-        DATABASE_URL: ecs.Secret.fromSecretsManager(props.databaseUrlSecret),
+        DB_USERNAME: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'username'),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'password'),
+        DB_HOST: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'host'),
+        DB_PORT: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'port'),
         AUTH_JWT_SECRET: ecs.Secret.fromSecretsManager(props.jwtSecret),
       },
       logging: ecs.LogDrivers.awsLogs({

@@ -51,7 +51,6 @@ function createTemplates(imageTag?: string) {
     originCertificate: foundation.originCertificate,
     jwtSecret: foundation.jwtSecret,
     originVerifySecret: foundation.originVerifySecret,
-    databaseUrlSecret: foundation.database.urlSecret,
     databaseCredentialsSecret: foundation.database.secret,
   });
   return {
@@ -133,12 +132,15 @@ describe('AppStack', () => {
         { Name: 'CORS_ORIGINS', Value: stagingConfig.appOrigin },
       ]),
       Secrets: expect.arrayContaining([
-        { Name: 'DATABASE_URL', ValueFrom: expect.anything() },
+        { Name: 'DB_USERNAME', ValueFrom: expect.anything() },
+        { Name: 'DB_PASSWORD', ValueFrom: expect.anything() },
+        { Name: 'DB_HOST', ValueFrom: expect.anything() },
+        { Name: 'DB_PORT', ValueFrom: expect.anything() },
         { Name: 'AUTH_JWT_SECRET', ValueFrom: expect.anything() },
       ]),
     });
     const environmentJson = JSON.stringify(container?.Environment);
-    expect(environmentJson).not.toContain('DATABASE_URL');
+    expect(environmentJson).not.toContain('DB_PASSWORD');
     expect(environmentJson).not.toContain('AUTH_JWT_SECRET');
     expect(JSON.stringify(container?.Image)).toContain(':missing-image-tag');
   });

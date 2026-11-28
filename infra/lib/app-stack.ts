@@ -26,7 +26,6 @@ export interface AppStackProps extends StackProps {
   originCertificate: acm.ICertificate;
   jwtSecret: secretsmanager.ISecret;
   originVerifySecret: secretsmanager.ISecret;
-  databaseUrlSecret: secretsmanager.ISecret;
   databaseCredentialsSecret: secretsmanager.ISecret;
 }
 
@@ -43,7 +42,6 @@ export class AppStack extends Stack {
       originCertificate,
       jwtSecret,
       originVerifySecret,
-      databaseUrlSecret,
       databaseCredentialsSecret,
       ...stackProps
     } = props;
@@ -60,7 +58,6 @@ export class AppStack extends Stack {
       mediaBucket,
       uploadsBucket,
       jwtSecret,
-      databaseUrlSecret,
       databaseCredentialsSecret,
     });
     const origin = new OriginLoadBalancer(this, 'Origin', {

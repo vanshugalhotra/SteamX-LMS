@@ -60,16 +60,21 @@ create local credentials manually in the AWS console when needed.
 ## Migrations
 
 Migrations run automatically at container startup via `docker-entrypoint.sh`, which calls
-`prisma migrate deploy` before starting the application. If migration fails, the container exits
-immediately. The ECS health-check grace period and container start period are set to 120 seconds
-to cover migration time.
+`prisma migrate deploy` before starting the application. If there are no pending migrations the
+command is a no-op. If migration fails, the container exits immediately. Prisma acquires a
+PostgreSQL advisory lock, so concurrent migration attempts during rolling deploys are serialized
+safely. The ECS health-check grace period and container start period are set to 120 seconds to
+cover migration time.
+
+Set `SKIP_MIGRATIONS=true` as a container environment variable to skip migrations on startup
+(for example, a config-only redeploy or a manual scaling operation).
 
 **Rule: migrations must be backward-compatible.** Because the old API tasks may still be running
 during the ECS rolling update, every migration must be additive (expand) first. Destructive
 changes (dropping columns, renaming) happen in a later release after all tasks run the new code.
 
 A single `cdk deploy` of the App stack is sufficient on a cold start — no separate migration task
-is needed. The two-phase deploy (`migrationsOnly` context) has been removed.
+is needed.
 
 ## Lifecycle scripts
 
