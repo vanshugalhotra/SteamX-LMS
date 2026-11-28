@@ -45,7 +45,7 @@ already exists), then runs `cdk deploy`. Migrations run automatically at contain
 Build the SPA and sync to S3, then invalidate CloudFront:
 
 ```powershell
-pnpm --filter @steamx/frontend build
+pnpm --dir apps/frontend build
 
 # Get the bucket name and distribution ID from Foundation outputs
 aws s3 sync apps/frontend/dist s3://<MediaBucketName>/spa/ --delete --region ap-south-1
