@@ -32,9 +32,7 @@ async function main(): Promise<void> {
   const target = process.argv[2] as Target | undefined;
 
   if (!target) {
-    throw new Error(
-      `Deploy target is required. Valid targets: ${VALID_TARGETS.join(', ')}.`,
-    );
+    throw new Error(`Deploy target is required. Valid targets: ${VALID_TARGETS.join(', ')}.`);
   }
 
   if (!VALID_TARGETS.includes(target)) {
@@ -43,8 +41,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const targets: Target[] =
-    target === 'all' ? ['cert', 'foundation', 'app'] : [target];
+  const targets: Target[] = target === 'all' ? ['cert', 'foundation', 'app'] : [target];
 
   for (const t of targets) {
     switch (t) {
