@@ -21,6 +21,7 @@ This index helps developers find the guide for the task they are working on.
 | Run tests or write API/workflow tests               | [Testing](./testing/testing.md), [API testing](./testing/api-testing.md), [workflow testing](./testing/workflows-testing.md) |
 | Load manual test data                               | [Testing seed data](./testing/testing-seed-data.md)                                                                          |
 | Deploy the current CDK stack                        | [Infrastructure](./operations/infrastructure.md)                                                                             |
+| Deploy, stop, start, or tear down staging           | [Deployment runbook](./operations/runbooks/deployment.md)                                                                    |
 | Reset a platform admin password                     | [Admin recovery](./operations/runbooks/admin-recovery.md)                                                                    |
 
 The [AWS architecture](./architecture/aws-architecture.md) describes a proposed target design; it

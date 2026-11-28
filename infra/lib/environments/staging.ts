@@ -5,6 +5,7 @@ const LOCAL_DEV_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'
 
 export const stagingConfig: EnvConfig = {
   envName: 'staging',
+  account: '761774876116',
   region: 'ap-south-1',
   monthlyBudgetUsd: 25,
   domainName: DOMAIN_NAME,

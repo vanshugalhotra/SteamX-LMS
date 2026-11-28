@@ -52,16 +52,18 @@ COPY --from=build /workspace/apps/backend/dist ./dist
 COPY --from=build /workspace/apps/backend/prisma/schema.prisma ./prisma/schema.prisma
 COPY --from=build /workspace/apps/backend/prisma/migrations ./prisma/migrations
 COPY --from=build /workspace/apps/backend/prisma.config.ts ./prisma.config.ts
+COPY apps/backend/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 USER node
 
 EXPOSE 3333
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3333) + '/health/live').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"
 
 ARG GIT_SHA=dev
 ENV GIT_SHA=$GIT_SHA
 LABEL org.opencontainers.image.revision=$GIT_SHA
 
-CMD ["node", "dist/main.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

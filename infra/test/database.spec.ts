@@ -32,4 +32,34 @@ describe('Database', () => {
       Properties: { DeletionProtection: true },
     });
   });
+
+  it('deletes the instance when retainOnDelete is false', () => {
+    const stack = new Stack(new App(), 'StagingDatabaseStack');
+    const vpc = new ec2.Vpc(stack, 'Vpc', {
+      maxAzs: 2,
+      natGateways: 0,
+      subnetConfiguration: [{ name: 'isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED }],
+    });
+    const securityGroup = new ec2.SecurityGroup(stack, 'DatabaseSecurityGroup', { vpc });
+    new Database(stack, 'Database', {
+      vpc,
+      securityGroup,
+      instanceType: 't4g.micro',
+      backupRetentionDays: 1,
+      maxAllocatedStorageGb: 25,
+      retainOnDelete: false,
+    });
+
+    const instances = Object.values(
+      Template.fromStack(stack).findResources('AWS::RDS::DBInstance'),
+    );
+    expect(instances).toHaveLength(1);
+    expect(instances[0]).toMatchObject({
+      DeletionPolicy: 'Delete',
+      Properties: {
+        DeletionProtection: false,
+        DeleteAutomatedBackups: true,
+      },
+    });
+  });
 });

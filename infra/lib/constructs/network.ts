@@ -5,6 +5,7 @@ export const API_PORT = 3333;
 
 const CLOUDFRONT_ORIGIN_PREFIX_LIST = 'com.amazonaws.global.cloudfront.origin-facing';
 
+/** VPC with public and isolated subnets. Creates the ALB, ECS-task, and DB security groups. */
 export class Network extends Construct {
   public readonly vpc: ec2.Vpc;
   public readonly albSg: ec2.SecurityGroup;
@@ -40,7 +41,6 @@ export class Network extends Construct {
     const cloudFrontPrefixList = ec2.PrefixList.fromLookup(this, 'CloudFrontOriginPrefixList', {
       prefixListName: CLOUDFRONT_ORIGIN_PREFIX_LIST,
     });
-    // The prefix list includes every CloudFront distribution; a later change adds a secret header check.
     this.albSg.addIngressRule(cloudFrontPrefixList, ec2.Port.tcp(443), 'HTTPS from CloudFront');
 
     this.ecsSg = new ec2.SecurityGroup(this, 'EcsSecurityGroup', {

@@ -1,7 +1,15 @@
 # Admin recovery
 
-Use `admin:create --reset` to set a new password for an existing Admin. It preserves the account,
-sets `mustChangePassword`, and requires the Admin to change the password after signing in.
+For a staging Admin, set `ADMIN_STEAMX_ID` and a temporary `ADMIN_PASSWORD` in
+`apps/backend/.env`, then run the ECS-backed reset below. It preserves the account, sets
+`mustChangePassword`, and requires the Admin to change the password after signing in:
+
+```powershell
+pnpm staging:create-admin --reset
+```
+
+For a local database, use `admin:create --reset` as shown below. Do not use the local command to
+recover the staging account.
 
 In PowerShell, enter the SteamX ID and password for this invocation only:
 

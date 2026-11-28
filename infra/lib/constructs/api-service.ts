@@ -15,14 +15,13 @@ import type { EnvConfig } from '../environments/types.js';
 
 export interface ApiServiceProps {
   config: EnvConfig;
-  migrationsOnly: boolean;
   vpc: ec2.IVpc;
   ecsSecurityGroup: ec2.ISecurityGroup;
   repository: ecr.IRepository;
   mediaBucket: s3.IBucket;
   uploadsBucket: s3.IBucket;
   jwtSecret: secretsmanager.ISecret;
-  databaseUrlSecret: secretsmanager.ISecret;
+  databaseCredentialsSecret: secretsmanager.ISecret;
 }
 
 export class ApiService extends Construct {
@@ -83,13 +82,14 @@ export class ApiService extends Construct {
       }),
     );
 
-    props.databaseUrlSecret.grantRead(executionRole);
+    props.databaseCredentialsSecret.grantRead(executionRole);
     props.jwtSecret.grantRead(executionRole);
 
+    const removalPolicy = props.config.protectData ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
     this.logGroup = new logs.LogGroup(this, 'ApiLogGroup', {
       logGroupName: `/steamx/${props.config.envName}/api`,
       retention: logs.RetentionDays.ONE_MONTH,
-      removalPolicy: RemovalPolicy.DESTROY,
+      removalPolicy,
     });
     const imageTag = resolveImageTag(this);
     const container = taskDefinition.addContainer('ApiContainer', {
@@ -104,7 +104,10 @@ export class ApiService extends Construct {
         CORS_ORIGINS: props.config.appOrigin,
       },
       secrets: {
-        DATABASE_URL: ecs.Secret.fromSecretsManager(props.databaseUrlSecret),
+        DB_USERNAME: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'username'),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'password'),
+        DB_HOST: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'host'),
+        DB_PORT: ecs.Secret.fromSecretsManager(props.databaseCredentialsSecret, 'port'),
         AUTH_JWT_SECRET: ecs.Secret.fromSecretsManager(props.jwtSecret),
       },
       logging: ecs.LogDrivers.awsLogs({
@@ -112,14 +115,25 @@ export class ApiService extends Construct {
         streamPrefix: 'api',
       }),
       stopTimeout: Duration.seconds(30),
+      healthCheck: {
+        command: [
+          'CMD-SHELL',
+          `node -e "fetch('http://127.0.0.1:${API_PORT}/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"`,
+        ],
+        interval: Duration.seconds(30),
+        timeout: Duration.seconds(5),
+        startPeriod: Duration.seconds(120),
+        retries: 3,
+      },
     });
     container.addPortMappings({ containerPort: API_PORT });
 
+    const scaling = props.config.apiScaling;
     this.service = new ecs.FargateService(this, 'Service', {
       cluster: this.cluster,
       taskDefinition,
       serviceName: 'api',
-      desiredCount: props.migrationsOnly ? 0 : props.config.apiScaling.minTasks,
+      desiredCount: scaling.minTasks,
       assignPublicIp: true,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       securityGroups: [props.ecsSecurityGroup],
@@ -127,12 +141,11 @@ export class ApiService extends Construct {
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
       circuitBreaker: { rollback: true },
-      healthCheckGracePeriod: Duration.seconds(60),
+      healthCheckGracePeriod: Duration.seconds(120),
     });
-    const scaling = props.config.apiScaling;
     this.service
       .autoScaleTaskCount({
-        minCapacity: props.migrationsOnly ? 0 : scaling.minTasks,
+        minCapacity: scaling.minTasks,
         maxCapacity: scaling.maxTasks,
       })
       .scaleOnCpuUtilization('CpuScaling', {

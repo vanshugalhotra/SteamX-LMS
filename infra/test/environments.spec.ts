@@ -39,4 +39,13 @@ describe('loadEnvironmentConfig', () => {
     expect(loaded.config).not.toBe(config);
     expect(loaded.budgetEmail).toBe('budget-recipient');
   });
+
+  it('includes the account from config', () => {
+    const loaded = loadEnvironmentConfig(
+      stagingConfig,
+      {},
+      { STEAMX_BUDGET_EMAIL: 'test@test.com' },
+    );
+    expect(loaded.config.account).toBe(stagingConfig.account);
+  });
 });

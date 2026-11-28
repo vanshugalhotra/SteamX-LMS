@@ -2,7 +2,6 @@ import type { EnvConfig } from './types.js';
 
 export interface LoadedEnvironment {
   config: EnvConfig;
-  account: string | undefined;
   budgetEmail: string;
 }
 
@@ -18,7 +17,7 @@ export function loadEnvironmentConfig(
 
   const budgetEmail = environment.STEAMX_BUDGET_EMAIL?.trim();
   if (!budgetEmail) {
-    throw new Error('STEAMX_BUDGET_EMAIL is required to synthesize the Base stack.');
+    throw new Error('STEAMX_BUDGET_EMAIL is required to synthesize the Foundation stack.');
   }
 
   const contextRegion = context.region === undefined ? undefined : String(context.region).trim();
@@ -28,7 +27,6 @@ export function loadEnvironmentConfig(
       ...config,
       region: contextRegion || environment.AWS_REGION || config.region,
     },
-    account: environment.CDK_DEFAULT_ACCOUNT,
     budgetEmail,
   };
 }

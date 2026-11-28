@@ -2,13 +2,13 @@ import { App, aws_certificatemanager as acm } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it, vi } from 'vitest';
 import { AppStack } from '../lib/app-stack.js';
-import { BaseStack } from '../lib/base-stack.js';
+import { FoundationStack } from '../lib/foundation-stack.js';
 import { API_PORT } from '../lib/constructs/network.js';
 import { stagingConfig } from '../lib/environments/staging.js';
 
 vi.setConfig({ testTimeout: 30000 });
 
-function createAppTemplate(imageTag?: string, migrationsOnly = false): Template {
+function createTemplates(imageTag?: string) {
   const account = '123456789012';
   const app = new App({
     context: {
@@ -17,49 +17,50 @@ function createAppTemplate(imageTag?: string, migrationsOnly = false): Template 
         Name: 'version26.in',
       },
       ...(imageTag === undefined ? {} : { imageTag }),
-      ...(migrationsOnly ? { migrationsOnly: 'true' } : {}),
     },
   });
-  const env = { account, region: stagingConfig.region };
+  const config = { ...stagingConfig, account };
+  const env = { account, region: config.region };
   const edgeCertificate = acm.Certificate.fromCertificateArn(
     app,
     'EdgeCertificate',
     `arn:aws:acm:us-east-1:${account}:certificate/12345678-1234-1234-1234-123456789012`,
   );
-  const baseStack = new BaseStack(app, 'SteamxStagingBase', stagingConfig, 'budget-recipient', {
-    stackName: 'SteamxStagingBase',
-    env,
-    edgeCertificate,
-    crossRegionReferences: true,
-  });
-  const stack = new AppStack(app, 'SteamxStagingApp', stagingConfig, {
+  const foundation = new FoundationStack(
+    app,
+    'SteamxStagingFoundation',
+    config,
+    'budget-recipient',
+    {
+      stackName: 'SteamxStagingFoundation',
+      env,
+      edgeCertificate,
+      crossRegionReferences: true,
+    },
+  );
+  const appStack = new AppStack(app, 'SteamxStagingApp', config, {
     stackName: 'SteamxStagingApp',
     env,
-    repository: baseStack.repository,
-    mediaBucket: baseStack.mediaBucket,
-    uploadsBucket: baseStack.uploadsBucket,
-    hostedZone: baseStack.hostedZone,
-    originCertificate: baseStack.originCertificate,
-    jwtSecret: baseStack.jwtSecret,
-    originVerifySecret: baseStack.originVerifySecret,
+    vpc: foundation.network.vpc,
+    ecsSg: foundation.network.ecsSg,
+    albSg: foundation.network.albSg,
+    repository: foundation.repository,
+    mediaBucket: foundation.mediaBucket,
+    uploadsBucket: foundation.uploadsBucket,
+    hostedZone: foundation.hostedZone,
+    originCertificate: foundation.originCertificate,
+    jwtSecret: foundation.jwtSecret,
+    originVerifySecret: foundation.originVerifySecret,
+    databaseCredentialsSecret: foundation.database.secret,
   });
-  return Template.fromStack(stack);
+  return {
+    foundationTemplate: Template.fromStack(foundation),
+    appTemplate: Template.fromStack(appStack),
+  };
 }
 
-function hasSubnetName(subnet: unknown, name: string): boolean {
-  const tags = getProperties(subnet).Tags;
-  return (
-    Array.isArray(tags) &&
-    tags.some(
-      (tag) =>
-        typeof tag === 'object' &&
-        tag !== null &&
-        'Key' in tag &&
-        'Value' in tag &&
-        tag.Key === 'aws-cdk:subnet-name' &&
-        tag.Value === name,
-    )
-  );
+function createAppTemplate(imageTag?: string): Template {
+  return createTemplates(imageTag).appTemplate;
 }
 
 function getProperties(resource: unknown): Record<string, unknown> {
@@ -103,90 +104,6 @@ function getIngressGroupId(rule: unknown): string | undefined {
 }
 
 describe('AppStack', () => {
-  it('creates the staging PostgreSQL database with the expected storage, backup, and deletion settings', () => {
-    const template = createAppTemplate();
-    const instances = Object.values(template.findResources('AWS::RDS::DBInstance'));
-    expect(instances).toHaveLength(1);
-    expect(instances[0]).toMatchObject({
-      DeletionPolicy: 'Delete',
-      Properties: {
-        DBInstanceClass: 'db.t4g.micro',
-        Engine: 'postgres',
-        EngineVersion: '18',
-        MultiAZ: false,
-        StorageEncrypted: true,
-        PubliclyAccessible: false,
-        StorageType: 'gp3',
-        AllocatedStorage: '20',
-        MaxAllocatedStorage: stagingConfig.dbMaxAllocatedStorageGb,
-        BackupRetentionPeriod: stagingConfig.dbBackupRetentionDays,
-        DeletionProtection: false,
-        PreferredBackupWindow: '19:00-19:30',
-        PreferredMaintenanceWindow: 'sun:20:00-sun:20:30',
-      },
-    });
-
-    const parameterGroups = Object.values(template.findResources('AWS::RDS::DBParameterGroup'));
-    expect(parameterGroups).toHaveLength(1);
-    expect(parameterGroups[0]?.Properties).toMatchObject({
-      Family: 'postgres18',
-      Parameters: {
-        'rds.force_ssl': '1',
-      },
-    });
-  });
-
-  it('places the database in isolated subnets and attaches only the database security group', () => {
-    const template = createAppTemplate();
-    const isolatedSubnetIds = new Set(
-      Object.entries(template.findResources('AWS::EC2::Subnet'))
-        .filter(([, subnet]) => hasSubnetName(subnet, 'isolated'))
-        .map(([id]) => id),
-    );
-    const dbSubnetGroups = Object.values(template.findResources('AWS::RDS::DBSubnetGroup'));
-    expect(dbSubnetGroups).toHaveLength(1);
-    const subnetIds = getProperties(dbSubnetGroups[0]).SubnetIds;
-    expect(Array.isArray(subnetIds)).toBe(true);
-    if (!Array.isArray(subnetIds)) {
-      throw new Error('Expected the database subnet group to contain subnet IDs.');
-    }
-    const dbSubnetIds = new Set(subnetIds.map(getReferenceId));
-    expect(dbSubnetIds.size).toBe(2);
-    expect([...dbSubnetIds].every((id) => id !== undefined && isolatedSubnetIds.has(id))).toBe(
-      true,
-    );
-
-    const db = getSecurityGroup(template, 'Allow PostgreSQL traffic only from ECS tasks.');
-    const instances = Object.values(template.findResources('AWS::RDS::DBInstance'));
-    expect(instances).toHaveLength(1);
-    expect(instances[0]?.Properties?.VPCSecurityGroups).toEqual([
-      { 'Fn::GetAtt': [db.logicalId, 'GroupId'] },
-    ]);
-  });
-
-  it('generates credentials without a fixed secret name or URL-unsafe characters', () => {
-    const template = createAppTemplate();
-    const secrets = Object.values(template.findResources('AWS::SecretsManager::Secret'));
-    expect(secrets).toHaveLength(2);
-    const credentialsSecret = secrets.find(
-      (secret) => secret.Properties?.GenerateSecretString !== undefined,
-    );
-    const databaseUrlSecret = secrets.find(
-      (secret) => secret.Properties?.SecretString !== undefined,
-    );
-    expect(credentialsSecret?.Properties).not.toHaveProperty('Name');
-    expect(credentialsSecret?.Properties).toMatchObject({
-      GenerateSecretString: {
-        ExcludeCharacters: ' %+~#$&*()|[]{}:;<>?!\'/@"\\=`',
-        SecretStringTemplate: JSON.stringify({ username: 'steamx_owner' }),
-      },
-    });
-    expect(databaseUrlSecret?.Properties).not.toHaveProperty('Name');
-    const databaseUrlTemplate = JSON.stringify(databaseUrlSecret?.Properties?.SecretString);
-    expect(databaseUrlTemplate).toContain('resolve:secretsmanager');
-    expect(databaseUrlTemplate).toContain('sslmode=require');
-  });
-
   it('creates an ARM64 Fargate API task with Secrets Manager values', () => {
     const template = createAppTemplate();
     const taskDefinitions = Object.values(template.findResources('AWS::ECS::TaskDefinition'));
@@ -215,12 +132,15 @@ describe('AppStack', () => {
         { Name: 'CORS_ORIGINS', Value: stagingConfig.appOrigin },
       ]),
       Secrets: expect.arrayContaining([
-        { Name: 'DATABASE_URL', ValueFrom: expect.anything() },
+        { Name: 'DB_USERNAME', ValueFrom: expect.anything() },
+        { Name: 'DB_PASSWORD', ValueFrom: expect.anything() },
+        { Name: 'DB_HOST', ValueFrom: expect.anything() },
+        { Name: 'DB_PORT', ValueFrom: expect.anything() },
         { Name: 'AUTH_JWT_SECRET', ValueFrom: expect.anything() },
       ]),
     });
     const environmentJson = JSON.stringify(container?.Environment);
-    expect(environmentJson).not.toContain('DATABASE_URL');
+    expect(environmentJson).not.toContain('DB_PASSWORD');
     expect(environmentJson).not.toContain('AUTH_JWT_SECRET');
     expect(JSON.stringify(container?.Image)).toContain(':missing-image-tag');
   });
@@ -267,17 +187,11 @@ describe('AppStack', () => {
     });
   });
 
-  it('allows the App stack to deploy with zero API tasks for database migrations', () => {
-    const template = createAppTemplate(undefined, true);
+  it('sets health-check grace period to 120s to cover migration startup', () => {
+    const template = createAppTemplate();
     const services = Object.values(template.findResources('AWS::ECS::Service'));
     expect(services).toHaveLength(1);
-    expect(services[0]?.Properties.DesiredCount).toBe(0);
-
-    const targets = Object.values(
-      template.findResources('AWS::ApplicationAutoScaling::ScalableTarget'),
-    ).filter((target) => target.Properties.ServiceNamespace === 'ecs');
-    expect(targets).toHaveLength(1);
-    expect(targets[0]?.Properties.MinCapacity).toBe(0);
+    expect(services[0]?.Properties.HealthCheckGracePeriodSeconds).toBe(120);
   });
 
   it('creates a 30-day log group with delete-on-stack-removal behavior', () => {
@@ -364,100 +278,18 @@ describe('AppStack', () => {
     expect(
       JSON.stringify(createAppTemplate('release-123').findResources('AWS::ECS::TaskDefinition')),
     ).toContain(':release-123');
-    expect(() => createAppTemplate('bad:tag')).toThrow('imageTag');
+    expect(() => createTemplates('bad:tag')).toThrow('imageTag');
   });
 
-  it('creates a two-AZ VPC with public and isolated subnets and no NAT gateways', () => {
+  it('creates the ALB->ECS ingress rule in the App stack', () => {
     const template = createAppTemplate();
-    template.resourceCountIs('AWS::EC2::VPC', 1);
-    template.hasResourceProperties('AWS::EC2::VPC', { CidrBlock: '10.0.0.0/16' });
-    template.resourceCountIs('AWS::EC2::NatGateway', 0);
-    template.resourceCountIs('AWS::EC2::InternetGateway', 1);
-
-    const subnets = Object.values(template.findResources('AWS::EC2::Subnet'));
-    expect(subnets).toHaveLength(4);
-    expect(subnets.filter((subnet) => hasSubnetName(subnet, 'public'))).toHaveLength(2);
-    expect(subnets.filter((subnet) => hasSubnetName(subnet, 'isolated'))).toHaveLength(2);
-    expect(new Set(subnets.map((subnet) => subnet.Properties.AvailabilityZone)).size).toBe(2);
-    expect(subnets.every((subnet) => subnet.Properties.CidrBlock.endsWith('/24'))).toBe(true);
-  });
-
-  it('does not add internet routes to isolated subnet route tables', () => {
-    const template = createAppTemplate();
-    const isolatedSubnetIds = new Set(
-      Object.entries(template.findResources('AWS::EC2::Subnet'))
-        .filter(([, subnet]) => hasSubnetName(subnet, 'isolated'))
-        .map(([id]) => id),
-    );
-    const isolatedRouteTableIds = new Set(
-      Object.values(template.findResources('AWS::EC2::SubnetRouteTableAssociation'))
-        .filter((association) =>
-          isolatedSubnetIds.has(getReferenceId(association.Properties.SubnetId) ?? ''),
-        )
-        .map((association) => getReferenceId(association.Properties.RouteTableId))
-        .filter((id): id is string => id !== undefined),
-    );
-    const internetRoutes = Object.values(template.findResources('AWS::EC2::Route')).filter(
-      (route) =>
-        isolatedRouteTableIds.has(getReferenceId(route.Properties.RouteTableId) ?? '') &&
-        route.Properties.DestinationCidrBlock === '0.0.0.0/0',
-    );
-
-    expect(isolatedRouteTableIds.size).toBe(2);
-    expect(internetRoutes).toHaveLength(0);
-  });
-
-  it('allows HTTPS to the ALB only from a prefix list', () => {
-    const template = createAppTemplate();
-    const alb = getSecurityGroup(
-      template,
-      'Allow HTTPS from the CloudFront origin-facing network.',
-    );
+    // Uses CfnSecurityGroupIngress directly so the rule lives in the App stack.
     const ingressRules = Object.values(template.findResources('AWS::EC2::SecurityGroupIngress'));
-    const albIngress = ingressRules.filter((rule) => getIngressGroupId(rule) === alb.logicalId);
-
-    expect(ingressRules).toHaveLength(3);
-    expect(albIngress).toHaveLength(1);
-    expect(albIngress[0]?.Properties).toMatchObject({
-      IpProtocol: 'tcp',
-      FromPort: 443,
-      ToPort: 443,
-      SourcePrefixListId: 'pl-xxxxxxxx',
+    const ecsIngress = ingressRules.filter((rule) => {
+      const props = getProperties(rule);
+      return props.FromPort === API_PORT && props.ToPort === API_PORT && props.IpProtocol === 'tcp';
     });
-  });
-
-  it('allows ECS API and database ingress only from the preceding security group', () => {
-    const template = createAppTemplate();
-    const alb = getSecurityGroup(
-      template,
-      'Allow HTTPS from the CloudFront origin-facing network.',
-    );
-    const ecs = getSecurityGroup(
-      template,
-      'Allow API traffic only from the application load balancer.',
-    );
-    const db = getSecurityGroup(template, 'Allow PostgreSQL traffic only from ECS tasks.');
-    const ingressRules = Object.values(template.findResources('AWS::EC2::SecurityGroupIngress'));
-    const ecsIngress = ingressRules.filter((rule) => getIngressGroupId(rule) === ecs.logicalId);
-    const dbIngress = ingressRules.filter((rule) => getIngressGroupId(rule) === db.logicalId);
-
     expect(ecsIngress).toHaveLength(1);
-    expect(ecsIngress[0]?.Properties).toMatchObject({
-      IpProtocol: 'tcp',
-      FromPort: API_PORT,
-      ToPort: API_PORT,
-      SourceSecurityGroupId: { 'Fn::GetAtt': [alb.logicalId, 'GroupId'] },
-    });
-    expect(dbIngress).toHaveLength(1);
-    expect(dbIngress[0]?.Properties).toMatchObject({
-      IpProtocol: 'tcp',
-      FromPort: 5432,
-      ToPort: 5432,
-      SourceSecurityGroupId: { 'Fn::GetAtt': [ecs.logicalId, 'GroupId'] },
-    });
-    expect(db.properties.SecurityGroupEgress).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ CidrIp: '0.0.0.0/0' })]),
-    );
   });
 
   it('limits the task role to the required bucket prefixes and ECS Exec permissions', () => {

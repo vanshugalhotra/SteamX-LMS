@@ -14,6 +14,7 @@ import { API_PORT } from './network.js';
 export interface OriginLoadBalancerProps {
   vpc: ec2.IVpc;
   securityGroup: ec2.ISecurityGroup;
+  ecsSecurityGroup: ec2.ISecurityGroup;
   service: ecs.FargateService;
   hostedZone: route53.IHostedZone;
   certificate: acm.ICertificate;
@@ -33,6 +34,20 @@ export class OriginLoadBalancer extends Construct {
       securityGroup: props.securityGroup,
       deletionProtection: false,
     });
+
+    // Create the ALB → ECS task ingress rule in the App stack.
+    // Using CfnSecurityGroupIngress directly so CDK places this resource here (not in Foundation
+    // where both SGs are defined). The App stack already depends on Foundation via the imported
+    // SG IDs, so this cannot cause a cycle.
+    new ec2.CfnSecurityGroupIngress(this, 'AlbToEcsIngress', {
+      groupId: props.ecsSecurityGroup.securityGroupId,
+      ipProtocol: 'tcp',
+      fromPort: API_PORT,
+      toPort: API_PORT,
+      sourceSecurityGroupId: props.securityGroup.securityGroupId,
+      description: 'API traffic from ALB',
+    });
+
     const listener = this.loadBalancer.addListener('HttpsListener', {
       port: 443,
       certificates: [props.certificate],
