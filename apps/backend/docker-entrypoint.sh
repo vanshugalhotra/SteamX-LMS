@@ -13,5 +13,10 @@ else
   echo "SKIP_MIGRATIONS is set, skipping migrations."
 fi
 
+if [ "$#" -gt 0 ]; then
+  echo "Starting one-off command..."
+  exec "$@"
+fi
+
 echo "Starting application..."
 exec node dist/main.js
